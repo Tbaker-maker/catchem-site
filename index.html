@@ -245,7 +245,24 @@
       color: inherit;
       cursor: pointer;
       overflow: hidden;
+      text-align: left;
+      font: inherit;
       transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .entry-mode[aria-expanded="true"] {
+      transform: translateY(-3px);
+    }
+    .entry-collector[aria-expanded="true"] {
+      border-color: rgba(54, 211, 153, 0.7);
+      box-shadow: 0 14px 40px rgba(54, 211, 153, 0.18);
+    }
+    .entry-flipper[aria-expanded="true"] {
+      border-color: rgba(245, 158, 11, 0.7);
+      box-shadow: 0 14px 40px rgba(245, 158, 11, 0.18);
+    }
+    .entry-grader[aria-expanded="true"] {
+      border-color: rgba(139, 92, 246, 0.7);
+      box-shadow: 0 14px 40px rgba(139, 92, 246, 0.18);
     }
     .entry-mode::before {
       content: "";
@@ -316,6 +333,119 @@
     .entry-collector:hover .entry-mode-cta { color: var(--green); }
     .entry-flipper:hover .entry-mode-cta { color: #f59e0b; }
     .entry-grader:hover .entry-mode-cta { color: #a78bfa; }
+
+    /* ── Mode detail panel (revealed on mode card click) ──────────────────── */
+    .mode-detail {
+      margin: 20px 0 36px;
+      max-width: 1040px;
+      overflow: hidden;
+      animation: modeDetailOpen 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    .mode-detail[hidden] { display: none; }
+    @keyframes modeDetailOpen {
+      from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+      to { opacity: 1; transform: translateY(0); max-height: 500px; }
+    }
+    .mode-detail-inner {
+      background: linear-gradient(165deg, rgba(20, 24, 32, 0.75) 0%, rgba(16, 20, 28, 0.55) 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      position: relative;
+    }
+    .mode-detail[data-mode="collector"] .mode-detail-inner {
+      border-color: rgba(54, 211, 153, 0.28);
+      box-shadow: inset 0 0 0 1px rgba(54, 211, 153, 0.05);
+    }
+    .mode-detail[data-mode="flipper"] .mode-detail-inner {
+      border-color: rgba(245, 158, 11, 0.28);
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.05);
+    }
+    .mode-detail[data-mode="grader"] .mode-detail-inner {
+      border-color: rgba(139, 92, 246, 0.28);
+      box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.05);
+    }
+    .mode-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-detail-emoji {
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+    .mode-detail-name {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin: 0;
+      flex: 1;
+    }
+    .mode-detail[data-mode="collector"] .mode-detail-name { color: var(--green); }
+    .mode-detail[data-mode="flipper"] .mode-detail-name { color: #f59e0b; }
+    .mode-detail[data-mode="grader"] .mode-detail-name { color: #a78bfa; }
+    .mode-detail-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .mode-detail-close:hover {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+    .mode-detail-benefits {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+    .mode-detail-benefits li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.96rem;
+      line-height: 1.5;
+      color: var(--text-sub);
+    }
+    .mode-detail-benefits li::before {
+      content: "";
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      margin-top: 9px;
+      border-radius: 99px;
+      background: currentColor;
+      opacity: 0.5;
+    }
+    .mode-detail[data-mode="collector"] .mode-detail-benefits li::before { background: var(--green); opacity: 1; }
+    .mode-detail[data-mode="flipper"] .mode-detail-benefits li::before { background: #f59e0b; opacity: 1; }
+    .mode-detail[data-mode="grader"] .mode-detail-benefits li::before { background: #a78bfa; opacity: 1; }
+    .mode-detail-benefits li strong {
+      color: var(--text);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 2px;
+    }
 
     /* ── Dashboard preview ── */
     .dashboard-frame {
@@ -990,7 +1120,6 @@
         <span class="wordmark-bolt">⚡</span>Catch<span class="wordmark-tick">'em</span>
       </a>
       <div class="nav-links">
-        <a href="#modes" class="nav-hide">Modes</a>
         <a href="#rotation" class="nav-hide">Rotation</a>
         <a href="#features" class="nav-hide">Features</a>
         <a href="#signals" class="nav-hide">Signals</a>
@@ -1016,79 +1145,49 @@
 
       <!-- Mode selection trio — the entry point -->
       <div class="entry-modes reveal" role="group" aria-label="Choose your mode">
-        <a href="#modes" class="entry-mode entry-collector" data-mode="collector">
+        <button type="button" class="entry-mode entry-collector" data-mode="collector" aria-expanded="false" aria-controls="mode-detail">
           <span class="entry-mode-emoji" aria-hidden="true">🎴</span>
           <div class="entry-mode-name">Collector</div>
           <div class="entry-mode-tagline">Build something worth keeping.</div>
           <div class="entry-mode-cta">
-            <span>See collector mode</span>
+            <span class="entry-mode-cta-label">See what collectors get</span>
             <span class="entry-mode-arrow" aria-hidden="true">→</span>
           </div>
-        </a>
-        <a href="#modes" class="entry-mode entry-flipper" data-mode="flipper">
+        </button>
+        <button type="button" class="entry-mode entry-flipper" data-mode="flipper" aria-expanded="false" aria-controls="mode-detail">
           <span class="entry-mode-emoji" aria-hidden="true">💰</span>
           <div class="entry-mode-name">Flipper</div>
           <div class="entry-mode-tagline">Buy smart. Sell smarter.</div>
           <div class="entry-mode-cta">
-            <span>See flipper mode</span>
+            <span class="entry-mode-cta-label">See what flippers get</span>
             <span class="entry-mode-arrow" aria-hidden="true">→</span>
           </div>
-        </a>
-        <a href="#modes" class="entry-mode entry-grader" data-mode="grader">
+        </button>
+        <button type="button" class="entry-mode entry-grader" data-mode="grader" aria-expanded="false" aria-controls="mode-detail">
           <span class="entry-mode-emoji" aria-hidden="true">💎</span>
           <div class="entry-mode-name">Grader</div>
           <div class="entry-mode-tagline">Submit the right cards only.</div>
           <div class="entry-mode-cta">
-            <span>See grader mode</span>
+            <span class="entry-mode-cta-label">See what graders get</span>
             <span class="entry-mode-arrow" aria-hidden="true">→</span>
           </div>
-        </a>
+        </button>
+      </div>
+
+      <!-- Mode detail panel — reveals when a mode card is clicked -->
+      <div class="mode-detail" id="mode-detail" aria-live="polite" hidden>
+        <div class="mode-detail-inner">
+          <div class="mode-detail-header">
+            <span class="mode-detail-emoji" aria-hidden="true"></span>
+            <h3 class="mode-detail-name"></h3>
+            <button type="button" class="mode-detail-close" aria-label="Close details">&times;</button>
+          </div>
+          <ul class="mode-detail-benefits"></ul>
+        </div>
       </div>
 
       <div class="hero-meta reveal">
         Free forever <span class="dot">·</span> No credit card <span class="dot">·</span> Switch modes anytime
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Modes ── -->
-  <section id="modes" class="section">
-    <div class="container">
-      <div class="section-eyebrow reveal">Three modes · one app</div>
-      <h2 class="section-title reveal">Pick the mode that matches how you care about your cards.</h2>
-      <p class="section-sub reveal">Catch'em re-ranks the market based on what <em>you</em> actually want. Switch modes whenever your goal shifts — a card can be a long-term hold today and a flip candidate six months from now.</p>
-
-      <div class="modes-grid">
-        <div class="mode-card collector reveal" style="border-color: rgba(54, 211, 153, 0.3);">
-          <span class="mode-emoji">🎴</span>
-          <div class="mode-name">Collector</div>
-          <p class="mode-tagline">For builders, long-term holders, and grail hunters.</p>
-          <ul class="mode-benefits">
-            <li><strong>Scarcity-weighted picks</strong> — OOP and rotated sets surface first</li>
-            <li><strong>Rarity signal</strong> that rewards iconic artwork &amp; illustration rares</li>
-            <li><strong>Vintage intelligence</strong> for Base Set, Jungle, Fossil, HGSS</li>
-          </ul>
-        </div>
-        <div class="mode-card flipper reveal">
-          <span class="mode-emoji">💰</span>
-          <div class="mode-name">Flipper</div>
-          <p class="mode-tagline">For turning inventory when the math works.</p>
-          <ul class="mode-benefits">
-            <li><strong>Real net profit</strong> after fees on eBay, TCGplayer, Facebook</li>
-            <li><strong>Flood-risk warnings</strong> on just-rotated + heavy-reprint sets</li>
-            <li><strong>Pre-rotation window</strong> for the 12-month closing supply</li>
-          </ul>
-        </div>
-        <div class="mode-card grader reveal">
-          <span class="mode-emoji">💎</span>
-          <div class="mode-name">Grader</div>
-          <p class="mode-tagline">For the PSA pop-report patient.</p>
-          <ul class="mode-benefits">
-            <li><strong>Gem-rate weighting</strong> for cards that actually PSA 10</li>
-            <li><strong>Net ROI math</strong> across PSA 9 and PSA 10 outcomes</li>
-            <li><strong>"Don't submit this"</strong> flags on unprofitable candidates</li>
-          </ul>
-        </div>
       </div>
     </div>
   </section>
@@ -1098,7 +1197,7 @@
     <div class="container">
       <div class="section-eyebrow reveal">🕒 The scarcity signal most tools miss</div>
       <h2 class="rotation-hook reveal">
-        Every rotation reshapes the market.<br />
+        The scarcity tool most collectors never see.<br />
         <span class="em">We tell you exactly where every set sits.</span>
       </h2>
       <p class="section-sub reveal">
@@ -1161,7 +1260,7 @@
   <section id="features" class="section">
     <div class="container">
       <div class="section-eyebrow reveal">What you get</div>
-      <h2 class="section-title reveal">Every tool a serious Pokémon TCG player needs.</h2>
+      <h2 class="section-title reveal">Built for collectors. Loved by flippers. Trusted by graders.</h2>
       <p class="section-sub reveal">Not a generic collection tracker with a price column. A purpose-built intelligence tool for the cards you own, the cards you're hunting, and the sealed products you're stashing.</p>
 
       <div class="features-grid">
@@ -1548,6 +1647,80 @@
         status.className = "waitlist-status error";
       }
     });
+
+    // ── Mode card detail panel ────────────────────────────────────────────
+    const MODE_DETAILS = {
+      collector: {
+        emoji: "🎴",
+        name: "Collector",
+        benefits: [
+          { title: "Scarcity-weighted picks", body: "OOP and rotated sets surface first — the cards that can't be reprinted rise to the top." },
+          { title: "Rarity signal", body: "Rewards iconic artwork, illustration rares, and chase pulls — not just the highest-priced card." },
+          { title: "Vintage intelligence", body: "Built-in awareness for Base Set, Jungle, Fossil, HGSS, and other foundational eras." },
+        ],
+      },
+      flipper: {
+        emoji: "💰",
+        name: "Flipper",
+        benefits: [
+          { title: "Real net profit", body: "Actual take-home after fees across eBay, TCGplayer, and Facebook — not just sticker prices." },
+          { title: "Flood-risk warnings", body: "Surface sets where just-rotated status meets heavy-reprint history — the ones to unload early." },
+          { title: "Pre-rotation window", body: "See the 12-month closing supply window and know when inventory becomes finite." },
+        ],
+      },
+      grader: {
+        emoji: "💎",
+        name: "Grader",
+        benefits: [
+          { title: "Gem-rate weighting", body: "Cards that actually PSA 10 — filtered by population data, not wishful thinking." },
+          { title: "Net ROI math", body: "PSA 9 and PSA 10 outcomes modeled together, with grading and shipping costs baked in." },
+          { title: "\"Don't submit this\" flags", body: "Unprofitable grading candidates called out before you waste the submission fee." },
+        ],
+      },
+    };
+
+    const modeCards = document.querySelectorAll(".entry-mode");
+    const modeDetail = document.getElementById("mode-detail");
+    const modeDetailEmoji = modeDetail.querySelector(".mode-detail-emoji");
+    const modeDetailName = modeDetail.querySelector(".mode-detail-name");
+    const modeDetailBenefits = modeDetail.querySelector(".mode-detail-benefits");
+    const modeDetailClose = modeDetail.querySelector(".mode-detail-close");
+
+    function openMode(modeKey) {
+      const data = MODE_DETAILS[modeKey];
+      if (!data) return;
+
+      modeDetail.dataset.mode = modeKey;
+      modeDetailEmoji.textContent = data.emoji;
+      modeDetailName.textContent = data.name + " mode";
+      modeDetailBenefits.innerHTML = data.benefits
+        .map(b => `<li><span><strong>${b.title}</strong>${b.body}</span></li>`)
+        .join("");
+      modeDetail.hidden = false;
+
+      modeCards.forEach(card => {
+        card.setAttribute("aria-expanded", card.dataset.mode === modeKey ? "true" : "false");
+      });
+    }
+
+    function closeMode() {
+      modeDetail.hidden = true;
+      modeCards.forEach(card => card.setAttribute("aria-expanded", "false"));
+    }
+
+    modeCards.forEach(card => {
+      card.addEventListener("click", () => {
+        const modeKey = card.dataset.mode;
+        const isOpen = card.getAttribute("aria-expanded") === "true";
+        if (isOpen) {
+          closeMode();
+        } else {
+          openMode(modeKey);
+        }
+      });
+    });
+
+    modeDetailClose.addEventListener("click", closeMode);
 
     // ── Staggered reveal-on-scroll ────────────────────────────────────────
     const io = new IntersectionObserver((entries) => {
