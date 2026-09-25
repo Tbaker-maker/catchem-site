@@ -128,6 +128,10 @@ input[type=email]:focus{outline:2px solid var(--gold);outline-offset:1px;border-
 .field .btn{min-height:52px;flex:0 0 auto}
 @media (max-width:480px){.field .btn{flex:1 1 100%}}
 .priv{color:var(--faint);font-size:14px;margin:14px 0 0}
+.opt{display:flex;align-items:flex-start;gap:10px;margin-top:14px;color:var(--soft);font-size:14.5px;line-height:1.45;cursor:pointer;max-width:100%}
+.opt span{min-width:0}
+.opt input{width:18px;height:18px;margin:2px 0 0;flex:0 0 auto;accent-color:var(--gold)}
+.opt input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 .status{margin:14px 0 0;font-size:16px;min-height:1px}
 .status.ok{color:var(--green)}.status.err{color:#f0a097}
 .hp{position:absolute;left:-5000px}
@@ -205,6 +209,11 @@ footer a{color:var(--gold)}
         <input id="email" type="email" name="email" placeholder="you@email.com" required autocomplete="email" inputmode="email">
         <button class="btn btn-primary" type="submit">Request access</button>
       </div>
+      <label class="opt" for="weekly">
+        <input id="weekly" type="checkbox">
+        <span>Also send me the weekly Feed email. Unsubscribe anytime.</span>
+      </label>
+      <input type="hidden" name="weekly_feed" id="weekly_feed_field" value="no">
       <input type="hidden" name="source" value="landing-2026-09">
       <input type="hidden" name="_subject" value="Catch'em waitlist signup">
       <input class="hp" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -229,6 +238,9 @@ footer a{color:var(--gold)}
 (function(){
   var f=document.getElementById("wl"), s=document.getElementById("status");
   f.addEventListener("submit", function(e){
+    var box=document.getElementById("weekly");
+    var field=document.getElementById("weekly_feed_field");
+    field.value=(box && box.checked) ? "yes" : "no";
     e.preventDefault();
     var b=f.querySelector("button"); b.disabled=true; b.textContent="Sending…"; s.className="status"; s.textContent="";
     fetch(f.action,{method:"POST",body:new FormData(f),headers:{Accept:"application/json"}})
