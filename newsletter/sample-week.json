@@ -1,0 +1,60 @@
+{
+  "weekOf": "Sep 21, 2026",
+  "asOf": "Sep 21, 2026",
+  "play": {
+    "name": "Sample Skies Booster Box",
+    "image": "https://placehold.co/180x250/1a1815/D8B878/png?text=SAMPLE",
+    "call": "Rip this week",
+    "price": "SAMPLE $12.00",
+    "asOf": "Sep 21, 2026",
+    "confidence": "Sample only. Not a real call."
+  },
+  "cards": [
+    {
+      "headline": "Sample Umbreon card",
+      "why": "A fake fact for the preview, not a price call.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=1",
+      "price": "SAMPLE $1.00",
+      "asOf": "Sep 21, 2026"
+    },
+    {
+      "headline": "Sample game reprint",
+      "why": "Pretend news about an old Pokémon game, written for this sample.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=2",
+      "price": "SAMPLE $2.00",
+      "asOf": "Sep 21, 2026"
+    },
+    {
+      "headline": "Sample Pikachu illustration",
+      "why": "The artist line is made up so the preview has a second sentence.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=3",
+      "price": "SAMPLE $3.00",
+      "asOf": "Sep 21, 2026"
+    },
+    {
+      "headline": "Sample booster bundle",
+      "why": "This row exists only to show how a sealed product would read.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=4",
+      "price": "SAMPLE $4.00",
+      "asOf": "Sep 21, 2026"
+    },
+    {
+      "headline": "Sample Charmander chart",
+      "why": "A chart note with no real numbers behind it.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=5",
+      "price": "SAMPLE $5.00",
+      "asOf": "Sep 21, 2026"
+    },
+    {
+      "headline": "Sample weekend news",
+      "why": "Placeholder news copy. Nothing here happened.",
+      "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=6",
+      "price": "SAMPLE $6.00",
+      "asOf": "Sep 21, 2026"
+    }
+  ],
+  "giveaway": {
+    "headline": "Sample giveaway",
+    "line": "A fake Pokémon box for this preview. Not a real prize, and nobody is entered."
+  }
+}

@@ -1,0 +1,143 @@
+// Build newsletter/out/preview.html from newsletter/sample-week.json.
+// Node builtins only. Incomplete rows are dropped, never filled in.
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = dirname(fileURLToPath(import.meta.url));
+const week = JSON.parse(readFileSync(join(root, "sample-week.json"), "utf8"));
+const tpl = readFileSync(join(root, "template.html"), "utf8");
+
+const BANNED = /\b(crypto|nft|token|mint|protocol|buyback|investment)\b/i;
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&" + "amp;")
+    .replace(/</g, "&" + "lt;")
+    .replace(/>/g, "&" + "gt;")
+    .replace(/"/g, "&" + "quot;");
+}
+
+function clean(s) {
+  const t = String(s ?? "").trim();
+  if (!t || BANNED.test(t)) return "";
+  return t;
+}
+
+function priceLine(item) {
+  const price = clean(item?.price);
+  const asOf = clean(item?.asOf);
+  if (!price || !asOf || !/SAMPLE/i.test(price)) return "";
+  return `${esc(price)} · as of ${esc(asOf)}`;
+}
+
+function playBlock(play) {
+  const name = clean(play?.name);
+  const call = clean(play?.call);
+  const image = clean(play?.image);
+  const confidence = clean(play?.confidence);
+  const price = priceLine(play);
+  if (!name || !call || !image || !confidence || !price) return "";
+  if (name === call || name === confidence || call === confidence) return "";
+  return `
+        <tr>
+          <td style="padding:0 28px 8px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#efe9de;">The Play</td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 22px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="92" valign="top" style="width:92px;padding-right:16px;">
+                  <img src="${esc(image)}" width="76" alt="" style="display:block;width:76px;height:auto;border:0;border-radius:6px;">
+                </td>
+                <td valign="top" style="font-family:Arial,Helvetica,sans-serif;">
+                  <div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;line-height:1.25;color:#efe9de;">${esc(name)}</div>
+                  <div style="padding-top:6px;font-size:16px;line-height:1.4;color:#D8B878;">${esc(call)}</div>
+                  <div style="padding-top:8px;font-size:15px;line-height:1.4;color:#efe9de;">${price}</div>
+                  <div style="padding-top:4px;font-size:14px;line-height:1.4;color:#b3aa9c;">${esc(confidence)}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+}
+
+function cardBlock(card) {
+  const headline = clean(card?.headline);
+  const why = clean(card?.why);
+  const image = clean(card?.image);
+  const price = priceLine(card);
+  if (!headline || !why || !image || !price) return "";
+  if (headline === why) return "";
+  return `
+        <tr>
+          <td style="padding:0 28px 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1a1815;border:1px solid #2f2b26;border-radius:10px;">
+              <tr>
+                <td width="84" valign="top" style="width:84px;padding:14px 0 14px 14px;">
+                  <img src="${esc(image)}" width="64" alt="" style="display:block;width:64px;height:auto;border:0;border-radius:4px;">
+                </td>
+                <td valign="top" style="padding:14px 14px 14px 12px;font-family:Arial,Helvetica,sans-serif;">
+                  <div style="font-family:Georgia,'Times New Roman',serif;font-size:18px;line-height:1.25;color:#efe9de;">${esc(headline)}</div>
+                  <div style="padding-top:4px;font-size:14px;line-height:1.45;color:#b3aa9c;">${esc(why)}</div>
+                  <div style="padding-top:8px;font-size:14px;line-height:1.4;color:#D8B878;">${price}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+}
+
+function giveawayBlock(g) {
+  const headline = clean(g?.headline);
+  const line = clean(g?.line);
+  if (!headline || !line || headline === line) return "";
+  return `
+        <tr>
+          <td style="padding:8px 28px 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #2f2b26;">
+              <tr>
+                <td style="padding-top:20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#efe9de;">${esc(headline)}</td>
+              </tr>
+              <tr>
+                <td style="padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#b3aa9c;">${esc(line)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+}
+
+const cards = (Array.isArray(week.cards) ? week.cards : [])
+  .map(cardBlock)
+  .filter(Boolean)
+  .slice(0, 7);
+if (cards.length < 5) {
+  throw new Error(`need 5 to 7 feed cards, got ${cards.length}`);
+}
+
+const play = playBlock(week.play);
+if (!play) throw new Error("The Play is missing a field");
+const giveaway = giveawayBlock(week.giveaway);
+if (!giveaway) throw new Error("giveaway is missing a field");
+const weekOf = clean(week.weekOf);
+if (!weekOf) throw new Error("weekOf is missing");
+
+const html = tpl
+  .replace("{{WEEK_OF}}", esc(weekOf))
+  .replace("{{PLAY}}", play)
+  .replace("{{CARDS}}", cards.join("\n"))
+  .replace("{{GIVEAWAY}}", giveaway);
+
+if (html.includes("{{")) {
+  const left = html.match(/\{\{[A-Z_]+\}\}/g) || [];
+  const allowed = left.filter((t) => t !== "{{unsubscribe_url}}");
+  if (allowed.length) throw new Error("unfilled placeholders: " + allowed.join(", "));
+}
+if (!html.includes("{{unsubscribe_url}}")) throw new Error("unsubscribe token was removed");
+if (!html.includes("https://discord.gg/fUSjxDX4Hy")) throw new Error("discord link missing");
+if (BANNED.test(html.replace(/\{\{unsubscribe_url\}\}/g, ""))) throw new Error("banned wording in the email");
+
+const outDir = join(root, "out");
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "preview.html"), html);
+console.log(`wrote ${cards.length} cards`);
