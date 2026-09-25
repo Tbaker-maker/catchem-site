@@ -1,0 +1,4 @@
+{
+  "_readme": "CASL: every real (non-sample) send must show the sender's mailing address. Fill mailingAddress with the real postal address before sending. build.mjs refuses to build a non-sample week while this is empty. Do not put a made-up address here.",
+  "mailingAddress": ""
+}
