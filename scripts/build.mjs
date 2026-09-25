@@ -32,7 +32,8 @@ const hubs = existsSync(join(OUT, "sets")) ? readdirSync(join(OUT, "sets")).leng
 const root = readFileSync(join(OUT, "index.html"), "utf-8");
 if (missing.length) throw new Error("site-public is missing: " + missing.join(", "));
 if (landers < 150 || hubs < 40) throw new Error(`too few pages: ${landers} landers, ${hubs} set hubs`);
-if (!root.includes("written so you can read them") || !root.includes('id="wl"'))
+// Check stable markers (the waitlist form), not headline copy, so copy edits don't block deploys.
+if (!root.includes('id="wl"') || !root.includes("formspree.io/f/"))
   throw new Error("root is not the waitlist page");
 rmSync(WORK, { recursive: true, force: true });
 console.log(`✓ catchem-site ready: ${landers} landers, ${hubs} set hubs, root = waitlist`);
