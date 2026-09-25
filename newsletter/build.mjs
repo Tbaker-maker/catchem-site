@@ -1,14 +1,29 @@
-// Build newsletter/out/preview.html from newsletter/sample-week.json.
+// Build newsletter/out/preview.html from a week file (default: newsletter/sample-week.json).
+//   node newsletter/build.mjs [week.json]
 // Node builtins only. Incomplete rows are dropped, never filled in.
+//
+// Sample vs real: a week file with "sample": true must mark every price SAMPLE and
+// may leave the CASL mailing address empty (a loud placeholder is rendered).
+// Any other week file is a real send: prices must NOT say SAMPLE, and
+// newsletter/config.json "mailingAddress" must be filled in or the build fails.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const week = JSON.parse(readFileSync(join(root, "sample-week.json"), "utf8"));
-const tpl = readFileSync(join(root, "template.html"), "utf8");
 
-const BANNED = /\b(crypto|nft|token|mint|protocol|buyback|investment)\b/i;
+const BANNED = /\b(crypto|nft|nfts|token|tokens|protocol|buyback|investment)\b/i;
+// "mint" is a card condition word (Near Mint, Gem Mint, Mint condition, PSA 10 Gem Mint).
+// Those phrases are allowed; any other "mint"/"minting"/"minted" is treated as crypto usage.
+const MINT_OK = /\b(?:near[\s-]+mint|gem[\s-]+mint|mint[\s-]+condition|mint\/near[\s-]+mint)\b/gi;
+const MINT_BAD = /\bmint(?:s|ed|ing)?\b/i;
+export const ADDRESS_PLACEHOLDER = "[CASL MAILING ADDRESS REQUIRED BEFORE ANY REAL SEND: set mailingAddress in newsletter/config.json]";
+
+export function isBanned(s) {
+  const t = String(s ?? "");
+  if (BANNED.test(t)) return true;
+  return MINT_BAD.test(t.replace(MINT_OK, " "));
+}
 
 function esc(s) {
   return String(s)
@@ -20,14 +35,18 @@ function esc(s) {
 
 function clean(s) {
   const t = String(s ?? "").trim();
-  if (!t || BANNED.test(t)) return "";
+  if (!t || isBanned(t)) return "";
   return t;
 }
+
+let SAMPLE_MODE = true;
 
 function priceLine(item) {
   const price = clean(item?.price);
   const asOf = clean(item?.asOf);
-  if (!price || !asOf || !/SAMPLE/i.test(price)) return "";
+  if (!price || !asOf) return "";
+  // Sample weeks must say SAMPLE on every price; real weeks must never carry sample prices.
+  if (SAMPLE_MODE !== /SAMPLE/i.test(price)) return "";
   return `${esc(price)} · as of ${esc(asOf)}`;
 }
 
@@ -107,37 +126,55 @@ function giveawayBlock(g) {
         </tr>`;
 }
 
-const cards = (Array.isArray(week.cards) ? week.cards : [])
-  .map(cardBlock)
-  .filter(Boolean)
-  .slice(0, 7);
-if (cards.length < 5) {
-  throw new Error(`need 5 to 7 feed cards, got ${cards.length}`);
+export function render(week, tpl, config = {}) {
+  SAMPLE_MODE = week?.sample === true;
+  const address = String(config?.mailingAddress ?? "").trim();
+  if (!SAMPLE_MODE && !address) {
+    throw new Error("mailingAddress is empty in newsletter/config.json. CASL requires a mailing address in every real send.");
+  }
+  const cards = (Array.isArray(week.cards) ? week.cards : [])
+    .map(cardBlock)
+    .filter(Boolean)
+    .slice(0, 7);
+  if (cards.length < 5) {
+    throw new Error(`need 5 to 7 feed cards, got ${cards.length}`);
+  }
+
+  const play = playBlock(week.play);
+  if (!play) throw new Error("The Play is missing a field");
+  const giveaway = giveawayBlock(week.giveaway);
+  if (!giveaway) throw new Error("giveaway is missing a field");
+  const weekOf = clean(week.weekOf);
+  if (!weekOf) throw new Error("weekOf is missing");
+
+  const html = tpl
+    .replace("{{WEEK_OF}}", esc(weekOf))
+    .replace("{{PLAY}}", play)
+    .replace("{{CARDS}}", cards.join("\n"))
+    .replace("{{GIVEAWAY}}", giveaway)
+    .replace("{{MAILING_ADDRESS}}", esc(address || ADDRESS_PLACEHOLDER));
+
+  if (html.includes("{{")) {
+    const left = html.match(/\{\{[A-Z_]+\}\}/g) || [];
+    const allowed = left.filter((t) => t !== "{{unsubscribe_url}}");
+    if (allowed.length) throw new Error("unfilled placeholders: " + allowed.join(", "));
+  }
+  if (!html.includes("{{unsubscribe_url}}")) throw new Error("unsubscribe token was removed");
+  if (!html.includes("https://discord.gg/fUSjxDX4Hy")) throw new Error("discord link missing");
+  if (isBanned(html.replace(/\{\{unsubscribe_url\}\}/g, ""))) throw new Error("banned wording in the email");
+  return { html, cards: cards.length, sample: SAMPLE_MODE };
 }
 
-const play = playBlock(week.play);
-if (!play) throw new Error("The Play is missing a field");
-const giveaway = giveawayBlock(week.giveaway);
-if (!giveaway) throw new Error("giveaway is missing a field");
-const weekOf = clean(week.weekOf);
-if (!weekOf) throw new Error("weekOf is missing");
-
-const html = tpl
-  .replace("{{WEEK_OF}}", esc(weekOf))
-  .replace("{{PLAY}}", play)
-  .replace("{{CARDS}}", cards.join("\n"))
-  .replace("{{GIVEAWAY}}", giveaway);
-
-if (html.includes("{{")) {
-  const left = html.match(/\{\{[A-Z_]+\}\}/g) || [];
-  const allowed = left.filter((t) => t !== "{{unsubscribe_url}}");
-  if (allowed.length) throw new Error("unfilled placeholders: " + allowed.join(", "));
+function main() {
+  const weekPath = resolve(process.argv[2] || join(root, "sample-week.json"));
+  const week = JSON.parse(readFileSync(weekPath, "utf8"));
+  const tpl = readFileSync(join(root, "template.html"), "utf8");
+  const config = JSON.parse(readFileSync(join(root, "config.json"), "utf8"));
+  const { html, cards, sample } = render(week, tpl, config);
+  const outDir = join(root, "out");
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, "preview.html"), html);
+  console.log(`wrote ${cards} cards${sample ? " (SAMPLE)" : ""}`);
 }
-if (!html.includes("{{unsubscribe_url}}")) throw new Error("unsubscribe token was removed");
-if (!html.includes("https://discord.gg/fUSjxDX4Hy")) throw new Error("discord link missing");
-if (BANNED.test(html.replace(/\{\{unsubscribe_url\}\}/g, ""))) throw new Error("banned wording in the email");
 
-const outDir = join(root, "out");
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "preview.html"), html);
-console.log(`wrote ${cards.length} cards`);
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

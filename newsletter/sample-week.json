@@ -1,4 +1,5 @@
 {
+  "sample": true,
   "weekOf": "Sep 21, 2026",
   "asOf": "Sep 21, 2026",
   "play": {
@@ -12,7 +13,7 @@
   "cards": [
     {
       "headline": "Sample Umbreon card",
-      "why": "A fake fact for the preview, not a price call.",
+      "why": "A fake Near Mint copy for the preview, not a price call.",
       "image": "https://placehold.co/120x168/1a1815/D8B878/png?text=1",
       "price": "SAMPLE $1.00",
       "asOf": "Sep 21, 2026"
