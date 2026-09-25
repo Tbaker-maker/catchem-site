@@ -1,0 +1,18 @@
+// catchemtcg.com — the `catchem-site` Worker (assets only, no script).
+//
+// Workers Builds runs `npx wrangler deploy` on every push to main. Wrangler
+// runs build.command first: scripts/build.mjs clones Tbaker-maker/catchem-app
+// and runs its scripts/build-public-site.mjs with THIS repo's index.html as
+// the root, so the whole public site ships together (/, /build, /creators,
+// /faq, /methodology, /corrections, /pulse, /board, /p/*, /sets/*, sitemap).
+// An assets deploy replaces every file, so deploying index.html alone would
+// 404 everything else — build.mjs refuses to finish if any of those is missing.
+//
+// Manual deploy (same result): node scripts/build.mjs && npx wrangler deploy
+// No SPA fallback: unknown paths 404 rather than serve the landing everywhere.
+{
+  "name": "catchem-site",
+  "compatibility_date": "2026-08-01",
+  "build": { "command": "node scripts/build.mjs" },
+  "assets": { "directory": "./site-public" }
+}

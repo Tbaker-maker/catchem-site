@@ -1,0 +1,6 @@
+.build/
+site-public/
+node_modules/
+.wrangler/
+.dev.vars*
+.env*
