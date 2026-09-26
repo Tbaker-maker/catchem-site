@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Catch'em — free Pokémon TCG tools. Know what to rip, what to buy, and what to hold.</title>
+<title>Catch'em — for collectors, rippers, and the people who post.</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Free tools and a community for Pokémon collectors. Market reads in seconds, posts ready in a click, and giveaways every month.">
+<meta name="description" content="Free tools and a community for collectors, rippers, and the people who post. Market reads in seconds, posts ready in a click, and giveaways every month.">
 <meta name="theme-color" content="#12100e">
 <link rel="canonical" href="https://catchemtcg.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Catch'em">
 <meta property="og:url" content="https://catchemtcg.com/">
-<meta property="og:title" content="Catch'em — know what to rip, what to buy, and what to hold">
-<meta property="og:description" content="Free tools and a community for Pokémon collectors. Market reads in seconds, posts ready in a click, and giveaways every month.">
+<meta property="og:title" content="Catch'em — for collectors, rippers, and the people who post">
+<meta property="og:description" content="Free tools and a community for collectors, rippers, and the people who post. Market reads in seconds, posts ready in a click, and giveaways every month.">
 <meta property="og:image" content="https://catchemtcg.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Catch'em. Know what to rip, what to buy, and what to hold. Free Pokémon TCG tools.">
+<meta property="og:image:alt" content="Catch'em. For collectors, rippers, and the people who post.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Catch'em — know what to rip, what to buy, and what to hold">
-<meta name="twitter:description" content="Free tools and a community for Pokémon collectors. Market reads in seconds, posts ready in a click, and giveaways every month.">
+<meta name="twitter:title" content="Catch'em — for collectors, rippers, and the people who post">
+<meta name="twitter:description" content="Free tools and a community for collectors, rippers, and the people who post. Market reads in seconds, posts ready in a click, and giveaways every month.">
 <meta name="twitter:image" content="https://catchemtcg.com/og.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312100e'/%3E%3Crect x='7' y='8' width='12' height='17' rx='2' fill='none' stroke='%23d9b779' stroke-width='1.6' transform='rotate(-12 13 16.5)'/%3E%3Crect x='10' y='7' width='12' height='17' rx='2' fill='none' stroke='%23e0675b' stroke-width='1.6'/%3E%3Crect x='13' y='8' width='12' height='17' rx='2' fill='none' stroke='%236f9be8' stroke-width='1.6' transform='rotate(12 19 16.5)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -139,6 +139,10 @@ input[type=email]:focus{outline:2px solid var(--gold);outline-offset:1px;border-
 footer{padding:44px 0 64px;color:var(--faint);font-size:14px;line-height:1.7}
 footer p{margin:0 0 10px;max-width:62ch}
 footer a{color:var(--gold)}
+.premium{margin:0 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 20px}
+.premium p{margin:0;color:var(--soft);max-width:62ch}
+.premium b{color:var(--text)}
+.premium .btn{flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -152,16 +156,21 @@ footer a{color:var(--gold)}
     <div class="fan" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>
   <div>
-    <p class="kicker">Free Pokémon TCG tools</p>
-    <h1>Know what to rip, what to buy, and what to hold.</h1>
-    <p class="lede"><strong>Free tools and a community for Pokémon collectors.</strong> Market reads in seconds, posts ready in a click, and giveaways every month.</p>
+    <p class="kicker">Free tools for collectors</p>
+    <h1>For collectors, rippers, and the people who post.</h1>
+    <p class="lede"><strong>Free tools and a community.</strong> Market reads in seconds, posts ready in a click, and giveaways every month. Pokémon first. Room to grow.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join the Discord</a>
-      <a class="btn btn-ghost" href="#list">Get on the list</a>
+      <a class="btn btn-ghost" href="/feed">Open The Feed</a>
     </div>
     <p class="beta"><b>Early beta</b><span>Get on the list and test new tools before anyone else.</span></p>
   </div>
 </header>
+
+<section class="premium" aria-label="Discord Premium">
+  <p><b>Discord Premium · $14.99/mo.</b> The Feed, the charts, Post Office, and a Stadium seat. Calls we track until they hit or miss.</p>
+  <a class="btn btn-primary" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join Discord</a>
+</section>
 
 <hr class="rule">
 
@@ -172,9 +181,10 @@ footer a{color:var(--gold)}
   </div>
   <div class="tiles">
     <article class="tile feed">
-      <span class="tag">Opening soon</span>
+      <span class="tag open">Open</span>
       <h3>The Feed</h3>
-      <p>Card prices, game prices, charts, a Pokémon fact and the news. Written short, so you can read it in a minute.</p>
+      <p>Sealed and singles, kept apart. A short daily read, and calls we track until they hit or miss.</p>
+      <a class="more" href="/feed">Open The Feed <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile post">
       <span class="tag">Opening soon</span>

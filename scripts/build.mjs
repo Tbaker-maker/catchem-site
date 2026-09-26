@@ -2,6 +2,7 @@
 // Node builtins + git only (Workers Builds image has both; no npm install).
 import { execFileSync } from "node:child_process";
 import { rmSync, cpSync, existsSync, readFileSync, readdirSync, mkdirSync } from "node:fs";
+import { writePublicRoutes } from "./public-routes.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,10 +23,12 @@ run(process.execPath, [join(APP, "scripts/build-public-site.mjs")], {
   env: { ...process.env, LANDING_FILE: join(ROOT, "index.html") },
 });
 cpSync(join(APP, "site-public"), OUT, { recursive: true });
+await writePublicRoutes(OUT);
 
 // Refuse to hand wrangler a partial site: an assets deploy replaces everything.
 const must = ["index.html", "build.html", "methodology.html", "corrections.html",
-  "creators.html", "faq.html", "pulse.html", "board.html", "robots.txt", "sitemap.xml", "og.png", "favicon.svg"];
+  "creators.html", "faq.html", "pulse.html", "board.html", "robots.txt", "sitemap.xml", "og.png", "favicon.svg",
+  "feed.html", "feed/index.html", "try.html", "try/index.html", "app.html", "app/index.html"];
 const missing = must.filter(f => !existsSync(join(OUT, f)));
 const landers = existsSync(join(OUT, "p")) ? readdirSync(join(OUT, "p")).length : 0;
 const hubs = existsSync(join(OUT, "sets")) ? readdirSync(join(OUT, "sets")).length : 0;
