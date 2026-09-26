@@ -11,7 +11,7 @@ const t = (name, cond) => {
 
 t("Demand replaces Buy Pressure", neutralizeCopy("Buy Pressure est.") === "Demand est.");
 t("HEAT replaces BULLISH", neutralizeCopy("BULLISH·long") === "HEAT·long");
-t("heat replaces bullish", !neutralizeCopy("not bullish").includes("bullish"));
+t("HEAT replaces bullish", neutralizeCopy("not bullish") == "not HEAT");
 
 const dir = await mkdtemp(join(tmpdir(), "routes-"));
 await writeFile(join(dir, "pulse.html"), "<h1>Pulse</h1><p>Buy Pressure</p><b>BULLISH</b>");
