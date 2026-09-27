@@ -18,9 +18,13 @@ await writeFile(join(dir, "pulse.html"), "<h1>Pulse</h1><p>Buy Pressure</p><b>BU
 await writeFile(join(dir, "index.html"), "<h1>what to buy, and what to hold</h1>");
 const written = await writePublicRoutes(dir);
 t("writes the six route files", written.length === 6);
-for (const rel of ["feed.html", "feed/index.html", "try.html", "try/index.html", "app.html", "app/index.html"]) {
+for (const rel of ["feed.html", "feed/index.html"]) {
   const html = await readFile(join(dir, rel), "utf8");
   t(`${rel} is the feed`, html.includes("Pulse") && !html.includes("Buy Pressure") && !html.includes("BULLISH"));
+}
+for (const rel of ["try.html", "try/index.html", "app.html", "app/index.html"]) {
+  const html = await readFile(join(dir, rel), "utf8");
+  t(`${rel} redirects to the feed`, html.includes('url=/feed') && !html.includes("Pulse") && !html.includes("BULLISH"));
 }
 const pulse = await readFile(join(dir, "pulse.html"), "utf8");
 t("pulse itself is neutralized", pulse.includes("Demand") && pulse.includes("HEAT"));

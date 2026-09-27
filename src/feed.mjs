@@ -3,17 +3,28 @@
 
 export const PULSE_URL = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/the-pulse.html";
 export const REPORT_URL = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/ppt/run-report.json";
-const FRESH_HOURS = 36;
+const FRESH_HOURS = 48;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
-const FIT = `<style id="feed-fit">html,body{overflow-x:hidden;max-width:100%}img,svg{max-width:100%;height:auto}img.thumb{width:46px;max-width:46px;min-width:0}img.thumb.logo{width:56px;max-width:56px;min-width:0;height:auto}.sig,.sigbody,.row{min-width:0;max-width:100%}</style>`;
+const FIT = `<style id="feed-fit">html,body{overflow-x:hidden}img,svg{max-width:100%;height:auto}img.thumb{width:46px;max-width:46px;min-width:0}img.thumb.logo{width:56px;max-width:56px;min-width:0;height:auto}.sig,.sigbody,.row{min-width:0;max-width:100%}</style>`;
 
-export function isFeedPath(pathname) {
+function normalize(pathname) {
   let path = String(pathname || "").split("?")[0];
   if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
   if (path.endsWith("/index.html")) path = path.slice(0, -"/index.html".length);
   else if (path.endsWith(".html")) path = path.slice(0, -5);
-  return path === "/feed" || path === "/pulse" || path === "/try" || path === "/app";
+  return path;
+}
+
+export function redirectPath(pathname) {
+  const path = normalize(pathname);
+  if (path === "/app" || path === "/try") return "/feed";
+  return null;
+}
+
+export function isFeedPath(pathname) {
+  const path = normalize(pathname);
+  return path === "/feed" || path === "/pulse";
 }
 
 export function formatPt(iso) {
@@ -33,8 +44,9 @@ export function freshnessFrom(iso, now = Date.now()) {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return { label: "Data delayed", at: "" };
   const at = new Date(t).toISOString();
-  if ((now - t) / 3600000 > FRESH_HOURS) return { label: "Data delayed", at };
-  return { label: `Updated ${formatPt(iso)}`, at };
+  const label = `Updated ${formatPt(iso)}`;
+  if ((now - t) / 3600000 > FRESH_HOURS) return { label: `${label} · STALE`, at };
+  return { label, at };
 }
 
 export function stampFeed(html, iso, now = Date.now()) {
@@ -52,7 +64,7 @@ export function stampFeed(html, iso, now = Date.now()) {
     out = out.includes("</head>") ? out.replace("</head>", `${FIT}</head>`) : FIT + out;
   }
   const when = fresh.at ? formatPt(fresh.at) : null;
-  if (when) out = out.replace(/Written by the machine at [^·<]+/, `Written by the machine at ${when} `);
+  if (when) out = out.replace(/<div class="byline">\s*Written by the machine[\s\S]*?<\/div>/, "");
   out = out.replaceAll("A floor that far below the median usually rewards patience.", "The lowest ask sits far below the median.");
   return out;
 }

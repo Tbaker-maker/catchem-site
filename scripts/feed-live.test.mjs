@@ -1,4 +1,4 @@
-import { isFeedPath, loadLatestFeed, stampFeed } from "../src/feed.mjs";
+import { isFeedPath, loadLatestFeed, redirectPath, stampFeed } from "../src/feed.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -6,18 +6,19 @@ const t = (name, cond) => {
   else { fail++; console.log("  FAIL", name); }
 };
 
-t("feed paths", isFeedPath("/feed") && isFeedPath("/feed/") && isFeedPath("/pulse.html") && isFeedPath("/try/index.html") && isFeedPath("/app"));
+t("feed paths", isFeedPath("/feed") && isFeedPath("/feed/") && isFeedPath("/pulse.html") && !isFeedPath("/try/index.html") && !isFeedPath("/app"));
+t("app and try redirect home to the feed", redirectPath("/app/") === "/feed" && redirectPath("/try/index.html") === "/feed" && redirectPath("/feed") === null);
 t("not a product page", !isFeedPath("/p/sv3pt5-etb") && !isFeedPath("/methodology"));
 
 const now = Date.parse("2026-09-26T22:00:00.000Z");
 const html = `<head></head><body><div class="byline" id="fresh" data-at="2026-09-01T00:00:00.000Z">Updated old</div><div class="byline">Written by the machine at 15:46 UTC · every number is live production data</div><p>A floor that far below the median usually rewards patience.</p></body>`;
 const out = stampFeed(html, "2026-09-26T20:20:22.665Z", now);
 t("clock is the run", out.includes('data-at="2026-09-26T20:20:22.665Z"') && out.includes("Updated Sep 26, 1:20 PM PT") && !out.includes("Updated old"));
-t("body clock matches the run", out.includes("Written by the machine at Sep 26, 1:20 PM PT") && !out.includes("15:46"));
+t("body clock matches the run", out.includes("Updated Sep 26, 1:20 PM PT") && !out.includes("Written by the machine") && !out.includes("15:46"));
 t("floor wording is gone", !/\bfloor\b/i.test(out) && out.includes("The lowest ask sits far below the median."));
-t("wide logo is constrained", out.includes('id="feed-fit"') && out.includes("max-width:56px") && out.includes("overflow-x:hidden"));
+t("wide logo is constrained without flattening the column", out.includes('id="feed-fit"') && out.includes("max-width:56px") && out.includes("overflow-x:hidden") && !out.includes("html,body{overflow-x:hidden;max-width:100%}"));
 const late = stampFeed(html, "2026-09-20T00:00:00.000Z", now);
-t("a late run says delayed but keeps the clock", late.includes("Data delayed") && late.includes('data-at="2026-09-20T00:00:00.000Z"'));
+t("a late run keeps the date and says stale", late.includes("Updated ") && late.includes("· STALE") && late.includes('data-at="2026-09-20T00:00:00.000Z"') && !/>Data delayed</.test(late));
 
 const sha = "a".repeat(40);
 const seen = [];

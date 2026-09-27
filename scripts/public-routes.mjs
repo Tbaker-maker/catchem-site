@@ -35,6 +35,14 @@ const FALLBACK = `<!doctype html>
 </main>
 `;
 
+const REDIRECT = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link rel="canonical" href="https://catchemtcg.com/feed">
+<meta http-equiv="refresh" content="0;url=/feed">
+<title>The Feed — Catch'em</title>
+<script>location.replace("/feed")</script>
+</head><body><p><a href="/feed">The Feed</a></p></body></html>
+`;
+
 export async function writePublicRoutes(outDir) {
   for (const name of ["index.html", "pulse.html", "methodology.html", "board.html"]) {
     const path = join(outDir, name);
@@ -49,7 +57,7 @@ export async function writePublicRoutes(outDir) {
   for (const rel of ROUTE_FILES) {
     const path = join(outDir, rel);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, feed);
+    await writeFile(path, rel.startsWith("feed") ? feed : REDIRECT);
   }
   return ROUTE_FILES;
 }
