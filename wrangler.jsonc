@@ -22,6 +22,6 @@
   "assets": {
     "directory": "./site-public",
     "binding": "ASSETS",
-    "run_worker_first": ["/feed", "/feed/*", "/feed.html", "/pulse", "/pulse/*", "/pulse.html", "/try", "/try/*", "/try.html", "/app", "/app/*", "/app.html"]
+    "run_worker_first": true
   }
 }
