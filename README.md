@@ -19,10 +19,11 @@ An assets deploy replaces every file, so never deploy `index.html` on its own.
 Manual deploy: `node scripts/build.mjs && npx wrangler deploy`
 
 `/feed` (and the same page at `/pulse`, `/try`, `/app`) is not the copy baked
-at deploy time. The worker reads `research/assets/the-pulse.html` and
-`data/ppt/run-report.json` from Catchem-data on each request, then keeps that
-response for 60 seconds. The run clock on the page is `finishedAt` from that
-report. The baked `pulse.html` is only used if that read fails.
+at deploy time. The worker reads the current main commit, then that commit's
+`research/assets/the-pulse.html` and `data/ppt/run-report.json`. The run stamp
+and the "written by the machine" line both use `finishedAt`. The response is
+`no-store`, so a CDN copy cannot keep an older run. The baked `pulse.html` is
+only used if that read fails.
 
 ## Files
 

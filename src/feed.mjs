@@ -51,14 +51,30 @@ export function stampFeed(html, iso, now = Date.now()) {
   if (!out.includes('id="feed-fit"')) {
     out = out.includes("</head>") ? out.replace("</head>", `${FIT}</head>`) : FIT + out;
   }
+  const when = fresh.at ? formatPt(fresh.at) : null;
+  if (when) out = out.replace(/Written by the machine at [^·<]+/, `Written by the machine at ${when} `);
+  out = out.replaceAll("A floor that far below the median usually rewards patience.", "The lowest ask sits far below the median.");
   return out;
 }
 
 export async function loadLatestFeed(fetchImpl = fetch, now = Date.now()) {
-  const headers = { "user-agent": "catchem-site", "cache-control": "no-cache" };
+  const headers = {
+    "user-agent": "catchem-site",
+    accept: "application/vnd.github+json",
+    "cache-control": "no-cache",
+  };
+  const tip = await fetchImpl("https://api.github.com/repos/Tbaker-maker/Catchem-data/commits/main", {
+    headers,
+    cache: "no-store",
+  });
+  if (!tip.ok) throw new Error(`tip ${tip.status}`);
+  const sha = (await tip.json())?.sha;
+  if (!/^[0-9a-f]{40}$/.test(sha || "")) throw new Error("tip sha missing");
+  const base = `https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/${sha}`;
+  const rawHeaders = { "user-agent": "catchem-site", "cache-control": "no-cache" };
   const [pulseRes, reportRes] = await Promise.all([
-    fetchImpl(PULSE_URL, { headers }),
-    fetchImpl(REPORT_URL, { headers }),
+    fetchImpl(`${base}/research/assets/the-pulse.html`, { headers: rawHeaders, cache: "no-store" }),
+    fetchImpl(`${base}/data/ppt/run-report.json`, { headers: rawHeaders, cache: "no-store" }),
   ]);
   if (!pulseRes.ok) throw new Error(`pulse ${pulseRes.status}`);
   const html = await pulseRes.text();
