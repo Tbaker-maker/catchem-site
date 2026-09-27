@@ -18,6 +18,12 @@ An assets deploy replaces every file, so never deploy `index.html` on its own.
 
 Manual deploy: `node scripts/build.mjs && npx wrangler deploy`
 
+`/feed` (and the same page at `/pulse`, `/try`, `/app`) is not the copy baked
+at deploy time. The worker reads `research/assets/the-pulse.html` and
+`data/ppt/run-report.json` from Catchem-data on each request, then keeps that
+response for 60 seconds. The run clock on the page is `finishedAt` from that
+report. The baked `pulse.html` is only used if that read fails.
+
 ## Files
 
 - `index.html`: the waitlist page. Self-contained (inline CSS/JS, Google Fonts).

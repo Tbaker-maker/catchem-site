@@ -1,4 +1,4 @@
-// catchemtcg.com — the `catchem-site` Worker (assets only, no script).
+// catchemtcg.com — the `catchem-site` Worker.
 //
 // Workers Builds runs `npx wrangler deploy` on every push to main. Wrangler
 // runs build.command first: scripts/build.mjs clones Tbaker-maker/catchem-app
@@ -8,11 +8,20 @@
 // An assets deploy replaces every file, so deploying index.html alone would
 // 404 everything else — build.mjs refuses to finish if any of those is missing.
 //
+// /feed, /pulse, /try, and /app do not stay on that baked copy. src/index.mjs
+// reads the latest the-pulse.html and the run clock from Catchem-data. The
+// baked file is only the fallback when that read fails.
+//
 // Manual deploy (same result): node scripts/build.mjs && npx wrangler deploy
 // No SPA fallback: unknown paths 404 rather than serve the landing everywhere.
 {
   "name": "catchem-site",
+  "main": "src/index.mjs",
   "compatibility_date": "2026-08-01",
   "build": { "command": "node scripts/build.mjs" },
-  "assets": { "directory": "./site-public" }
+  "assets": {
+    "directory": "./site-public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/feed", "/feed/", "/feed.html", "/feed/*", "/pulse", "/pulse/", "/pulse.html", "/try", "/try/", "/try.html", "/try/*", "/app", "/app/", "/app.html", "/app/*"]
+  }
 }
