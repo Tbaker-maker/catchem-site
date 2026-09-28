@@ -37,6 +37,7 @@ const files = {
   "reads.json": reads,
   "movers.json": movers,
   "receipts.json": receipts,
+  "redirects.json": { products: { "sv3pt5-etb": "/p/tcgcsv-504467" }, sets: { base1: "/sets/base-set" } },
 };
 
 const fetchImpl = async (url) => {
@@ -61,7 +62,9 @@ t("a deep link starts on that read", deep.includes('id="start"') && deep.include
 const all = await (await renderPath("/feed/all", fetchImpl)).text();
 t("all reads is a list", all.includes("All reads") && all.includes("Alakazam"));
 const setPage = await renderPath("/sets/missing", fetchImpl);
-t("a missing set redirects", setPage.status === 301);
+t("a missing set is not a generic redirect", setPage.status === 404);
+const known = await renderPath("/sets/base1", fetchImpl);
+t("a known old set slug is one hop", known.status === 301 && known.headers.get("location") === "/sets/base-set");
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
 t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori"));
 const board = await (await renderPath("/board", fetchImpl)).text();
@@ -87,7 +90,7 @@ const old = await worker.fetch(new Request("https://catchemtcg.com/p/sv3pt5-etb"
 t("an old lander redirects", old.status === 301);
 const pulse = await worker.fetch(new Request("https://catchemtcg.com/pulse"), env);
 t("pulse redirects to the feed", pulse.status === 301 && pulse.headers.get("location").endsWith("/feed"));
-t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1280px") && feedHtml.includes(".dock{display:none"));
+t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1024px") && feedHtml.includes(".dock{display:none") && feedHtml.includes("2 days of history"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
