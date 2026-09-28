@@ -1,7 +1,7 @@
 // Assemble ./site-public for catchemtcg.com. See wrangler.jsonc.
 // Node builtins + git only (Workers Builds image has both; no npm install).
 import { execFileSync } from "node:child_process";
-import { rmSync, cpSync, existsSync, readFileSync, readdirSync, mkdirSync } from "node:fs";
+import { rmSync, cpSync, existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { writePublicRoutes } from "./public-routes.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,26 @@ const APP = join(WORK, "catchem-app");
 const OUT = join(ROOT, "site-public");
 const APP_REPO = process.env.CATCHEM_APP_REPO || "https://github.com/Tbaker-maker/catchem-app.git";
 const APP_REF = process.env.CATCHEM_APP_REF || "main";
+
+function stampBuild() {
+  let sha = process.env.WORKERS_CI_COMMIT_SHA || "";
+  let date = "";
+  try {
+    if (!sha) sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+    date = execFileSync("git", ["show", "-s", "--format=%cs", sha || "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  } catch {
+    date = new Date().toISOString().slice(0, 10);
+  }
+  const file = join(ROOT, "src/build-stamp.mjs");
+  let body = readFileSync(file, "utf8");
+  const shaLit = JSON.stringify(sha || "dev");
+  const dayLit = JSON.stringify(String(date).slice(0, 10));
+  body = body.replace(/export const BUILD_SHA = "[^"]*";/, "export const BUILD_SHA = " + shaLit + ";");
+  body = body.replace(/export const BUILD_DATE = "[^"]*";/, "export const BUILD_DATE = " + dayLit + ";");
+  writeFileSync(file, body);
+}
+
+stampBuild();
 
 rmSync(WORK, { recursive: true, force: true });
 rmSync(OUT, { recursive: true, force: true });

@@ -178,9 +178,10 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 @media (min-width:1280px){.site-bar nav{display:flex}}
 `;
 
-function chrome(active, body, title, stamp) {
+function chrome(active, body, title, stamp, extraFoot = "") {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
   const fresh = stamp ? `<div class="wrap" style="padding-bottom:0"><p class="muted" id="fresh" style="margin:0">${esc(stamp)}</p></div>` : "";
+  const foot = extraFoot ? `<p id="post-office-build">${esc(extraFoot)}</p>` : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -193,7 +194,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
-<footer class="site-foot"><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p></footer>
+<footer class="site-foot"><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);</script>
 </body></html>`;
 }
@@ -491,11 +492,12 @@ export function renderRetired(kind) {
   return chrome("", body, title);
 }
 
-export function renderPost(stamp) {
+export function renderPost(stamp, mark = "") {
+  const line = typeof mark === "string" ? mark : "";
   const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
 <iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
 <style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
-  return chrome("Post Office", body, "Post Office", stamp);
+  return chrome("Post Office", body, "Post Office", stamp, line);
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {

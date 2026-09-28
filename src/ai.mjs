@@ -2,7 +2,8 @@
 // Prompt follows docs/access-and-ai-search/POST-TEXT-STYLE-GUIDE.md.
 
 import { editionLabel, priceLine } from "./post-copy.mjs";
-import { commit, peek, readUser } from "./quota.mjs";
+import { commit, ideasSignInLine, peek, readUser, usageOf } from "./quota.mjs";
+import { discordReady } from "./auth.mjs";
 
 const LITE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/search-lite.json";
 const POCKET = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/pocket-catalogue.json";
@@ -17,7 +18,7 @@ const BANNED = new RegExp(
 );
 const POST_MODEL = "grok-4.20-0309-non-reasoning";
 
-export const STYLE_PROMPT = `You write short social copy for Catch'em, a Pokémon TCG collector site. Write as a real collector talking to collectors, rippers, and flippers: warm, specific, and a little fun. Lead with a concrete supplied fact.
+export const STYLE_PROMPT = `You write short social copy for Catch'em, a Pokémon TCG collector site. Write as a real collector talking to collectors, rippers, and flippers: warm, specific, conversational, and a little fun. Lead with a concrete fact when possible: artist, set, card number, pull rate, or current TCGplayer market price.
 
 SOURCE OF TRUTH — USE ONLY THESE SUPPLIED FACTS:
 {facts}
@@ -29,23 +30,41 @@ REQUESTED PLATFORM:
 {platform}
 
 NON-NEGOTIABLE RULES:
-- Use only the facts in SOURCE OF TRUTH. Never invent or look up a card, price, date, artist, set, number, or claim.
+- Use only the facts in SOURCE OF TRUTH. Never invent or look up a card, product, price, date, pull rate, artist, set, number, or claim.
 - Always spell Pokémon with the accent.
-- If a price is supplied, write it as “TCGplayer market: [price] ([date])”. Never use a price without its date. If either is missing, omit the price.
-- Never use investment language: buy, sell, hold, floor, target, plays, picks, bullish, bearish, invest, ROI, or “to the moon.” Do not use crypto, NFT, or Web3 language.
-- Do not promise a future price, pull, grade, or outcome.
-- Return exactly 3 clearly different variations for the platform.
-- X: each variation is at most 280 characters.
-- This prompt follows POST-TEXT-STYLE-GUIDE.md.`;
+- If a price is supplied, write it as "TCGplayer market: [price] ([date])", using the supplied price and date. Never use a price without its supplied date. If either is missing, omit the price.
+- Never use investment language: buy, sell, hold, floor, target, plays, picks, bullish, bearish, invest, ROI, or "to the moon." Do not use crypto, NFT, or Web3 language.
+- Do not promise or guarantee a future price, pull, grade, value, or outcome.
+- Do not use generic hype without a concrete detail.
+- Do not browse or rely on outside knowledge.
+- Return exactly 3 clearly different variations. Keep every variation factual and within the requested platform format.
+
+FORMAT REQUIREMENTS:
+- X: each variation is at most 280 characters and has 1-2 relevant hashtags when hashtags fit.
+- Instagram: each variation has one hook line, then 2-4 short lines, and no more than 8 hashtags.
+- TikTok: each variation is at most 150 characters.
+- YouTube: each variation has a title of at most 70 characters and a description of exactly 3 short lines.
+- Discord: each variation is a compact, conversational post with short paragraphs or bullets as useful.
+
+TONE GUIDANCE:
+- hype = energetic but specific, not shouty
+- chill = low-key and appreciative
+- funny = light and observant; the joke must be anchored to a supplied detail
+- informative = clear, useful, and concise
+
+Output only the 3 variations. Label them Variation 1, Variation 2, and Variation 3. Do not add a preface, explanation, fact check, or extra variation.
+This prompt follows POST-TEXT-STYLE-GUIDE.md.`;
 
 let liteCache = null;
 let pocketCache = null;
 let asOfCache = "";
+let paperIdMap = null;
 
 export function resetCatalogCache() {
   liteCache = null;
   pocketCache = null;
   asOfCache = "";
+  paperIdMap = null;
 }
 
 async function loadLite(fetchImpl) {
@@ -102,9 +121,27 @@ export function rowFact(row, date) {
   };
 }
 
+async function resolveIds(ids, fetchImpl) {
+  const list = (ids || []).map(String).filter(Boolean).slice(0, 4);
+  const direct = list.filter((id) => id.startsWith("tcgcsv-") || id.startsWith("tcgp-"));
+  const paper = list.filter((id) => !id.startsWith("tcgcsv-") && !id.startsWith("tcgp-"));
+  if (!paper.length) return direct;
+  if (!paperIdMap) {
+    paperIdMap = new Map();
+    try {
+      const { patchedPaper } = await import("./full-editor.mjs");
+      const rows = JSON.parse(await patchedPaper(fetchImpl));
+      for (const row of rows) if (row && row[0] && row[22]) paperIdMap.set(String(row[0]), String(row[22]));
+    } catch { /* catalog id map stays empty */ }
+  }
+  const extra = paper.map((id) => paperIdMap.get(id)).filter(Boolean);
+  return [...new Set(direct.concat(extra))];
+}
+
 export async function factsFor(ids, fetchImpl) {
   const date = await asOf(fetchImpl);
-  const want = new Set((ids || []).map(String));
+  const resolved = await resolveIds(ids, fetchImpl);
+  const want = new Set(resolved);
   const out = [];
   if ([...want].some((id) => id.startsWith("tcgcsv-"))) {
     const lite = await loadLite(fetchImpl);
@@ -129,21 +166,80 @@ function lineOf(card) {
 }
 
 export function factIdeas(cards) {
-  return (cards || []).slice(0, 3).map((card, i) => {
-    const lead = ["Notable print", "Same catalog row", "Read the printing"][i] || "Catalog row";
-    return `${lead}: ${lineOf(card)}`;
-  });
-}
-
-export function factPost(cards) {
   const card = cards && cards[0];
   if (!card) return [];
+  const line = lineOf(card);
+  const also = cards[1] ? lineOf(cards[1]) : "";
+  return [
+    `Notable Pokémon print: ${line}`,
+    `Same Pokémon catalog row: ${line}`,
+    also ? `Also on the Pokémon page: ${also}` : `Read the Pokémon printing: ${line}`,
+  ];
+}
+
+function detail(card) {
+  const bits = [card.name];
+  if (card.printing && card.printing !== "Printing not labeled") bits.push(card.printing);
+  if (card.edition && card.edition !== "Edition not labeled") bits.push(card.edition);
+  if (card.artist) bits.push("art by " + card.artist);
+  return bits.filter(Boolean).join(", ");
+}
+
+function toneLines(card, tone) {
+  const base = detail(card);
+  if (tone === "hype") {
+    return [
+      `${base}. That Pokémon artwork still knows how to stop a binder page.`,
+      `A whole table leans in for this Pokémon. ${base}.`,
+      `${base}. Worth a second look in the Pokémon binder.`,
+    ];
+  }
+  if (tone === "chill") {
+    return [
+      `${base}. A Pokémon card to slow down and look at.`,
+      `Quietly one of those Pokémon binder cards. ${base}.`,
+      `${base}. Easy to sit with, Pokémon and all.`,
+    ];
+  }
+  if (tone === "funny") {
+    return [
+      `${base}. The Pokémon binder page has entered its dramatic era.`,
+      `${base}. Every other Pokémon card just asked for the same spotlight.`,
+      `${base}. Pokémon, and a little theatrical about it.`,
+    ];
+  }
+  return [
+    `${base}. A clean Pokémon note for the binder.`,
+    `Card details, Pokémon: ${base}.`,
+    `${base}. Useful Pokémon reference, and nothing extra.`,
+  ];
+}
+
+function fitLine(sentence, price) {
+  let text = String(sentence || "").replace(/\s+/g, " ").trim();
+  if (price) {
+    const tail = " " + price + ".";
+    const room = 280 - tail.length;
+    if (text.length > room) text = text.slice(0, Math.max(0, room)).replace(/\s+\S*$/, "").trim();
+    text = (text + tail).replace(/\s+/g, " ").trim();
+  } else if (text.length > 280) {
+    text = text.slice(0, 277).replace(/\s+\S*$/, "").trim() + "…";
+  }
+  return text;
+}
+
+export function factPost(cards, tone = "informative") {
+  const list = cards || [];
+  const card = list[0];
+  if (!card) return [];
   const price = card.price && card.price !== "No market price" ? card.price : "";
-  const artist = card.artist ? ` Art by ${card.artist}.` : "";
-  const a = `${card.name}, ${card.printing}, ${card.edition}.${artist}${price ? " " + price + "." : ""}`.replace(/\s+/g, " ").trim();
-  const b = `${card.edition} printing ${card.printing}. ${card.name}.${artist}${price ? " " + price + "." : ""}`.replace(/\s+/g, " ").trim();
-  const c = [card.name, card.edition, price].filter(Boolean).join(" — ") + ".";
-  return [a, b, c].map((t) => t.slice(0, 280));
+  const mood = ["hype", "chill", "funny", "informative"].includes(tone) ? tone : "informative";
+  const lines = toneLines(card, mood);
+  if (list[1]) {
+    const extra = lineOf(list[1]).replace(/\.$/, "");
+    lines[2] = `${lines[2].replace(/\.$/, "")} Also ${extra}.`;
+  }
+  return lines.map((line) => fitLine(line, price));
 }
 
 export function acceptable(text, cards) {
@@ -175,34 +271,37 @@ async function modelText(env, system, user, model) {
 }
 
 function splitThree(text) {
-  const parts = String(text || "").split(/\n+/).map((s) => s.replace(/^\s*\d+[\).\s-]+/, "").trim()).filter(Boolean);
+  const parts = String(text || "").split(/\n+/).map((s) => s.replace(/^\s*(variation\s*)?\d+[\).:\s-]*/i, "").trim()).filter(Boolean);
   return parts.slice(0, 3);
 }
 
 export async function handleIdeas(request, env, fetchImpl = fetch) {
-  const userGate = peek(await (await import("./quota.mjs")).readUser(request, env), "ideas");
-  if (!userGate.ok) return json(userGate, userGate.status);
+  const userGate = peek(await readUser(request, env), "ideas");
+  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const facts = await factsFor(body.ids || [], fetchImpl);
   if (!facts.cards.length) return json({ ok: false, error: "No catalog rows for those ids." }, 400);
   let ideas = null;
-  const drafted = await modelText(env, "Give exactly 3 short catalog ideas. Use only the JSON facts. No prices you were not given. Spell Pokémon with the accent.", JSON.stringify(facts), env.AI_IDEAS_MODEL || "grok-3");
+  let fromModel = false;
+  const drafted = await modelText(env, "Give exactly 3 short catalog ideas. Use only the JSON facts. No prices you were not given. Spell Pokémon with the accent. Do not use investment language.", JSON.stringify(facts), env.AI_IDEAS_MODEL || "grok-3");
   if (drafted) {
     const parts = splitThree(drafted);
-    if (parts.length === 3 && parts.every((p) => acceptable(p, facts.cards))) ideas = parts;
+    if (parts.length === 3 && parts.every((p) => acceptable(p, facts.cards))) {
+      ideas = parts;
+      fromModel = true;
+    }
   }
   if (!ideas) ideas = factIdeas(facts.cards);
-  const { readUser } = await import("./quota.mjs");
-  commit(await readUser(request, env), "ideas");
-  return json({ ok: true, ideas, asOf: facts.asOf, model: drafted ? "catalog-model" : "fact-pack" });
+  const user = await readUser(request, env);
+  commit(user, "ideas");
+  return json({ ok: true, ideas, asOf: facts.asOf, quota: usageOf(user, "ideas"), model: fromModel ? "catalog-model" : "fact-pack" });
 }
 
 export async function handlePostText(request, env, fetchImpl = fetch) {
-  const { readUser } = await import("./quota.mjs");
   const user = await readUser(request, env);
   const userGate = peek(user, "post-text");
-  if (!userGate.ok) return json(userGate, userGate.status);
+  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const facts = await factsFor((body.ids || []).slice(0, 4), fetchImpl);
@@ -220,9 +319,9 @@ export async function handlePostText(request, env, fetchImpl = fetch) {
       model = env.AI_MODEL || POST_MODEL;
     }
   }
-  if (!variations) variations = factPost(facts.cards);
+  if (!variations) variations = factPost(facts.cards, tone);
   commit(user, "post-text");
-  return json({ ok: true, variations, asOf: facts.asOf, model });
+  return json({ ok: true, variations, asOf: facts.asOf, tone, quota: usageOf(user, "post-text"), model });
 }
 
 function json(obj, status = 200) {

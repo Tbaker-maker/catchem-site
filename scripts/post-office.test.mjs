@@ -65,6 +65,7 @@ const fetchImpl = async (url) => {
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
 t("editor is on the page", post.includes('src="/post-office/app"') && post.includes("Post Office editor") && post.includes("The full catalog:"));
+t("post office footer names the build", post.includes('id="post-office-build"') && post.includes("Post Office build "));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
 t("catalog spelling", post.includes("The full catalog:") && !post.includes("catalogue"));
 t("browser helpers define printingRank", clientHelpers().includes("function printingRank"));
@@ -82,10 +83,14 @@ const shell = [
   '<option value="art">Just art</option>',
   '<button id="make">Make the image</button>',
   '<input id="q" placeholder="Pokémon, artist, or set">',
+  "let INDEX = [], tray = [], blob = null;",
+  "</body>",
 ].join("\n");
 const patchedHtml = patchEditorHtml(shell, "2026-09-27");
 t("full editor keeps its tools", patchedHtml.includes("Compare both") && patchedHtml.includes("binder page") && patchedHtml.includes("Just art") && patchedHtml.includes("Make the image") && patchedHtml.includes("artist"));
-t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patchedHtml.includes('PRICES_AS_OF = "2026-09-27"') && patchedHtml.includes("TCGplayer market") && !patchedHtml.includes("sells for") && patchedHtml.includes("Facebook") && patchedHtml.includes("YouTube") && patchedHtml.includes("Instagram") && patchedHtml.includes("catchem.png") && !patchedHtml.includes('".jpg"'));
+t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patchedHtml.includes('PRICES_AS_OF = "2026-09-27"') && patchedHtml.includes("TCGplayer market") && !patchedHtml.includes("sells for") && patchedHtml.includes("Facebook") && patchedHtml.includes("YouTube") && patchedHtml.includes("Instagram") && patchedHtml.includes("catchem.png") && !patchedHtml.includes('".jpg"') && patchedHtml.includes("Write the post") && patchedHtml.includes("Ideas") && patchedHtml.includes("Copy all") && patchedHtml.includes("var INDEX = [], tray = []"));
+const stamped = patchEditorHtml(shell, "2026-09-27", "Post Office build abc1234 · 2026-09-28");
+t("editor stamp sits in the footer", stamped.includes('id="post-build"') && stamped.includes("Post Office build abc1234 · 2026-09-28") && stamped.indexOf("post-build") < stamped.lastIndexOf("</body>"));
 const pricedRows = patchPaperRows([
   ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
   ["ex13-104", "Pikachu ★", "Holon Phantoms", "2006", "", "Rare Holo Star", 3200],
@@ -106,6 +111,7 @@ const pricedRows = patchPaperRows([
   ["tcgcsv-shadow", "Charizard", "Base Set (Shadowless)", "4/102", "", "single", 5000, "", ""],
 ]);
 t("live market replaces the old figures", pricedRows.rows[0][6] === 345 && pricedRows.rows[1][6] === 900 && pricedRows.rows[2][6] === 2214.79 && pricedRows.rows[3][6] === 0);
+t("matched paper row keeps the catalog id", pricedRows.rows[0][22] === "tcgcsv-89171" && pricedRows.rows[3][22] == null);
 t("a zero live price stays unpriced", pricedRows.rows[4][6] === 0 && pricedRows.rows[5][6] === 0);
 t("base set does not take the shadowless price", pricedRows.rows[6][6] === 944.53);
 const feedHidden = await renderPath("/feed", fetchImpl);
@@ -136,7 +142,7 @@ resetQuota();
 resetCatalogCache();
 const anon = await worker.fetch(new Request("https://catchemtcg.com/api/ideas", { method: "POST", body: "{}" }), { SESSION_SECRET: "test-secret", PUBLIC_FETCH: fetchImpl });
 const anonBody = await anon.json();
-t("ideas require sign-in", anon.status === 401 && anonBody.card && anonBody.card.title);
+t("ideas require sign-in", anon.status === 401 && anonBody.card && anonBody.card.title && /Discord sign-in is not turned on yet/.test(anonBody.line) && anonBody.ready === false);
 const secret = "test-secret";
 const cookie = "ce_session=" + await signSession({ sub: "user-1", premium: false }, secret);
 let ideaHits = 0;
@@ -148,7 +154,8 @@ for (let i = 0; i < 4; i++) {
   }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
   if (i < 3) {
     const body = await res.json();
-    t("idea " + (i + 1) + " is from the catalog", res.status === 200 && body.ideas && body.ideas[0].includes("Umbreon") && body.ideas.join(" ").includes("TCGplayer market: $2,214.79 (2026-09-27)"));
+    t("idea " + (i + 1) + " is from the catalog", res.status === 200 && body.ideas && body.ideas[0].includes("Umbreon") && body.ideas.join(" ").includes("TCGplayer market: $2,214.79 (2026-09-27)") && body.ideas.every((line) => line.includes("Pokémon")));
+    t("idea quota counts down", body.quota && body.quota.left === 2 - i && body.quota.cap === 3);
   } else {
     const body = await res.json();
     ideaHits = res.status;
@@ -166,7 +173,32 @@ const textBody = await text.json();
 t("post text is three lines with the price", text.status === 200 && textBody.variations.length === 3 && textBody.variations.every((v) => v.includes("TCGplayer market: $2,214.79 (2026-09-27)")) && !/sells for|about 0|catalogue/i.test(textBody.variations.join(" ")));
 t("style prompt names the guide and the accent", STYLE_PROMPT.includes("POST-TEXT-STYLE-GUIDE.md") && STYLE_PROMPT.includes("Pokémon") && STYLE_PROMPT.includes("3"));
 const local = factPost([{ name: "Umbreon VMAX", printing: "215/203", edition: "Evolving Skies", artist: "Keiichiro Ito", price: "TCGplayer market: $2,214.79 (2026-09-27)" }]);
-t("fact post does not invent", local.length === 3 && local.every((v) => v.includes("Keiichiro Ito") || v.includes("Evolving Skies")));
+t("fact post does not invent", local.length === 3 && local.every((v) => v.includes("Keiichiro Ito") && v.includes("Evolving Skies") && v.includes("Pokémon") && v.includes("TCGplayer market: $2,214.79 (2026-09-27)")));
+const sampleCard = { name: "Umbreon VMAX", printing: "215/203", edition: "Evolving Skies", artist: "Keiichiro Ito", price: "TCGplayer market: $2,214.79 (2026-09-27)" };
+const toneNames = ["informative", "hype", "chill", "funny"];
+const tonePosts = toneNames.map((tone) => factPost([sampleCard], tone));
+t("tones change the text", new Set(tonePosts.map((lines) => lines[0])).size === 4 && tonePosts.every((lines) => lines.length === 3));
+const pocketCard = { name: "Pikachu", printing: "094", edition: "Genetic Apex", artist: "", price: "No market price" };
+const samples = tonePosts.concat([factPost([pocketCard], "informative")]);
+const bannedPost = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|invest|roi|crypto|nfts?|web3)\b|to the moon|about 0/i;
+t("five sample posts stay inside the rules", samples.length === 5 && samples.every((lines) => lines.length === 3 && lines.every((line) => line.includes("Pokémon") && !line.includes("Pokemon") && !bannedPost.test(line) && line.length <= 280 && (line.includes("Pikachu") ? !line.includes("TCGplayer market:") : line.includes("TCGplayer market: $2,214.79 (2026-09-27)")))));
+const signPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), { PUBLIC_FETCH: fetchImpl });
+const signHtml = await signPage.text();
+t("signed out sign-in is one line and not a button", signPage.status === 200 && signHtml.includes("Discord sign-in is not turned on yet") && !signHtml.includes("<button") && !signHtml.includes("/auth/discord"));
+const sessionOff = await worker.fetch(new Request("https://catchemtcg.com/api/session"), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+const sessionOffBody = await sessionOff.json();
+t("session tells a signed-out visitor how to sign in", sessionOff.status === 200 && sessionOffBody.signedIn === false && sessionOffBody.ready === false && /not turned on yet/.test(sessionOffBody.line));
+const sessionOn = await worker.fetch(new Request("https://catchemtcg.com/api/session", { headers: { cookie } }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+const sessionOnBody = await sessionOn.json();
+t("signed in session shows the free idea cap", sessionOn.status === 200 && sessionOnBody.signedIn === true && sessionOnBody.premium === false && sessionOnBody.ideas.cap === 3 && sessionOnBody.ideas.left === 0);
+const discordEnv = { SESSION_SECRET: secret, DISCORD_CLIENT_ID: "id", DISCORD_CLIENT_SECRET: "sec", PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS };
+const readyPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), discordEnv);
+const readyHtml = await readyPage.text();
+t("configured sign-in is a Discord link", readyHtml.includes('href="/auth/discord?next=/post-office"') && readyHtml.includes("Sign in with Discord") && !readyHtml.includes("<button"));
+const start = await worker.fetch(new Request("https://catchemtcg.com/auth/discord?next=/post-office"), discordEnv);
+t("discord sign-in leaves for Discord", start.status === 302 && String(start.headers.get("location")).startsWith("https://discord.com/oauth2/authorize?") && String(start.headers.get("location")).includes("client_id=id"));
+const badCb = await worker.fetch(new Request("https://catchemtcg.com/auth/discord/callback?code=x&state=nope"), discordEnv);
+t("discord callback rejects a bad state", (await badCb.text()).includes("did not finish"));
 
 const premium = "ce_session=" + await signSession({ sub: "pro", premium: true }, secret);
 resetQuota();

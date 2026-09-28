@@ -164,6 +164,7 @@ export function patchPaperRows(rows, lite) {
     }
     if (found) {
       copy[6] = Math.round(found.price * 100) / 100;
+      copy[22] = found.id;
       if (copy.length > 18) copy[18] = 0;
       matched += 1;
     } else if (copy.length > 6) {
@@ -231,7 +232,206 @@ const SIZE_JS = `<script id="sizes-boot">
 })();
 </script>`;
 
-export function patchEditorHtml(html, asOf) {
+const AI_JS = `<script id="ai-boot">
+(function(){
+  var tone = "informative";
+  var seat = null;
+  var signInHref = "/auth/discord?next=/post-office";
+  function boot(){
+    var dl = document.getElementById("dl");
+    if (!dl || document.getElementById("ai-panel")) return;
+    var panel = document.createElement("div");
+    panel.id = "ai-panel";
+    panel.style.cssText = "margin:12px 0 20px;padding:12px;border:1px solid #3a3428;border-radius:12px";
+    var anchor = document.getElementById("sizes") || dl;
+    anchor.parentNode.insertBefore(panel, anchor.nextSibling);
+    load(panel);
+  }
+  function ids(){
+    var tray = window.tray || [];
+    var out = [];
+    for (var i = 0; i < tray.length && out.length < 4; i++) {
+      var c = tray[i] || {};
+      var id = c.cid || "";
+      if (!id && String(c.i || "").indexOf("tcgp-") === 0) id = c.i;
+      if (!id && c.i) id = String(c.i);
+      if (id && out.indexOf(id) < 0) out.push(id);
+    }
+    return out;
+  }
+  function showLine(panel, text, href){
+    panel.innerHTML = "";
+    var p = document.createElement("p");
+    p.id = "ai-line";
+    p.style.cssText = "margin:0;color:#d9c7a2";
+    if (href) {
+      var a = document.createElement("a");
+      a.href = href;
+      a.textContent = "Sign in with Discord";
+      p.appendChild(a);
+      p.appendChild(document.createTextNode(" to use Ideas. A free seat is 3 a day. Premium is 50 a day."));
+    } else {
+      p.textContent = text;
+    }
+    panel.appendChild(p);
+  }
+  function quotaText(view){
+    var bits = [];
+    if (view && view.ideas) bits.push("Ideas left today: " + view.ideas.left);
+    if (view && view.post) bits.push("Post text left today: " + view.post.left);
+    return bits.join(". ") + (view && view.premium ? ". Premium." : ". Free.");
+  }
+  function controls(panel, view){
+    seat = view;
+    panel.innerHTML = "";
+    var quota = document.createElement("p");
+    quota.id = "ai-quota";
+    quota.style.cssText = "margin:0 0 8px;color:#d9c7a2";
+    quota.textContent = quotaText(view);
+    panel.appendChild(quota);
+    var idea = document.createElement("button");
+    idea.type = "button";
+    idea.className = "sec";
+    idea.id = "go-idea";
+    idea.textContent = "Ideas";
+    idea.onclick = function(){ ask(panel, "/api/ideas"); };
+    panel.appendChild(idea);
+    var tones = document.createElement("div");
+    tones.id = "ai-tones";
+    tones.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:8px 0";
+    ["informative", "hype", "chill", "funny"].forEach(function(name){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "sec";
+      b.setAttribute("data-tone", name);
+      b.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      b.setAttribute("aria-pressed", name === tone ? "true" : "false");
+      b.onclick = function(){
+        tone = name;
+        tones.querySelectorAll("button").forEach(function(n){
+          n.setAttribute("aria-pressed", n.getAttribute("data-tone") === tone ? "true" : "false");
+        });
+      };
+      tones.appendChild(b);
+    });
+    panel.appendChild(tones);
+    var write = document.createElement("button");
+    write.type = "button";
+    write.className = "go";
+    write.id = "go-text";
+    write.textContent = "Write the post";
+    write.onclick = function(){ ask(panel, "/api/post-text"); };
+    panel.appendChild(write);
+    var out = document.createElement("div");
+    out.id = "ai-out";
+    panel.appendChild(out);
+  }
+  function copy(text, button){
+    var done = function(){ button.textContent = "Copied"; };
+    function fallback(){
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (err) {}
+      ta.remove();
+      done();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else fallback();
+  }
+  function showLines(lines){
+    var out = document.getElementById("ai-out");
+    if (!out) return;
+    out.innerHTML = "";
+    var all = [];
+    lines.forEach(function(text){
+      all.push(text);
+      var p = document.createElement("p");
+      p.textContent = text;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "sec";
+      b.textContent = "Copy";
+      b.onclick = function(){ copy(text, b); };
+      out.appendChild(p);
+      out.appendChild(b);
+    });
+    var every = document.createElement("button");
+    every.type = "button";
+    every.id = "go-copy";
+    every.className = "sec";
+    every.textContent = "Copy all";
+    every.onclick = function(){ copy(all.join("\\n\\n"), every); };
+    out.appendChild(every);
+  }
+  function ask(panel, path){
+    var picked = ids();
+    var out = document.getElementById("ai-out");
+    if (!picked.length) {
+      if (out) out.textContent = "Pick a card from the live catalog first.";
+      return;
+    }
+    if (out) out.textContent = "Working…";
+    fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: picked, tone: tone, platform: "x" })
+    }).then(function(res){
+      return res.json().then(function(data){ return { status: res.status, data: data || {} }; });
+    }).then(function(pack){
+      var data = pack.data;
+      if (pack.status === 401) {
+        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.", data.ready ? signInHref : "");
+        return;
+      }
+      if (data.card && !data.ideas && !data.variations) {
+        if (out) out.textContent = (data.card.title ? data.card.title + ". " : "") + (data.card.body || "");
+        return;
+      }
+      var lines = data.ideas || data.variations || [];
+      if (!lines.length) {
+        if (out) out.textContent = data.error || "Nothing came back.";
+        return;
+      }
+      showLines(lines);
+      if (data.quota) {
+        if (!seat) seat = {};
+        if (path.indexOf("post-text") >= 0) seat.post = data.quota;
+        else seat.ideas = data.quota;
+        var quota = document.getElementById("ai-quota");
+        if (quota) quota.textContent = quotaText(seat);
+      }
+    }).catch(function(){
+      if (out) out.textContent = "Ideas did not load.";
+    });
+  }
+  function load(panel){
+    fetch("/api/session").then(function(r){ return r.json(); }).then(function(view){
+      if (!view || !view.signedIn) {
+        showLine(panel, (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.", view && view.ready ? signInHref : "");
+      } else {
+        controls(panel, view);
+      }
+    }).catch(function(){
+      showLine(panel, "Ideas did not load.", false);
+    });
+  }
+  boot();
+  setTimeout(boot, 0);
+})();
+</script>`;
+
+function escStamp(value) {
+  return String(value || "")
+    .split("&").join("&amp;")
+    .split("<").join("&lt;")
+    .split(">").join("&gt;")
+    .split('"').join("&quot;");
+}
+
+export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
   let out = String(html || "");
@@ -246,8 +446,15 @@ export function patchEditorHtml(html, asOf) {
   out = out.split(' + " for about " + ').join(' + " — TCGplayer market $" + ');
   out = out.split('? fname() : "catchem") + ".jpg"').join('? fname() : "catchem.png")');
   out = out.split('? fname() : "catchem") + (b.type.indexOf("jpeg") >= 0 ? ".jpg" : ".png")').join('? fname() : "catchem.png")');
+  out = out.split("if (r[21]) o.mech = r[21];").join("if (r[21]) o.mech = r[21];\n  if (r[22]) o.cid = r[22];");
+  out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   if (!out.includes('id="sizes-boot"')) out += SIZE_JS;
+  if (!out.includes('id="ai-boot"')) out += AI_JS;
+  if (mark && !out.includes('id="post-build"')) {
+    const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
+    out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;
+  }
   return out;
 }
 
@@ -264,9 +471,9 @@ export function resetEditorCache() {
   htmlCache.clear();
 }
 
-export async function editorDocument(asOf, fetchImpl = fetch) {
+export async function editorDocument(asOf, fetchImpl = fetch, mark = "") {
   const raw = await textOf(EDITOR_URL, fetchImpl);
-  return patchEditorHtml(raw, asOf);
+  return patchEditorHtml(raw, asOf, mark);
 }
 
 export async function patchedPaper(fetchImpl = fetch) {
