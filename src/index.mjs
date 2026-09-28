@@ -3,7 +3,7 @@ import { loadJson, proxyPublic } from "./data.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
-  renderPost, renderReceipts, renderSearch, renderSetShell, renderSets,
+  renderPost, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -36,6 +36,9 @@ export function pageKind(pathname) {
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
   if (path === "/accuracy") return "accuracy";
+  if (path === "/faq") return "faq";
+  if (path === "/build") return "build";
+  if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
@@ -80,7 +83,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return html(renderSetShell(slug, stamp));
     } catch {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
-      return go(map?.sets?.[slug] || "/sets");
+      const dest = map?.sets?.[slug];
+      if (dest) return go(dest);
+      return html(`<main class="wrap"><h1>Set not found</h1><p class="muted">That set slug is not in the catalog.</p><p><a href="/sets">All sets</a></p></main>`, 404);
     }
   }
   if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp));
@@ -94,7 +99,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const cardId = decodeURIComponent(raw);
     if (!cardId.startsWith("tcgcsv-")) {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
-      return go(map?.products?.[cardId] || "/search");
+      const dest = map?.products?.[cardId];
+      if (dest) return go(dest);
+      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
@@ -106,6 +113,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp));
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp));
+  if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind));
   if (kind === "post") return html(renderPost(stamp, pageOpts));
   return null;
 }
