@@ -24,6 +24,8 @@ run(process.execPath, [join(APP, "scripts/build-public-site.mjs")], {
 });
 cpSync(join(APP, "site-public"), OUT, { recursive: true });
 await writePublicRoutes(OUT);
+const videoSrc = join(ROOT, "vendor/video");
+if (existsSync(videoSrc)) cpSync(videoSrc, join(OUT, "video"), { recursive: true });
 
 // Refuse to hand wrangler a partial site: an assets deploy replaces everything.
 const must = ["index.html", "build.html", "methodology.html", "corrections.html",

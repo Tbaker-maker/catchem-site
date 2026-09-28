@@ -9,7 +9,7 @@ const t = (name, cond) => {
 };
 
 const BANNED = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|roi|invest(?:ing|ment|or)?s?|crypto|nfts?|web3|dsk|tickers?|tapes?)\b/i;
-const LOCKED = "The full catalogue: every card and every artist. Pick one and the post is ready for X or Facebook.";
+const LOCKED = "The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.";
 
 function clean(html) {
   return String(html).replaceAll(LOCKED, "LOCKED");
