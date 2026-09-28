@@ -24,7 +24,7 @@ export function redirectPath(pathname) {
 
 export function isFeedPath(pathname) {
   const path = normalize(pathname);
-  return path === "/feed" || path === "/pulse";
+  return path === "/pulse";
 }
 
 export function formatPt(iso) {

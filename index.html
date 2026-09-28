@@ -27,7 +27,7 @@
 <style>
 :root{
   --bg:#12100e; --panel:#1a1815; --panel-2:#211e1a; --line:#2f2b26; --line-2:#403a33;
-  --text:#efe9de; --soft:#b3aa9c; --faint:#9a9184;
+  --text:#efe9de; --soft:#c4baab; --faint:#c4baab;
   --gold:#d9b779; --gold-ink:#1a1407; --red:#e0675b; --blue:#6f9be8; --green:#7fc79a;
   --serif:'Fraunces',Georgia,'Times New Roman',serif;
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
@@ -37,7 +37,7 @@
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;overflow-x:hidden}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
 body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.6 var(--sans);
-  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;padding-bottom:76px}
 a{color:var(--gold)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
 .skip{position:absolute;left:-9999px;top:8px;background:var(--gold);color:var(--gold-ink);padding:8px 12px;border-radius:8px;font-weight:600;z-index:10}
@@ -46,7 +46,7 @@ a{color:var(--gold)}
 .site-bar .logo{font:600 28px/1 var(--serif);color:var(--text);text-decoration:none;letter-spacing:-.03em}
 .site-bar .logo span{color:var(--gold)}
 .site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}
-.site-bar nav a{color:var(--soft);text-decoration:none;font:500 14.5px/1 var(--sans)}
+.site-bar nav a{color:var(--soft);text-decoration:none;font:500 14.5px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center}
 .site-bar nav a:hover{color:var(--gold)}
 .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
 
@@ -129,7 +129,7 @@ label.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 
 .field{display:flex;gap:10px;flex-wrap:wrap}
 input[type=email]{flex:1 1 240px;min-height:52px;background:var(--bg);border:1px solid var(--line-2);border-radius:10px;
   color:var(--text);padding:0 16px;font:400 17px var(--sans)}
-input[type=email]::placeholder{color:#8a8175}
+input[type=email]::placeholder{color:#c4baab}
 input[type=email]:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
 .field .btn{min-height:52px;flex:0 0 auto}
 @media (max-width:480px){.field .btn{flex:1 1 100%}}
@@ -149,6 +149,16 @@ footer a{color:var(--gold)}
 .premium p{margin:0;color:var(--soft);max-width:62ch}
 .premium b{color:var(--text)}
 .premium .btn{flex:0 0 auto}
+.counts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.counts b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:44px}
+.counts b span{display:block;font:400 12px/1.3 var(--sans);color:var(--soft);font-weight:400}
+.reads{display:grid;gap:12px}
+@media (min-width:760px){.reads{grid-template-columns:repeat(3,1fr)}}
+.read{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px;min-height:44px}
+.read a{color:var(--text);text-decoration:none;font:600 18px/1.3 var(--serif)}
+.read a:hover{color:var(--gold)}
+.dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6}
+.dock a{color:var(--soft);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
 </style>
 </head>
 <body>
@@ -157,8 +167,10 @@ footer a{color:var(--gold)}
   <a class="logo" href="/">Catch'em<span>.</span></a>
   <nav>
     <a href="/feed">The Feed</a>
-    <a href="/board">Board</a>
-    <a href="/methodology">Methodology</a>
+    <a href="/sets">Sets</a>
+    <a href="/board">Movers</a>
+    <a href="/artists">Artists</a>
+    <a href="/post-office">Post Office</a>
     <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
   </nav>
 </header>
@@ -173,12 +185,12 @@ footer a{color:var(--gold)}
   <div>
     <p class="kicker">Free Pokémon TCG tools</p>
     <h1>Know what to rip.</h1>
-    <p class="lede"><strong>Free tools and a community for Pokémon collectors.</strong> Market reads in seconds, posts ready in a click, and giveaways every month.</p>
+    <p class="lede"><strong>Free tools for collectors, rippers and flippers.</strong> One read at a time, the full catalog when you want it, and a community on Discord.</p>
     <div class="actions">
-      <a class="btn btn-primary" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join the Discord</a>
-      <a class="btn btn-ghost" href="#list">Get on the list</a>
+      <a class="btn btn-primary" href="/feed">Open The Feed</a>
+      <a class="btn btn-ghost" href="/sets">Browse sets</a>
     </div>
-    <p class="beta"><b>Early beta</b><span>Get on the list and test new tools before anyone else.</span></p>
+    <p class="beta" id="fresh"><b>Open</b><span id="fresh-line">Catalog counts load from the public bundle.</span></p>
   </div>
 </header>
 
@@ -200,6 +212,7 @@ footer a{color:var(--gold)}
       <span class="tag">Opening soon</span>
       <h3>Post Office</h3>
       <p>The full catalogue: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+      <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
       <span class="tag open">Open now</span>
@@ -217,15 +230,31 @@ footer a{color:var(--gold)}
   </div>
 </section>
 
+<section class="section" id="catalog" aria-labelledby="catalog-h">
+  <div class="head">
+    <h2 id="catalog-h">The catalog</h2>
+    <p id="catalog-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
+  </div>
+  <div class="counts" id="counts"></div>
+</section>
+
+<section class="section" id="preview" aria-labelledby="preview-h" hidden>
+  <div class="head">
+    <h2 id="preview-h">Three reads</h2>
+    <p><a href="/feed">The rest of The Feed</a></p>
+  </div>
+  <div class="reads" id="reads"></div>
+</section>
+
 <section class="premium" aria-label="Discord Premium">
-  <p><b>Discord Premium is $14.99/mo.</b> Paid Discord perks, if you want them. The tools on this page stay free.</p>
+  <p><b>Discord Premium is $14.99/mo.</b> It is a Discord seat. Stadium giveaways seat Premium members automatically. The first 222 seats are numbered and never reissued. The tools on this site stay free.</p>
   <a class="btn btn-primary" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join Discord</a>
 </section>
 
 <section class="join" id="list" aria-labelledby="list-h">
   <div>
     <h2 id="list-h">Get on the list</h2>
-    <p class="lead">One email when The Feed and Post Office open. Nothing else unless you tick the box. The tools stay free.</p>
+    <p class="lead">One email when Post Office opens. The Feed is already open. Nothing else unless you tick the box. The tools stay free.</p>
   </div>
   <div>
     <form id="wl" action="https://formspree.io/f/xgorlypa" method="POST">
@@ -244,7 +273,7 @@ footer a{color:var(--gold)}
       <input class="hp" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true">
     </form>
     <p class="status" id="status" role="status" aria-live="polite"></p>
-    <p class="priv">One address, nothing else. We will not sell it, and you can leave in one click.</p>
+    <p class="priv">One address, nothing else. We do not pass it on, and you can leave in one click.</p>
   </div>
 </section>
 
@@ -253,11 +282,43 @@ footer a{color:var(--gold)}
 
 <footer>
   <div class="wrap">
-    <p>Made by one person who collects. Card images and names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is an independent fan project and is not affiliated with or endorsed by them.</p>
-    <p><a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>
+    <p>Made by one person who collects. Card images and names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p>
+    <p><a href="/methodology">How the numbers are made</a> · <a href="/receipts">Receipts</a> · <a href="/search">Search</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>
   </div>
 </footer>
-
+<nav class="dock" aria-label="Primary">
+  <a href="/feed">The Feed</a>
+  <a href="/sets">Sets</a>
+  <a href="/board">Movers</a>
+  <a href="/artists">Artists</a>
+  <a href="/search">Search</a>
+</nav>
+<script>
+(function(){
+  function money(n){ n=Number(n); if(!(n>0)) return ""; return "$"+n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function text(s){ return String(s==null?"":s).replace(/[&<>]/g,""); }
+  fetch("/data/counts.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(c){
+    var bits=[["items","items"],["single","singles"],["sealed","sealed"],["slab","slabs"]];
+    document.getElementById("counts").innerHTML=bits.map(function(b){
+      var n=Number(c[b[0]]);
+      if(!Number.isFinite(n)) return "";
+      return "<b>"+n.toLocaleString("en-US")+"<span>"+b[1]+"</span></b>";
+    }).join("");
+    var line=document.getElementById("fresh-line");
+    if(c.asOf) line.textContent="Updated "+c.asOf+" · TCGplayer market · "+Number(c.sets||0).toLocaleString("en-US")+" sets";
+  }).catch(function(){});
+  fetch("/data/reads.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){
+    var rows=(d.reads||[]).filter(function(r){ return r && r.headline && money(r.price); }).slice(0,3);
+    if(!rows.length) return;
+    var box=document.getElementById("preview");
+    box.hidden=false;
+    document.getElementById("reads").innerHTML=rows.map(function(r){
+      var pct=Number.isFinite(Number(r.changePct)) ? ((r.changePct>0?"+":"")+r.changePct+"%") : "";
+      return '<article class="read"><a href="/feed/r/'+encodeURIComponent(r.id)+'">'+text(r.headline)+'</a><p class="priv" style="margin:0">'+money(r.price)+(pct?" · "+pct:"")+' · '+text(r.confidence||"")+'</p></article>';
+    }).join("");
+  }).catch(function(){});
+})();
+</script>
 <script>
 // Submit in place. If fetch fails, fall back to a normal POST so a signup is never lost.
 (function(){
@@ -271,7 +332,7 @@ footer a{color:var(--gold)}
     fetch(f.action,{method:"POST",body:new FormData(f),headers:{Accept:"application/json"}})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok, j:j}; }); })
       .then(function(res){
-        if(res.ok){ f.hidden=true; s.className="status ok"; s.textContent="You're on the list. One email when they open."; return; }
+        if(res.ok){ f.hidden=true; s.className="status ok"; s.textContent="You're on the list. One email when Post Office opens."; return; }
         var msg=(res.j&&res.j.errors&&res.j.errors[0]&&res.j.errors[0].message)||"That did not go through.";
         s.className="status err"; s.textContent=msg.charAt(0).toUpperCase()+msg.slice(1)+". Check the address and try again.";
         b.disabled=false; b.textContent="Request access";
