@@ -63,7 +63,7 @@ t("board, receipts, and accuracy are hidden without the flag",
   && (await renderPath("/feed/r/box-etb", fetchImpl)).status === 302);
 const feed = await renderPath("/feed", fetchImpl, { feed: true });
 const feedHtml = await feed.text();
-t("the feed is one read at a time", feed.status === 200 && feedHtml.includes("scroll-snap-type:y mandatory") && feedHtml.includes("min(420px,100%)") && feedHtml.includes("Caught up") && feedHtml.includes("$14.99/mo") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN"));
+t("the feed is a sectioned list", feed.status === 200 && feedHtml.includes("Today") && feedHtml.includes("Load more") && feedHtml.includes("Set alert") && feedHtml.includes(">Up") && feedHtml.includes("Sideways") && feedHtml.includes("Watches") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN") && !feedHtml.includes("scroll-snap-type"));
 t("the feed names Pokémon and hides a missing image price", feedHtml.includes("Pokémon") && !/(\$0|\$null|\$NaN)/.test(feedHtml));
 const deep = await (await renderPath("/feed/r/box-etb", fetchImpl, { feed: true })).text();
 t("a deep link starts on that read", deep.includes('id="start"') && deep.includes("box-etb"));
@@ -105,7 +105,8 @@ const app = await worker.fetch(new Request("https://catchemtcg.com/app"), env);
 t("app does not land on the feed", app.status === 301 && new URL(app.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 const on = { ...env, FEED_ENABLED: "true" };
 const opened = await worker.fetch(new Request("https://catchemtcg.com/feed"), on);
-t("the worker serves shorts when the flag is on", (await opened.text()).includes("scroll-snap-type"));
+const openedHtml = await opened.text();
+t("the worker serves the feed when the flag is on", openedHtml.includes("The Feed") && openedHtml.includes("Load more"));
 const movedOn = await worker.fetch(new Request("https://catchemtcg.com/movers"), on);
 t("movers redirects to the board when the flag is on", movedOn.status === 301 && movedOn.headers.get("location").endsWith("/board"));
 const pulseOn = await worker.fetch(new Request("https://catchemtcg.com/pulse"), on);
