@@ -142,12 +142,11 @@ a{color:var(--gold)}
   .site-bar nav{display:none;position:absolute;top:100%;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
 }
-@media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
-.chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
-.chart{height:180px;min-height:180px;flex:none}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6}
 .dock a{color:var(--dim);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
 .dock a[aria-current="page"]{color:var(--gold)}
+.chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
+.chart{height:180px;min-height:180px;flex:none}
 .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 32px;overflow-x:hidden}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
@@ -176,7 +175,8 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
   .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
 }
-@media (min-width:1280px){.dock{display:none}body{padding-bottom:24px}.site-bar nav{display:flex}}
+@media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
+@media (min-width:1280px){.site-bar nav{display:flex}}
 `;
 
 function chrome(active, body, title, stamp) {
@@ -550,7 +550,8 @@ function slide(r,i){
   el.className="slide"; el.id="r-"+r.id; el.dataset.i=i;
   const pct=Number.isFinite(r.changePct)?(r.changePct>0?"+":"")+r.changePct+"%":"no day-to-day change";
   const img=r.image && !/ebay/i.test(r.image)?'<img alt="" width="320" height="240" src="'+r.image.replace(/"/g,"")+'" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'ph\\',textContent:\\'No stock image\\'}))">':'<div class="ph">No stock image</div>';
-  const shortLink = opts.video ? '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>' : "";
+  const showShort = ${opts.video ? "true" : "false"};
+  const shortLink = showShort ? '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>' : "";
   el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+' · '+r.type+' · '+r.confidence+'</p>'+img+'<h2 style="font:500 22px/1.2 var(--serif);margin:0">'+html(r.headline)+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+pct+' · '+html(r.source)+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button> '+shortLink+'</div><div class="more"><p>'+html(r.why||"")+'</p><p class="muted">Sales counts are not in this feed. '+(r.low>0?"Lowest listed price is a listing, not this market price.":"No lowest listed price is stored on this read.")+'</p><p class="muted">Confidence: '+html(r.confidence||"Early")+'. Source: '+html(r.source||"TCGplayer market")+'. </p><p><a href="'+html(r.href)+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
   el.querySelector(".slot").appendChild(chart(r.hist&&r.hist.length?r.hist:r.history));
   el.querySelector("[data-act=more]").onclick=()=>el.querySelector(".more").classList.toggle("open");
