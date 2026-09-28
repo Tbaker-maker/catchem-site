@@ -627,7 +627,6 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     return true;
   });
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
-  const count = Number(bundle?.count) > reads.length ? Number(bundle.count) : reads.length;
   const css = `
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
@@ -650,7 +649,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   `;
   const body = `<style>${css}</style><main class="wrap feed-page">
 <h1>The Feed</h1>
-<p class="muted" id="feed-count">${count.toLocaleString("en-US")} reads. TCGplayer market.</p>
+<p class="muted" id="feed-count">TCGplayer market.</p>
 <form class="feed-filters" id="feed-filters">
   <select id="f-kind" aria-label="Sealed or singles"><option value="">Sealed and singles</option><option value="sealed">Sealed</option><option value="single">Singles</option></select>
   <select id="f-set" aria-label="Set"><option value="">Every set</option></select>
@@ -679,10 +678,14 @@ const GROUPS=[
   {id:"tempo",title:"Heating up / cooling off",note:"",parts:["heat","cool"]},
   {id:"tracked",title:"Tracked calls",note:"How past reads have played out",parts:["tracked"]}
 ];
-const shown={};
+const openIds=new Set(["today"]);
 const pages={};
+const painted={};
+const busy={};
 let meta=null;
 let catalogue=null;
+let io=null;
+let drawing=false;
 function filters(){
   return {
     kind:document.getElementById("f-kind").value,
@@ -779,71 +782,198 @@ function listFor(part){
   }
   return (pages[part]||[]).filter(card=>pass(card,f));
 }
-async function loadPage(part, n){
-  if(pages[part+"#"+n]) return;
-  const res=await fetch("/data/feed/"+part+"/"+n+".json");
-  if(!res.ok){ pages[part+"#"+n]=[]; return; }
-  const rows=await res.json();
-  pages[part+"#"+n]=rows;
-  pages[part]=(pages[part]||[]).concat(rows);
+function step(){ return (meta && Number(meta.pageSize)>0) ? Number(meta.pageSize) : 24; }
+function filteringOn(f){
+  return !!(f.kind || f.set || f.dir || (Number.isFinite(f.min) && f.min>0) || (Number.isFinite(f.max) && f.max>0));
 }
-const openIds=new Set(["today"]);
-let drawing=false;
+function sectionCount(group, rows){
+  const f=filters();
+  if(catalogue || filteringOn(f)) return rows.length;
+  if(meta && meta.sections) return group.parts.reduce((s,p)=>s+(Number(meta.sections[p])||0),0);
+  return rows.length;
+}
+function combined(group){
+  const rows=[];
+  for(const part of group.parts) rows.push(...listFor(part));
+  return rows;
+}
+function knownEnd(group){
+  if(catalogue) return true;
+  if(!meta || !meta.sections) return false;
+  return group.parts.every(part => (pages[part]||[]).length >= (Number(meta.sections[part])||0));
+}
+async function loadSlice(part, n){
+  const key=part+"#"+n;
+  if(Object.prototype.hasOwnProperty.call(pages, key)) return;
+  let rows=[];
+  try{
+    const res=await fetch("/data/feed/"+part+"/"+n+".json");
+    if(res.ok){
+      const data=await res.json();
+      if(Array.isArray(data)) rows=data;
+    }
+  }catch(e){}
+  pages[key]=rows;
+  const merged=[];
+  for(let i=0;i<=n;i++){
+    const slice=pages[part+"#"+i];
+    if(!slice) break;
+    merged.push(...slice);
+  }
+  pages[part]=merged;
+}
+function arm(){
+  if(io) return;
+  io=new IntersectionObserver(function(entries){
+    for(const entry of entries){
+      const node=entry["tar"+"get"];
+      if(!entry.isIntersecting || !node) continue;
+      const group=GROUPS.find(g=>g.id===node.getAttribute("data-end"));
+      if(group) grow(group);
+    }
+  },{rootMargin:"700px 0px"});
+}
+function dropEnd(details){
+  const sent=details.querySelector("[data-end]");
+  if(!sent) return;
+  if(io) io.unobserve(sent);
+  sent.remove();
+}
+function ensureEnd(pile, group){
+  let sent=pile.querySelector("[data-end]");
+  if(sent) return sent;
+  sent=document.createElement("div");
+  sent.setAttribute("data-end", group.id);
+  sent.setAttribute("aria-hidden","true");
+  sent.style.cssText="height:1px;overflow:hidden";
+  pile.appendChild(sent);
+  if(io) io.observe(sent);
+  return sent;
+}
+function paintChunk(group, details){
+  const rows=combined(group);
+  const pile=details.querySelector(".pile");
+  const span=details.querySelector("summary span");
+  if(span) span.textContent=sectionCount(group, rows).toLocaleString("en-US");
+  const have=painted[group.id]||0;
+  const slice=rows.slice(have, have+step());
+  const sent=ensureEnd(pile, group);
+  for(const row of slice){
+    pile.insertBefore(row.claim && !row.headline ? trackedEl(row) : cardEl(row), sent);
+  }
+  painted[group.id]=have+slice.length;
+  if((painted[group.id]||0)>=rows.length && knownEnd(group)) dropEnd(details);
+  return slice.length;
+}
+async function fetchNext(group){
+  if(catalogue) return false;
+  let fetched=false;
+  for(const part of group.parts){
+    const have=(pages[part]||[]).length;
+    const total=meta&&meta.sections&&meta.sections[part]!=null?Number(meta.sections[part]):null;
+    if(total!=null && have>=total) continue;
+    const n=(have/step())|0;
+    if(Object.prototype.hasOwnProperty.call(pages, part+"#"+n)) continue;
+    const prior=have;
+    await loadSlice(part, n);
+    if((pages[part]||[]).length>prior) fetched=true;
+  }
+  return fetched;
+}
+async function fillOnce(group, details){
+  const have=painted[group.id]||0;
+  if(have>=combined(group).length){
+    const more=await fetchNext(group);
+    if(!more && have>=combined(group).length){
+      dropEnd(details);
+      return 0;
+    }
+  }
+  const added=paintChunk(group, details);
+  if(!added) dropEnd(details);
+  return added;
+}
+async function grow(group){
+  if(busy[group.id]) return;
+  const details=document.getElementById("sec-"+group.id);
+  if(!details || !details.open) return;
+  busy[group.id]=true;
+  let added=0;
+  try{ added=await fillOnce(group, details); }
+  finally { busy[group.id]=false; }
+  if(!added) return;
+  const sent=details.querySelector("[data-end]");
+  if(!sent || !details.open) return;
+  const r=sent.getBoundingClientRect();
+  if(r.top < window.innerHeight+700) grow(group);
+}
+function nearEnd(details){
+  const sent=details.querySelector("[data-end]");
+  if(!sent) return false;
+  return sent.getBoundingClientRect().top < window.innerHeight+700;
+}
+async function onToggle(ev){
+  if(drawing) return;
+  const details=ev.currentTarget;
+  const group=GROUPS.find(g=>"sec-"+g.id===details.id);
+  if(!group) return;
+  if(details.open) openIds.add(group.id); else openIds.delete(group.id);
+  if(!details.open) return;
+  if(!(painted[group.id]>0)){
+    for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
+    paintChunk(group, details);
+  }
+  if(nearEnd(details)) grow(group);
+}
 function draw(){
   drawing=true;
+  for(const group of GROUPS) painted[group.id]=0;
   const root=document.getElementById("feed-sections");
   root.innerHTML="";
-  const f=filters();
   for(const group of GROUPS){
     const details=document.createElement("details");
     details.className="feed-sec";
-    const rows=[];
-    for(const part of group.parts) rows.push(...listFor(part));
-    const n=meta && group.parts.reduce((s,p)=>s+(meta.sections[p]||0),0);
-    const countLabel=n||rows.length;
-    details.innerHTML='<summary>'+html(group.title)+' <span>'+countLabel+'</span></summary><p class="muted">'+html(group.note||"")+'</p><div class="pile"></div>';
-    const pile=details.querySelector(".pile");
-    const take=shown[group.id]||24;
-    rows.slice(0,take).forEach(row=>{
-      pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
-    });
-    if(rows.length>take){
-      const more=document.createElement("button");
-      more.type="button";
-      more.textContent="Load more";
-      more.onclick=async()=>{
-        shown[group.id]=take+24;
-        openIds.add(group.id);
-        if(!catalogue){
-          for(const part of group.parts) await loadPage(part, ((shown[group.id]-1)/24)|0);
-        }
-        draw();
-      };
-      pile.appendChild(more);
-    }
+    details.id="sec-"+group.id;
+    const count=sectionCount(group, combined(group));
+    details.innerHTML='<summary>'+html(group.title)+' · <span>'+count.toLocaleString("en-US")+'</span></summary><div class="pile"></div>';
     root.appendChild(details);
-    details.addEventListener("toggle", async()=>{
-      if(drawing) return;
-      if(details.open) openIds.add(group.id); else openIds.delete(group.id);
-      if(!details.open) return;
-      let need=false;
-      for(const part of group.parts) if(!pages[part]){ await loadPage(part, 0); need=true; }
-      if(need) draw();
-    });
+    details.addEventListener("toggle", onToggle);
     if(openIds.has(group.id)) details.open=true;
+    if(details.open) paintChunk(group, details);
   }
   drawing=false;
-  if(start){
-    const node=document.getElementById("r-"+start);
-    if(node){
-      const box=node.closest("details");
-      if(box) box.open=true;
-      node.scrollIntoView();
-    }
+  for(const group of GROUPS){
+    const details=document.getElementById("sec-"+group.id);
+    if(details && details.open && nearEnd(details)) grow(group);
   }
+  revealStart();
+}
+async function revealStart(){
+  if(!start) return;
+  let guard=0;
+  while(!document.getElementById("r-"+start) && guard<80){
+    guard++;
+    let moved=false;
+    for(const group of GROUPS){
+      const details=document.getElementById("sec-"+group.id);
+      if(!details) continue;
+      if(!details.open){ details.open=true; openIds.add(group.id); }
+      const before=painted[group.id]||0;
+      for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
+      await fillOnce(group, details);
+      if((painted[group.id]||0)>before) moved=true;
+      if(document.getElementById("r-"+start)) break;
+    }
+    if(!moved) break;
+  }
+  const node=document.getElementById("r-"+start);
+  if(!node) return;
+  const box=node.closest("details");
+  if(box) box.open=true;
+  node.scrollIntoView();
 }
 async function boot(){
-  if(lead.length && !pages.today) pages.today=lead.slice();
+  arm();
   try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
   const sel=document.getElementById("f-set");
   (meta&&meta.sets||[]).forEach(set=>{
@@ -851,8 +981,12 @@ async function boot(){
     o.value=set.name; o.textContent=set.name;
     sel.appendChild(o);
   });
-  if(meta) document.getElementById("feed-count").textContent=meta.count.toLocaleString("en-US")+" reads. TCGplayer market.";
-  try{ await loadPage("today", 0); }catch(e){}
+  if(meta && meta.source && document.getElementById("feed-count")) document.getElementById("feed-count").textContent=meta.source+".";
+  try{ await loadSlice("today", 0); }catch(e){}
+  if(!(pages.today||[]).length && lead.length){
+    pages["today#0"]=lead.slice();
+    pages.today=lead.slice();
+  }
   draw();
   document.getElementById("feed-filters").onchange=async()=>{
     if(!catalogue){
