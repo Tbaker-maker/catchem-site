@@ -151,12 +151,14 @@ export default {
         }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
     }
+    if ((request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/build") {
+      return Response.redirect(new URL("/post-office", url), 301);
+    }
     if (request.method === "GET") {
       const dest = redirectPath(url.pathname);
       if (dest) return Response.redirect(new URL(dest, url), 301);
       if (norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
-      if (norm(url.pathname) === "/build") return Response.redirect(new URL("/post-office", url), 301);
       const kind = pageKind(url.pathname);
       if (kind && kind !== "data") {
         try {

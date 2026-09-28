@@ -98,6 +98,8 @@ const opened = await worker.fetch(new Request("https://catchemtcg.com/video/stud
 t("query string is not the gate", opened.status === 200);
 const build = await worker.fetch(new Request("https://catchemtcg.com/build"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("build stays on this site", build.status === 301 && new URL(build.headers.get("location"), "https://catchemtcg.com").pathname === "/post-office");
+const buildHead = await worker.fetch(new Request("https://catchemtcg.com/build", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
+t("build head stays on this site", buildHead.status === 301 && new URL(buildHead.headers.get("location"), "https://catchemtcg.com").pathname === "/post-office");
 const sneak = await worker.fetch(new Request("https://catchemtcg.com/feed?video=1"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("video query does not mount the button", !(await sneak.text()).includes("Make a Short"));
 
