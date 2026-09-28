@@ -73,7 +73,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
     const indexes = await loadJson("indexes.json", fetchImpl).catch(() => null);
+    const counts = await loadJson("counts.json", fetchImpl).catch(() => null);
     if (indexes) sets.singlesIndex = indexes.singles;
+    if (counts?.sealedNote) sets.sealedNote = counts.sealedNote;
+    if (counts?.soldNote) sets.soldNote = counts.soldNote;
     return html(renderSets(sets, stamp));
   }
   if (kind === "set") {
