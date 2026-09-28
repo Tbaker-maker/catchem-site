@@ -1,5 +1,6 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
+import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
@@ -127,6 +128,31 @@ export default {
       // ?video=1 is not a gate. The flag is env.VIDEO_ENABLED, checked below.
     }
     const video = env?.VIDEO_ENABLED === "true";
+    if (request.method === "GET" && url.pathname === "/post-office/app") {
+      try {
+        const counts = await loadJson("counts.json", fetchImpl);
+        const body = await editorDocument(counts.asOf || "", fetchImpl);
+        return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      } catch {
+        return new Response("The editor did not load.", { status: 503, headers: { "cache-control": "no-store" } });
+      }
+    }
+    if (request.method === "GET" && url.pathname === POCKET_PATH) {
+      try {
+        const body = await pocketDocument(fetchImpl);
+        return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
+      } catch {
+        return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+      }
+    }
+    if (request.method === "GET" && url.pathname === PAPER_PATH) {
+      try {
+        const body = await patchedPaper(fetchImpl);
+        return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
+      } catch {
+        return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+      }
+    }
     if (request.method === "GET" && url.pathname === "/api/card-img") {
       const pid = Number(url.searchParams.get("pid"));
       if (!Number.isFinite(pid) || pid <= 0) return new Response("Bad", { status: 400 });
