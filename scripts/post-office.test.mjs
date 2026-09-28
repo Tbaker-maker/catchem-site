@@ -81,6 +81,10 @@ const shell = [
   '<option value="both">Compare both</option>',
   '<option value="9">9 — a binder page</option>',
   '<option value="art">Just art</option>',
+  '<button class="chip" data-i="sell">Selling</button>',
+  'add("question", "Would you still buy the " + first.s + " " + first.n + " today?");',
+  'const label = fIntent === "want" ? "Looking for" : fIntent === "trade" ? "Trade list" : "For sale";',
+  'box.innerHTML = "<b>We will not make a sell image for singles.</b><br>" + "The whole question on a single is condition, and a buyer needs to see the card you are actually sending. ";',
   '<button id="make">Make the image</button>',
   '<input id="q" placeholder="Pokémon, artist, or set">',
   "let INDEX = [], tray = [], blob = null;",
@@ -89,6 +93,7 @@ const shell = [
 const patchedHtml = patchEditorHtml(shell, "2026-09-27");
 t("full editor keeps its tools", patchedHtml.includes("Compare both") && patchedHtml.includes("binder page") && patchedHtml.includes("Just art") && patchedHtml.includes("Make the image") && patchedHtml.includes("artist"));
 t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patchedHtml.includes('PRICES_AS_OF = "2026-09-27"') && patchedHtml.includes("TCGplayer market") && !patchedHtml.includes("sells for") && patchedHtml.includes("Facebook") && patchedHtml.includes("YouTube") && patchedHtml.includes("Instagram") && patchedHtml.includes("catchem.png") && !patchedHtml.includes('".jpg"') && patchedHtml.includes("Write the post") && patchedHtml.includes("Ideas") && patchedHtml.includes("Copy all") && patchedHtml.includes("var INDEX = [], tray = []"));
+t("editor drops buy and sell prompts", !patchedHtml.includes("Selling") && !patchedHtml.includes("Would you still buy") && !patchedHtml.includes("For sale") && !patchedHtml.includes("sell image for singles") && !patchedHtml.includes("buyer needs") && patchedHtml.includes("Looking for") && patchedHtml.includes("Trade list") && patchedHtml.includes("Make the image"));
 const stamped = patchEditorHtml(shell, "2026-09-27", "Post Office build abc1234 · 2026-09-28");
 t("editor stamp sits in the footer", stamped.includes('id="post-build"') && stamped.includes("Post Office build abc1234 · 2026-09-28") && stamped.indexOf("post-build") < stamped.lastIndexOf("</body>"));
 const pricedRows = patchPaperRows([
