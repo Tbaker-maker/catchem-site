@@ -168,6 +168,12 @@ h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .row b{overflow-wrap:anywhere}
 .row > b{flex:none;white-space:nowrap}
 .row svg{flex:none}
+.row.mover{align-items:center;gap:10px}
+.row.mover img{flex:none;width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a}
+.row.mover a{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:2px;overflow-wrap:break-word}
+.row.mover a b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal}
+.row.mover .mover-stat{flex:0 0 auto;white-space:nowrap;text-align:right;padding-left:8px}
+.row.mover svg{display:block;width:100%;max-width:160px;height:36px}
 img,svg{max-width:100%}
 .filters input,.filters select{max-width:100%;min-width:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:12px}
@@ -186,8 +192,13 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 @media (min-width:1280px){.site-bar nav{display:flex}}
 `;
 
-function chrome(active, body, title, stamp, extraFoot = "") {
+function feedNav(opts) {
+  return opts?.feed === true || opts?.FEED_ENABLED === "true";
+}
+
+function chrome(active, body, title, stamp, extraFoot = "", feed = false) {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
+  const feedLink = feed ? item("/feed", "Feed") : "";
   const fresh = stamp ? `<div class="wrap" style="padding-bottom:0"><p class="muted" id="fresh" style="margin:0">${esc(stamp)}</p></div>` : "";
   const foot = extraFoot ? `<p id="post-office-build">${esc(extraFoot)}</p>` : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -195,12 +206,12 @@ function chrome(active, body, title, stamp, extraFoot = "") {
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}</style><script>${CHART_JS}</script></head><body>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${fresh}
 ${body}
 <nav class="dock" aria-label="Primary">
-${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
 <footer class="site-foot"><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);</script>
@@ -217,7 +228,7 @@ function spark(values) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="TCGplayer market"><path d="${d}" fill="none" stroke="${up ? "#7fc79a" : "#e0675b"}" stroke-width="2"/></svg>`;
 }
 
-export function renderSets(index, stamp) {
+export function renderSets(index, stamp, opts = {}) {
   const sets = index?.sets || [];
   const eras = [...new Set(sets.map((s) => s.era))].sort((a, b) => {
     const order = ["Mega Evolution", "Scarlet & Violet", "Sword & Shield", "Sun & Moon", "XY", "Black & White", "HeartGold & SoulSilver", "Diamond & Pearl", "EX", "Original", "Neo", "Promos and extras", "Other"];
@@ -231,10 +242,10 @@ ${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
 ${chartBox(index?.singlesIndex || [], "Singles index, chain-linked")}
 ${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s) => `<a class="card" href="/sets/${esc(s.slug)}"><b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${s.release ? ` · ${esc(s.release)}` : ""}</p></a>`).join("")}</div>`).join("")}
 </main>`;
-  return chrome("Sets", body, "Sets", stamp);
+  return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
 }
 
-export function renderSetShell(slug, stamp) {
+export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main class="wrap"><h1 id="title">Set</h1>
 <div id="lines"></div><div id="charts"></div>
 <div class="filters"><select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
@@ -287,11 +298,11 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
 ["kind","q","sort"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 </script>`;
-  return chrome("Sets", body, "Set", stamp);
+  return chrome("Sets", body, "Set", stamp, "", feedNav(opts));
 }
 
 export function renderCard(card, stamp, opts = {}) {
-  if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp);
+  if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const price = money(card.price);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
   const img = card.pid
@@ -342,21 +353,21 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
 });
 </script>
 </main>`;
-  return chrome("", body, card.name, stamp);
+  return chrome("", body, card.name, stamp, "", feedNav(opts));
 }
 
-export function renderArtists(index, stamp) {
+export function renderArtists(index, stamp, opts = {}) {
   const rows = index?.artists || [];
   const body = `<main class="wrap"><p class="muted">${esc(index?.note || "")}</p><h1>Artists</h1>
 <div class="filters"><input id="q" aria-label="Find an artist" placeholder="Find an artist"></div>
 <div id="list" class="grid">${rows.map((a) => `<a class="card" data-name="${esc(a.name.toLowerCase())}" href="/artists/${esc(a.slug)}"><b>${esc(a.name)}</b><p class="muted">${a.count} matched cards</p></a>`).join("")}</div>
 <script>document.getElementById("q").addEventListener("input",ev=>{const q=ev.currentTarget.value.toLowerCase();document.querySelectorAll("#list a").forEach(a=>{a.hidden=!a.dataset.name.includes(q)})})</script>
 </main>`;
-  return chrome("Artists", body, "Artists", stamp);
+  return chrome("Artists", body, "Artists", stamp, "", feedNav(opts));
 }
 
-export function renderArtist(doc, stamp) {
-  if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp);
+export function renderArtist(doc, stamp, opts = {}) {
+  if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp, "", feedNav(opts));
   const top = (doc.cards || []).slice(0, 12);
   const rest = (doc.cards || []).slice(12);
   const row = (c) => `<div class="row">${c.pid ? `<img alt="" width="48" height="48" src="https://tcgplayer-cdn.tcgplayer.com/product/${Number(c.pid)}_in_200x200.jpg" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a" onerror="this.remove()">` : ""}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
@@ -366,19 +377,25 @@ ${chartBox(doc.index || [], "Artist index, chain-linked")}
 ${top.map(row).join("")}
 ${rest.length ? `<details><summary>Show all ${doc.cards.length}</summary>${rest.map(row).join("")}</details>` : ""}
 </main>`;
-  return chrome("Artists", body, doc.name, stamp);
+  return chrome("Artists", body, doc.name, stamp, "", feedNav(opts));
 }
 
-export function renderMovers(doc, stamp) {
+export function renderMovers(doc, stamp, opts = {}) {
   const spark = (hist) => {
     const pts = (hist || []).map((p) => Number(Array.isArray(p) ? p[1] : p?.v)).filter((n) => n > 0);
     if (pts.length < 2) return "";
     const w = 96, h = 36, min = Math.min(...pts), max = Math.max(...pts), span = max - min || 1;
     const step = (w - 8) / (pts.length - 1);
     const d = pts.map((v, i) => `${i ? "L" : "M"}${(4 + i * step).toFixed(1)},${(h - 4 - ((v - min) / span) * (h - 8)).toFixed(1)}`).join(" ");
-    return `<svg width="96" height="36" viewBox="0 0 ${w} ${h}" style="flex:none;width:96px;height:36px" aria-hidden="true"><path d="${d}" fill="none" stroke="#d9b779" stroke-width="2"/></svg>`;
+    return `<svg width="96" height="36" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="#d9b779" stroke-width="2"/></svg>`;
   };
-  const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => `<div class="row">${r.image ? `<img alt="" width="48" height="48" src="${esc(r.image)}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a" onerror="this.remove()">` : ""}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><br><span class="muted">${esc(r.set || "")}</span></a>${spark(r.hist)}<b>${money(r.price) || "—"} <span class="muted">${Number.isFinite(r.changePct) ? (r.changePct > 0 ? "+" : "") + r.changePct + "%" : ""}</span></b></div>`).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => `<div class="row"><a href="${esc(r.href)}"><b>${esc(r.name)}</b></a><b>${money(r.price) || "—"}</b></div>`).join("")}</details>` : ""}`;
+  const row = (r, withSpark) => {
+    const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
+    const img = r.image ? `<img alt="" width="48" height="48" src="${esc(r.image)}" onerror="this.remove()">` : "";
+    const line = withSpark ? spark(r.hist) : "";
+    return `<div class="row mover">${img}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
+  };
+  const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
 <h1>Movers</h1>
 <div id="index-charts"></div>
@@ -396,10 +413,10 @@ fetch("/data/indexes.json").then(r=>r.json()).then(idx=>{
 }).catch(()=>{});
 </script>
 </main>`;
-  return chrome("Movers", body, "Movers", stamp);
+  return chrome("Movers", body, "Movers", stamp, "", feedNav(opts));
 }
 
-export function renderReceipts(doc, stamp) {
+export function renderReceipts(doc, stamp, opts = {}) {
   const rows = doc?.rows || [];
 const mark = (r) => {
     const v = String(r.result || "open").toLowerCase();
@@ -411,10 +428,10 @@ const mark = (r) => {
 ${chartBox(doc?.series || [], "TCGplayer market")}
 ${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}<p class="muted">${esc(r.why || "")}</p></article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
 </main>`;
-  return chrome("", body, "Receipts", stamp);
+  return chrome("", body, "Receipts", stamp, "", feedNav(opts));
 }
 
-export function renderSearch() {
+export function renderSearch(opts = {}) {
   const body = `<main class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
 <div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus></div>
 <p class="muted" id="meta">Loading the index.</p><div id="list"></div>
@@ -446,10 +463,10 @@ function draw(){
 fetch("/data/search-lite.json").then(r=>r.json()).then(data=>{rows=data;document.getElementById("meta").textContent=rows.length+" names loaded.";draw()}).catch(()=>{document.getElementById("meta").textContent="Search did not load."});
 document.getElementById("q").addEventListener("input",draw);
 </script></main>`;
-  return chrome("Search", body, "Search");
+  return chrome("Search", body, "Search", "", "", feedNav(opts));
 }
 
-export function renderMethod(counts, stamp) {
+export function renderMethod(counts, stamp, opts = {}) {
   const single = Number(counts?.single);
   const sealed = Number(counts?.sealed);
   const catalog = Number.isFinite(single) && Number.isFinite(sealed)
@@ -466,10 +483,10 @@ export function renderMethod(counts, stamp) {
 <p>Box math divides that same market price by the pack count. Artist pages only include illustrator credits we could match.</p>
 <p><a href="/corrections">Corrections</a></p>
 </main>`;
-  return chrome("", body, "Methodology", stamp);
+  return chrome("", body, "Methodology", stamp, "", feedNav(opts));
 }
 
-export function renderAccuracy(doc, stamp) {
+export function renderAccuracy(doc, stamp, opts = {}) {
   const body = `<main class="wrap"><h1>Accuracy</h1>
 <p>${esc(doc?.note || "A hit rate is shown after 20 calls had a direction written down first.")}</p>
 <p class="muted">Scored ${Number(doc?.scored) || 0}. Hits ${Number(doc?.hits) || 0}. Misses ${Number(doc?.misses) || 0}. Crowd votes are not in this score until the server store is on.</p>
@@ -478,10 +495,10 @@ ${(doc?.rows || []).map((r) => `<article class="card" style="margin:10px 0"><h2>
 <h2>Privacy</h2>
 <p>A vote is a yes or a no on a read. A price report is the number you say you paid or received, the date, the condition, and where. We do not ask for your name. Reports stay private. A community median is shown only after five reports of the same product. You can email support@catchemtcg.com to ask for a report to be deleted.</p>
 </main>`;
-  return chrome("", body, "Accuracy", stamp);
+  return chrome("", body, "Accuracy", stamp, "", feedNav(opts));
 }
 
-export function renderRetired(kind) {
+export function renderRetired(kind, opts = {}) {
   const pages = {
     faq: ["Questions", "The tools are free. One price, labeled TCGplayer market. The community is on Discord."],
     build: ["This page is retired", "The current site is the catalog. Older build notes are not kept here."],
@@ -489,15 +506,15 @@ export function renderRetired(kind) {
   };
   const [title, line] = pages[kind] || pages.faq;
   const body = `<main class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
-  return chrome("", body, title);
+  return chrome("", body, title, "", "", feedNav(opts));
 }
 
-export function renderPost(stamp, mark = "") {
+export function renderPost(stamp, mark = "", opts = {}) {
   const line = typeof mark === "string" ? mark : "";
   const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
 <iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
 <style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
-  return chrome("Post Office", body, "Post Office", stamp, line);
+  return chrome("Post Office", body, "Post Office", stamp, line, feedNav(opts));
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {
@@ -583,8 +600,8 @@ function slide(r,i){
     const voteEl=el.querySelector(".vote");
     fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:r.id,vote:b.dataset.vote})})
       .then(res=>res.json().then(j=>({ok:res.ok,j})))
-      .then(res=>{ voteEl.textContent=res.ok?("Votes "+(res.j.yes||0)+" keep going, "+(res.j.no||0)+" fade."):"Your vote was not stored. The server store is not on."; })
-      .catch(()=>{ voteEl.textContent="Your vote was not stored. The server store is not on."; });
+      .then(res=>{ voteEl.textContent=res.ok?("Votes "+(res.j.yes||0)+" keep going, "+(res.j.no||0)+" fade."):"Votes are not open yet."; })
+      .catch(()=>{ voteEl.textContent="Votes are not open yet."; });
   });
   return el;
 }
@@ -634,13 +651,13 @@ addEventListener("keydown",e=>{
   go(e.key==="ArrowDown"||e.key==="j"?i+1:i-1);
 });
 </script>`;
-  return chrome("The Feed", body, "The Feed", stamp);
+  return chrome("Feed", body, "The Feed", stamp, "", feedNav(opts));
 }
 
-export function renderAll(bundle, stamp) {
+export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
   const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
 ${reads.map((r) => `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(r.headline)}</b></a><b>${money(r.price) || ""}</b></div>`).join("")}
 </main>`;
-  return chrome("The Feed", body, "All reads", stamp);
+  return chrome("Feed", body, "All reads", stamp, "", feedNav(opts));
 }

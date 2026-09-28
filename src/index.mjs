@@ -68,6 +68,24 @@ const home302 = () => new Response(null, {
 
 const go = (loc) => new Response(null, { status: 301, headers: { location: loc, "cache-control": "no-store" } });
 
+export function addFeedEntry(html) {
+  let out = String(html || "");
+  if (out.includes('href="/feed"')) return out;
+  out = out.replace(
+    '<nav id="site-nav">\n    <a href="/sets">Sets</a>',
+    '<nav id="site-nav">\n    <a href="/feed">Feed</a>\n    <a href="/sets">Sets</a>',
+  );
+  out = out.replace(
+    '<nav class="dock" aria-label="Primary">\n  <a href="/sets">Sets</a>',
+    '<nav class="dock" aria-label="Primary">\n  <a href="/feed">Feed</a>\n  <a href="/sets">Sets</a>',
+  );
+  out = out.replace(
+    '<div class="actions">\n      <a class="btn btn-primary" href="/sets">Browse sets</a>',
+    '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Feed</a>\n      <a class="btn btn-primary" href="/sets">Browse sets</a>',
+  );
+  return out;
+}
+
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
   if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
@@ -88,7 +106,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
-    if (path === "/feed/all") return html(renderAll(bundle, stamp));
+    if (path === "/feed/all") return html(renderAll(bundle, stamp, pageOpts));
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     return html(renderFeed(bundle, id, stamp, pageOpts));
   }
@@ -99,13 +117,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (indexes) sets.singlesIndex = indexes.singles;
     if (counts?.sealedNote) sets.sealedNote = counts.sealedNote;
     if (counts?.soldNote) sets.soldNote = counts.soldNote;
-    return html(renderSets(sets, stamp));
+    return html(renderSets(sets, stamp, pageOpts));
   }
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
       await loadJson(`sets/${slug}.json`, fetchImpl);
-      return html(renderSetShell(slug, stamp));
+      return html(renderSetShell(slug, stamp, pageOpts));
     } catch {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.sets?.[slug];
@@ -113,11 +131,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return html(`<main class="wrap"><h1>Set not found</h1><p class="muted">That set slug is not in the catalog.</p><p><a href="/sets">All sets</a></p></main>`, 404);
     }
   }
-  if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp));
+  if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp, pageOpts));
   if (kind === "artist") {
     const slug = decodeURIComponent(path.slice("/artists/".length));
-    try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp)); }
-    catch { return html(renderArtist(null, stamp), 404); }
+    try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp, pageOpts)); }
+    catch { return html(renderArtist(null, stamp, pageOpts), 404); }
   }
   if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
@@ -133,13 +151,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const card = (rows || []).find((row) => row.id === cardId);
     return html(renderCard(card, stamp, pageOpts), card ? 200 : 404);
   }
-  if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp));
-  if (kind === "search") return html(renderSearch());
-  if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp));
-  if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp));
-  if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp));
-  if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind));
-  if (kind === "post") return html(renderPost(stamp, await liveStamp(fetchImpl)));
+  if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp, pageOpts));
+  if (kind === "search") return html(renderSearch(pageOpts));
+  if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
+  if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
+  if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
+  if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind, pageOpts));
+  if (kind === "post") return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   return null;
 }
 
@@ -253,6 +271,17 @@ export default {
           },
         });
       } catch { /* baked pulse */ }
+    }
+    if (feed && request.method === "GET" && norm(url.pathname) === "/") {
+      const asset = await env.ASSETS.fetch(request);
+      const headers = new Headers(asset.headers);
+      const type = headers.get("content-type") || "";
+      if (type.includes("text/html")) {
+        headers.set("cache-control", "no-store");
+        headers.set("cdn-cache-control", "no-store");
+        return new Response(addFeedEntry(await asset.text()), { status: asset.status, headers });
+      }
+      return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
     const asset = await env.ASSETS.fetch(request);
     const headers = new Headers(asset.headers);

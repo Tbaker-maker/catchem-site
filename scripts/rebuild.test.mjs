@@ -1,6 +1,7 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import { esc } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
+import { readFile } from "node:fs/promises";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -110,6 +111,15 @@ t("movers redirects to the board when the flag is on", movedOn.status === 301 &&
 const pulseOn = await worker.fetch(new Request("https://catchemtcg.com/pulse"), on);
 t("pulse redirects to the feed when the flag is on", pulseOn.status === 301 && pulseOn.headers.get("location").endsWith("/feed"));
 t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1024px") && feedHtml.includes(".dock{display:none") && feedHtml.includes("TCGplayer market") && !feedHtml.includes("2 days of history") && !feedHtml.includes("Axis from the low"));
+t("the feed nav shows only when the flag is on", !/href="\/feed"/.test(cardPage) && cardPage.includes("Sets") && (await (await renderPath("/c/tcgcsv-10", fetchImpl, { feed: true })).text()).includes('href="/feed">Feed'));
+t("a vote that does not save uses plain words", feedHtml.includes("Votes are not open yet.") && !feedHtml.includes("server store"));
+t("a mover name keeps the main width", board.includes("row mover") && board.includes("-webkit-line-clamp:2") && board.includes("mover-stat"));
+const indexHtml = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const homeAssets = { fetch: async () => new Response(indexHtml, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }) };
+const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets })).text();
+const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, FEED_ENABLED: "true" })).text();
+t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && !homeOff.includes('href="/feed"'));
+t("the homepage hero and nav gain a feed link only when the flag is on", (homeOn.match(/href="\/feed"/g) || []).length === 3 && homeOn.includes('class="btn btn-primary" href="/feed">Feed'));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
