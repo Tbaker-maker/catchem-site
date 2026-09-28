@@ -535,27 +535,86 @@ export function renderPost(stamp, mark = "", opts = {}) {
 }
 
 const RATE_LOCK = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
+const PAUSE_STAY = "Pause up to 2 months in any 12, your number and rate stay.";
 
 export function renderPremium(stamp, opts = {}) {
-  const body = `<main class="wrap"><h1>Discord Premium</h1>
-<p>Join the club · claim your First 222 number.</p>
-<p>Pokémon members get a number, the Premium role, and the private channels that come with that seat.</p>
+  void stamp;
+  const ico = (paths) => `<span class="prem-ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></span>`;
+  const card = (paths, title, copy) => `<article class="prem-card">${ico(paths)}<h3>${title}</h3><p>${copy}</p></article>`;
+  const body = `<main class="wrap prem">
+<style>
+.prem-hero{padding:18px 0 6px}
+.prem-kicker{margin:0 0 14px;letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)}
+.prem-hero h1{font:500 clamp(34px,7vw,58px)/1.02 var(--serif);letter-spacing:-.03em;margin:0 0 14px;max-width:11em}
+.prem-lede{font-size:18px;line-height:1.4;margin:0 0 16px;max-width:28em}
+.prem-price{margin:0 0 16px;font:600 22px/1.2 var(--serif);color:var(--gold)}
+.prem-join{display:flex;width:100%;align-items:center;justify-content:center;min-height:48px;padding:0 22px;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
+.prem-join:hover{color:#1a1407}
+.prem-fine{margin:12px 0 0;color:var(--dim);font-size:14px;max-width:36em}
+.prem-grid{display:grid;gap:12px;grid-template-columns:1fr}
+.prem-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.prem-card h3{margin:10px 0 6px;font:600 16px/1.3 var(--sans)}
+.prem-card p{margin:0;color:var(--dim);font-size:15px;line-height:1.45}
+.prem-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#241f18;color:var(--gold)}
+.prem-lock{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:16px;padding:16px}
+.prem-lock p{margin:8px 0 0}
+.prem-also{color:var(--dim);font-size:15px}
+.prem-also ul{margin:8px 0;padding-left:18px}
+.prem-faq{display:grid;gap:0;margin:4px 0 8px}
+.prem-q{border-top:1px solid var(--line);padding:12px 0}
+.prem-q b{display:block;font:600 15px/1.4 var(--sans)}
+.prem-q p{margin:4px 0 0;color:var(--dim);font-size:15px}
+.prem-manage{margin:18px 0 0;color:var(--dim);font-size:14px}
+.prem-acts{display:flex;flex-wrap:nowrap;gap:8px;margin:8px 0 0}
+.prem-acts a{flex:1 1 0;min-width:0;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans)}
+@media(min-width:840px){
+  .prem-grid{grid-template-columns:repeat(6,1fr)}
+  .prem-card{grid-column:span 2}
+  .prem-card:nth-child(4),.prem-card:nth-child(5){grid-column:span 3}
+  .prem-faq{grid-template-columns:1fr 1fr;column-gap:28px}
+  .prem-join{display:inline-flex;width:auto;min-width:220px}
+}
+</style>
+<section class="prem-hero">
+<p class="prem-kicker">Discord Premium</p>
+<h1>Join the club.<br>Claim your First 222 number.</h1>
+<p class="prem-lede">Hang out with serious collectors, rippers and flippers.</p>
+<p class="prem-price">$14.99 a month. Cancel anytime.</p>
+<a class="prem-join" href="${DISCORD}">Join Premium</a>
+<p class="prem-fine">One number per person. Never reused. Card payments only. Checkout starts in Discord.</p>
+</section>
+<h2>What you're joining</h2>
+<div class="prem-grid">
+${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Your First 222 number + Premium role", "Premium members get a number and the Premium role. One person, one number. Never reused.")}
+${card('<path d="M4 16V7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5V12H7.2L4 14.6z"/><path d="M9 11.5h8.5A1.5 1.5 0 0 1 19 13V18l-2.4-2H10.5A1.5 1.5 0 0 1 9 14.5z"/>', "Private member channels", "The rooms that open with the seat.")}
+${card('<path d="M12 3l1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3z"/>', "Early beta access", "Try new Feed features, bots and tools before anyone else, and help shape them. Beta channel, feedback votes, a first look at new reads, alerts, and Post Office tools.")}
+${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ideas a day, not 3. Post text is 100 a day, not 3. Video export is 5 a day and 35 a week, not 1 a day and 2 a week.")}
+${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="3"/>', "Vault votes on what we build next", "The club weighs in on the next tool, the next bot, and the next read.")}
+</div>
+<h2>Your price stays locked</h2>
+<div class="prem-lock">
 <p>${RATE_LOCK}</p>
-<p>Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.</p>
-<p><b>$14.99/mo</b> through Stripe. A membership seat in the Discord club. The tools on this site stay free. The first 222 numbers go to card payments and are never reused.</p>
-<style>.prem-acts{display:flex;flex-wrap:nowrap;gap:8px;margin:16px 0}.prem-acts a{flex:1 1 0;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans)}</style>
-<div class="prem-acts"><a href="${DISCORD}">Pause</a><a href="${DISCORD}">Cancel</a></div>
+<p>${PAUSE_STAY}</p>
+</div>
 <h2>Members also get</h2>
+<div class="prem-also">
 <ul>
 <li>monthly Stadium giveaway auto-entry</li>
-<li>Premium votes</li>
 <li>member-only drops</li>
 </ul>
-<p>Watching the Stadium for free is fine. Cancel whenever.</p>
-<p class="muted">Pause and Cancel are the same weight. You use them in Discord with /premium. This page does not take a payment.</p>
-<p><a href="${DISCORD}">Join Discord</a></p>
+<p>Watching the Stadium for free is fine.</p>
+</div>
+<h2>Questions</h2>
+<div class="prem-faq">
+<div class="prem-q"><b>What's free?</b><p>All tools on the site stay free.</p></div>
+<div class="prem-q"><b>Can I pause?</b><p>${PAUSE_STAY}</p></div>
+<div class="prem-q"><b>What happens if I cancel?</b><p>Cancel and the number is retired. If you come back, you pay the public rate then on the site.</p></div>
+<div class="prem-q"><b>How do I manage it?</b><p>Use /premium in Discord.</p></div>
+</div>
+<p class="prem-manage">Already in?</p>
+<div class="prem-acts"><a href="${DISCORD}">Pause</a><a href="${DISCORD}">Cancel</a></div>
 </main>`;
-  return chrome("", body, "Discord Premium", stamp, "", feedNav(opts));
+  return chrome("", body, "Discord Premium", "", "", feedNav(opts));
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {

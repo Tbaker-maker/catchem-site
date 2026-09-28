@@ -126,7 +126,13 @@ const lock = "The rate you check out at stays yours while you stay subscribed or
 t("premium is a worker page", pageKind("/premium") === "premium" && premium.status === 200);
 t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause</a><a href=") && premiumHtml.includes(">Cancel</a>"));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
-t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(premiumHtml));
+t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(premiumHtml) && !/pay to win|more entries/i.test(premiumHtml));
+t("premium sells the club", premiumHtml.includes("Join the club.") && premiumHtml.includes("Claim your First 222 number.") && premiumHtml.includes("Hang out with serious collectors, rippers and flippers.") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes("Join Premium") && premiumHtml.includes("$14.99 a month"));
+t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
+t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));
+t("premium drops the internal notes", !premiumHtml.includes("does not take a payment") && !premiumHtml.includes("same weight"));
+t("premium has the joining cards and the faq", premiumHtml.includes("What you're joining") && premiumHtml.includes("Early beta access") && premiumHtml.includes("50 AI Ideas a day, not 3") && premiumHtml.includes("Post text is 100 a day, not 3") && premiumHtml.includes("35 a week") && premiumHtml.includes("Vault votes on what we build next") && premiumHtml.includes("What's free?") && premiumHtml.includes("Pause up to 2 months in any 12, your number and rate stay.") && premiumHtml.includes("Use /premium in Discord."));
+t("join premium uses the discord flow", premiumHtml.includes('class="prem-join" href="https://discord.gg/fUSjxDX4Hy"') && !premiumHtml.includes("checkout.stripe.com") && !/href="\/(feed|board|receipts|accuracy)/.test(premiumHtml));
 t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
 
 if (fail) process.exit(1);
