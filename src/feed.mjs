@@ -23,8 +23,7 @@ export function redirectPath(pathname) {
 }
 
 export function isFeedPath(pathname) {
-  const path = normalize(pathname);
-  return path === "/pulse";
+  return false;
 }
 
 export function formatPt(iso) {

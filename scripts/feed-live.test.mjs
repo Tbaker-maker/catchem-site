@@ -6,7 +6,7 @@ const t = (name, cond) => {
   else { fail++; console.log("  FAIL", name); }
 };
 
-t("pulse is the morning edition", isFeedPath("/pulse") && isFeedPath("/pulse.html") && !isFeedPath("/feed") && !isFeedPath("/feed/") && !isFeedPath("/try/index.html") && !isFeedPath("/app"));
+t("pulse is not served as the baked page", !isFeedPath("/pulse") && !isFeedPath("/pulse.html") && !isFeedPath("/feed") && redirectPath("/pulse") === null);
 t("app and try redirect home to the feed", redirectPath("/app/") === "/feed" && redirectPath("/try/index.html") === "/feed" && redirectPath("/feed") === null);
 t("not a product page", !isFeedPath("/p/sv3pt5-etb") && !isFeedPath("/methodology"));
 

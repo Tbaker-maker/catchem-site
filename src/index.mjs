@@ -1,7 +1,7 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
 import {
-  esc, renderAll, renderArtist, renderArtists, renderCard, renderFeed, renderMethod, renderMovers,
+  clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
   renderPost, renderReceipts, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
@@ -29,81 +29,97 @@ export function pageKind(pathname) {
   if (path === "/artists") return "artists";
   if (path.startsWith("/artists/")) return "artist";
   if (path.startsWith("/c/")) return "card";
-  if (path.startsWith("/p/tcgcsv-")) return "card";
+  if (path.startsWith("/p/")) return "product";
   if (path === "/board" || path === "/movers") return "movers";
   if (path === "/search") return "search";
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
+  if (path === "/accuracy") return "accuracy";
   if (path === "/post-office") return "post";
-  if (path === "/sitemap.xml") return "sitemap";
+  if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
 }
 
+const go = (loc) => new Response(null, { status: 301, headers: { location: loc, "cache-control": "no-store" } });
+
 export async function renderPath(pathname, fetchImpl = fetch) {
   const path = norm(pathname);
   const kind = pageKind(path);
+  let stamp = "";
+  try { stamp = clockLabel((await loadJson("counts.json", fetchImpl)).updatedAt); } catch { stamp = ""; }
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
     return proxyPublic(rel, fetchImpl);
   }
+  if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
-    if (path === "/feed/all") return html(renderAll(bundle));
+    if (path === "/feed/all") return html(renderAll(bundle, stamp));
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    return html(renderFeed(bundle, id));
+    return html(renderFeed(bundle, id, stamp));
   }
-  if (kind === "sets") return html(renderSets(await loadJson("sets.json", fetchImpl)));
+  if (kind === "sets") {
+    const sets = await loadJson("sets.json", fetchImpl);
+    const indexes = await loadJson("indexes.json", fetchImpl).catch(() => null);
+    if (indexes) sets.singlesIndex = indexes.singles;
+    return html(renderSets(sets, stamp));
+  }
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
-    try { await loadJson(`sets/${slug}.json`, fetchImpl); }
-    catch { return null; }
-    return html(renderSetShell(slug));
+    try {
+      await loadJson(`sets/${slug}.json`, fetchImpl);
+      return html(renderSetShell(slug, stamp));
+    } catch {
+      const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
+      return go(map?.sets?.[slug] || "/sets");
+    }
   }
-  if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl)));
+  if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp));
   if (kind === "artist") {
     const slug = decodeURIComponent(path.slice("/artists/".length));
-    try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl))); }
-    catch { return html(renderArtist(null), 404); }
+    try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp)); }
+    catch { return html(renderArtist(null, stamp), 404); }
   }
-  if (kind === "card") {
+  if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
     const cardId = decodeURIComponent(raw);
+    if (!cardId.startsWith("tcgcsv-")) {
+      const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
+      return go(map?.products?.[cardId] || "/search");
+    }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
     const card = (rows || []).find((row) => row.id === cardId);
-    return html(renderCard(card), card ? 200 : 404);
+    return html(renderCard(card, stamp), card ? 200 : 404);
   }
-  if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl)));
+  if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp));
   if (kind === "search") return html(renderSearch());
-  if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl)));
-  if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null)));
-  if (kind === "post") return html(renderPost());
-  if (kind === "sitemap") return sitemap(fetchImpl);
+  if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp));
+  if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp));
+  if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp));
+  if (kind === "post") return html(renderPost(stamp));
   return null;
-}
-
-async function sitemap(fetchImpl) {
-  const sets = await loadJson("sets.json", fetchImpl);
-  const artists = await loadJson("artists.json", fetchImpl);
-  const urls = ["/", "/feed", "/feed/all", "/sets", "/board", "/artists", "/search", "/methodology", "/receipts", "/post-office", "/pulse"];
-  for (const row of sets?.sets || []) urls.push(`/sets/${row.slug}`);
-  for (const row of artists?.artists || []) urls.push(`/artists/${row.slug}`);
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>https://catchemtcg.com${esc(u)}</loc></url>`).join("\n")}\n</urlset>\n`;
-  return new Response(body, {
-    headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" },
-  });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    if (request.method === "GET" || request.method === "POST") {
+      if (url.pathname === "/api/vote" || url.pathname === "/api/report") {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: "The server store is not on. Votes and price reports are not counted yet.",
+        }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+      }
+    }
     if (request.method === "GET") {
       const dest = redirectPath(url.pathname);
       if (dest) return Response.redirect(new URL(dest, url), 301);
       if (norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
+      if (norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
       if (kind && kind !== "data") {
         try {

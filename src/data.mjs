@@ -13,11 +13,14 @@ export async function loadJson(rel, fetchImpl = fetch) {
 
 export async function proxyPublic(rel, fetchImpl = fetch) {
   const res = await fetchImpl(BASE + rel, { cf: { cacheTtl: 300 } });
-  if (!res.ok) return new Response("Not found", { status: 404 });
+  if (!res.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+  const type = rel.endsWith(".xml") ? "application/xml; charset=utf-8"
+    : rel.endsWith(".mjs") ? "text/javascript; charset=utf-8"
+    : "application/json; charset=utf-8";
   return new Response(res.body, {
     status: 200,
     headers: {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": type,
       "cache-control": "public, max-age=300",
       "access-control-allow-origin": "*",
     },

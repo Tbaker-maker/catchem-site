@@ -42,7 +42,15 @@ a{color:var(--gold)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
 .skip{position:absolute;left:-9999px;top:8px;background:var(--gold);color:var(--gold-ink);padding:8px 12px;border-radius:8px;font-weight:600;z-index:10}
 .skip:focus{left:12px}
-.site-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding:14px 22px;border-bottom:1px solid var(--line)}
+.site-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:0 16px;height:56px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+.menu-btn{display:none;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--panel);color:var(--text);font:600 14px var(--sans)}
+@media (max-width:1279px){
+  .menu-btn{display:inline-flex;align-items:center}
+  .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
+  .site-bar nav.open{display:flex}
+}
+@media (min-width:1280px){.dock{display:none}body{padding-bottom:24px}}
+.chart{height:180px;min-height:180px}
 .site-bar .logo{font:600 28px/1 var(--serif);color:var(--text);text-decoration:none;letter-spacing:-.03em}
 .site-bar .logo span{color:var(--gold)}
 .site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}
@@ -165,7 +173,8 @@ footer a{color:var(--gold)}
 <a class="skip" href="#list">Skip to the waitlist</a>
 <header class="site-bar">
   <a class="logo" href="/">Catch'em<span>.</span></a>
-  <nav>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+  <nav id="site-nav">
     <a href="/feed">The Feed</a>
     <a href="/sets">Sets</a>
     <a href="/board">Movers</a>
@@ -205,7 +214,7 @@ footer a{color:var(--gold)}
     <article class="tile feed">
       <span class="tag open">Open</span>
       <h3>The Feed</h3>
-      <p>Card prices, game prices, charts, a Pokémon fact and the news. Written short, so you can read it in a minute.</p>
+      <p>Card prices and charts. Written short, so you can read it in a minute.</p>
       <a class="more" href="/feed">Open The Feed <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile post">
@@ -236,6 +245,7 @@ footer a{color:var(--gold)}
     <p id="catalog-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
   </div>
   <div class="counts" id="counts"></div>
+  <div id="home-charts"></div>
 </section>
 
 <section class="section" id="preview" aria-labelledby="preview-h" hidden>
@@ -305,7 +315,10 @@ footer a{color:var(--gold)}
       return "<b>"+n.toLocaleString("en-US")+"<span>"+b[1]+"</span></b>";
     }).join("");
     var line=document.getElementById("fresh-line");
-    if(c.asOf) line.textContent="Updated "+c.asOf+" · TCGplayer market · "+Number(c.sets||0).toLocaleString("en-US")+" sets";
+    if(c.updatedAt){
+      var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(c.updatedAt));
+      line.textContent="Updated "+clock+" PT";
+    } else if(c.asOf) line.textContent="Updated "+c.asOf;
   }).catch(function(){});
   fetch("/data/reads.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){
     var rows=(d.reads||[]).filter(function(r){ return r && r.headline && money(r.price); }).slice(0,3);
@@ -317,6 +330,39 @@ footer a{color:var(--gold)}
       return '<article class="read"><a href="/feed/r/'+encodeURIComponent(r.id)+'">'+text(r.headline)+'</a><p class="priv" style="margin:0">'+money(r.price)+(pct?" · "+pct:"")+' · '+text(r.confidence||"")+'</p></article>';
     }).join("");
   }).catch(function(){});
+  function pts(raw){var rows=Array.isArray(raw)?raw:[];var out=[];rows.forEach(function(p){var d=p&&p.d;var v=Number(p&&p.v);if(d&&v>0)out.push({d:d,v:v})});return out}
+  function draw(host,points,caption){
+    host.style.height="180px";host.style.minHeight="180px";
+    if(points.length<3){host.innerHTML='<p class="priv">History starts '+(points[0]?points[0].d:"when the first daily print lands")+'. '+points.length+' daily points. A line needs 3.</p>';return}
+    var w=640,h=180,min=Math.min.apply(null,points.map(function(p){return p.v})),max=Math.max.apply(null,points.map(function(p){return p.v}));
+    var span=(max-min)||1,step=(w-72)/(points.length-1);
+    var d=points.map(function(p,i){var y=18+((max-p.v)/span)*(h-46);return (i?"L":"M")+(56+i*step).toFixed(1)+","+y.toFixed(1)}).join(" ");
+    host.innerHTML='<svg width="100%" height="180" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+caption+'" style="display:block;width:100%;height:180px"><path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"/></svg><p class="priv">'+caption+'. TCGplayer market, daily. '+points.length+' points.</p>';
+  }
+  function filterPts(all, range){
+    if(!all.length || range==="All") return all;
+    var days=range==="7D"?7:range==="30D"?30:range==="90D"?90:365;
+    var end=Date.parse(all[all.length-1].d+"T00:00:00Z");
+    var cut=new Date(end-(days-1)*86400000).toISOString().slice(0,10);
+    return all.filter(function(p){return p.d>=cut});
+  }
+  fetch("/data/indexes.json").then(function(r){if(!r.ok) throw 0; return r.json()}).then(function(idx){
+    var singles=pts(idx.singles), sealed=pts(idx.sealed);
+    var box=document.getElementById("home-charts");
+    var ranges=["7D","30D","90D","1Y","All"];
+    function buttons(which){return ranges.map(function(r){return '<button type="button" data-ix="'+which+'" data-range="'+r+'"'+(r==="All"?' aria-pressed="true"':"")+'>'+r+'</button>'}).join("")}
+    box.innerHTML='<h2>Singles index</h2><div class="chart" id="ix-s"></div><div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'+buttons("s")+'</div><h2>Sealed index</h2><div class="chart" id="ix-b"></div><div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'+buttons("b")+'</div>';
+    function paint(which, range){ draw(document.getElementById(which==="s"?"ix-s":"ix-b"), filterPts(which==="s"?singles:sealed, range), which==="s"?"Singles index, chain-linked":"Sealed index, chain-linked"); }
+    paint("s","All"); paint("b","All");
+    box.querySelectorAll("[data-range]").forEach(function(btn){btn.addEventListener("click", function(){
+      var which=btn.getAttribute("data-ix");
+      box.querySelectorAll('[data-ix="'+which+'"]').forEach(function(x){x.setAttribute("aria-pressed","false")});
+      btn.setAttribute("aria-pressed","true");
+      paint(which, btn.getAttribute("data-range"));
+    })});
+  }).catch(function(){});
+  var menuBtn=document.querySelector(".menu-btn"), siteNav=document.getElementById("site-nav");
+  if(menuBtn&&siteNav) menuBtn.addEventListener("click", function(){var open=siteNav.classList.toggle("open"); menuBtn.setAttribute("aria-expanded", open?"true":"false")});
 })();
 </script>
 <script>
