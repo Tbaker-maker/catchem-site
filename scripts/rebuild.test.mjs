@@ -45,23 +45,23 @@ const fetchImpl = async (url) => {
   return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
 };
 
-t("old product urls are not catalog cards", pageKind("/p/sv3pt5-etb") === null && pageKind("/p/sv3pt5-etb.html") === null);
-t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "card" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
-t("pulse is the morning edition, not the shorts", isFeedPath("/pulse") && isFeedPath("/pulse.html") && !isFeedPath("/feed") && !isFeedPath("/feed/"));
+t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
+t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
+t("pulse is redirected, not the baked shorts", !isFeedPath("/pulse") && !isFeedPath("/feed"));
 t("app and try still go to the feed", redirectPath("/app/") === "/feed" && redirectPath("/try/index.html") === "/feed");
 const escaped = esc("A & B <x>");
 t("esc keeps markup out of a name", escaped.includes("amp;") && escaped.includes("lt;") && escaped.includes("gt;") && !escaped.includes("<"));
 
 const feed = await renderPath("/feed", fetchImpl);
 const feedHtml = await feed.text();
-t("the feed is one read at a time", feedHtml.includes("scroll-snap-type:y mandatory") && feedHtml.includes("min(420px,100%)") && feedHtml.includes("caught up") && feedHtml.includes("$14.99/mo") && feedHtml.includes("4.2%") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN"));
+t("the feed is one read at a time", feedHtml.includes("scroll-snap-type:y mandatory") && feedHtml.includes("min(420px,100%)") && feedHtml.includes("Caught up") && feedHtml.includes("$14.99/mo") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN"));
 t("the feed names Pokémon and hides a missing image price", feedHtml.includes("Pokémon") && !/(\$0|\$null|\$NaN)/.test(feedHtml));
 const deep = await (await renderPath("/feed/r/box-etb", fetchImpl)).text();
 t("a deep link starts on that read", deep.includes('id="start"') && deep.includes("box-etb"));
 const all = await (await renderPath("/feed/all", fetchImpl)).text();
 t("all reads is a list", all.includes("All reads") && all.includes("Alakazam"));
-const setPage = await (await renderPath("/sets/missing", fetchImpl));
-t("a missing set falls through", setPage === null);
+const setPage = await renderPath("/sets/missing", fetchImpl);
+t("a missing set redirects", setPage.status === 301);
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
 t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori"));
 const board = await (await renderPath("/board", fetchImpl)).text();
@@ -84,7 +84,10 @@ t("the worker serves shorts for /feed", (await homeFeed.text()).includes("scroll
 const moved = await worker.fetch(new Request("https://catchemtcg.com/movers"), env);
 t("movers redirects to the board", moved.status === 301 && moved.headers.get("location").endsWith("/board"));
 const old = await worker.fetch(new Request("https://catchemtcg.com/p/sv3pt5-etb"), env);
-t("an old lander is still the asset", (await old.text()) === "asset");
+t("an old lander redirects", old.status === 301);
+const pulse = await worker.fetch(new Request("https://catchemtcg.com/pulse"), env);
+t("pulse redirects to the feed", pulse.status === 301 && pulse.headers.get("location").endsWith("/feed"));
+t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1280px") && feedHtml.includes(".dock{display:none"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
