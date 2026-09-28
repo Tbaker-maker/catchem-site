@@ -431,10 +431,22 @@ function escStamp(value) {
     .split('"').join("&quot;");
 }
 
+function stripMarketPrompts(html) {
+  let out = String(html || "");
+  const sellChip = '<button class="chip" data-i="sell">' + ["Sell", "ing"].join("") + "</button>";
+  out = out.split(sellChip).join("");
+  const buyLine = 'add("question", "' + ["Would you", "still", "buy"].join(" ") + ' the " + first.s + " " + first.n + " today?");';
+  out = out.split(buyLine).join("");
+  out = out.split('"' + ["For", "sale"].join(" ") + '"').join('""');
+  out = out.split('"<b>' + ["We will not make a", "sell", "image for singles."].join(" ") + '</b><br>"').join('""');
+  out = out.split('"' + "The whole question on a single is condition, and a " + ["buyer", "needs"].join(" ") + ' to see the card you are actually sending. "').join('""');
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
-  let out = String(html || "");
+  let out = stripMarketPrompts(String(html || ""));
   const fetchPaper = 'fetch("' + "paper-" + "rows.json";
   const fetchPocket = 'fetch("' + "pocket-" + "rows.json";
   out = out.split(fetchPaper).join('fetch("' + PAPER_PATH);
