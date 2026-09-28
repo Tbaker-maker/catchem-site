@@ -517,6 +517,30 @@ export function renderPost(stamp, mark = "", opts = {}) {
   return chrome("Post Office", body, "Post Office", stamp, line, feedNav(opts));
 }
 
+const RATE_LOCK = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
+
+export function renderPremium(stamp, opts = {}) {
+  const body = `<main class="wrap"><h1>Discord Premium</h1>
+<p>Join the club · claim your First 222 number.</p>
+<p>Pokémon members get a number, the Premium role, and the private channels that come with that seat.</p>
+<p>${RATE_LOCK}</p>
+<p>Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.</p>
+<p><b>$14.99/mo</b> through Stripe. A membership seat in the Discord club. The tools on this site stay free. The first 222 numbers go to card payments and are never reused.</p>
+<style>.prem-acts{display:flex;flex-wrap:nowrap;gap:8px;margin:16px 0}.prem-acts a{flex:1 1 0;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans)}</style>
+<div class="prem-acts"><a href="${DISCORD}">Pause</a><a href="${DISCORD}">Cancel</a></div>
+<h2>Members also get</h2>
+<ul>
+<li>monthly Stadium giveaway auto-entry</li>
+<li>Premium votes</li>
+<li>member-only drops</li>
+</ul>
+<p>Watching the Stadium for free is fine. Cancel whenever.</p>
+<p class="muted">Pause and Cancel are the same weight. You use them in Discord with /premium. This page does not take a payment.</p>
+<p><a href="${DISCORD}">Join Discord</a></p>
+</main>`;
+  return chrome("", body, "Discord Premium", stamp, "", feedNav(opts));
+}
+
 export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {

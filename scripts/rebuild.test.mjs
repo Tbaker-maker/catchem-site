@@ -120,6 +120,13 @@ const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/")
 const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, FEED_ENABLED: "true" })).text();
 t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && !homeOff.includes('href="/feed"'));
 t("the homepage hero and nav gain a feed link only when the flag is on", (homeOn.match(/href="\/feed"/g) || []).length === 3 && homeOn.includes('class="btn btn-primary" href="/feed">Feed'));
+const premium = await worker.fetch(new Request("https://catchemtcg.com/premium"), env);
+const premiumHtml = await premium.text();
+const lock = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
+t("premium is a worker page", pageKind("/premium") === "premium" && premium.status === 200);
+t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause</a><a href=") && premiumHtml.includes(">Cancel</a>"));
+t("premium keeps the lock sentence", premiumHtml.includes(lock));
+t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(premiumHtml));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");

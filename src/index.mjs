@@ -6,7 +6,7 @@ import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
-  renderPost, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -43,6 +43,7 @@ export function pageKind(pathname) {
   if (path === "/build") return "build";
   if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
+  if (path === "/premium") return "premium";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -158,6 +159,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post") return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
+  if (kind === "premium") return html(renderPremium(stamp, pageOpts));
   return null;
 }
 
