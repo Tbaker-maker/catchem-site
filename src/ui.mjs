@@ -186,12 +186,12 @@ function chrome(active, body, title, stamp) {
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}</style><script>${CHART_JS}</script></head><body>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${item("/feed", "The Feed")}${item("/sets", "Sets")}${item("/board", "Movers")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${fresh}
 ${body}
 <nav class="dock" aria-label="Primary">
-${item("/feed", "The Feed")}${item("/sets", "Sets")}${item("/board", "Movers")}${item("/artists", "Artists")}${item("/search", "Search")}
+${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
 <footer class="site-foot"><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p></footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);</script>
@@ -316,7 +316,7 @@ ${chartBox(card.hist || [], "TCGplayer market, daily", "")}
 <p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p>Recent sold prices: ${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).` : "No sold data yet."} TCGplayer market is the one price above, not a sold list.</p>
-<p><a href="/accuracy">Accuracy</a> · <button type="button" id="paid">I paid or sold at a price</button></p>
+<p><button type="button" id="paid">I paid or sold at a price</button></p>
 <form id="paid-form" hidden>
 <label>Price <input name="price" inputmode="decimal" required></label>
 <label>Date <input name="date" type="date" required></label>
@@ -463,7 +463,6 @@ export function renderMethod(counts, stamp) {
 <p>A one-day move is marked <b>Early</b>. If a price is missing, the page says so. We do not print a blank, a zero, or a made-up sold price.</p>
 <p>Charts say how many daily points they have. Two days is not a month. History starts on the first day we stored.</p>
 <p>Box math divides that same market price by the pack count. Artist pages only include illustrator credits we could match.</p>
-<p><a href="/receipts">Receipts</a> keep revisits visible. A hit rate waits until a direction was written down first.</p>
 <p><a href="/corrections">Corrections</a></p>
 </main>`;
   return chrome("", body, "Methodology", stamp);
@@ -483,12 +482,12 @@ ${(doc?.rows || []).map((r) => `<article class="card" style="margin:10px 0"><h2>
 
 export function renderRetired(kind) {
   const pages = {
-    faq: ["Questions", "The tools are free. One price, labeled TCGplayer market. The Feed is one read at a time. The community is on Discord."],
-    build: ["This page is retired", "The current site is the Feed and the catalog. Older build notes are not kept here."],
-    creators: ["This page is retired", "Creator notes from the old site are not the current product. The Feed is open."],
+    faq: ["Questions", "The tools are free. One price, labeled TCGplayer market. The community is on Discord."],
+    build: ["This page is retired", "The current site is the catalog. Older build notes are not kept here."],
+    creators: ["This page is retired", "Creator notes from the old site are not the current product."],
   };
   const [title, line] = pages[kind] || pages.faq;
-  const body = `<main class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/feed">The Feed</a> · <a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
+  const body = `<main class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
   return chrome("", body, title);
 }
 
@@ -590,7 +589,7 @@ function slide(r,i){
 reads.forEach((r,i)=>snap.appendChild(slide(r,i)));
 const end=document.createElement("section");
 end.className="slide";
-end.innerHTML='<article class="read"><p class="kicker">Caught up</p><h2 style="font:500 28px/1.2 var(--serif);margin:0">That is today\\'s list.</h2><p>Card prices and charts. Written short, so you can read it in a minute.</p><p><a href="/feed/all">All reads</a> · <a href="/receipts">Receipts</a></p><p><b>Discord Premium is $14.99/mo.</b> It is a Discord seat. Stadium giveaways seat Premium members automatically. The first 222 seats are numbered and never reissued. The tools on this site stay free.</p><p><a class="primary" style="display:inline-flex;align-items:center;min-height:44px" href="${DISCORD}">Join Discord</a></p></article>';
+end.innerHTML='<article class="read"><p class="kicker">Caught up</p><h2 style="font:500 28px/1.2 var(--serif);margin:0">That is today\\'s list.</h2><p>Card prices and charts. Written short, so you can read it in a minute.</p><p><b>Discord Premium is $14.99/mo.</b> It is a Discord seat. Stadium giveaways seat Premium members automatically. The first 222 seats are numbered and never reissued. The tools on this site stay free.</p><p><a class="primary" style="display:inline-flex;align-items:center;min-height:44px" href="${DISCORD}">Join Discord</a></p></article>';
 snap.appendChild(end);
 const all=document.createElement("section");
 all.className="slide"; all.id="all-reads";

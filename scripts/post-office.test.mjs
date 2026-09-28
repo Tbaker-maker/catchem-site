@@ -35,6 +35,7 @@ t("homepage title dropped the old line", !home.includes("Know what to rip"));
 t("homepage says catalog", home.includes("The full catalog:") && !home.includes("catalogue"));
 t("nav close wins on small screens", home.lastIndexOf(".site-bar nav{display:none") > home.indexOf(".site-bar nav{display:none"));
 t("dock hide is the last dock display", home.lastIndexOf(".dock{display:none") > home.lastIndexOf(".dock{display:flex"));
+t("homepage does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(home));
 
 const moon = ["tcgcsv-246723", "Umbreon VMAX (Alternate Art Secret)", "SWSH07: Evolving Skies", "215/203", "Keiichiro Ito", "single", 2214.79, "swsh07-evolving-skies", "Secret Rare"];
 const other = ["tcgcsv-246720", "Umbreon VMAX", "SWSH07: Evolving Skies", "095/203", "Akira Egawa", "single", 27.25, "swsh07-evolving-skies", "Ultra Rare"];
@@ -107,11 +108,13 @@ const pricedRows = patchPaperRows([
 t("live market replaces the old figures", pricedRows.rows[0][6] === 345 && pricedRows.rows[1][6] === 900 && pricedRows.rows[2][6] === 2214.79 && pricedRows.rows[3][6] === 0);
 t("a zero live price stays unpriced", pricedRows.rows[4][6] === 0 && pricedRows.rows[5][6] === 0);
 t("base set does not take the shadowless price", pricedRows.rows[6][6] === 944.53);
-const feedOff = await (await renderPath("/feed", fetchImpl)).text();
-t("short button stays off without the flag", !feedOff.includes("Make a Short"));
-const feedOn = await (await renderPath("/feed", fetchImpl, { video: true })).text();
-t("short button is in the feed when the flag is on", feedOn.includes("Make a Short"));
-t("dock rule wins", feedOff.lastIndexOf(".dock{display:none") > feedOff.lastIndexOf(".dock{display:flex"));
+const feedHidden = await renderPath("/feed", fetchImpl);
+t("feed stays home without the flag", feedHidden.status === 302 && feedHidden.headers.get("location") === "/");
+const feedVideoOff = await (await renderPath("/feed", fetchImpl, { feed: true })).text();
+t("short button stays off without the video flag", !feedVideoOff.includes("Make a Short"));
+const feedOn = await (await renderPath("/feed", fetchImpl, { feed: true, video: true })).text();
+t("short button is in the feed when both flags are on", feedOn.includes("Make a Short"));
+t("dock rule wins", feedVideoOff.lastIndexOf(".dock{display:none") > feedVideoOff.lastIndexOf(".dock{display:flex"));
 
 const env = {
   VIDEO_ENABLED: "true",
@@ -127,7 +130,7 @@ t("build stays on this site", build.status === 301 && new URL(build.headers.get(
 const buildHead = await worker.fetch(new Request("https://catchemtcg.com/build", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("build head stays on this site", buildHead.status === 301 && new URL(buildHead.headers.get("location"), "https://catchemtcg.com").pathname === "/post-office");
 const sneak = await worker.fetch(new Request("https://catchemtcg.com/feed?video=1"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
-t("video query does not mount the button", !(await sneak.text()).includes("Make a Short"));
+t("video query does not open the feed", sneak.status === 302 && new URL(sneak.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 
 resetQuota();
 resetCatalogCache();

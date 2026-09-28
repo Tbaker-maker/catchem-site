@@ -53,13 +53,20 @@ t("app and try still go to the feed", redirectPath("/app/") === "/feed" && redir
 const escaped = esc("A & B <x>");
 t("esc keeps markup out of a name", escaped.includes("amp;") && escaped.includes("lt;") && escaped.includes("gt;") && !escaped.includes("<"));
 
-const feed = await renderPath("/feed", fetchImpl);
+const hidden = await renderPath("/feed", fetchImpl);
+t("feed is hidden without the flag", hidden.status === 302 && hidden.headers.get("location") === "/");
+t("board, receipts, and accuracy are hidden without the flag",
+  (await renderPath("/board", fetchImpl)).status === 302
+  && (await renderPath("/receipts", fetchImpl)).headers.get("location") === "/"
+  && (await renderPath("/accuracy", fetchImpl)).status === 302
+  && (await renderPath("/feed/r/box-etb", fetchImpl)).status === 302);
+const feed = await renderPath("/feed", fetchImpl, { feed: true });
 const feedHtml = await feed.text();
-t("the feed is one read at a time", feedHtml.includes("scroll-snap-type:y mandatory") && feedHtml.includes("min(420px,100%)") && feedHtml.includes("Caught up") && feedHtml.includes("$14.99/mo") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN"));
+t("the feed is one read at a time", feed.status === 200 && feedHtml.includes("scroll-snap-type:y mandatory") && feedHtml.includes("min(420px,100%)") && feedHtml.includes("Caught up") && feedHtml.includes("$14.99/mo") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN"));
 t("the feed names Pokémon and hides a missing image price", feedHtml.includes("Pokémon") && !/(\$0|\$null|\$NaN)/.test(feedHtml));
-const deep = await (await renderPath("/feed/r/box-etb", fetchImpl)).text();
+const deep = await (await renderPath("/feed/r/box-etb", fetchImpl, { feed: true })).text();
 t("a deep link starts on that read", deep.includes('id="start"') && deep.includes("box-etb"));
-const all = await (await renderPath("/feed/all", fetchImpl)).text();
+const all = await (await renderPath("/feed/all", fetchImpl, { feed: true })).text();
 t("all reads is a list", all.includes("All reads") && all.includes("Alakazam"));
 const setPage = await renderPath("/sets/missing", fetchImpl);
 t("a missing set is not a generic redirect", setPage.status === 404);
@@ -67,7 +74,10 @@ const known = await renderPath("/sets/base1", fetchImpl);
 t("a known old set slug is one hop", known.status === 301 && known.headers.get("location") === "/sets/base-set");
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
 t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori"));
-const board = await (await renderPath("/board", fetchImpl)).text();
+t("a card page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(cardPage));
+const setHtml = await (await renderPath("/sets/base", fetchImpl)).text();
+t("a set page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(setHtml));
+const board = await (await renderPath("/board", fetchImpl, { feed: true })).text();
 t("movers keep slabs off the list", board.includes("Slabs") && board.includes("graded feed") && board.includes("Alakazam"));
 const post = await (await renderPath("/post-office", fetchImpl)).text();
 t("post office keeps the locked line", post.includes(LOCKED));
@@ -83,13 +93,22 @@ const env = {
   ASSETS: { fetch: async () => new Response("asset", { status: 200, headers: { "content-type": "text/html" } }) },
 };
 const homeFeed = await worker.fetch(new Request("https://catchemtcg.com/feed"), env);
-t("the worker serves shorts for /feed", (await homeFeed.text()).includes("scroll-snap-type"));
+t("the worker sends /feed home", homeFeed.status === 302 && new URL(homeFeed.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 const moved = await worker.fetch(new Request("https://catchemtcg.com/movers"), env);
-t("movers redirects to the board", moved.status === 301 && moved.headers.get("location").endsWith("/board"));
+t("movers sends home when the feed is off", moved.status === 302 && new URL(moved.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 const old = await worker.fetch(new Request("https://catchemtcg.com/p/sv3pt5-etb"), env);
 t("an old lander redirects", old.status === 301);
 const pulse = await worker.fetch(new Request("https://catchemtcg.com/pulse"), env);
-t("pulse redirects to the feed", pulse.status === 301 && pulse.headers.get("location").endsWith("/feed"));
+t("pulse sends home when the feed is off", pulse.status === 302 && new URL(pulse.headers.get("location"), "https://catchemtcg.com").pathname === "/");
+const app = await worker.fetch(new Request("https://catchemtcg.com/app"), env);
+t("app does not land on the feed", app.status === 301 && new URL(app.headers.get("location"), "https://catchemtcg.com").pathname === "/");
+const on = { ...env, FEED_ENABLED: "true" };
+const opened = await worker.fetch(new Request("https://catchemtcg.com/feed"), on);
+t("the worker serves shorts when the flag is on", (await opened.text()).includes("scroll-snap-type"));
+const movedOn = await worker.fetch(new Request("https://catchemtcg.com/movers"), on);
+t("movers redirects to the board when the flag is on", movedOn.status === 301 && movedOn.headers.get("location").endsWith("/board"));
+const pulseOn = await worker.fetch(new Request("https://catchemtcg.com/pulse"), on);
+t("pulse redirects to the feed when the flag is on", pulseOn.status === 301 && pulseOn.headers.get("location").endsWith("/feed"));
 t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1024px") && feedHtml.includes(".dock{display:none") && feedHtml.includes("2 days of history"));
 
 if (fail) process.exit(1);
