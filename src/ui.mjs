@@ -63,12 +63,20 @@ function catchemDraw(host,pts,release,caption){
   host.innerHTML="";
   host.style.height="180px";
   host.style.minHeight="180px";
+  var box=host.parentElement;
+  var hover=box&&box.querySelector(".chart-readout");
+  if(box&&!hover){
+    hover=document.createElement("p");
+    hover.className="chart-readout muted";
+    hover.setAttribute("aria-live","polite");
+    box.insertBefore(hover, host);
+  }
   var note=host.parentElement&&host.parentElement.querySelector(".chart-note");
-  var start=pts.length?pts[0].d:"";
   if(pts.length<2){
     host.style.height="auto";
     host.style.minHeight="0";
     host.innerHTML='<p class="muted" style="margin:0">No daily points in this range.</p>';
+    if(hover) hover.textContent="";
     if(note) note.textContent=(caption||"TCGplayer market, daily")+". No daily points in this range.";
     return;
   }
@@ -89,19 +97,27 @@ function catchemDraw(host,pts,release,caption){
   var money=function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
   function when(d){var parts=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(parts[1])||1)-1]+" "+Number(parts[2])+", "+parts[0];}
   var label=(caption||"TCGplayer market, daily").replace(/"/g,"");
-  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none"><text x="4" y="22" fill="#c4baab" font-size="12">'+money(max)+'</text><text x="4" y="'+(h-30)+'" fill="#c4baab" font-size="12">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"></path><text x="56" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[0].d.slice(5)+'</text><text x="'+(w-70)+'" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[pts.length-1].d.slice(5)+'</text></svg><p class="chart-hover muted" style="min-height:1.2em;margin:4px 0 0"></p>';
+  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="4" y="22" fill="#c4baab" font-size="12">'+money(max)+'</text><text x="4" y="'+(h-30)+'" fill="#c4baab" font-size="12">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"></path><text x="56" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[0].d.slice(5)+'</text><text x="'+(w-70)+'" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
   if(note) note.textContent=(caption||"TCGplayer market, daily")+". "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+".";
+  if(hover) hover.textContent=when(pts[pts.length-1].d)+" · "+money(pts[pts.length-1].v);
   var svg=host.querySelector("svg");
-  var hover=host.querySelector(".chart-hover");
   function show(ev){
+    if(!svg||!hover) return;
     var rect=svg.getBoundingClientRect();
+    if(!rect.width) return;
     var x=(ev.clientX-rect.left)/rect.width*w;
     var i=Math.round((x-56)/step);
     if(i<0) i=0; if(i>=pts.length) i=pts.length-1;
-    if(hover) hover.textContent=pts[i].d+" · "+money(pts[i].v);
+    hover.textContent=when(pts[i].d)+" · "+money(pts[i].v);
   }
-  svg.addEventListener("mousemove", show);
-  svg.addEventListener("click", show);
+  var active=false;
+  svg.addEventListener("pointerdown", function(ev){ active=true; show(ev); });
+  svg.addEventListener("pointermove", function(ev){
+    if(ev.pointerType==="touch" && !active) return;
+    show(ev);
+  });
+  svg.addEventListener("pointerup", function(){ active=false; });
+  svg.addEventListener("pointercancel", function(){ active=false; });
 }
 function catchemMount(root){
   (root||document).querySelectorAll(".chart[data-chart]").forEach(function(host){
@@ -152,7 +168,8 @@ a{color:var(--gold)}
 .dock a{color:var(--dim);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
 .dock a[aria-current="page"]{color:var(--gold)}
 .chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
-.chart{height:180px;min-height:180px;flex:none}
+.chart{height:180px;min-height:180px;flex:none;overflow:hidden}
+.chart-readout{min-height:1.4em;margin:0 0 6px;font-size:14px;line-height:1.4}
 .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 32px;overflow-x:hidden}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
