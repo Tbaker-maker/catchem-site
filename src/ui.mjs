@@ -667,6 +667,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeURIComponent(String(card.href||'').split('/').pop())+'\">Make a Short</a>';" : "const shortFor=()=>'';"}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
@@ -731,7 +732,7 @@ function cardEl(card){
   el.id="r-"+card.id;
   const img=card.image?'<img alt="" src="'+String(card.image).replace(/"/g,"")+'" onerror="this.remove()">':'';
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
-  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><div class="feed-acts"><button type="button" data-vote="up">Up <span>0</span></button><button type="button" data-vote="sideways">Sideways <span>0</span></button><button type="button" data-vote="down">Down <span>0</span></button><button type="button" data-act="alert">Set alert</button><a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="price" inputmode="decimal" aria-label="Alert price" placeholder="Price"><input name="pct" inputmode="decimal" aria-label="Alert percent" placeholder="Percent"><select name="direction" aria-label="Up or down"><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save alert</button></form><p class="alert-note muted"></p>';
+  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><div class="feed-acts"><button type="button" data-vote="up">Up <span>0</span></button><button type="button" data-vote="sideways">Sideways <span>0</span></button><button type="button" data-vote="down">Down <span>0</span></button><button type="button" data-act="alert">Set alert</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="price" inputmode="decimal" aria-label="Alert price" placeholder="Price"><input name="pct" inputmode="decimal" aria-label="Alert percent" placeholder="Percent"><select name="direction" aria-label="Up or down"><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save alert</button></form><p class="alert-note muted"></p>';
   const slot=el.querySelector(".slot");
   if(card.hist) slot.appendChild(chart(card.hist, src));
   el.querySelector("[data-act=alert]").onclick=()=>el.querySelector(".alert-box").classList.toggle("open");
