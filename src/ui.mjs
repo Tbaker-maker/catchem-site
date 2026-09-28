@@ -491,7 +491,7 @@ export function renderRetired(kind) {
 
 export function renderPost(stamp) {
   const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
-<iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 220px)"></iframe>
+<iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
 <style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
   return chrome("Post Office", body, "Post Office", stamp);
 }
