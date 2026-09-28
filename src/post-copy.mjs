@@ -75,7 +75,7 @@ export function comparePair(tcg, pocket) {
 }
 
 export function clientHelpers() {
-  return [priceLine, downloadName, parseQuery, editionLabel, preferPrinting, artistNotable, comparePair]
+  return [priceLine, downloadName, parseQuery, editionLabel, printingRank, preferPrinting, artistNotable, comparePair]
     .map((fn) => fn.toString())
     .join("\n");
 }
