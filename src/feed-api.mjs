@@ -38,6 +38,30 @@ export async function handleVote(request, env) {
   return json({ ok: true, ...counts });
 }
 
+export async function handleFollow(request, env) {
+  const store = env?.FEED_KV;
+  if (!store) return json({ ok: false, error: "Follows are not open yet." }, 503);
+  if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
+  const user = await readUser(request, env);
+  if (!user?.sub) return json({ ok: false, error: "Sign in with Discord to follow." }, 401);
+  let body = {};
+  try { body = await request.json(); } catch { return json({ ok: false, error: "Bad follow." }, 400); }
+  const id = String(body.id || "").slice(0, 80);
+  const sku = String(body.sku || "");
+  if (!id || !sku.startsWith("tcgcsv-")) return json({ ok: false, error: "Bad follow." }, 400);
+  const listKey = `follows:${user.sub}`;
+  const list = await store.get(listKey, "json") || [];
+  if (list.includes(id)) return json({ ok: true, following: true, saved: list.length });
+  const cap = user.premium === true ? 25 : 3;
+  if (list.length >= cap) {
+    return json({ ok: false, error: user.premium ? "25 follows saved." : "A free seat can follow 3 reads." }, 429);
+  }
+  list.push(id);
+  await store.put(`follow:${user.sub}:${id}`, JSON.stringify({ id, sku, at: new Date().toISOString() }));
+  await store.put(listKey, JSON.stringify(list));
+  return json({ ok: true, following: true, saved: list.length, cap });
+}
+
 export async function handleAlert(request, env) {
   const store = env?.FEED_KV;
   if (!store) return json({ ok: false, error: "Alerts are not open yet." }, 503);
