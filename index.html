@@ -344,7 +344,7 @@ footer a{color:var(--gold)}
     var w=640,h=180,min=Math.min.apply(null,points.map(function(p){return p.v})),max=Math.max.apply(null,points.map(function(p){return p.v}));
     var span=(max-min)||1,step=(w-72)/Math.max(1,points.length-1);
     var d=points.map(function(p,i){var y=18+((max-p.v)/span)*(h-46);return (i?"L":"M")+(56+i*step).toFixed(1)+","+y.toFixed(1)}).join(" ");
-    var note=points.length===2?"2 days of history":points.length+" points";
+    var note=points.length===2?"2 days of history, "+points[0].d+" and "+points[points.length-1].d:points.length+" points";
     host.innerHTML='<svg width="100%" height="180" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+caption+'" style="display:block;width:100%;height:180px"><path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"/></svg><p class="priv">'+caption+'. TCGplayer market, daily. '+note+'.</p>';
   }
   function filterPts(all, range){
