@@ -620,136 +620,247 @@ ${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="
 export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {
-    if (!r || !r.headline || !money(r.price) || /\b(buy|sell|hold|floor|target|play|pick|bullish|bearish|crypto|nft|web3|ticker)\b/i.test(r.headline)) return false;
+    if (!r || !r.headline || !money(r.price)) return false;
     const key = String(r.href || r.id || r.headline);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  const safe = JSON.stringify(reads).replace(/</g, "\\u003c");
+  const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
+  const count = Number(bundle?.count) > reads.length ? Number(bundle.count) : reads.length;
   const css = `
-  html,body{overflow:hidden;height:100%}
-  .site-foot,.wrap{display:none}body{padding-bottom:0}
-  .site-bar{position:fixed;top:0;left:0;right:0}
-  #snap{position:fixed;top:56px;right:0;bottom:62px;left:0;overflow:hidden;scroll-snap-type:y mandatory;overscroll-behavior:contain;touch-action:none}
-  @media (min-width:1024px){#snap{bottom:0}}
-  .slide{height:100%;min-height:100%;max-height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px 16px}
-  .read{width:min(420px,100%);max-height:100%;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:12px;display:flex;flex-direction:column;gap:6px}
-  .read img{width:100%;max-height:18vh;object-fit:contain;background:#211e1a;border-radius:14px;flex:none}
-  #snap .chart,#snap .chart svg,#snap .chart-box{min-height:0;height:auto}
-  #snap .chart{height:96px;min-height:96px}
-  #snap .filters{margin:2px 0}
-  #snap button{min-height:32px;padding:0 10px;font-size:13px}
-  .kicker{letter-spacing:.08em;text-transform:uppercase;font-size:12px;color:var(--gold);margin:0}
-  .price{font:600 28px/1 var(--serif);color:var(--gold);margin:0}
-  .more{display:none}.more.open{display:block}
-  @media (prefers-reduced-motion:reduce){#snap{scroll-snap-type:none}}
+  .feed-page{padding-top:8px}
+  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
+  .feed-sec{border-top:1px solid var(--line);padding:8px 0}
+  .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
+  .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
+  .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
+  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
+  .feed-card h3{font:500 22px/1.25 var(--serif);margin:0}
+  .feed-card .price{font:600 28px/1 var(--serif);color:var(--gold);margin:0}
+  .feed-card .chg{display:flex;flex-wrap:wrap;gap:8px}
+  .feed-card .chg b{font-weight:600}
+  .feed-acts{display:flex;flex-wrap:wrap;gap:8px}
+  .feed-acts button,.feed-acts a{min-height:44px;display:inline-flex;align-items:center}
+  .alert-box{display:none;gap:8px;flex-wrap:wrap}
+  .alert-box.open{display:flex}
+  .alert-box input{min-height:44px;max-width:140px}
+  @media (max-width:420px){.feed-card h3{font-size:20px}}
   `;
-  const stampJs = JSON.stringify(stamp || "");
-  const body = `<style>${css}</style><div id="snap" tabindex="0"></div>
-<script type="application/json" id="reads">${safe}</script>
+  const body = `<style>${css}</style><main class="wrap feed-page">
+<h1>The Feed</h1>
+<p class="muted" id="feed-count">${count.toLocaleString("en-US")} reads. TCGplayer market.</p>
+<form class="feed-filters" id="feed-filters">
+  <select id="f-kind" aria-label="Sealed or singles"><option value="">Sealed and singles</option><option value="sealed">Sealed</option><option value="single">Singles</option></select>
+  <select id="f-set" aria-label="Set"><option value="">Every set</option></select>
+  <input id="f-min" inputmode="decimal" aria-label="Minimum price" placeholder="Min price">
+  <input id="f-max" inputmode="decimal" aria-label="Maximum price" placeholder="Max price">
+  <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
+  <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
+</form>
+<div id="feed-sections"></div>
+</main>
+<script type="application/json" id="feed-lead">${lead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script>
-const reads=JSON.parse(document.getElementById("reads").textContent);
+const lead=JSON.parse(document.getElementById("feed-lead").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
-const stamp=${stampJs};
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
-const snap=document.getElementById("snap");
+function showPct(n){return typeof n==="number" && Number.isFinite(n)}
+function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
+const GROUPS=[
+  {id:"today",title:"Today",note:"Daily reads",parts:["today"],open:true},
+  {id:"watch",title:"Watches",note:"Setups building over weeks",parts:["watch"]},
+  {id:"cook",title:"Cooks",note:"Setups over months",parts:["cook"]},
+  {id:"movers",title:"Biggest movers",note:"Up and down",parts:["up","down"]},
+  {id:"tempo",title:"Heating up / cooling off",note:"",parts:["heat","cool"]},
+  {id:"tracked",title:"Tracked calls",note:"How past reads have played out",parts:["tracked"]}
+];
+const shown={};
+const pages={};
+let meta=null;
+let catalogue=null;
+function filters(){
+  return {
+    kind:document.getElementById("f-kind").value,
+    set:document.getElementById("f-set").value,
+    min:Number(document.getElementById("f-min").value),
+    max:Number(document.getElementById("f-max").value),
+    dir:document.getElementById("f-dir").value,
+    sort:document.getElementById("f-sort").value
+  };
+}
+function pass(card,f){
+  if(!card) return false;
+  if(f.kind && card.kind!==f.kind) return false;
+  if(f.set && card.set!==f.set) return false;
+  if(Number.isFinite(f.min) && f.min>0 && !(card.price>=f.min)) return false;
+  if(Number.isFinite(f.max) && f.max>0 && !(card.price<=f.max)) return false;
+  if(f.dir && card.direction && card.direction!==f.dir) return false;
+  return true;
+}
 function chart(hist, caption){
   const el=document.createElement("div");
   el.className="chart-box";
-  el.innerHTML='<div class="chart" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p>';
+  el.innerHTML='<div class="chart" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="All" aria-pressed="true">All</button></div>';
   const host=el.querySelector(".chart");
   host.setAttribute("data-chart", JSON.stringify(hist||[]));
-  host.setAttribute("data-caption", caption || "TCGplayer market");
-  host.setAttribute("data-h","96");
+  host.setAttribute("data-caption", caption||"TCGplayer market");
   if(typeof catchemMount==="function") catchemMount(el);
   return el;
 }
-function slide(r,i){
-  const el=document.createElement("section");
-  el.className="slide"; el.id="r-"+r.id; el.dataset.i=i;
-  const pct=Number.isFinite(r.changePct)?(r.changePct>0?"+":"")+r.changePct+"%":"no day-to-day change";
-  const img=r.image && !/ebay/i.test(r.image)?'<img alt="" width="320" height="240" src="'+r.image.replace(/"/g,"")+'" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'ph\\',textContent:\\'No stock image\\'}))">':'<div class="ph">No stock image</div>';
-  ${opts.video ? `const shortLink = '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>';` : `const shortLink = "";`}
-  el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+'</p>'+img+'<h2 style="font:500 22px/1.2 var(--serif);margin:0">'+html(r.headline)+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+html(r.source||"TCGplayer market")+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button> '+shortLink+'</div><div class="more"><p>'+html(r.why||"")+'</p><p><a href="'+html(r.href)+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
-  el.querySelector(".slot").appendChild(chart(r.hist&&r.hist.length?r.hist:r.history, r.source||"TCGplayer market"));
-  el.querySelector("[data-act=more]").onclick=()=>el.querySelector(".more").classList.toggle("open");
-  el.querySelector("[data-act=share]").onclick=async()=>{
-    const url=location.origin+"/feed/r/"+encodeURIComponent(r.id);
-    const text=r.headline+" "+money(r.price);
-    try{
-      const c=document.createElement("canvas"); c.width=1200; c.height=630;
-      const g=c.getContext("2d");
-      g.fillStyle="#12100e"; g.fillRect(0,0,1200,630);
-      g.fillStyle="#d9b779"; g.font="600 28px sans-serif"; g.fillText("Catch'em",64,80);
-      g.fillStyle="#efe9de"; g.font="500 48px Georgia, serif";
-      const words=String(r.headline).split(" "); let line="", y=200;
-      for(const w of words){ const next=line?line+" "+w:w; if(g.measureText(next).width>1040){ g.fillText(line,64,y); y+=62; line=w; } else line=next; }
-      if(line) g.fillText(line,64,y);
-      g.fillStyle="#d9b779"; g.font="600 64px Georgia, serif"; g.fillText(money(r.price)||"",64,y+100);
-      const blob=await new Promise(res=>c.toBlob(res,"image/png"));
-      const file=new File([blob],"catchem-read.png",{type:"image/png"});
-      if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Catch'em",text,url}); return; }
-    }catch(e){}
-    if(navigator.share){try{await navigator.share({title:"Catch'em",text,url});return}catch(e){}}
-    try{await navigator.clipboard.writeText(url+" "+text)}catch(e){}
-  };
-  el.querySelectorAll("[data-vote]").forEach(b=>b.onclick=()=>{
-    const voteEl=el.querySelector(".vote");
-    fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:r.id,vote:b.dataset.vote})})
+function changes(card){
+  const bits=[];
+  if(showPct(card.change7)) bits.push("<b>7D</b> "+pct(card.change7));
+  if(showPct(card.change30)) bits.push("<b>30D</b> "+pct(card.change30));
+  if(showPct(card.change90)) bits.push("<b>90D</b> "+pct(card.change90));
+  return bits.join(" · ");
+}
+function flagLine(card){
+  const f=card.flagged;
+  if(!f || !f.on) return "";
+  if(f.first) return "Flagged on "+html(f.on)+" at "+money(f.at)+".";
+  const p=Number.isFinite(Number(f.pct))?(" ("+pct(f.pct)+")"):"";
+  return "Flagged on "+html(f.on)+" at "+money(f.at)+", now "+money(f.now)+p+".";
+}
+function cardEl(card){
+  const el=document.createElement("article");
+  el.className="feed-card";
+  el.id="r-"+card.id;
+  const img=card.image?'<img alt="" src="'+String(card.image).replace(/"/g,"")+'" onerror="this.remove()">':'';
+  const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
+  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><div class="feed-acts"><button type="button" data-vote="up">Up <span>0</span></button><button type="button" data-vote="sideways">Sideways <span>0</span></button><button type="button" data-vote="down">Down <span>0</span></button><button type="button" data-act="alert">Set alert</button><a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="price" inputmode="decimal" aria-label="Alert price" placeholder="Price"><input name="pct" inputmode="decimal" aria-label="Alert percent" placeholder="Percent"><select name="direction" aria-label="Up or down"><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save alert</button></form><p class="alert-note muted"></p>';
+  const slot=el.querySelector(".slot");
+  if(card.hist) slot.appendChild(chart(card.hist, src));
+  el.querySelector("[data-act=alert]").onclick=()=>el.querySelector(".alert-box").classList.toggle("open");
+  el.querySelectorAll("[data-vote]").forEach(btn=>btn.onclick=()=>{
+    const note=el.querySelector(".vote");
+    fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,vote:btn.dataset.vote})})
       .then(res=>res.json().then(j=>({ok:res.ok,j})))
-      .then(res=>{ voteEl.textContent=res.ok?("Votes "+(res.j.yes||0)+" keep going, "+(res.j.no||0)+" fade."):"Votes are not open yet."; })
-      .catch(()=>{ voteEl.textContent="Votes are not open yet."; });
+      .then(res=>{
+        if(!res.ok){ note.textContent=res.j.error||"Votes are not open yet."; return; }
+        el.querySelector('[data-vote=up] span').textContent=res.j.up||0;
+        el.querySelector('[data-vote=sideways] span').textContent=res.j.sideways||0;
+        el.querySelector('[data-vote=down] span').textContent=res.j.down||0;
+        note.textContent="";
+      })
+      .catch(()=>{ note.textContent="Votes are not open yet."; });
   });
+  el.querySelector(".alert-box").onsubmit=(ev)=>{
+    ev.preventDefault();
+    const form=ev.currentTarget;
+    const note=el.querySelector(".alert-note");
+    fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,sku:card.sku||"",price:form.price.value,pct:form.pct.value,direction:form.direction.value})})
+      .then(res=>res.json().then(j=>({ok:res.ok,status:res.status,j})))
+      .then(res=>{ note.textContent=res.ok?"Alert saved. Discord messages come in a later update.":(res.j.error||"Sign in with Discord to save an alert."); })
+      .catch(()=>{ note.textContent="Sign in with Discord to save an alert."; });
+  };
   return el;
 }
-reads.forEach((r,i)=>snap.appendChild(slide(r,i)));
-const end=document.createElement("section");
-end.className="slide";
-end.innerHTML='<article class="read"><p class="kicker">Caught up</p><h2 style="font:500 28px/1.2 var(--serif);margin:0">That is today\\'s list.</h2><p>Card prices and charts. Written short, so you can read it in a minute.</p><p><b>Discord Premium is $14.99/mo.</b> It is a Discord seat. Stadium giveaways seat Premium members automatically. The first 222 seats are numbered and never reissued. The tools on this site stay free.</p><p><a class="primary" style="display:inline-flex;align-items:center;min-height:44px" href="${DISCORD}">Join Discord</a></p></article>';
-snap.appendChild(end);
-const all=document.createElement("section");
-all.className="slide"; all.id="all-reads";
-all.innerHTML='<article class="read"><h2>All reads</h2>'+reads.map(r=>'<p><a href="/feed/r/'+encodeURIComponent(r.id)+'">'+html(r.headline)+'</a></p>').join("")+'</article>';
-if(location.pathname.endsWith("/all")) snap.appendChild(all);
-let startAt=reads.findIndex(r=>r.id===start);
-if(startAt<0) startAt=0;
-function go(i){
-  const node=snap.children[Math.max(0,Math.min(snap.children.length-1,i))];
-  if(node) snap.scrollTo({top:node.offsetTop,behavior:"auto"});
+function trackedEl(row){
+  const el=document.createElement("article");
+  el.className="feed-card";
+  const p=Number.isFinite(Number(row.pct))?(" ("+pct(row.pct)+")"):"";
+  el.innerHTML='<h3>'+html(row.claim)+'</h3><p>Flagged on '+html(row.printed_on)+' at '+money(row.price_at_flag)+', now '+money(row.price_now)+p+'.</p><p class="muted">TCGplayer market, '+html(row.price_as_of||row.printed_on)+'</p>';
+  return el;
 }
-if(startAt>0) go(startAt);
-let lockUntil=0;
-snap.addEventListener("wheel",function(ev){
-  ev.preventDefault();
-  const now=Date.now();
-  if(now<lockUntil) return;
-  if(Math.abs(ev.deltaY)<4) return;
-  lockUntil=now+500;
-  const h=snap.clientHeight||1;
-  const i=Math.round(snap.scrollTop/h);
-  go(ev.deltaY>0?i+1:i-1);
-},{passive:false});
-let touchY=0;
-snap.addEventListener("touchstart",function(ev){ touchY=ev.changedTouches[0].clientY; },{passive:true});
-snap.addEventListener("touchend",function(ev){
-  const dy=touchY-ev.changedTouches[0].clientY;
-  if(Math.abs(dy)<28) return;
-  const h=snap.clientHeight||1;
-  const i=Math.round(snap.scrollTop/h);
-  go(dy>0?i+1:i-1);
-},{passive:true});
-addEventListener("keydown",e=>{
-  if(e.key!=="ArrowDown" && e.key!=="ArrowUp" && e.key!=="j" && e.key!=="k") return;
-  const box=document.activeElement;
-  if(box && (box.tagName==="INPUT"||box.tagName==="TEXTAREA")) return;
-  e.preventDefault();
-  const h=snap.clientHeight||1;
-  const i=Math.round(snap.scrollTop/h);
-  go(e.key==="ArrowDown"||e.key==="j"?i+1:i-1);
-});
+function listFor(part){
+  const f=filters();
+  if(catalogue){
+    if(part==="tracked") return (catalogue.tracked||[]).filter(row=>!f.dir || row.direction===f.dir);
+    let ids=catalogue[part]||[];
+    let rows=ids.map(id=>catalogue.cards[id]).filter(card=>pass(card,f));
+    if(f.sort==="price") rows.sort((a,b)=>b.price-a.price);
+    else if(f.sort==="name") rows.sort((a,b)=>String(a.name||a.headline).localeCompare(String(b.name||b.headline)));
+    return rows;
+  }
+  return (pages[part]||[]).filter(card=>pass(card,f));
+}
+async function loadPage(part, n){
+  if(pages[part+"#"+n]) return;
+  const res=await fetch("/data/feed/"+part+"/"+n+".json");
+  if(!res.ok){ pages[part+"#"+n]=[]; return; }
+  const rows=await res.json();
+  pages[part+"#"+n]=rows;
+  pages[part]=(pages[part]||[]).concat(rows);
+}
+const openIds=new Set(["today"]);
+let drawing=false;
+function draw(){
+  drawing=true;
+  const root=document.getElementById("feed-sections");
+  root.innerHTML="";
+  const f=filters();
+  for(const group of GROUPS){
+    const details=document.createElement("details");
+    details.className="feed-sec";
+    const rows=[];
+    for(const part of group.parts) rows.push(...listFor(part));
+    const n=meta && group.parts.reduce((s,p)=>s+(meta.sections[p]||0),0);
+    const countLabel=n||rows.length;
+    details.innerHTML='<summary>'+html(group.title)+' <span>'+countLabel+'</span></summary><p class="muted">'+html(group.note||"")+'</p><div class="pile"></div>';
+    const pile=details.querySelector(".pile");
+    const take=shown[group.id]||24;
+    rows.slice(0,take).forEach(row=>{
+      pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
+    });
+    if(rows.length>take){
+      const more=document.createElement("button");
+      more.type="button";
+      more.textContent="Load more";
+      more.onclick=async()=>{
+        shown[group.id]=take+24;
+        openIds.add(group.id);
+        if(!catalogue){
+          for(const part of group.parts) await loadPage(part, ((shown[group.id]-1)/24)|0);
+        }
+        draw();
+      };
+      pile.appendChild(more);
+    }
+    root.appendChild(details);
+    details.addEventListener("toggle", async()=>{
+      if(drawing) return;
+      if(details.open) openIds.add(group.id); else openIds.delete(group.id);
+      if(!details.open) return;
+      let need=false;
+      for(const part of group.parts) if(!pages[part]){ await loadPage(part, 0); need=true; }
+      if(need) draw();
+    });
+    if(openIds.has(group.id)) details.open=true;
+  }
+  drawing=false;
+  if(start){
+    const node=document.getElementById("r-"+start);
+    if(node){
+      const box=node.closest("details");
+      if(box) box.open=true;
+      node.scrollIntoView();
+    }
+  }
+}
+async function boot(){
+  if(lead.length && !pages.today) pages.today=lead.slice();
+  try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
+  const sel=document.getElementById("f-set");
+  (meta&&meta.sets||[]).forEach(set=>{
+    const o=document.createElement("option");
+    o.value=set.name; o.textContent=set.name;
+    sel.appendChild(o);
+  });
+  if(meta) document.getElementById("feed-count").textContent=meta.count.toLocaleString("en-US")+" reads. TCGplayer market.";
+  try{ await loadPage("today", 0); }catch(e){}
+  draw();
+  document.getElementById("feed-filters").onchange=async()=>{
+    if(!catalogue){
+      try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
+    }
+    draw();
+  };
+}
+boot();
 </script>`;
   return chrome("Feed", body, "The Feed", stamp, "", feedNav(opts));
 }

@@ -3,6 +3,7 @@ import { loadJson, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
+import { handleAlert, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
@@ -229,10 +230,12 @@ export default {
       if (!video) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
     }
     if (request.method === "GET" || request.method === "POST") {
-      if (url.pathname === "/api/vote" || url.pathname === "/api/report") {
+      if (url.pathname === "/api/vote") return handleVote(request, env);
+      if (url.pathname === "/api/alerts") return handleAlert(request, env);
+      if (url.pathname === "/api/report") {
         return new Response(JSON.stringify({
           ok: false,
-          error: "The server store is not on. Votes and price reports are not counted yet.",
+          error: "Price reports are not counted yet.",
         }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
     }
