@@ -66,6 +66,7 @@ t("editor is on the page", post.includes(priceLine(1, "2026-09-27").slice(0, 16)
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
 t("compare is side by side", post.includes("side by side") && post.includes("Pikachu, both"));
 t("catalog spelling", post.includes("The full catalog:") && !post.includes("catalogue"));
+t("browser helpers define printingRank", post.includes("function printingRank"));
 t("editor script parses", await (async () => {
   const start = post.indexOf("<script type=\"module\">");
   const end = post.indexOf("</script>", start);
