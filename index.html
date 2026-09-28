@@ -182,10 +182,9 @@ footer a{color:var(--gold)}
   <a class="logo" href="/">Catch'em<span>.</span></a>
   <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
   <nav id="site-nav">
-    <a href="/feed">The Feed</a>
     <a href="/sets">Sets</a>
-    <a href="/board">Movers</a>
     <a href="/artists">Artists</a>
+    <a href="/search">Search</a>
     <a href="/post-office">Post Office</a>
     <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
   </nav>
@@ -203,8 +202,8 @@ footer a{color:var(--gold)}
     <h1>A home for collectors, rippers and flippers.</h1>
     <p class="lede">Tools, daily market reads, and weekly and monthly wraps, built with <strong>the community</strong>.</p>
     <div class="actions">
-      <a class="btn btn-primary" href="/feed">Open The Feed</a>
-      <a class="btn btn-ghost" href="/sets">Browse sets</a>
+      <a class="btn btn-primary" href="/sets">Browse sets</a>
+      <a class="btn btn-ghost" href="/post-office">Post Office</a>
     </div>
     <p class="beta" id="fresh"><b>Open</b><span id="fresh-line">Catalog counts load from the public bundle.</span></p>
   </div>
@@ -218,11 +217,11 @@ footer a{color:var(--gold)}
     <p>Built in-house. Free to use.</p>
   </div>
   <div class="tiles">
-    <article class="tile feed">
+    <article class="tile">
       <span class="tag open">Open</span>
-      <h3>The Feed</h3>
-      <p>Card prices and charts. Written short, so you can read it in a minute.</p>
-      <a class="more" href="/feed">Open The Feed <span aria-hidden="true">→</span></a>
+      <h3>Sets</h3>
+      <p>Every set we publish. Singles and sealed stay apart, with the TCGplayer market price and the date.</p>
+      <a class="more" href="/sets">Browse sets <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile post">
       <span class="tag open">Open</span>
@@ -255,14 +254,6 @@ footer a{color:var(--gold)}
   <div id="home-charts"></div>
 </section>
 
-<section class="section" id="preview" aria-labelledby="preview-h" hidden>
-  <div class="head">
-    <h2 id="preview-h">Three reads</h2>
-    <p><a href="/feed">The rest of The Feed</a></p>
-  </div>
-  <div class="reads" id="reads"></div>
-</section>
-
 <section class="premium" aria-label="Discord Premium">
   <p><b>Discord Premium is $14.99/mo.</b> It is a Discord seat. Stadium giveaways seat Premium members automatically. The first 222 seats are numbered and never reissued. The tools on this site stay free.</p>
   <a class="btn btn-primary" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join Discord</a>
@@ -271,7 +262,7 @@ footer a{color:var(--gold)}
 <section class="join" id="list" aria-labelledby="list-h">
   <div>
     <h2 id="list-h">Get on the list</h2>
-    <p class="lead">One email when a new tool ships. The Feed and Post Office are open. Nothing else unless you tick the box. The tools stay free.</p>
+    <p class="lead">One email when a new tool ships. Post Office is open. Nothing else unless you tick the box. The tools stay free.</p>
   </div>
   <div>
     <form id="wl" action="https://formspree.io/f/xgorlypa" method="POST">
@@ -300,15 +291,15 @@ footer a{color:var(--gold)}
 <footer>
   <div class="wrap">
     <p>Made by one person who collects. Card images and names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p>
-    <p><a href="/methodology">How the numbers are made</a> · <a href="/receipts">Receipts</a> · <a href="/search">Search</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>
+    <p><a href="/methodology">How the numbers are made</a> · <a href="/search">Search</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>
   </div>
 </footer>
 <nav class="dock" aria-label="Primary">
-  <a href="/feed">The Feed</a>
   <a href="/sets">Sets</a>
-  <a href="/board">Movers</a>
   <a href="/artists">Artists</a>
   <a href="/search">Search</a>
+  <a href="/post-office">Post Office</a>
+  <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
 </nav>
 <script>
 (function(){
@@ -326,16 +317,6 @@ footer a{color:var(--gold)}
       var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(c.updatedAt));
       line.textContent="Updated "+clock+" PT";
     } else if(c.asOf) line.textContent="Updated "+c.asOf;
-  }).catch(function(){});
-  fetch("/data/reads.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){
-    var rows=(d.reads||[]).filter(function(r){ return r && r.headline && money(r.price); }).slice(0,3);
-    if(!rows.length) return;
-    var box=document.getElementById("preview");
-    box.hidden=false;
-    document.getElementById("reads").innerHTML=rows.map(function(r){
-      var pct=Number.isFinite(Number(r.changePct)) ? ((r.changePct>0?"+":"")+r.changePct+"%") : "";
-      return '<article class="read"><a href="/feed/r/'+encodeURIComponent(r.id)+'">'+text(r.headline)+'</a><p class="priv" style="margin:0">'+money(r.price)+(pct?" · "+pct:"")+' · '+text(r.confidence||"")+'</p></article>';
-    }).join("");
   }).catch(function(){});
   function pts(raw){var rows=Array.isArray(raw)?raw:[];var out=[];rows.forEach(function(p){var d=p&&p.d;var v=Number(p&&p.v);if(d&&v>0)out.push({d:d,v:v})});return out}
   function draw(host,points,caption){

@@ -46,10 +46,29 @@ export function pageKind(pathname) {
   return null;
 }
 
+export function feedEnabled(opts) {
+  return opts?.feed === true || opts?.FEED_ENABLED === "true";
+}
+
+export function gatedFeedPath(pathname) {
+  const path = norm(pathname);
+  if (path === "/feed" || path.startsWith("/feed/")) return true;
+  if (path === "/board" || path === "/movers") return true;
+  if (path === "/receipts" || path === "/accuracy") return true;
+  if (path === "/pulse") return true;
+  return false;
+}
+
+const home302 = () => new Response(null, {
+  status: 302,
+  headers: { location: "/", "cache-control": "no-store" },
+});
+
 const go = (loc) => new Response(null, { status: 301, headers: { location: loc, "cache-control": "no-store" } });
 
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
+  if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
   const kind = pageKind(path);
   let stamp = "";
   let asOf = "";
@@ -131,6 +150,7 @@ export default {
       // ?video=1 is not a gate. The flag is env.VIDEO_ENABLED, checked below.
     }
     const video = env?.VIDEO_ENABLED === "true";
+    const feed = env?.FEED_ENABLED === "true";
     if (request.method === "GET" && url.pathname === "/post-office/app") {
       try {
         const counts = await loadJson("counts.json", fetchImpl);
@@ -191,26 +211,30 @@ export default {
     if ((request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/build") {
       return Response.redirect(new URL("/post-office", url), 301);
     }
-    if (request.method === "GET") {
+    if (request.method === "GET" || request.method === "HEAD") {
+      if (!feed && gatedFeedPath(url.pathname)) return home302();
       const dest = redirectPath(url.pathname);
-      if (dest) return Response.redirect(new URL(dest, url), 301);
-      if (norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
-      if (norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
+      if (dest) {
+        const loc = !feed && (dest === "/feed" || dest.startsWith("/feed/")) ? "/" : dest;
+        return Response.redirect(new URL(loc, url), 301);
+      }
+      if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
+      if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
-      if (kind && kind !== "data") {
+      if (kind && kind !== "data" && request.method === "GET") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }
       }
-      if (kind === "data") {
-        try { return await renderPath(url.pathname, fetchImpl); }
+      if (kind === "data" && request.method === "GET") {
+        try { return await renderPath(url.pathname, fetchImpl, { feed }); }
         catch { return new Response("Not found", { status: 404 }); }
       }
     }
-    if (request.method === "GET" && isFeedPath(url.pathname)) {
+    if (feed && request.method === "GET" && isFeedPath(url.pathname)) {
       try {
         const body = await loadLatestFeed(fetchImpl);
         return new Response(body, {
