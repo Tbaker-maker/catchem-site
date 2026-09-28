@@ -1,0 +1,17 @@
+name: test
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/rebuild.test.mjs
+      - run: node scripts/public-routes.test.mjs
+      - run: node scripts/feed-live.test.mjs
+      - run: node scripts/post-office.test.mjs
+      - run: node scripts/check-ppt-safety.mjs

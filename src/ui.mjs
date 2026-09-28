@@ -1,3 +1,5 @@
+import { editorBody } from "./editor-page.mjs";
+
 const DISCORD = "https://discord.gg/fUSjxDX4Hy";
 
 export function esc(s) {
@@ -159,6 +161,12 @@ button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--
 button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 .site-foot{max-width:1040px;margin:0 auto;padding:8px 16px 24px;color:var(--dim);font-size:14px}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{scroll-behavior:auto!important;transition:none!important}}
+@media (max-width:1279px){
+  .menu-btn{display:inline-flex;align-items:center;justify-content:center}
+  .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
+  .site-bar nav.open{display:flex}
+}
+@media (min-width:1280px){.dock{display:none}body{padding-bottom:24px}.site-bar nav{display:flex}}
 `;
 
 function chrome(active, body, title, stamp) {
@@ -248,7 +256,7 @@ document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()})
   return chrome("Sets", body, "Set", stamp);
 }
 
-export function renderCard(card, stamp) {
+export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp);
   const price = money(card.price);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
@@ -264,7 +272,8 @@ export function renderCard(card, stamp) {
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
 <p style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</p>
-<p class="muted">${esc(pct)} · TCGplayer market</p>
+<p class="muted">${esc(pct)} · TCGplayer market${card.asOf ? ` (${esc(String(card.asOf).slice(0, 10))})` : ""}</p>
+${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
 ${chartBox(card.hist || [], "TCGplayer market, daily", "")}
 <details><summary>Why</summary>
@@ -430,15 +439,11 @@ ${(doc?.rows || []).map((r) => `<article class="card" style="margin:10px 0"><h2>
   return chrome("", body, "Accuracy", stamp);
 }
 
-export function renderPost(stamp) {
-  const body = `<main class="wrap"><h1>Post Office</h1>
-<p>The full catalogue: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
-<p class="muted">Opening soon. The catalog is already on <a href="/sets">Sets</a> and <a href="/artists">Artists</a>. The Feed is open.</p>
-</main>`;
-  return chrome("Post Office", body, "Post Office", stamp);
+export function renderPost(stamp, opts = {}) {
+  return chrome("Post Office", editorBody(opts.asOf || "", opts), "Post Office", stamp);
 }
 
-export function renderFeed(bundle, startId, stamp) {
+export function renderFeed(bundle, startId, stamp, opts = {}) {
   const reads = (bundle?.reads || []).filter((r) => r && r.headline && money(r.price) && !/\b(buy|sell|hold|floor|target|play|pick|bullish|bearish|crypto|nft|web3|ticker)\b/i.test(r.headline));
   const safe = JSON.stringify(reads).replace(/</g, "\\u003c");
   const css = `
@@ -481,7 +486,7 @@ function slide(r,i){
   el.className="slide"; el.id="r-"+r.id; el.dataset.i=i;
   const pct=Number.isFinite(r.changePct)?(r.changePct>0?"+":"")+r.changePct+"%":"no day-to-day change";
   const img=r.image && !/ebay/i.test(r.image)?'<img alt="" width="320" height="240" src="'+r.image.replace(/"/g,"")+'" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'ph\\',textContent:\\'No stock image\\'}))">':'<div class="ph">No stock image</div>';
-  el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+' · '+r.type+' · '+r.confidence+'</p>'+img+'<h2 style="font:500 26px/1.2 var(--serif);margin:0">'+r.headline.replace(/[&<>]/g,"")+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+pct+' · '+r.source+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button></div><div class="more"><p>'+String(r.why||"").replace(/[&<>]/g,"")+'</p><p class="muted">Sales counts are not in this feed. '+(r.low>0?"Lowest listed price is a listing, not this market price.":"No lowest listed price is stored on this read.")+'</p><p class="muted">Confidence: '+(r.confidence||"Early")+'. Source: '+(r.source||"TCGplayer market")+'.</p><p><a href="'+r.href+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
+  el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+' · '+r.type+' · '+r.confidence+'</p>'+img+'<h2 style="font:500 26px/1.2 var(--serif);margin:0">'+r.headline.replace(/[&<>]/g,"")+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+pct+' · '+r.source+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button>${opts.video ? `'+( '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>')+'` : ""}</div><div class="more"><p>'+String(r.why||"").replace(/[&<>]/g,"")+'</p><p class="muted">Sales counts are not in this feed. '+(r.low>0?"Lowest listed price is a listing, not this market price.":"No lowest listed price is stored on this read.")+'</p><p class="muted">Confidence: '+(r.confidence||"Early")+'. Source: '+(r.source||"TCGplayer market")+'.</p><p><a href="'+r.href+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
   el.querySelector(".slot").appendChild(chart(r.hist&&r.hist.length?r.hist:r.history));
   el.querySelector("[data-act=more]").onclick=()=>el.querySelector(".more").classList.toggle("open");
   el.querySelector("[data-act=share]").onclick=async()=>{

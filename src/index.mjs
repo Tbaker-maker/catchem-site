@@ -1,5 +1,6 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
+import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
   renderPost, renderReceipts, renderSearch, renderSetShell, renderSets,
@@ -43,11 +44,17 @@ export function pageKind(pathname) {
 
 const go = (loc) => new Response(null, { status: 301, headers: { location: loc, "cache-control": "no-store" } });
 
-export async function renderPath(pathname, fetchImpl = fetch) {
+export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
   const kind = pageKind(path);
   let stamp = "";
-  try { stamp = clockLabel((await loadJson("counts.json", fetchImpl)).updatedAt); } catch { stamp = ""; }
+  let asOf = "";
+  try {
+    const counts = await loadJson("counts.json", fetchImpl);
+    stamp = clockLabel(counts.updatedAt);
+    asOf = counts.asOf || "";
+  } catch { stamp = ""; }
+  const pageOpts = { ...opts, asOf };
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
@@ -58,7 +65,7 @@ export async function renderPath(pathname, fetchImpl = fetch) {
     const bundle = await loadJson("reads.json", fetchImpl);
     if (path === "/feed/all") return html(renderAll(bundle, stamp));
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    return html(renderFeed(bundle, id, stamp));
+    return html(renderFeed(bundle, id, stamp, pageOpts));
   }
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
@@ -92,14 +99,14 @@ export async function renderPath(pathname, fetchImpl = fetch) {
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
     const card = (rows || []).find((row) => row.id === cardId);
-    return html(renderCard(card, stamp), card ? 200 : 404);
+    return html(renderCard(card, stamp, pageOpts), card ? 200 : 404);
   }
   if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp));
   if (kind === "search") return html(renderSearch());
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp));
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp));
-  if (kind === "post") return html(renderPost(stamp));
+  if (kind === "post") return html(renderPost(stamp, pageOpts));
   return null;
 }
 
@@ -107,6 +114,35 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    const urlVideo = url.searchParams.get("video");
+    if (urlVideo != null) {
+      // ?video=1 is not a gate. The flag is env.VIDEO_ENABLED, checked below.
+    }
+    const video = env?.VIDEO_ENABLED === "true";
+    if (request.method === "GET" && url.pathname === "/api/card-img") {
+      const pid = Number(url.searchParams.get("pid"));
+      if (!Number.isFinite(pid) || pid <= 0) return new Response("Bad", { status: 400 });
+      const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
+      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      return new Response(img.body, {
+        status: 200,
+        headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" },
+      });
+    }
+    if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
+    if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
+    if (request.method === "POST" && url.pathname === "/api/video/quota") return handleVideoQuota(request, env);
+    if (request.method === "GET" && url.pathname === "/api/pocket-lite") {
+      try {
+        const rows = await pocketRows(fetchImpl);
+        return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
+      } catch {
+        return new Response("[]", { headers: { "content-type": "application/json; charset=utf-8" } });
+      }
+    }
+    if (request.method === "GET" && (url.pathname === "/video" || url.pathname.startsWith("/video/"))) {
+      if (!video) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+    }
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/api/vote" || url.pathname === "/api/report") {
         return new Response(JSON.stringify({
@@ -120,10 +156,11 @@ export default {
       if (dest) return Response.redirect(new URL(dest, url), 301);
       if (norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
+      if (norm(url.pathname) === "/build") return Response.redirect(new URL("/post-office", url), 301);
       const kind = pageKind(url.pathname);
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl);
+          const page = await renderPath(url.pathname, fetchImpl, { video });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.

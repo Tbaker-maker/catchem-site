@@ -53,7 +53,6 @@ a{color:var(--gold)}
 .chart{height:180px;min-height:180px}
 .site-bar .logo{font:600 28px/1 var(--serif);color:var(--text);text-decoration:none;letter-spacing:-.03em}
 .site-bar .logo span{color:var(--gold)}
-.site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}
 .site-bar nav a{color:var(--soft);text-decoration:none;font:500 14.5px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center}
 .site-bar nav a:hover{color:var(--gold)}
 .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
@@ -167,6 +166,12 @@ footer a{color:var(--gold)}
 .read a:hover{color:var(--gold)}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6}
 .dock a{color:var(--soft);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+@media (max-width:1279px){
+  .menu-btn{display:inline-flex;align-items:center}
+  .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
+  .site-bar nav.open{display:flex}
+}
+@media (min-width:1280px){.dock{display:none}body{padding-bottom:24px}.site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}}
 </style>
 </head>
 <body>
@@ -218,9 +223,9 @@ footer a{color:var(--gold)}
       <a class="more" href="/feed">Open The Feed <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile post">
-      <span class="tag">Opening soon</span>
+      <span class="tag open">Open</span>
       <h3>Post Office</h3>
-      <p>The full catalogue: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+      <p>The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
       <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
@@ -264,7 +269,7 @@ footer a{color:var(--gold)}
 <section class="join" id="list" aria-labelledby="list-h">
   <div>
     <h2 id="list-h">Get on the list</h2>
-    <p class="lead">One email when Post Office opens. The Feed is already open. Nothing else unless you tick the box. The tools stay free.</p>
+    <p class="lead">One email when a new tool ships. The Feed and Post Office are open. Nothing else unless you tick the box. The tools stay free.</p>
   </div>
   <div>
     <form id="wl" action="https://formspree.io/f/xgorlypa" method="POST">
@@ -378,7 +383,7 @@ footer a{color:var(--gold)}
     fetch(f.action,{method:"POST",body:new FormData(f),headers:{Accept:"application/json"}})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok, j:j}; }); })
       .then(function(res){
-        if(res.ok){ f.hidden=true; s.className="status ok"; s.textContent="You're on the list. One email when Post Office opens."; return; }
+        if(res.ok){ f.hidden=true; s.className="status ok"; s.textContent="You're on the list. One email when a new tool ships."; return; }
         var msg=(res.j&&res.j.errors&&res.j.errors[0]&&res.j.errors[0].message)||"That did not go through.";
         s.className="status err"; s.textContent=msg.charAt(0).toUpperCase()+msg.slice(1)+". Check the address and try again.";
         b.disabled=false; b.textContent="Request access";
