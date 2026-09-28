@@ -3,7 +3,7 @@ import { loadJson, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
-import { handleAlert, handleVote } from "./feed-api.mjs";
+import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
@@ -103,6 +103,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
+    if (rel.includes("calls.jsonl") || rel.includes("shelf.jsonl") || rel.startsWith("learning/")) return new Response("Not found", { status: 404 });
     return proxyPublic(rel, fetchImpl);
   }
   if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
@@ -232,6 +233,7 @@ export default {
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/api/vote") return handleVote(request, env);
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
+      if (url.pathname === "/api/follow") return handleFollow(request, env);
       if (url.pathname === "/api/report") {
         return new Response(JSON.stringify({
           ok: false,
