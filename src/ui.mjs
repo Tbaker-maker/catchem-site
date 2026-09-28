@@ -1,5 +1,3 @@
-import { editorBody } from "./editor-page.mjs";
-
 const DISCORD = "https://discord.gg/fUSjxDX4Hy";
 
 export function esc(s) {
@@ -491,8 +489,11 @@ export function renderRetired(kind) {
   return chrome("", body, title);
 }
 
-export function renderPost(stamp, opts = {}) {
-  return chrome("Post Office", editorBody(opts.asOf || "", opts), "Post Office", stamp);
+export function renderPost(stamp) {
+  const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+<iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 148px)"></iframe>
+<style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
+  return chrome("Post Office", body, "Post Office", stamp);
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {
@@ -550,8 +551,7 @@ function slide(r,i){
   el.className="slide"; el.id="r-"+r.id; el.dataset.i=i;
   const pct=Number.isFinite(r.changePct)?(r.changePct>0?"+":"")+r.changePct+"%":"no day-to-day change";
   const img=r.image && !/ebay/i.test(r.image)?'<img alt="" width="320" height="240" src="'+r.image.replace(/"/g,"")+'" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'ph\\',textContent:\\'No stock image\\'}))">':'<div class="ph">No stock image</div>';
-  const showShort = ${opts.video ? "true" : "false"};
-  const shortLink = showShort ? '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>' : "";
+  ${opts.video ? `const shortLink = '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>';` : `const shortLink = "";`}
   el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+' · '+r.type+' · '+r.confidence+'</p>'+img+'<h2 style="font:500 22px/1.2 var(--serif);margin:0">'+html(r.headline)+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+pct+' · '+html(r.source)+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button> '+shortLink+'</div><div class="more"><p>'+html(r.why||"")+'</p><p class="muted">Sales counts are not in this feed. '+(r.low>0?"Lowest listed price is a listing, not this market price.":"No lowest listed price is stored on this read.")+'</p><p class="muted">Confidence: '+html(r.confidence||"Early")+'. Source: '+html(r.source||"TCGplayer market")+'. </p><p><a href="'+html(r.href)+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
   el.querySelector(".slot").appendChild(chart(r.hist&&r.hist.length?r.hist:r.history));
   el.querySelector("[data-act=more]").onclick=()=>el.querySelector(".more").classList.toggle("open");

@@ -1,8 +1,9 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker, { renderPath } from "../src/index.mjs";
-import { artistNotable, comparePair, downloadName, parseQuery, preferPrinting, priceLine } from "../src/post-copy.mjs";
+import { artistNotable, clientHelpers, comparePair, downloadName, parseQuery, preferPrinting, priceLine } from "../src/post-copy.mjs";
+import { patchEditorHtml, patchPaperRows, PAPER_PATH } from "../src/full-editor.mjs";
 import { resetQuota, signSession } from "../src/quota.mjs";
 import { factPost, factsFor, resetCatalogCache, STYLE_PROMPT } from "../src/ai.mjs";
 
@@ -62,26 +63,50 @@ const fetchImpl = async (url) => {
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("editor is on the page", post.includes(priceLine(1, "2026-09-27").slice(0, 16)) && post.includes("/data/search-lite.json") && post.includes("rankCatalog"));
+t("editor is on the page", post.includes('src="/post-office/app"') && post.includes("Post Office editor") && post.includes("The full catalog:"));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
-t("compare is side by side", post.includes("side by side") && post.includes("Pikachu, both"));
 t("catalog spelling", post.includes("The full catalog:") && !post.includes("catalogue"));
-t("browser helpers define printingRank", post.includes("function printingRank"));
-t("editor script parses", await (async () => {
-  const start = post.indexOf("<script type=\"module\">");
-  const end = post.indexOf("</script>", start);
-  const script = post.slice(start + "<script type=\"module\">".length, end);
-  const file = "/tmp/editor-check.mjs";
-  await writeFile(file, script);
-  try {
-    const { execFileSync } = await import("node:child_process");
-    execFileSync(process.execPath, ["--check", file], { stdio: "pipe" });
-    return true;
-  } catch (err) {
-    console.log(String(err.stderr || err));
-    return false;
-  }
-})());
+t("browser helpers define printingRank", clientHelpers().includes("function printingRank"));
+const shell = [
+  'fetch("paper-rows.json?v=" + v)',
+  'fetch("pocket-rows.json?v=" + v)',
+  'const PRICES_AS_OF = "2026/08/22";',
+  'dateNote = "priced " + PRICES_AS_OF;',
+  'priced[0].n + " sells for about " + Math.round(priced[0].p)',
+  'priced[priced.length-1].n + " for about " + Math.round(priced[priced.length-1].p)',
+  'var name = (typeof fname === "function" ? fname() : "catchem") + ".jpg";',
+  "var CARD_ROWS = (window.__PAPER_ROWS && window.__PAPER_ROWS.length) ? window.__PAPER_ROWS : CORE_ROWS.slice();",
+  '<option value="both">Compare both</option>',
+  '<option value="9">9 — a binder page</option>',
+  '<option value="art">Just art</option>',
+  '<button id="make">Make the image</button>',
+  '<input id="q" placeholder="Pokémon, artist, or set">',
+].join("\n");
+const patchedHtml = patchEditorHtml(shell, "2026-09-27");
+t("full editor keeps its tools", patchedHtml.includes("Compare both") && patchedHtml.includes("binder page") && patchedHtml.includes("Just art") && patchedHtml.includes("Make the image") && patchedHtml.includes("artist"));
+t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patchedHtml.includes('PRICES_AS_OF = "2026-09-27"') && patchedHtml.includes("TCGplayer market") && !patchedHtml.includes("sells for") && patchedHtml.includes("Facebook") && patchedHtml.includes("YouTube") && patchedHtml.includes("Instagram") && patchedHtml.includes("catchem.png") && !patchedHtml.includes('".jpg"'));
+const pricedRows = patchPaperRows([
+  ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
+  ["ex13-104", "Pikachu ★", "Holon Phantoms", "2006", "", "Rare Holo Star", 3200],
+  ["swsh7-215", "Umbreon VMAX", "Evolving Skies", "2021", "Keiichiro Ito", "Rare Secret", 2410],
+  ["missing-x", "Not A Card", "Nowhere", "1999", "", "", 99],
+  ["ex11-113", "Metagross ★", "Delta Species", "2005", "", "", 951.99],
+  ["ex10-105", "Lugia ex", "Unseen Forces", "2005", "", "", 2500],
+  ["base1-4", "Charizard", "Base", "1999", "Ken Sugimori", "", 855.52],
+], [
+  ["tcgcsv-89171", "Shining Tyranitar", "Neo Destiny", "113/105", "Ken Sugimori", "single", 345, "", "Secret Rare"],
+  ["tcgcsv-88111", "Pikachu Star", "EX Holon Phantoms", "104/110", "", "single", 900, "", ""],
+  ["tcgcsv-246723", "Umbreon VMAX (Alternate Art Secret)", "SWSH07: Evolving Skies", "215/203", "", "single", 2214.79, "", ""],
+  ["tcgcsv-87342", "Metagross (Delta Species)", "EX Delta Species", "11/113", "", "single", 130.45, "", ""],
+  ["tcgcsv-241789", "Metagross VMAX", "SWSH06: Chilling Reign", "113/198", "", "single", 2.73, "", ""],
+  ["tcgcsv-86912", "Lugia ex", "EX Unseen Forces", "105/115", "", "single", 0, "", ""],
+  ["tcgcsv-477776", "Lugia ex - 2006 (Hiroki Yano)", "World Championship Decks", "105/115", "", "single", 103.5, "", ""],
+  ["tcgcsv-42382", "Charizard", "Base Set", "004/102", "Ken Sugimori", "single", 944.53, "", ""],
+  ["tcgcsv-shadow", "Charizard", "Base Set (Shadowless)", "4/102", "", "single", 5000, "", ""],
+]);
+t("live market replaces the old figures", pricedRows.rows[0][6] === 345 && pricedRows.rows[1][6] === 900 && pricedRows.rows[2][6] === 2214.79 && pricedRows.rows[3][6] === 0);
+t("a zero live price stays unpriced", pricedRows.rows[4][6] === 0 && pricedRows.rows[5][6] === 0);
+t("base set does not take the shadowless price", pricedRows.rows[6][6] === 944.53);
 const feedOff = await (await renderPath("/feed", fetchImpl)).text();
 t("short button stays off without the flag", !feedOff.includes("Make a Short"));
 const feedOn = await (await renderPath("/feed", fetchImpl, { video: true })).text();
