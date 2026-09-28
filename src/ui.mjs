@@ -87,10 +87,10 @@ function catchemDraw(host,pts,release,caption){
     }
   }
   var money=function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
-  var daysNote=pts.length===2?"2 days of history, "+pts[0].d+" and "+pts[pts.length-1].d:pts.length+" points";
+  function when(d){var parts=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(parts[1])||1)-1]+" "+Number(parts[2])+", "+parts[0];}
   var label=(caption||"TCGplayer market, daily").replace(/"/g,"");
-  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+', '+pts.length+' points" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none"><text x="4" y="22" fill="#c4baab" font-size="12">'+money(max)+'</text><text x="4" y="'+(h-30)+'" fill="#c4baab" font-size="12">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"></path><text x="56" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[0].d.slice(5)+'</text><text x="'+(w-70)+'" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[pts.length-1].d.slice(5)+'</text></svg><p class="chart-hover muted" style="min-height:1.2em;margin:4px 0 0"></p>';
-  if(note) note.textContent=(caption||"TCGplayer market, daily")+". "+daysNote+". Axis from the low to the high, not from zero."+(release?" Release "+release+".":"");
+  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none"><text x="4" y="22" fill="#c4baab" font-size="12">'+money(max)+'</text><text x="4" y="'+(h-30)+'" fill="#c4baab" font-size="12">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"></path><text x="56" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[0].d.slice(5)+'</text><text x="'+(w-70)+'" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[pts.length-1].d.slice(5)+'</text></svg><p class="chart-hover muted" style="min-height:1.2em;margin:4px 0 0"></p>';
+  if(note) note.textContent=(caption||"TCGplayer market, daily")+". "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+".";
   var svg=host.querySelector("svg");
   var hover=host.querySelector(".chart-hover");
   function show(ev){
@@ -110,10 +110,17 @@ function catchemMount(root){
     var caption=host.getAttribute("data-caption")||"TCGplayer market, daily";
     var release=host.getAttribute("data-release")||"";
     var box=host.parentElement;
+    var span=all.length<2?0:Math.round((Date.parse(all[all.length-1].d+"T00:00:00Z")-Date.parse(all[0].d+"T00:00:00Z"))/86400000)+1;
+    var allow=["All"];
+    if(span>=7) allow.unshift("7D");
+    if(span>=30) allow.splice(allow.indexOf("All"),0,"30D");
+    if(span>=90) allow.splice(allow.indexOf("All"),0,"90D");
+    if(span>=365) allow.splice(allow.indexOf("All"),0,"1Y");
     function paint(range){ catchemDraw(host, catchemFilter(all, range), release, caption); }
     paint("All");
     if(!box) return;
     box.querySelectorAll("[data-range]").forEach(function(btn){
+      if(allow.indexOf(btn.getAttribute("data-range"))<0) btn.hidden=true;
       btn.addEventListener("click", function(){
         box.querySelectorAll("[data-range]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
         btn.setAttribute("aria-pressed","true");
@@ -150,6 +157,7 @@ a{color:var(--gold)}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
+.chart-note{font-size:15px;line-height:1.45;margin:8px 0 0}
 .counts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .counts b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:44px}
 .counts b span{display:block;font:400 12px/1.3 var(--sans);color:var(--dim)}
@@ -206,7 +214,7 @@ function spark(values) {
   const step = (w - 16) / (pts.length - 1);
   const d = pts.map((v, i) => `${i ? "L" : "M"}${(8 + i * step).toFixed(1)},${(h - 10 - ((v - min) / span) * (h - 24)).toFixed(1)}`).join(" ");
   const up = pts[pts.length - 1] >= pts[0];
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="price, ${pts.length} points, axis from low to high not from zero"><path d="${d}" fill="none" stroke="${up ? "#7fc79a" : "#e0675b"}" stroke-width="2"/></svg><p class="muted" style="font-size:12px;margin:4px 0 0">${pts.length} points · axis runs from the low to the high, not from zero</p>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="TCGplayer market"><path d="${d}" fill="none" stroke="${up ? "#7fc79a" : "#e0675b"}" stroke-width="2"/></svg>`;
 }
 
 export function renderSets(index, stamp) {
@@ -291,32 +299,24 @@ export function renderCard(card, stamp, opts = {}) {
     : (card.scan && String(card.scan).startsWith("https://images.pokemontcg.io/")
       ? `<img alt="${esc(card.name)}" width="320" height="446" src="${esc(card.scan)}" style="width:min(280px,100%);height:auto;border-radius:16px;background:#211e1a" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'No stock image'}))">`
       : `<div class="ph">No stock image</div>`);
-  const pct = Number.isFinite(Number(card.pct)) ? `${card.pct > 0 ? "up" : card.pct < 0 ? "down" : "unchanged"} ${Math.abs(card.pct)}% from the last print` : "No day-to-day change to show.";
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
-  const low = money(card.low);
   const body = `<main class="wrap">
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
 <p style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</p>
-<p class="muted">${esc(pct)} · TCGplayer market${card.asOf ? ` (${esc(String(card.asOf).slice(0, 10))})` : ""}</p>
+<p class="muted">TCGplayer market${card.asOf ? `, ${esc(String(card.asOf).slice(0, 10))}` : ""}</p>
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
 <p class="muted">${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")})` : "No sold data yet"}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
-${chartBox(card.hist || [], "TCGplayer market, daily", "")}
-<details><summary>Why</summary>
-<p>${esc(card.artist ? `${card.name} is illustrated by ${card.artist}.` : "No illustrator credit is matched for this row.")} ${esc(pct)}</p>
-<p>${card.sold && Number(card.sold.n) > 0 ? `Sold count ${esc(String(card.sold.n))}${card.sold.dates ? ` (${esc(card.sold.dates)})` : ""}.` : "No sold list is stored for this card."}</p>
-<p>${low ? `Lowest listed price ${low}. That is a listing, not a sold price, and it is not the market price above.` : "A lowest listed price was not stored for this row."}</p>
-<p>Confidence: ${esc((card.hist || []).length >= 7 ? "Tracked" : "Early")}. Source: TCGplayer market, dated ${esc(card.asOf || "")}.</p>
-</details>
+${chartBox(card.hist || [], "TCGplayer market, daily", card.release || "")}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
 <p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
-<p>Recent sold prices: ${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).` : "No sold data yet."} TCGplayer market is the one price above, not a sold list.</p>
+<p>Recent sold prices: ${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).` : "No sold data yet."}</p>
 <p><button type="button" id="paid">I paid or sold at a price</button></p>
 <form id="paid-form" hidden>
 <label>Price <input name="price" inputmode="decimal" required></label>
@@ -408,7 +408,7 @@ const mark = (r) => {
   const body = `<main class="wrap"><p class="muted" id="fresh">Updated ${esc(doc?.asOf || "")}</p><h1>Receipts</h1>
 <p>${esc(doc?.note || "")}</p>
 <p class="muted">Scored calls: ${Number(doc?.scored) || 0}. Hit rate: ${doc?.hitRate == null ? "not shown until 20 calls are scored" : esc(String(doc.hitRate))}</p>
-${chartBox(doc?.series || [], "Calls versus the later market print")}
+${chartBox(doc?.series || [], "TCGplayer market")}
 ${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}<p class="muted">${esc(r.why || "")}</p></article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
 </main>`;
   return chrome("", body, "Receipts", stamp);
@@ -456,13 +456,13 @@ export function renderMethod(counts, stamp) {
     ? `The public catalog is ${single.toLocaleString("en-US")} singles and ${sealed.toLocaleString("en-US")} sealed products. Slabs are not in it.`
     : "Singles and sealed are counted apart. Slabs are not in the catalog.";
   const body = `<main class="wrap"><h1>How the numbers are made</h1>
-<p>Catch'em prints one price for a product: the TCGplayer market price. Singles and sealed are never added into one index.</p>
+<p>Catch'em shows one price for a product: the TCGplayer market price. Singles and sealed are never added into one index.</p>
 <ul>
 <li><b>TCGplayer market</b> is the catalog price. ${catalog}</li>
-<li>A sold list is printed only when the file has one, labeled TCGplayer recent sales. Otherwise the page says no sold data yet. The market price is still the one catalog number.</li>
+<li>A sold list is shown only when the file has one, labeled TCGplayer recent sales. Otherwise the page says no sold data yet. The market price is still the one catalog number.</li>
 </ul>
-<p>A one-day move is marked <b>Early</b>. If a price is missing, the page says so. We do not print a blank, a zero, or a made-up sold price.</p>
-<p>Charts say how many daily points they have. Two days is not a month. History starts on the first day we stored.</p>
+<p>If a price is missing, the page says so. We do not show a blank, a zero, or a made-up sold price.</p>
+<p>The chart axis runs from the low to the high, not from zero. A range button is shown only when the series covers that range. The line is labeled TCGplayer market and shows the first and last price and date. Missing days are not filled in.</p>
 <p>Box math divides that same market price by the pack count. Artist pages only include illustrator credits we could match.</p>
 <p><a href="/corrections">Corrections</a></p>
 </main>`;
@@ -556,7 +556,7 @@ function slide(r,i){
   const pct=Number.isFinite(r.changePct)?(r.changePct>0?"+":"")+r.changePct+"%":"no day-to-day change";
   const img=r.image && !/ebay/i.test(r.image)?'<img alt="" width="320" height="240" src="'+r.image.replace(/"/g,"")+'" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'ph\\',textContent:\\'No stock image\\'}))">':'<div class="ph">No stock image</div>';
   ${opts.video ? `const shortLink = '<a href="/video/studio.html?ids='+encodeURIComponent(String(r.href||"").split("/").pop())+'">Make a Short</a>';` : `const shortLink = "";`}
-  el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+' · '+r.type+' · '+r.confidence+'</p>'+img+'<h2 style="font:500 22px/1.2 var(--serif);margin:0">'+html(r.headline)+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+pct+' · '+html(r.source)+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button> '+shortLink+'</div><div class="more"><p>'+html(r.why||"")+'</p><p class="muted">'+(r.sold&&Number(r.sold.n)>0?("Sold count "+r.sold.n+(r.sold.dates?" ("+html(r.sold.dates)+")":"")+". "):"No sold list is stored for this card. ")+(r.low>0?"Lowest listed price is a listing, not this market price.":"No lowest listed price is stored on this read.")+'</p><p class="muted">Confidence: '+html(r.confidence||"Early")+'. Source: '+html(r.source||"TCGplayer market")+'. </p><p><a href="'+html(r.href)+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
+  el.innerHTML='<article class="read"><p class="kicker">'+(stamp?stamp+' · ':'')+(i+1)+' of '+reads.length+'</p>'+img+'<h2 style="font:500 22px/1.2 var(--serif);margin:0">'+html(r.headline)+'</h2><p class="price">'+money(r.price)+'</p><p class="muted">'+html(r.source||"TCGplayer market")+'</p><div class="slot"></div><div><button type="button" data-act="more">Why</button> <button type="button" data-act="share">Share</button> '+shortLink+'</div><div class="more"><p>'+html(r.why||"")+'</p><p><a href="'+html(r.href)+'">Open the page</a></p><p>Will this move keep going?</p><button type="button" data-vote="yes">I think it keeps going</button> <button type="button" data-vote="no">I think it fades</button><p class="vote muted"></p></div></article>';
   el.querySelector(".slot").appendChild(chart(r.hist&&r.hist.length?r.hist:r.history, r.source||"TCGplayer market"));
   el.querySelector("[data-act=more]").onclick=()=>el.querySelector(".more").classList.toggle("open");
   el.querySelector("[data-act=share]").onclick=async()=>{
