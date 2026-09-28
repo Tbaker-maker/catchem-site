@@ -127,6 +127,7 @@ t("premium is a worker page", pageKind("/premium") === "premium" && premium.stat
 t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause</a><a href=") && premiumHtml.includes(">Cancel</a>"));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(premiumHtml));
+t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
