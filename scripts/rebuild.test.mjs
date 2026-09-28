@@ -109,7 +109,7 @@ const movedOn = await worker.fetch(new Request("https://catchemtcg.com/movers"),
 t("movers redirects to the board when the flag is on", movedOn.status === 301 && movedOn.headers.get("location").endsWith("/board"));
 const pulseOn = await worker.fetch(new Request("https://catchemtcg.com/pulse"), on);
 t("pulse redirects to the feed when the flag is on", pulseOn.status === 301 && pulseOn.headers.get("location").endsWith("/feed"));
-t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1024px") && feedHtml.includes(".dock{display:none") && feedHtml.includes("2 days of history"));
+t("the header is one row and the dock hides on a wide screen", feedHtml.includes("menu-btn") && feedHtml.includes("min-width:1024px") && feedHtml.includes(".dock{display:none") && feedHtml.includes("TCGplayer market") && !feedHtml.includes("2 days of history") && !feedHtml.includes("Axis from the low"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
