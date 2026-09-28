@@ -1,6 +1,8 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
+import { liveStamp } from "./build-stamp.mjs";
+import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
@@ -137,7 +139,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp));
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp));
   if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind));
-  if (kind === "post") return html(renderPost(stamp, pageOpts));
+  if (kind === "post") return html(renderPost(stamp, await liveStamp(fetchImpl)));
   return null;
 }
 
@@ -154,12 +156,18 @@ export default {
     if (request.method === "GET" && url.pathname === "/post-office/app") {
       try {
         const counts = await loadJson("counts.json", fetchImpl);
-        const body = await editorDocument(counts.asOf || "", fetchImpl);
+        const mark = await liveStamp(fetchImpl);
+        const body = await editorDocument(counts.asOf || "", fetchImpl, mark);
         return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       } catch {
         return new Response("The editor did not load.", { status: 503, headers: { "cache-control": "no-store" } });
       }
     }
+    if (request.method === "GET" && url.pathname === "/api/session") return handleSession(request, env);
+    if (request.method === "GET" && url.pathname === "/signin") return handleSignIn(request, env);
+    if (request.method === "GET" && url.pathname === "/auth/discord") return beginDiscord(request, env);
+    if (request.method === "GET" && url.pathname === "/auth/discord/callback") return finishDiscord(request, env, fetchImpl);
+    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout();
     if (request.method === "GET" && url.pathname === POCKET_PATH) {
       try {
         const body = await pocketDocument(fetchImpl);

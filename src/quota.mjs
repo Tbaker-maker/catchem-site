@@ -1,5 +1,10 @@
 // Sign-in caps. A browser cookie that is not a signed session does not count.
 
+export function ideasSignInLine(ready) {
+  if (ready) return "Sign in with Discord to use Ideas. A free seat is 3 a day. Premium is 50 a day.";
+  return "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.";
+}
+
 export const LIMITS = {
   ideas: { free: 3, premium: 50 },
   "post-text": { free: 3, premium: 100 },
@@ -94,7 +99,7 @@ export function signInCard(feature) {
   if (feature === "ideas") {
     return {
       title: "Sign in for Ideas",
-      body: "Ideas are 3 a day on a free seat and 50 a day on Premium. A browser cookie is not a pass.",
+      body: "A free seat is 3 Ideas a day. Premium is 50 a day. A browser cookie is not a pass.",
     };
   }
   return {
@@ -112,6 +117,15 @@ export function limitCard(feature, cap, premium) {
     return { title: "Ideas limit", body: `${seat} Ideas are capped at ${cap} a day. The count resets at midnight Pacific.` };
   }
   return { title: "Post text limit", body: `${seat} post text is capped at ${cap} a day. The count resets at midnight Pacific.` };
+}
+
+export function usageOf(user, feature) {
+  if (!user) return null;
+  const spec = LIMITS[feature];
+  if (!spec || feature === "video") return null;
+  const { dayUsed } = bucket(user.sub, feature);
+  const cap = user.premium ? spec.premium : spec.free;
+  return { used: dayUsed, cap, left: Math.max(0, cap - dayUsed) };
 }
 
 export function peek(user, feature) {
