@@ -80,24 +80,25 @@ function catchemDraw(host,pts,release,caption){
     if(note) note.textContent=(caption||"TCGplayer market, daily")+". No daily points in this range.";
     return;
   }
-  var w=640,h=Number(host.getAttribute("data-h"))||180,min=Math.min.apply(null,pts.map(function(p){return p.v})),max=Math.max.apply(null,pts.map(function(p){return p.v}));
+  var wMeasured=host.getBoundingClientRect?Math.round(host.getBoundingClientRect().width):0;
+  var w=wMeasured>=280?wMeasured:640,h=Number(host.getAttribute("data-h"))||180,min=Math.min.apply(null,pts.map(function(p){return p.v})),max=Math.max.apply(null,pts.map(function(p){return p.v}));
   host.style.height=h+"px";
   host.style.minHeight=h+"px";
   var span=max-min||Math.max(max*0.04,0.01);
   var lo=min-span*0.08, hi=max+span*0.08, plot=hi-lo;
-  var step=(w-72)/Math.max(1,pts.length-1);
-  function y(v){return (18+((hi-v)/plot)*(h-46));}
-  var d=pts.map(function(p,i){return (i?"L":"M")+(56+i*step).toFixed(1)+","+y(p.v).toFixed(1)}).join(" ");
+  var step=(w-112)/Math.max(1,pts.length-1);
+  function y(v){return (22+((hi-v)/plot)*(h-52));}
+  var d=pts.map(function(p,i){return (i?"L":"M")+(96+i*step).toFixed(1)+","+y(p.v).toFixed(1)}).join(" ");
   var rel="";
   if(release){
     for(var i=0;i<pts.length;i++){
-      if(pts[i].d>=release){ rel='<line x1="'+(56+i*step).toFixed(1)+'" y1="16" x2="'+(56+i*step).toFixed(1)+'" y2="'+(h-28)+'" stroke="#6f9be8" stroke-dasharray="3 3"/>'; break; }
+      if(pts[i].d>=release){ rel='<line x1="'+(96+i*step).toFixed(1)+'" y1="18" x2="'+(96+i*step).toFixed(1)+'" y2="'+(h-30)+'" stroke="#6f9be8" stroke-dasharray="3 3"/>'; break; }
     }
   }
   var money=function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
   function when(d){var parts=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(parts[1])||1)-1]+" "+Number(parts[2])+", "+parts[0];}
   var label=(caption||"TCGplayer market, daily").replace(/"/g,"");
-  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="4" y="22" fill="#c4baab" font-size="12">'+money(max)+'</text><text x="4" y="'+(h-30)+'" fill="#c4baab" font-size="12">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="3"></path><text x="56" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[0].d.slice(5)+'</text><text x="'+(w-70)+'" y="'+(h-8)+'" fill="#c4baab" font-size="12">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
+  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="6" y="20" fill="#efe9de" font-size="14">'+money(max)+'</text><text x="6" y="'+(h-32)+'" fill="#efe9de" font-size="14">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"></path><text x="96" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[0].d.slice(5)+'</text><text x="'+(w-72)+'" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
   if(note) note.textContent=(caption||"TCGplayer market, daily")+". "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+".";
   if(hover) hover.textContent=when(pts[pts.length-1].d)+" · "+money(pts[pts.length-1].v);
   var svg=host.querySelector("svg");
@@ -106,7 +107,7 @@ function catchemDraw(host,pts,release,caption){
     var rect=svg.getBoundingClientRect();
     if(!rect.width) return;
     var x=(ev.clientX-rect.left)/rect.width*w;
-    var i=Math.round((x-56)/step);
+    var i=Math.round((x-96)/step);
     if(i<0) i=0; if(i>=pts.length) i=pts.length-1;
     hover.textContent=when(pts[i].d)+" · "+money(pts[i].v);
   }
@@ -636,7 +637,23 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
   .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
-  .feed-card h3{font:500 22px/1.25 var(--serif);margin:0}
+  .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
+  .one-line{margin:0}
+  .means{background:#211e1a;border-radius:14px;padding:12px 14px}
+  .means b{display:block;margin:0 0 6px}
+  .means p{margin:0 0 8px}
+  .means p:last-child{margin:0}
+  .vote-q{margin:4px 0 0;font-weight:600}
+  .set-ph{min-height:160px;display:flex;align-items:center;justify-content:center;background:#211e1a;border-radius:12px;padding:16px;text-align:center;font:600 16px/1.3 var(--sans);color:var(--gold)}
+  .stats{display:flex;flex-direction:column;gap:4px}
+  .stats p{margin:0}
+  .track-done{margin:0;color:var(--gold)}
+  .custom{display:flex;flex-wrap:wrap;gap:8px}
+  .custom[hidden]{display:none}
+  .track-sheet{display:none}
+  .track-sheet.open{display:flex;flex-direction:column;gap:10px;position:fixed;z-index:30;left:12px;right:12px;bottom:12px;max-width:440px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
+  .track-sheet label{min-height:44px;display:flex;gap:8px;align-items:center}
+  .track-sheet button,.track-sheet input,.track-sheet select{min-height:44px}
   .feed-card .price{font:600 28px/1 var(--serif);color:var(--gold);margin:0}
   .feed-card .chg{display:flex;flex-wrap:wrap;gap:8px}
   .feed-card .chg b{font-weight:600}
@@ -732,7 +749,6 @@ function chart(hist, caption){
   const host=el.querySelector(".chart");
   host.setAttribute("data-chart", JSON.stringify(hist||[]));
   host.setAttribute("data-caption", caption||"TCGplayer market");
-  if(typeof catchemMount==="function") catchemMount(el);
   return el;
 }
 function changes(card){
@@ -776,29 +792,121 @@ function listingsLine(card){
   if(!(n>=20) || !card.listingsAsOf) return "";
   return "Active listings: "+n+" (as of "+card.listingsAsOf+")";
 }
-function trackCopy(move, direction, price, supply){
-  let what="Alert me if it moves 10% either way.";
-  if(Number(price)>0) what="Alert me if the price reaches "+money(price)+".";
-  else if(Number(move)>0 && direction==="up") what="Alert me if it moves "+move+"% up.";
-  else if(Number(move)>0 && direction==="down") what="Alert me if it moves "+move+"% down.";
-  else if(Number(move)>0) what="Alert me if it moves "+move+"% either way.";
-  let line=what+" We'll DM you on Discord.";
-  if(supply && supply.low && supply.high) line+=" Alert me if listings drop below "+supply.low+" or rise above "+supply.high+".";
-  return line;
+function daySpan(days){
+  if(days===7) return "7 days";
+  if(days===30) return "30 days";
+  if(days===90) return "90 days";
+  if(days>0) return days+" days";
+  return "this window";
+}
+function priorMoney(card){
+  const now=Number(card.price);
+  const pctN=Number(card.changePct);
+  if(!(now>0) || !Number.isFinite(pctN)) return "";
+  const denom=1+pctN/100;
+  if(!(denom>0)) return "";
+  const from=now/denom;
+  return from>0?money(from):"";
+}
+function moveLine(card){
+  const pctN=Number(card.changePct);
+  if(!Number.isFinite(pctN)) return "";
+  const dir=pctN<0?"Down":"Up";
+  const abs=Math.round(Math.abs(pctN)*10)/10;
+  return dir+" "+abs+"% over "+daySpan(Number(card.windowDays)||0);
+}
+function watchDay(iso){
+  const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
+  if(!Number.isFinite(t)) return "";
+  const d=new Date(t+7*86400000);
+  const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return months[d.getUTCMonth()]+" "+d.getUTCDate();
+}
+function meansCopy(card){
+  const name=card.name||"This product";
+  const pctN=Number(card.changePct);
+  const now=money(card.price);
+  const from=priorMoney(card);
+  const days=Number(card.windowDays)||0;
+  const dir=pctN<0?"down":"up";
+  const abs=Number.isFinite(pctN)?Math.round(Math.abs(pctN)*10)/10:"";
+  const sentences=[];
+  if(now && from && abs!=="") sentences.push(name+" is "+dir+" "+abs+"% over the last "+daySpan(days)+", from "+from+" to "+now+".");
+  else if(now) sentences.push(name+" is at "+now+".");
+  else sentences.push(name+" is on the feed.");
+  if(card.thin) sentences.push("The sales behind this are thin, so the size of the move is less sure.");
+  else if(days===90) sentences.push("A move over a few months is easier to notice, because it was not a one-day jump.");
+  else if(days===30) sentences.push("A move over several weeks has had time to show up more than once.");
+  else sentences.push("This is a recent move. A single week can fade, so the next check matters more than this one.");
+  const when=watchDay(card.asOf);
+  if(when && now) sentences.push("Check on "+when+" and see if it is still near "+now+".");
+  else if(now) sentences.push("Check again in a week and see if it is still near "+now+".");
+  return sentences;
+}
+function logoFor(card){
+  if(card.logo) return String(card.logo);
+  const sets=(meta&&meta.sets)||[];
+  for(let i=0;i<sets.length;i++){
+    const s=sets[i];
+    if(s && (s.name===card.set || (card.setSlug && s.slug===card.setSlug)) && s.logo) return s.logo;
+  }
+  return "";
+}
+function placeholder(setName){
+  const ph=document.createElement("div");
+  ph.className="set-ph";
+  ph.textContent=setName||"Pokémon";
+  return ph;
+}
+function photoEl(card){
+  const logo=logoFor(card);
+  const setName=card.set||"Pokémon";
+  const src=card.image?String(card.image):"";
+  if(!src && !logo) return placeholder(setName);
+  const img=document.createElement("img");
+  img.alt="";
+  img.src=src||logo;
+  img.onerror=function(){
+    if(logo && img.getAttribute("data-logo")!=="1"){
+      img.setAttribute("data-logo","1");
+      img.src=logo;
+      return;
+    }
+    img.replaceWith(placeholder(setName));
+  };
+  return img;
 }
 function cardEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const img=card.image?'<img alt="" src="'+String(card.image).replace(/"/g,"")+'" onerror="this.remove()">':'';
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
   const supply=supplyPreset(card);
   const listed=listingsLine(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
+  const line=moveLine(card);
+  const means=meansCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
+  const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+' or above '+supply.high+'</label>':"";
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
-  el.innerHTML=img+'<h3><a href="'+readHref+'">'+html(card.headline)+'</a></h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><p class="track-line">'+html(trackCopy(10,"either",null,supply))+'</p><div class="feed-acts"><button type="button" data-act="track">Track this</button><button type="button" class="linkish" data-act="change">Change</button><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'<button type="submit">Save</button></form><p class="alert-note muted"></p>';
+  const bits=[];
+  const ch=changes(card);
+  if(ch) bits.push('<p class="chg">'+ch+'</p>');
+  bits.push('<p class="muted">'+html(src)+'</p>');
+  if(listed) bits.push('<p class="muted">'+html(listed)+'</p>');
+  const flagged=flagLine(card);
+  if(flagged) bits.push("<p>"+flagged+"</p>");
+  if(card.why) bits.push("<p>"+html(card.why)+"</p>");
+  const pageLink=card.href?'<p><a href="'+html(card.href)+'">Open the page</a></p>':"";
+  const extra=shortFor(card);
+  const voteLabel="Where's it heading?";
+  const dmLine="We'll DM you on Discord.";
+  el.innerHTML='<h3><a href="'+readHref+'">'+html(card.name||card.headline||"Read")+'</a></h3>'+(line?'<p class="one-line">'+html(line)+'</p>':"")+'<p class="price">'+money(card.price)+'</p><div class="means"><b>What this means</b>'+means+'</div><div class="slot"></div><div class="stats">'+bits.join("")+pageLink+(extra?'<p>'+extra+'</p>':"")+'</div><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist) slot.appendChild(chart(card.hist, src));
+  const sheet=el.querySelector(".track-sheet");
+  const note=sheet.querySelector(".sheet-note");
+  const trackBtn=el.querySelector("[data-act=track]");
   function alertBody(extra){
     return Object.assign({
       id:card.id,
@@ -812,49 +920,77 @@ function cardEl(card){
     }, extra||{});
   }
   function saveAlert(body){
-    const note=el.querySelector(".alert-note");
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
       .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
       .then(function(res){
         if(!res.ok){ note.textContent=res.j.error||"Sign in with Discord to track this."; return; }
-        el.querySelector(".track-line").textContent=trackCopy(body.pct, body.direction, body.price, body.listingsBelow?{low:body.listingsBelow, high:body.listingsAbove}:null);
-        el.querySelector("[data-act=track]").textContent="Tracking";
-        el.querySelector(".alert-box").classList.remove("open");
+        sheet.classList.remove("open");
+        trackBtn.textContent="Tracking";
+        let done=el.querySelector(".track-done");
+        if(!done){
+          done=document.createElement("p");
+          done.className="track-done";
+          trackBtn.insertAdjacentElement("afterend", done);
+        }
+        done.textContent="Tracking. We'll DM you.";
         note.textContent="";
       })
       .catch(function(){ note.textContent="Sign in with Discord to track this."; });
   }
-  el.querySelector("[data-act=track]").onclick=function(){
-    saveAlert(alertBody({pct:10, direction:"either", listingsBelow:supply?supply.low:"", listingsAbove:supply?supply.high:""}));
+  trackBtn.onclick=function(){
+    const open=sheet.classList.contains("open");
+    document.querySelectorAll(".track-sheet.open").forEach(function(s){ s.classList.remove("open"); });
+    if(open) return;
+    document.body.appendChild(sheet);
+    sheet.classList.add("open");
   };
-  el.querySelector("[data-act=change]").onclick=function(){ el.querySelector(".alert-box").classList.toggle("open"); };
+  sheet.querySelector("[data-act=custom]").onclick=function(){
+    const box=sheet.querySelector(".custom");
+    box.hidden=!box.hidden;
+  };
   el.querySelectorAll("[data-vote]").forEach(function(btn){
     btn.onclick=function(){
-      const note=el.querySelector(".vote");
+      const voteNote=el.querySelector(".vote");
       fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,vote:btn.dataset.vote})})
         .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
         .then(function(res){
-          if(!res.ok){ note.textContent=res.j.error||"Votes are not open yet."; return; }
-          note.textContent=voteLine(btn.dataset.vote, res.j);
+          if(!res.ok){ voteNote.textContent=res.j.error||"Votes are not open yet."; return; }
+          voteNote.textContent=voteLine(btn.dataset.vote, res.j);
         })
-        .catch(function(){ note.textContent="Votes are not open yet."; });
+        .catch(function(){ voteNote.textContent="Votes are not open yet."; });
     };
   });
-  el.querySelector(".alert-box").onsubmit=function(ev){
+  sheet.onsubmit=function(ev){
     ev.preventDefault();
-    const form=ev.currentTarget;
+    const priceOn=!!sheet.querySelector("[data-opt=price]").checked;
+    const listBox=sheet.querySelector("[data-opt=listings]");
+    const listOn=!!(listBox && listBox.checked);
+    const custom=!sheet.querySelector(".custom").hidden;
+    const price=custom?sheet.price.value:"";
+    const pct=priceOn?(custom && sheet.pct.value!==""?sheet.pct.value:10):"";
+    const direction=custom?sheet.direction.value:"either";
+    let below="";
+    let above="";
+    if(listOn && supply){
+      below=custom && sheet.listingsBelow?sheet.listingsBelow.value:supply.low;
+      above=custom && sheet.listingsAbove?sheet.listingsAbove.value:supply.high;
+    }
+    if(!priceOn && !listOn && !(Number(price)>0)){
+      note.textContent="Choose a price move or a listings move.";
+      return;
+    }
     saveAlert(alertBody({
-      price:form.price.value,
-      pct:form.pct.value,
-      direction:form.direction.value,
-      listingsBelow:form.listingsBelow?form.listingsBelow.value:"",
-      listingsAbove:form.listingsAbove?form.listingsAbove.value:""
+      price:price,
+      pct:pct,
+      direction:direction,
+      listingsBelow:below,
+      listingsAbove:above
     }));
   };
   if(pageMode!=="read"){
     el.addEventListener("click", function(ev){
       const node=ev["tar"+"get"];
-      if(node && node.closest("button, a, form, input, select, .chart-box")) return;
+      if(node && node.closest("button, a, form, input, select, label, .chart-box")) return;
       remember();
       location.href=readHref;
     });
@@ -972,6 +1108,7 @@ function paint(group, details, limit){
   for(const row of rows.slice(0, limit)){
     pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
   }
+  if(typeof catchemMount==="function") catchemMount(pile);
   const shown=Math.min(limit, rows.length);
   if(!focusGroup() && count>HOME_CAP){
     const a=document.createElement("a");
@@ -1083,6 +1220,7 @@ async function showRead(){
   host.innerHTML="";
   if(!card){ host.textContent="That read is not on the feed."; return; }
   host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card));
+  if(typeof catchemMount==="function") catchemMount(host);
 }
 function revealStart(){}
 async function boot(){
@@ -1090,7 +1228,11 @@ async function boot(){
   if(back) back.onclick=function(ev){
     if(sessionStorage.getItem("feed-spot") && history.length>1){ ev.preventDefault(); history.back(); }
   };
-  if(pageMode==="read"){ await showRead(); return; }
+  if(pageMode==="read"){
+    try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
+    await showRead();
+    return;
+  }
   try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
   const sel=document.getElementById("f-set");
   if(sel){
