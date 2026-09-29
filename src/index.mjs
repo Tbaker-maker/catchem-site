@@ -158,7 +158,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
     const card = (rows || []).find((row) => row.id === cardId);
-    return html(renderCard(card, stamp, pageOpts), card ? 200 : 404);
+    const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
+    const fact = facts && cardId ? facts[cardId] : null;
+    return html(renderCard(card, stamp, { ...pageOpts, fact }), card ? 200 : 404);
   }
   if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp, pageOpts));
   if (kind === "search") return html(renderSearch(pageOpts));

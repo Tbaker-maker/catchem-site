@@ -156,6 +156,13 @@ const CSS = `
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 var(--sans)}
 body{overflow-x:hidden;padding-bottom:72px}
 a{color:var(--gold)}
+.px{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin:8px 0}
+.win{font:600 16px/1.2 var(--sans)}
+.win.up{color:var(--green)}
+.win.down{color:var(--red)}
+.means{background:#211e1a;border-radius:14px;padding:12px 14px}
+.means p{margin:0 0 8px}
+.means p:last-child{margin:0}
 .site-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:0 16px;height:56px;min-height:56px;max-height:56px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:5}
 .site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em}
 .site-bar .logo span{color:var(--gold)}
@@ -322,9 +329,93 @@ document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()})
   return chrome("Sets", body, "Set", stamp, "", feedNav(opts));
 }
 
+const CHECK_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function checkedLabel(iso) {
+  const s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  return `Checked ${CHECK_MONTHS[Number(s.slice(5, 7)) - 1]} ${Number(s.slice(8, 10))}, ${s.slice(0, 4)} PT`;
+}
+
+function seriesFacts(hist, asOf) {
+  const pts = (hist || []).filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0);
+  if (pts.length < 2) return null;
+  const end = pts[pts.length - 1];
+  const endDate = /^\d{4}-\d{2}-\d{2}$/.test(String(asOf || "").slice(0, 10)) ? String(asOf).slice(0, 10) : end[0];
+  const at = (days) => {
+    const target = new Date(Date.parse(`${endDate}T00:00:00Z`) - days * 86400000).toISOString().slice(0, 10);
+    let then = null;
+    for (const p of pts) {
+      if (p[0] <= target) then = p;
+      else break;
+    }
+    if (!then || !(Number(then[1]) > 0) || !(Number(end[1]) > 0)) return null;
+    const pct = Math.round(((Number(end[1]) - Number(then[1])) / Number(then[1])) * 1000) / 10;
+    return Number.isFinite(pct) ? pct : null;
+  };
+  const start = new Date(Date.parse(`${endDate}T00:00:00Z`) - 90 * 86400000).toISOString().slice(0, 10);
+  const win = pts.filter((p) => p[0] >= start && p[0] <= endDate);
+  const use = win.length >= 2 ? win : pts;
+  let hi = use[0];
+  let lo = use[0];
+  for (const p of use) {
+    if (p[1] > hi[1] || (p[1] === hi[1] && p[0] > hi[0])) hi = p;
+    if (p[1] < lo[1] || (p[1] === lo[1] && p[0] > lo[0])) lo = p;
+  }
+  const days = Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${hi[0]}T00:00:00Z`)) / 86400000);
+  return { change7: at(7), change30: at(30), change90: at(90), high: hi[1], highOn: hi[0], low: lo[1], lowOn: lo[0], daysSinceHigh: days };
+}
+
+function winChip(label, n) {
+  if (typeof n !== "number" || !Number.isFinite(n) || n === 0) return "";
+  const cls = n > 0 ? "up" : "down";
+  return `<span class="win ${cls}">${label} ${n > 0 ? "+" : ""}${n}%</span>`;
+}
+
+function flagHtml(f) {
+  if (!f?.on) return "";
+  if (f.first) return `Flagged ${esc(f.on)} at ${money(f.at)}.`;
+  const pct = Number(f.pct);
+  const extra = Number.isFinite(pct) ? ` (${pct > 0 ? "+" : ""}${pct}%)` : "";
+  return `Flagged ${esc(f.on)} at ${money(f.at)}, now ${money(f.now)}${esc(extra)}.`;
+}
+
+function histWithFact(hist, fact) {
+  const pts = Array.isArray(hist) ? hist.slice() : [];
+  if (!(fact?.price > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(String(fact.asOf || "").slice(0, 10))) return pts;
+  const day = String(fact.asOf).slice(0, 10);
+  const last = pts[pts.length - 1];
+  if (!last || String(last[0]) < day) pts.push([day, fact.price]);
+  else if (String(last[0]) === day) pts[pts.length - 1] = [day, fact.price];
+  return pts;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
-  const price = money(card.price);
+  const fact = opts.fact || null;
+  const shown = fact?.price > 0 ? fact.price : card.price;
+  const price = money(shown);
+  const asOf = fact?.asOf || card.asOf;
+  const hist = histWithFact(card.hist || [], fact);
+  const computed = seriesFacts(hist, asOf);
+  const chips = [
+    winChip("7D", fact?.change7 ?? computed?.change7),
+    winChip("30D", fact?.change30 ?? computed?.change30),
+    winChip("90D", fact?.change90 ?? computed?.change90),
+  ].join("");
+  const high = fact?.high ?? computed?.high;
+  const highOn = fact?.highOn || computed?.highOn || "";
+  const low = fact?.low ?? computed?.low;
+  const lowOn = fact?.lowOn || computed?.lowOn || "";
+  const since = fact?.daysSinceHigh ?? computed?.daysSinceHigh;
+  const breakBits = [];
+  if (high && highOn && low && lowOn) breakBits.push(`<p>High ${money(high)} on ${esc(highOn)}. Low ${money(low)} on ${esc(lowOn)}.</p>`);
+  if (Number.isFinite(Number(since))) breakBits.push(`<p>${Number(since)} days since the high.</p>`);
+  const listings = Number(fact?.listings);
+  if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
+  const flagged = flagHtml(fact?.flagged);
+  if (flagged) breakBits.push(`<p>${flagged}</p>`);
+  const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
   const img = card.pid
     ? `<img alt="${esc(card.name)}" width="320" height="320" src="https://tcgplayer-cdn.tcgplayer.com/product/${Number(card.pid)}_in_400x400.jpg" style="width:min(320px,100%);height:auto;border-radius:16px;background:#211e1a" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'No stock image'}))">`
@@ -335,14 +426,15 @@ export function renderCard(card, stamp, opts = {}) {
   const body = `<main class="wrap">
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
-<p style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</p>
-<p class="muted">TCGplayer market${card.asOf ? `, ${esc(String(card.asOf).slice(0, 10))}` : ""}</p>
+<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span>${chips}</p>
+<p class="muted">TCGplayer market${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}${checked ? `. ${esc(checked)}` : ""}</p>
+${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
 <p class="muted">${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")})` : "No sold data yet"}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
-${chartBox(card.hist || [], "TCGplayer market, daily", card.release || "")}
+${chartBox(hist, "TCGplayer market, daily", card.release || "")}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
@@ -771,6 +863,20 @@ function changes(card){
   if(showPct(card.change90)) bits.push("<b>90D</b> "+pct(card.change90));
   return bits.join(" · ");
 }
+function winChip(label, n){
+  if(!showPct(n) || !Number(n)) return "";
+  const cls=Number(n)>0?"up":"down";
+  return '<span class="win '+cls+'">'+label+" "+pct(n)+"</span>";
+}
+function priceRow(card){
+  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
+}
+function checkedLine(iso){
+  const s=String(iso||"").slice(0,10);
+  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return "";
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return "Checked "+months[Number(s.slice(5,7))-1]+" "+Number(s.slice(8,10))+", "+s.slice(0,4)+" PT";
+}
 function flagLine(card){
   const f=card.flagged;
   if(!f || !f.on) return "";
@@ -836,25 +942,16 @@ function watchDay(iso){
   return months[d.getUTCMonth()]+" "+d.getUTCDate();
 }
 function meansCopy(card){
-  const name=card.name||"This product";
-  const pctN=Number(card.changePct);
-  const now=money(card.price);
-  const from=priorMoney(card);
-  const days=Number(card.windowDays)||0;
-  const dir=pctN<0?"down":"up";
-  const abs=Number.isFinite(pctN)?Math.round(Math.abs(pctN)*10)/10:"";
-  const sentences=[];
-  if(now && from && abs!=="") sentences.push(name+" is "+dir+" "+abs+"% over the last "+daySpan(days)+", from "+from+" to "+now+".");
-  else if(now) sentences.push(name+" is at "+now+".");
-  else sentences.push(name+" is on the feed.");
-  if(card.thin) sentences.push("The sales behind this are thin, so the size of the move is less sure.");
-  else if(days===90) sentences.push("A move over a few months is easier to notice, because it was not a one-day jump.");
-  else if(days===30) sentences.push("A move over several weeks has had time to show up more than once.");
-  else sentences.push("This is a recent move. A single week can fade, so the next check matters more than this one.");
-  const when=watchDay(card.asOf);
-  if(when && now) sentences.push("Check on "+when+" and see if it is still near "+now+".");
-  else if(now) sentences.push("Check again in a week and see if it is still near "+now+".");
-  return sentences;
+  const path=String(card.path||"").trim();
+  if(path) return [path];
+  const hist=card.hist||[];
+  if(hist.length>=2){
+    const a=hist[hist.length-2];
+    const b=hist[hist.length-1];
+    const way=Number(b[1])<Number(a[1])?"down":"up";
+    return ["From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+"."];
+  }
+  return ["No path is stored for this series yet."];
 }
 function logoFor(card){
   if(card.logo) return String(card.logo);
@@ -895,25 +992,21 @@ function cardEl(card){
   el.id="r-"+card.id;
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
   const supply=supplyPreset(card);
-  const listed=listingsLine(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=moveLine(card);
   const means=meansCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
   const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+' or above '+supply.high+'</label>':"";
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const bits=[];
-  const ch=changes(card);
-  if(ch) bits.push('<p class="chg">'+ch+'</p>');
+  const checked=checkedLine(card.asOf);
+  if(checked) bits.push('<p class="muted">'+html(checked)+'</p>');
   bits.push('<p class="muted">'+html(src)+'</p>');
-  if(listed) bits.push('<p class="muted">'+html(listed)+'</p>');
-  const flagged=flagLine(card);
-  if(flagged) bits.push("<p>"+flagged+"</p>");
-  if(card.why) bits.push("<p>"+html(card.why)+"</p>");
-  const pageLink=card.href?'<p><a href="'+html(card.href)+'">Open the page</a></p>':"";
+  if(card.why && card.why!==card.path) bits.push("<p>"+html(card.why)+"</p>");
+  const pageLink=card.href?'<p><a href="'+html(card.href)+'">Open the data</a></p>':"";
   const extra=shortFor(card);
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML='<h3><a href="'+readHref+'">'+html(card.name||card.headline||"Read")+'</a></h3>'+(line?'<p class="one-line">'+html(line)+'</p>':"")+'<p class="price">'+money(card.price)+'</p><div class="means"><b>What this means</b>'+means+'</div><div class="slot"></div><div class="stats">'+bits.join("")+pageLink+(extra?'<p>'+extra+'</p>':"")+'</div><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML='<h3><a href="'+readHref+'">'+html(card.name||card.headline||"Read")+'</a></h3>'+(line?'<p class="one-line">'+html(line)+'</p>':"")+priceRow(card)+'<div class="means"><b>What this means</b>'+means+'</div><div class="slot"></div><div class="stats">'+bits.join("")+pageLink+(extra?'<p>'+extra+'</p>':"")+'</div><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist) slot.appendChild(chart(card.hist, src));
