@@ -75,7 +75,7 @@ export async function handleAlert(request, env) {
   if (!id || !sku.startsWith("tcgcsv-")) return json({ ok: false, error: "Bad alert." }, 400);
   const price = Number(body.price);
   const pct = Number(body.pct);
-  const direction = body.direction === "down" ? "down" : "up";
+  const direction = body.direction === "down" ? "down" : body.direction === "either" ? "either" : "up";
   if (!(price > 0) && !(pct > 0)) return json({ ok: false, error: "Add a price or a percent." }, 400);
   const listKey = `alerts:${user.sub}`;
   const list = await store.get(listKey, "json") || [];
