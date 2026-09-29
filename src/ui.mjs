@@ -748,6 +748,10 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .means b{display:block;margin:0 0 6px}
   .means p{margin:0 0 8px}
   .means p:last-child{margin:0}
+  .open-data{min-height:44px;display:inline-flex;align-items:center;font-weight:600}
+  .data-block{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+  .data-block h4{margin:0;font:600 16px/1.3 var(--sans)}
+  .data-block p{margin:0}
   .vote-q{margin:4px 0 0;font-weight:600}
   .set-ph{min-height:160px;display:flex;align-items:center;justify-content:center;background:#211e1a;border-radius:12px;padding:16px;text-align:center;font:600 16px/1.3 var(--sans);color:var(--gold)}
   .stats{display:flex;flex-direction:column;gap:4px}
@@ -986,7 +990,49 @@ function photoEl(card){
   };
   return img;
 }
-function cardEl(card){
+function monthDay(iso){
+  const s=String(iso||"").slice(0,10);
+  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return "";
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return months[Number(s.slice(5,7))-1]+" "+Number(s.slice(8,10));
+}
+function watchCopy(card){
+  const now=money(card.price);
+  const when=watchDay(card.asOf);
+  const bits=[];
+  if(when && now) bits.push("Check on "+when+" and see if it is still near "+now+".");
+  else if(now) bits.push("Check again in a week and see if it is still near "+now+".");
+  if(card.thin) bits.push("The sales behind this are thin, so the next check matters more than this one print.");
+  return bits;
+}
+function dataFacts(card, facts){
+  const row=facts && typeof facts==="object" ? facts : {};
+  let high=Number(row.high);
+  let low=Number(row.low);
+  let highOn=row.highOn||"";
+  let lowOn=row.lowOn||"";
+  if(!(high>0) || !(low>0)){
+    const hist=card.hist||[];
+    for(let i=0;i<hist.length;i++){
+      const v=Number(hist[i][1]);
+      if(!(v>0)) continue;
+      if(!(high>0) || v>high){ high=v; highOn=hist[i][0]; }
+      if(!(low>0) || v<low){ low=v; lowOn=hist[i][0]; }
+    }
+  }
+  return {
+    high: high>0?high:null,
+    highOn: highOn,
+    low: low>0?low:null,
+    lowOn: lowOn,
+    listings: row.listings!=null?row.listings:card.listings,
+    listingsAsOf: row.listingsAsOf||card.listingsAsOf||"",
+    flagged: row.flagged||card.flagged||null,
+    volume: row.volume!=null?row.volume:card.volume,
+    sold: row.sold!=null?row.sold:(row.solds!=null?row.solds:card.sold)
+  };
+}
+function cardEl(card, facts){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
@@ -995,25 +1041,59 @@ function cardEl(card){
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=moveLine(card);
   const means=meansCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
-  const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+' or above '+supply.high+'</label>':"";
-  const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
+  const title=html(card.name||card.headline||"Read");
+  const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
+  const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
+  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+'<div class="means"><b>What this means</b>'+means+"</div>"+priceRow(card);
+  if(pageMode!=="read"){
+    el.innerHTML=head+open;
+    el.insertBefore(photoEl(card), el.firstChild);
+    el.addEventListener("click", function(ev){
+      const node=ev["tar"+"get"];
+      if(node && node.closest("button, a, form, input, select, label")) return;
+      remember();
+      location.href=readHref;
+    });
+    const nameLink=el.querySelector("h3 a");
+    if(nameLink) nameLink.addEventListener("click", remember);
+    return el;
+  }
+  const info=dataFacts(card, facts);
   const bits=[];
+  const volN=info.volume!=null?Number(info.volume):null;
+  if(volN>0) bits.push("<p>Sales volume: "+volN+".</p>");
+  const windows=[winChip("7D", card.change7), winChip("30D", card.change30), winChip("90D", card.change90)].filter(Boolean).join(" ");
+  if(windows) bits.push('<p class="px">'+windows+"</p>");
+  const hi=[];
+  if(info.high) hi.push("High "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
+  if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
+  if(hi.length) bits.push("<p>"+html(hi.join(". ")+".")+"</p>");
+  const listed=listingsLine({listings: info.listings, listingsAsOf: info.listingsAsOf});
+  const soldN=info.sold!=null?Number(info.sold):null;
+  const soldOk=soldN!=null && soldN>=0 && Number.isFinite(soldN);
+  if(soldOk || listed){
+    if(soldOk) bits.push("<p>TCG solds: "+soldN+".</p>");
+    if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
+  }
+  const flagged=flagLine(Object.assign({}, card, {flagged: info.flagged}));
+  if(flagged) bits.push("<p>"+flagged+"</p>");
   const checked=checkedLine(card.asOf);
-  if(checked) bits.push('<p class="muted">'+html(checked)+'</p>');
-  bits.push('<p class="muted">'+html(src)+'</p>');
-  if(card.why && card.why!==card.path) bits.push("<p>"+html(card.why)+"</p>");
-  const pageLink=card.href?'<p><a href="'+html(card.href)+'">Open the data</a></p>':"";
+  if(checked) bits.push('<p class="muted">'+html(checked)+"</p>");
+  bits.push('<p class="muted">'+html(src)+"</p>");
+  const watch=watchCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
   const extra=shortFor(card);
+  const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+" or above "+supply.high+"</label>":"";
+  const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML='<h3><a href="'+readHref+'">'+html(card.name||card.headline||"Read")+'</a></h3>'+(line?'<p class="one-line">'+html(line)+'</p>':"")+priceRow(card)+'<div class="means"><b>What this means</b>'+means+'</div><div class="slot"></div><div class="stats">'+bits.join("")+pageLink+(extra?'<p>'+extra+'</p>':"")+'</div><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(watch?'<h4>What to watch</h4>'+watch:"")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
-  if(card.hist) slot.appendChild(chart(card.hist, src));
+  if(card.hist && slot) slot.appendChild(chart(card.hist, src));
   const sheet=el.querySelector(".track-sheet");
   const note=sheet.querySelector(".sheet-note");
   const trackBtn=el.querySelector("[data-act=track]");
-  function alertBody(extra){
+  function alertBody(extraBody){
     return Object.assign({
       id:card.id,
       sku:card.sku||"",
@@ -1023,7 +1103,7 @@ function cardEl(card){
       listings:card.listings,
       listingsAsOf:card.listingsAsOf||"",
       changePct:card.changePct
-    }, extra||{});
+    }, extraBody||{});
   }
   function saveAlert(body){
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
@@ -1044,9 +1124,9 @@ function cardEl(card){
       .catch(function(){ note.textContent="Sign in with Discord to track this."; });
   }
   trackBtn.onclick=function(){
-    const open=sheet.classList.contains("open");
+    const opened=sheet.classList.contains("open");
     document.querySelectorAll(".track-sheet.open").forEach(function(s){ s.classList.remove("open"); });
-    if(open) return;
+    if(opened) return;
     document.body.appendChild(sheet);
     sheet.classList.add("open");
   };
@@ -1093,16 +1173,6 @@ function cardEl(card){
       listingsAbove:above
     }));
   };
-  if(pageMode!=="read"){
-    el.addEventListener("click", function(ev){
-      const node=ev["tar"+"get"];
-      if(node && node.closest("button, a, form, input, select, label, .chart-box")) return;
-      remember();
-      location.href=readHref;
-    });
-  }
-  const head=el.querySelector("h3 a");
-  if(head && pageMode!=="read") head.addEventListener("click", remember);
   return el;
 }
 function trackedEl(row){
@@ -1325,7 +1395,14 @@ async function showRead(){
   }
   host.innerHTML="";
   if(!card){ host.textContent="That read is not on the feed."; return; }
-  host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card));
+  let facts=null;
+  if(card.sku){
+    try{
+      const all=await (await fetch("/data/feed/facts.json")).json();
+      facts=all && all[card.sku] ? all[card.sku] : null;
+    }catch(e){}
+  }
+  host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card, facts));
   if(typeof catchemMount==="function") catchemMount(host);
 }
 function revealStart(){}
