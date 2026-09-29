@@ -1,3 +1,5 @@
+import { BUILD_SHA } from "./build-stamp.mjs";
+
 // The full Post Office editor (Catchem-data research/assets/build.html).
 // Prices on that file are the August read. This overlays the live catalog.
 
@@ -470,9 +472,13 @@ export function patchEditorHtml(html, asOf, mark = "") {
   return out;
 }
 
+export function editorCacheKey() {
+  return String(BUILD_SHA || "dev").slice(0, 12) || "dev";
+}
+
 async function textOf(url, fetchImpl) {
   if (htmlCache.has(url)) return htmlCache.get(url);
-  const res = await fetchImpl(url);
+  const res = await fetchImpl(url, { cache: "no-store" });
   if (!res.ok) throw new Error(url + " " + res.status);
   const body = await res.text();
   htmlCache.set(url, body);
@@ -484,7 +490,7 @@ export function resetEditorCache() {
 }
 
 export async function editorDocument(asOf, fetchImpl = fetch, mark = "") {
-  const raw = await textOf(EDITOR_URL, fetchImpl);
+  const raw = await textOf(EDITOR_URL + "?v=" + editorCacheKey(), fetchImpl);
   return patchEditorHtml(raw, asOf, mark);
 }
 

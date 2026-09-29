@@ -3,6 +3,30 @@
 
 import { ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
 
+export const DISCORD_INVITE = "https://discord.gg/fUSjxDX4Hy";
+export const INVITE_LINE = "Post Office is invite-only for now. Join Discord to get on the list.";
+
+// Comma-separated Discord user ids (POST_OFFICE_ALLOWLIST). Tyler's id goes first.
+// Missing or empty stays open so a blank var does not lock the Post Office.
+export function officeAllowIds(env) {
+  const ids = [];
+  for (const part of String(env?.POST_OFFICE_ALLOWLIST || "").split(/[,\s]+/)) {
+    let id = part.trim();
+    if (id.startsWith("d:")) id = id.slice(2);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+export function officeAllowed(user, env) {
+  const ids = officeAllowIds(env);
+  if (!ids.length) return true;
+  if (!user || !user.sub) return false;
+  const sub = String(user.sub);
+  const id = sub.startsWith("d:") ? sub.slice(2) : sub;
+  return !!id && ids.includes(id);
+}
+
 export function discordReady(env) {
   return !!(env && env.SESSION_SECRET && env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET);
 }

@@ -1,4 +1,7 @@
-const DISCORD = "https://discord.gg/fUSjxDX4Hy";
+import { BUILD_SHA } from "./build-stamp.mjs";
+import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+
+const DISCORD = DISCORD_INVITE;
 
 export function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -526,10 +529,20 @@ export function renderRetired(kind, opts = {}) {
   return chrome("", body, title, "", "", feedNav(opts));
 }
 
+export function renderOfficeGate(opts = {}) {
+  const invite = INVITE_LINE.replace("Join Discord", `<a href="${esc(DISCORD)}">Join Discord</a>`);
+  const sign = opts.ready && !opts.signedIn
+    ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a></p>`
+    : "";
+  const body = `<main class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
+  return chrome("Post Office", body, "Post Office", "", "", feedNav(opts));
+}
+
 export function renderPost(stamp, mark = "", opts = {}) {
   const line = typeof mark === "string" ? mark : "";
+  const rev = encodeURIComponent(String(opts.editorRev || BUILD_SHA || "dev").slice(0, 12) || "dev");
   const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
-<iframe title="Post Office editor" src="/post-office/app" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
+<iframe title="Post Office editor" src="/post-office/app?v=${rev}" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
 <style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
   return chrome("Post Office", body, "Post Office", stamp, line, feedNav(opts));
 }
