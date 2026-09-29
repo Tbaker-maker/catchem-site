@@ -445,6 +445,38 @@ function stripMarketPrompts(html) {
   return out;
 }
 
+const SITE_SKIN = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style id="site-skin">
+:root{
+  --paper:#12100e;--sheet:#1a1815;--ink:#efe9de;--mute:#c4baab;
+  --line:#2f2b26;--accent:#d9b779;--accent-ink:#1a1407;
+  --font:"IBM Plex Sans",system-ui,sans-serif;
+}
+html,body{background:#12100e;color:#efe9de;font:400 16px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+a{color:#d9b779}
+body>header{display:none}
+main{max-width:1040px;padding:18px 16px calc(28px + env(safe-area-inset-bottom))}
+.banner{font:500 28px/1.15 Fraunces,Georgia,serif;letter-spacing:-.02em;color:#efe9de;border-bottom:1px solid #2f2b26}
+.media button,.rail button,.chip,.ghost,#q-hints button,#pairs button,nav button,.arr,button.sec{
+  background:#1a1815;color:#efe9de;border:1px solid #403a33;border-radius:10px;
+  font:600 14px/1 "IBM Plex Sans",system-ui,sans-serif;min-height:44px;
+}
+.media button.go,.go,.rail button.on,.chip.on,nav button.on,#q-hints button.fix,#pairs button.on{
+  background:#d9b779;color:#1a1407;border-color:transparent;border-radius:10px;
+}
+.ghost,.media button.ghost{background:#1a1815;color:#efe9de;border:1px solid #403a33}
+textarea,input[type="search"],.tiny{background:#12100e;color:#efe9de;border:1px solid #403a33;border-radius:10px;font-family:"IBM Plex Sans",system-ui,sans-serif}
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid #d9b779}
+@media(max-width:389px){.banner{font-size:22px}}
+@media(max-height:800px){#banner{display:block}}
+</style>`;
+
+function siteSkin(html) {
+  const out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.") || out.includes('id="site-skin"')) return out;
+  return out.includes("</head>") ? out.replace("</head>", SITE_SKIN + "</head>") : SITE_SKIN + out;
+}
+
 function rewritePlayAssets(html) {
   let out = String(html || "");
   const assetFn = [
@@ -520,6 +552,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = rewritePlayAssets(out);
+  out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';
     out = out.includes("</body>") ? out.replace("</body>", hook + "</body>") : out + hook;

@@ -540,12 +540,12 @@ export function renderOfficeGate(opts = {}) {
 }
 
 export function renderPost(stamp, mark = "", opts = {}) {
+  void stamp;
   const line = typeof mark === "string" ? mark : "";
   const rev = encodeURIComponent(String(opts.editorRev || BUILD_SHA || "dev").slice(0, 12) || "dev");
-  const body = `<p class="muted" style="margin:10px 16px 8px">The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
-<iframe title="Post Office editor" src="/post-office/app?v=${rev}" style="display:block;width:100%;border:0;background:#0a0c12;height:calc(100dvh - 248px)"></iframe>
-<style>@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 96px)}}</style>`;
-  return chrome("Post Office", body, "Post Office", stamp, line, feedNav(opts));
+  const body = `<iframe title="Post Office editor" src="/post-office/app?v=${rev}" style="display:block;width:100%;border:0;background:#12100e"></iframe>
+<style>iframe[title="Post Office editor"]{height:calc(100dvh - 128px)}@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 56px)}}</style>`;
+  return chrome("Post Office", body, "Post Office", "", line, feedNav(opts));
 }
 
 const RATE_LOCK = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";

@@ -82,7 +82,7 @@ t("a set page does not link the hidden pages", !/href="\/(feed|board|receipts|ac
 const board = await (await renderPath("/board", fetchImpl, { feed: true })).text();
 t("movers keep slabs off the list", board.includes("Slabs") && board.includes("graded feed") && board.includes("Alakazam"));
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("post office keeps the locked line", post.includes(LOCKED));
+t("post office drops the catalog line", !post.includes(LOCKED) && !post.includes('id="fresh"'));
 const method = await (await renderPath("/methodology", fetchImpl)).text();
 t("methodology uses the catalog counts", method.includes("28,030") && method.includes("3,235"));
 const badCopy = [feedHtml, cardPage, board, method, all].map(clean).filter((html) => BANNED.test(html));
