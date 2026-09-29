@@ -65,19 +65,45 @@ export async function handleFollow(request, env) {
 export async function handleAlert(request, env) {
   const store = env?.FEED_KV;
   if (!store) return json({ ok: false, error: "Alerts are not open yet." }, 503);
-  if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
   const user = await readUser(request, env);
   if (!user?.sub) return json({ ok: false, error: "Sign in with Discord to save an alert." }, 401);
+  const listKey = `alerts:${user.sub}`;
+  const loadRows = async () => {
+    const list = await store.get(listKey, "json") || [];
+    const rows = [];
+    for (const id of list) {
+      const row = await store.get(`alert:${user.sub}:${id}`, "json");
+      if (row) rows.push(row);
+    }
+    return rows;
+  };
+  if (request.method === "GET") return json({ ok: true, rows: await loadRows() });
+  if (request.method !== "POST" && request.method !== "DELETE") return json({ ok: false, error: "Use POST." }, 405);
   let body = {};
   try { body = await request.json(); } catch { return json({ ok: false, error: "Bad alert." }, 400); }
+  if (request.method === "DELETE") {
+    const id = String(body.id || "").slice(0, 80);
+    const list = (await store.get(listKey, "json") || []).filter((item) => item !== id);
+    await store.delete(`alert:${user.sub}:${id}`);
+    await store.put(listKey, JSON.stringify(list));
+    return json({ ok: true, rows: await loadRows() });
+  }
+  if (Array.isArray(body.order)) {
+    const list = await store.get(listKey, "json") || [];
+    const next = body.order.map((id) => String(id || "").slice(0, 80)).filter((id) => list.includes(id));
+    for (const id of list) if (!next.includes(id)) next.push(id);
+    await store.put(listKey, JSON.stringify(next));
+    return json({ ok: true, rows: await loadRows() });
+  }
   const id = String(body.id || "").slice(0, 80);
   const sku = String(body.sku || "");
   if (!id || !sku.startsWith("tcgcsv-")) return json({ ok: false, error: "Bad alert." }, 400);
   const price = Number(body.price);
   const pct = Number(body.pct);
   const direction = body.direction === "down" ? "down" : body.direction === "either" ? "either" : "up";
-  if (!(price > 0) && !(pct > 0)) return json({ ok: false, error: "Add a price or a percent." }, 400);
-  const listKey = `alerts:${user.sub}`;
+  const below = Number(body.listingsBelow);
+  const above = Number(body.listingsAbove);
+  if (!(price > 0) && !(pct > 0) && !(below > 0) && !(above > 0)) return json({ ok: false, error: "Add a price or a percent." }, 400);
   const list = await store.get(listKey, "json") || [];
   const cap = user.premium === true ? 25 : 3;
   if (!list.includes(id) && list.length >= cap) {
@@ -89,6 +115,14 @@ export async function handleAlert(request, env) {
     price: price > 0 ? price : null,
     pct: pct > 0 ? pct : null,
     direction,
+    listingsBelow: below > 0 ? Math.round(below) : null,
+    listingsAbove: above > 0 ? Math.round(above) : null,
+    name: String(body.name || "").slice(0, 120),
+    headline: String(body.headline || "").slice(0, 180),
+    market: Number(body.market) > 0 ? Number(body.market) : null,
+    listings: Number(body.listings) >= 20 ? Math.round(Number(body.listings)) : null,
+    listingsAsOf: /^\d{4}-\d{2}-\d{2}$/.test(String(body.listingsAsOf || "")) ? String(body.listingsAsOf) : null,
+    changePct: Number.isFinite(Number(body.changePct)) ? Number(body.changePct) : null,
     at: new Date().toISOString(),
   };
   await store.put(`alert:${user.sub}:${id}`, JSON.stringify(row));

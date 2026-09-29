@@ -6,7 +6,7 @@ import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
-  clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMovers,
+  clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
   renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
@@ -110,12 +110,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
     if (path === "/feed/all") return html(renderAll(bundle, stamp, pageOpts));
+    if (path === "/feed/mine") return html(renderMine(stamp, pageOpts));
     if (path.startsWith("/feed/s/")) {
       const section = decodeURIComponent(path.slice("/feed/s/".length));
       return html(renderFeed(bundle, "", stamp, { ...pageOpts, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    return html(renderFeed(bundle, id, stamp, pageOpts));
+    if (id) return html(renderFeed(bundle, id, stamp, { ...pageOpts, page: "read" }));
+    return html(renderFeed(bundle, "", stamp, pageOpts));
   }
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
