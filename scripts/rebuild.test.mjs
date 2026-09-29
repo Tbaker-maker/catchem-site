@@ -120,7 +120,7 @@ const indexHtml = await readFile(new URL("../index.html", import.meta.url), "utf
 const homeAssets = { fetch: async () => new Response(indexHtml, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }) };
 const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets })).text();
 const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, FEED_ENABLED: "true" })).text();
-t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && !homeOff.includes('href="/feed"'));
+t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && homeOff.includes("Join the Catch'em Club") && homeOff.includes("See Premium") && homeOff.includes("All site tools stay free.") && homeOff.includes("First 222") && !/lifetime|forever/i.test(homeOff) && !/more entries/i.test(homeOff) && !homeOff.includes("Discord Premium is $14.99") && !homeOff.includes('href="/feed"'));
 t("the homepage hero and nav gain a feed link only when the flag is on", (homeOn.match(/href="\/feed"/g) || []).length === 3 && homeOn.includes('class="btn btn-primary" href="/feed">Feed'));
 const premium = await worker.fetch(new Request("https://catchemtcg.com/premium"), env);
 const premiumHtml = await premium.text();
