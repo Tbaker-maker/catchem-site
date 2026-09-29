@@ -227,6 +227,22 @@ export default {
         return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
     }
+    if (request.method === "GET" && url.pathname.startsWith("/data/editor/tcg/")) {
+      const rest = decodeURIComponent(url.pathname.slice("/data/editor/tcg/".length));
+      if (!/^[a-z0-9]+\/[A-Za-z0-9._-]+$/.test(rest)) {
+        return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
+      }
+      const img = await fetch("https://images.pokemontcg.io/" + rest);
+      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      return new Response(img.body, {
+        status: 200,
+        headers: {
+          "content-type": img.headers.get("content-type") || "image/png",
+          "cache-control": "public, max-age=86400",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
     if (request.method === "GET" && url.pathname === "/api/card-img") {
       const pid = Number(url.searchParams.get("pid"));
       if (!Number.isFinite(pid) || pid <= 0) return new Response("Bad", { status: 400 });

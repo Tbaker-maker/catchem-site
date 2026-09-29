@@ -1,10 +1,10 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 
-// The full Post Office editor (Catchem-data research/assets/build.html).
-// Prices on that file are the August read. This overlays the live catalog.
+// The Post Office editor (Catchem-data research/assets/play.html).
+// Card scans are proxied same-origin so the picture canvas can read them.
 
 const RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/";
-export const EDITOR_URL = RAW + "build.html";
+export const EDITOR_URL = RAW + "play.html";
 export const PAPER_URL = RAW + "paper-" + "rows.json";
 export const POCKET_URL = RAW + "pocket-" + "rows.json";
 export const PAPER_PATH = "/data/editor/" + "paper-" + "rows.json";
@@ -250,13 +250,13 @@ const AI_JS = `<script id="ai-boot">
     load(panel);
   }
   function ids(){
-    var tray = window.tray || [];
+    var tray = (window.tray && window.tray.length) ? window.tray : (window.pins || []);
     var out = [];
     for (var i = 0; i < tray.length && out.length < 4; i++) {
       var c = tray[i] || {};
-      var id = c.cid || "";
+      var id = typeof c === "string" ? c : (c.cid || "");
       if (!id && String(c.i || "").indexOf("tcgp-") === 0) id = c.i;
-      if (!id && c.i) id = String(c.i);
+      if (!id && c && c.i) id = String(c.i);
       if (id && out.indexOf(id) < 0) out.push(id);
     }
     return out;
@@ -445,6 +445,62 @@ function stripMarketPrompts(html) {
   return out;
 }
 
+function rewritePlayAssets(html) {
+  let out = String(html || "");
+  const assetFn = [
+    "    function assetUrl(path) {",
+    "      var p = String(path || \"\");",
+    "      if (/^https?:\\/\\//i.test(p)) return p;",
+    "      if (p.charAt(0) === \"/\") p = p.slice(1);",
+    "      try { return new URL(p, document.baseURI).toString(); } catch (e) { return \"/\" + p; }",
+    "    }",
+  ].join("\n");
+  const assetNext = [
+    "    function assetUrl(path) {",
+    "      var p = String(path || \"\");",
+    "      if (/^https?:\\/\\//i.test(p)) return p;",
+    "      if (p.charAt(0) === \"/\") p = p.slice(1);",
+    "      var cut = p.indexOf(\"#\");",
+    "      if (cut >= 0) p = p.slice(0, cut);",
+    "      return " + JSON.stringify(RAW) + " + p;",
+    "    }",
+  ].join("\n");
+  if (out.includes(assetFn)) out = out.split(assetFn).join(assetNext);
+  const tcgFn = [
+    "    function tcgImg(path, hi) {",
+    "      var m = String(path || \"\").match(/^\\/(?:img|thumb)\\/([^/]+)\\/([^/?#]+)/);",
+    "      if (!m) return path;",
+    "      return \"https://images.pokemontcg.io/\" + m[1] + \"/\" + m[2] + (hi ? \"_hires.png\" : \".png\");",
+    "    }",
+  ].join("\n");
+  const tcgNext = [
+    "    function tcgImg(path, hi) {",
+    "      var m = String(path || \"\").match(/^\\/(?:img|thumb)\\/([^/]+)\\/([^/?#]+)/);",
+    "      if (!m) return path;",
+    "      return \"/data/editor/tcg/\" + m[1] + \"/\" + m[2] + (hi ? \"_hires.png\" : \".png\");",
+    "    }",
+  ].join("\n");
+  if (out.includes(tcgFn)) out = out.split(tcgFn).join(tcgNext);
+  const fetchFn = [
+    "    function fetchJson(url) {",
+    "      return fetch(url).then(function (r) {",
+    "        if (!r.ok) throw new Error(\"miss \" + url);",
+    "        return r.json();",
+    "      });",
+    "    }",
+  ].join("\n");
+  const fetchNext = [
+    "    function fetchJson(url) {",
+    "      return fetch(url).then(function (r) {",
+    "        if (!r.ok) return null;",
+    "        return r.json();",
+    "      }).catch(function () { return null; });",
+    "    }",
+  ].join("\n");
+  if (out.includes(fetchFn)) out = out.split(fetchFn).join(fetchNext);
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
@@ -463,6 +519,11 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("if (r[21]) o.mech = r[21];").join("if (r[21]) o.mech = r[21];\n  if (r[22]) o.cid = r[22];");
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
+  out = rewritePlayAssets(out);
+  if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
+    const hook = '<div id="dl" hidden></div>';
+    out = out.includes("</body>") ? out.replace("</body>", hook + "</body>") : out + hook;
+  }
   if (!out.includes('id="sizes-boot"')) out += SIZE_JS;
   if (!out.includes('id="ai-boot"')) out += AI_JS;
   if (mark && !out.includes('id="post-build"')) {

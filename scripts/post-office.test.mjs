@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker, { renderPath } from "../src/index.mjs";
 import { artistNotable, clientHelpers, comparePair, downloadName, parseQuery, preferPrinting, priceLine } from "../src/post-copy.mjs";
-import { patchEditorHtml, patchPaperRows, PAPER_PATH } from "../src/full-editor.mjs";
+import { patchEditorHtml, patchPaperRows, PAPER_PATH, EDITOR_URL } from "../src/full-editor.mjs";
 import { resetQuota, signSession } from "../src/quota.mjs";
 import { factPost, factsFor, resetCatalogCache, STYLE_PROMPT } from "../src/ai.mjs";
 
@@ -96,6 +96,12 @@ t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patch
 t("editor drops buy and sell prompts", !patchedHtml.includes("Selling") && !patchedHtml.includes("Would you still buy") && !patchedHtml.includes("For sale") && !patchedHtml.includes("sell image for singles") && !patchedHtml.includes("buyer needs") && patchedHtml.includes("Looking for") && patchedHtml.includes("Trade list") && patchedHtml.includes("Make the image"));
 const stamped = patchEditorHtml(shell, "2026-09-27", "Post Office build abc1234 · 2026-09-28");
 t("editor stamp sits in the footer", stamped.includes('id="post-build"') && stamped.includes("Post Office build abc1234 · 2026-09-28") && stamped.indexOf("post-build") < stamped.lastIndexOf("</body>"));
+t("editor file is play", EDITOR_URL.endsWith("/play.html") && !EDITOR_URL.endsWith("/build.html"));
+const playRaw = await (await fetch(EDITOR_URL)).text();
+const playHtml = patchEditorHtml(playRaw, "2026-09-27", "Post Office build abc");
+t("play assets leave the page origin", playHtml.includes("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/") && !playHtml.includes("document.baseURI") && playHtml.includes('"/data/editor/tcg/"') && !playHtml.includes("images.pokemontcg.io") && !playHtml.includes('throw new Error("miss "'));
+t("play is the pin editor", playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
+t("play keeps ideas on the pin list", playHtml.includes('id="dl"') && playHtml.includes("window.pins"));
 const pricedRows = patchPaperRows([
   ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
   ["ex13-104", "Pikachu ★", "Holon Phantoms", "2006", "", "Rare Holo Star", 3200],
@@ -136,6 +142,8 @@ const gated = await worker.fetch(new Request("https://catchemtcg.com/video/studi
 t("studio is closed until the server flag", gated.status === 404);
 const opened = await worker.fetch(new Request("https://catchemtcg.com/video/studio.html?video=1"), env);
 t("query string is not the gate", opened.status === 200);
+const badScan = await worker.fetch(new Request("https://catchemtcg.com/data/editor/tcg/not-a-set"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
+t("card scan proxy rejects a bad path", badScan.status === 400);
 const build = await worker.fetch(new Request("https://catchemtcg.com/build"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 const buildHtml = await build.text();
 t("build is the editor", build.status === 200 && !build.headers.get("location") && buildHtml.includes('src="/post-office/app?v=') && buildHtml.includes("Post Office editor"));
