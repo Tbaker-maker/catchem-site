@@ -64,10 +64,10 @@ const fetchImpl = async (url) => {
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("editor is on the page", post.includes('src="/post-office/app?v=') && post.includes("Post Office editor") && post.includes("The full catalog:"));
+t("editor is on the page", post.includes('src="/post-office/app?v=') && post.includes("Post Office editor") && !post.includes("The full catalog:") && !post.includes('id="fresh"'));
 t("post office footer names the build", post.includes('id="post-office-build"') && post.includes("Post Office build "));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
-t("catalog spelling", post.includes("The full catalog:") && !post.includes("catalogue"));
+t("catalog spelling stays off this page", !post.includes("The full catalog:") && !post.includes("catalogue"));
 t("browser helpers define printingRank", clientHelpers().includes("function printingRank"));
 const shell = [
   'fetch("paper-rows.json?v=" + v)',
@@ -100,7 +100,7 @@ t("editor file is play", EDITOR_URL.endsWith("/play.html") && !EDITOR_URL.endsWi
 const playRaw = await (await fetch(EDITOR_URL)).text();
 const playHtml = patchEditorHtml(playRaw, "2026-09-27", "Post Office build abc");
 t("play assets leave the page origin", playHtml.includes("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/") && !playHtml.includes("document.baseURI") && playHtml.includes('"/data/editor/tcg/"') && !playHtml.includes("images.pokemontcg.io") && !playHtml.includes('throw new Error("miss "'));
-t("play is the pin editor", playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
+t("play wears the site skin", playHtml.includes('id="site-skin"') && playHtml.includes("--accent:#d9b779") && playHtml.includes("body>header{display:none}") && playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
 t("play keeps ideas on the pin list", playHtml.includes('id="dl"') && playHtml.includes("window.pins"));
 const pricedRows = patchPaperRows([
   ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
