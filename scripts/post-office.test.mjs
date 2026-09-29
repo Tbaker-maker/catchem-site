@@ -35,7 +35,7 @@ t("homepage title dropped the old line", !home.includes("Know what to rip"));
 t("homepage says catalog", home.includes("The full catalog:") && !home.includes("catalogue"));
 t("nav close wins on small screens", home.lastIndexOf(".site-bar nav{display:none") > home.indexOf(".site-bar nav{display:none"));
 t("dock hide is the last dock display", home.lastIndexOf(".dock{display:none") > home.lastIndexOf(".dock{display:flex"));
-t("homepage does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(home));
+t("homepage does not link the hidden pages", !/href="\/(board|receipts|accuracy|movers)/.test(home) && home.includes('href="/feed">Open the Feed'));
 
 const moon = ["tcgcsv-246723", "Umbreon VMAX (Alternate Art Secret)", "SWSH07: Evolving Skies", "215/203", "Keiichiro Ito", "single", 2214.79, "swsh07-evolving-skies", "Secret Rare"];
 const other = ["tcgcsv-246720", "Umbreon VMAX", "SWSH07: Evolving Skies", "095/203", "Akira Egawa", "single", 27.25, "swsh07-evolving-skies", "Ultra Rare"];

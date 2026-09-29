@@ -73,7 +73,6 @@ const go = (loc) => new Response(null, { status: 301, headers: { location: loc, 
 
 export function addFeedEntry(html) {
   let out = String(html || "");
-  if (out.includes('href="/feed"')) return out;
   out = out.replace(
     '<nav id="site-nav">\n    <a href="/sets">Sets</a>',
     '<nav id="site-nav">\n    <a href="/feed">Feed</a>\n    <a href="/sets">Sets</a>',
