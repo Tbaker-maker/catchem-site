@@ -647,15 +647,19 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .alert-box{display:none;gap:8px;flex-wrap:wrap}
   .alert-box.open{display:flex}
   .alert-box input{min-height:44px;max-width:140px}
+  .mine-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:12px 0}
+  .mine-row a{font:600 18px/1.3 var(--serif);flex:1;min-width:160px}
+  .mine-row button{min-height:44px}
   @media (max-width:420px){.feed-card h3{font-size:20px}}
   `;
   const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };
   const focusTitle = titles[String(opts.section || "")] || "";
+  const page = opts.page === "read" ? "read" : "feed";
   const body = `<style>${css}</style><main class="wrap feed-page">
-<h1>${focusTitle || "The Feed"}</h1>
-${focusTitle ? '<p><a href="/feed">The Feed</a></p>' : ""}
+${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
+${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 <p class="muted" id="feed-count">TCGplayer market.</p>
-${focusTitle ? `<form class="feed-filters" id="feed-filters">
+${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-kind" aria-label="Sealed or singles"><option value="">Sealed and singles</option><option value="sealed">Sealed</option><option value="single">Singles</option></select>
   <select id="f-set" aria-label="Set"><option value="">Every set</option></select>
   <input id="f-min" inputmode="decimal" aria-label="Minimum price" placeholder="Min price">
@@ -664,7 +668,7 @@ ${focusTitle ? `<form class="feed-filters" id="feed-filters">
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
 <div id="feed-one"></div>
-<div id="feed-sections"></div>
+${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
@@ -677,6 +681,8 @@ function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
 const focus=${JSON.stringify(String(opts.section || ""))};
+const pageMode=${JSON.stringify(page)};
+if(history.scrollRestoration) history.scrollRestoration="manual";
 const GROUPS=[
   {id:"today",slug:"today",title:"Today",parts:["today"]},
   {id:"watch",slug:"watches",title:"Watches",parts:["watch"]},
@@ -757,13 +763,28 @@ function voteLine(choice, counts){
   }
   return bits.join(". ");
 }
-function trackCopy(move, direction, price){
+function supplyPreset(card){
+  const n=Number(card&&card.listings);
+  if(!(n>=20) || !card.listingsAsOf) return null;
+  const low=Math.round(n*0.8);
+  const high=Math.round(n*1.2);
+  if(!(low>0) || !(high>low)) return null;
+  return {low:low, high:high};
+}
+function listingsLine(card){
+  const n=Number(card&&card.listings);
+  if(!(n>=20) || !card.listingsAsOf) return "";
+  return "Active listings: "+n+" (as of "+card.listingsAsOf+")";
+}
+function trackCopy(move, direction, price, supply){
   let what="Alert me if it moves 10% either way.";
   if(Number(price)>0) what="Alert me if the price reaches "+money(price)+".";
   else if(Number(move)>0 && direction==="up") what="Alert me if it moves "+move+"% up.";
   else if(Number(move)>0 && direction==="down") what="Alert me if it moves "+move+"% down.";
   else if(Number(move)>0) what="Alert me if it moves "+move+"% either way.";
-  return what+" We'll DM you on Discord.";
+  let line=what+" We'll DM you on Discord.";
+  if(supply && supply.low && supply.high) line+=" Alert me if listings drop below "+supply.low+" or rise above "+supply.high+".";
+  return line;
 }
 function cardEl(card){
   const el=document.createElement("article");
@@ -771,23 +792,41 @@ function cardEl(card){
   el.id="r-"+card.id;
   const img=card.image?'<img alt="" src="'+String(card.image).replace(/"/g,"")+'" onerror="this.remove()">':'';
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
-  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><p class="track-line">'+html(trackCopy(10,"either"))+'</p><div class="feed-acts"><button type="button" data-act="track">Track this</button><button type="button" class="linkish" data-act="change">Change</button><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save</button></form><p class="alert-note muted"></p>';
+  const supply=supplyPreset(card);
+  const listed=listingsLine(card);
+  const readHref="/feed/r/"+encodeURIComponent(card.id);
+  const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
+  el.innerHTML=img+'<h3><a href="'+readHref+'">'+html(card.headline)+'</a></h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><p class="track-line">'+html(trackCopy(10,"either",null,supply))+'</p><div class="feed-acts"><button type="button" data-act="track">Track this</button><button type="button" class="linkish" data-act="change">Change</button><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'<button type="submit">Save</button></form><p class="alert-note muted"></p>';
   const slot=el.querySelector(".slot");
   if(card.hist) slot.appendChild(chart(card.hist, src));
+  function alertBody(extra){
+    return Object.assign({
+      id:card.id,
+      sku:card.sku||"",
+      name:card.name||"",
+      headline:card.headline||"",
+      market:card.price,
+      listings:card.listings,
+      listingsAsOf:card.listingsAsOf||"",
+      changePct:card.changePct
+    }, extra||{});
+  }
   function saveAlert(body){
     const note=el.querySelector(".alert-note");
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
       .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
       .then(function(res){
         if(!res.ok){ note.textContent=res.j.error||"Sign in with Discord to track this."; return; }
-        el.querySelector(".track-line").textContent=trackCopy(body.pct, body.direction, body.price);
+        el.querySelector(".track-line").textContent=trackCopy(body.pct, body.direction, body.price, body.listingsBelow?{low:body.listingsBelow, high:body.listingsAbove}:null);
         el.querySelector("[data-act=track]").textContent="Tracking";
         el.querySelector(".alert-box").classList.remove("open");
         note.textContent="";
       })
       .catch(function(){ note.textContent="Sign in with Discord to track this."; });
   }
-  el.querySelector("[data-act=track]").onclick=function(){ saveAlert({id:card.id,sku:card.sku||"",pct:10,direction:"either"}); };
+  el.querySelector("[data-act=track]").onclick=function(){
+    saveAlert(alertBody({pct:10, direction:"either", listingsBelow:supply?supply.low:"", listingsAbove:supply?supply.high:""}));
+  };
   el.querySelector("[data-act=change]").onclick=function(){ el.querySelector(".alert-box").classList.toggle("open"); };
   el.querySelectorAll("[data-vote]").forEach(function(btn){
     btn.onclick=function(){
@@ -804,8 +843,24 @@ function cardEl(card){
   el.querySelector(".alert-box").onsubmit=function(ev){
     ev.preventDefault();
     const form=ev.currentTarget;
-    saveAlert({id:card.id,sku:card.sku||"",price:form.price.value,pct:form.pct.value,direction:form.direction.value});
+    saveAlert(alertBody({
+      price:form.price.value,
+      pct:form.pct.value,
+      direction:form.direction.value,
+      listingsBelow:form.listingsBelow?form.listingsBelow.value:"",
+      listingsAbove:form.listingsAbove?form.listingsAbove.value:""
+    }));
   };
+  if(pageMode!=="read"){
+    el.addEventListener("click", function(ev){
+      const node=ev["tar"+"get"];
+      if(node && node.closest("button, a, form, input, select, .chart-box")) return;
+      remember();
+      location.href=readHref;
+    });
+  }
+  const head=el.querySelector("h3 a");
+  if(head && pageMode!=="read") head.addEventListener("click", remember);
   return el;
 }
 function trackedEl(row){
@@ -825,11 +880,24 @@ function listFor(part){
   }
   return (pages[part]||[]).filter(function(card){return pass(card,f)});
 }
+function fits(card, group){
+  if(!card) return false;
+  if(group.id==="tracked") return true;
+  const days=Number(card.windowDays);
+  if(!days) return true;
+  const abs=Math.abs(Number(card.changePct)||0);
+  if(group.id==="cook") return days===90;
+  if(group.id==="watch") return days===30;
+  if(group.id==="movers") return days===7 && abs>=8;
+  if(group.id==="today") return days===7 && abs<8;
+  return true;
+}
 function combined(group){
   const rows=[];
   const seen=new Set();
   for(const part of group.parts){
     for(const row of listFor(part)){
+      if(!fits(row, group)) continue;
       const key=row.id||row.call_id||row.headline||row.claim;
       if(seen.has(key)) continue;
       seen.add(key);
@@ -891,7 +959,11 @@ async function ensure(group, want){
   }
 }
 function paint(group, details, limit){
-  const rows=combined(group);
+  const rows=combined(group).filter(function(row){
+    const id=row.id||row.call_id;
+    const node=id&&document.getElementById("r-"+id);
+    return !(node && !details.contains(node));
+  });
   const pile=details.querySelector(".pile");
   const span=details.querySelector("summary span");
   const count=sectionCount(group);
@@ -925,8 +997,16 @@ async function onToggle(ev){
   const details=ev.currentTarget;
   const group=GROUPS.find(function(g){return "sec-"+g.id===details.id});
   if(!group || !details.open) return;
-  for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
-  paint(group, details, focusGroup()?PAGE:HOME_CAP);
+  const limit=focusGroup()?PAGE:HOME_CAP;
+  let guard=0;
+  while(combined(group).length<limit && guard<24){
+    const before=group.parts.reduce(function(s,p){return s+(pages[p]||[]).length},0);
+    await ensure(group, before+PAGE);
+    const after=group.parts.reduce(function(s,p){return s+(pages[p]||[]).length},0);
+    if(after===before) break;
+    guard++;
+  }
+  paint(group, details, limit);
 }
 function draw(){
   drawing=true;
@@ -952,14 +1032,65 @@ function draw(){
   }
   revealStart();
 }
-function revealStart(){
-  if(!start) return;
-  const fromLead=lead.find(function(r){return r && r.id===start});
-  const host=document.getElementById("feed-one");
-  if(!fromLead || !host || host.childElementCount) return;
-  host.appendChild(cardEl(fromLead));
+function remember(){
+  const open=[];
+  document.querySelectorAll("details[open]").forEach(function(d){ open.push(d.id); });
+  sessionStorage.setItem("feed-spot", JSON.stringify({path:location.pathname, y:window.scrollY, open:open}));
 }
+document.addEventListener("pointerdown", function(ev){
+  const node=ev["tar"+"get"];
+  if(!node || !node.closest) return;
+  if(node.closest("a[href^='/feed/r/'], a.see-all, article.feed-card")) remember();
+});
+async function restoreSpot(){
+  let spot=null;
+  try{ spot=JSON.parse(sessionStorage.getItem("feed-spot")||"null"); }catch(e){}
+  if(!spot || spot.path!==location.pathname) return;
+  for(const id of spot.open||[]){
+    const details=document.getElementById(id);
+    if(details && !details.open){
+      details.open=true;
+      await onToggle({currentTarget:details});
+    }
+  }
+  const y=Number(spot.y)||0;
+  const go=function(){ window.scrollTo(0, y); };
+  go();
+  setTimeout(go, 0);
+  setTimeout(go, 80);
+}
+function cameBack(){
+  const nav=performance.getEntriesByType("navigation")[0];
+  return !!(nav && nav.type==="back_forward");
+}
+async function showRead(){
+  const host=document.getElementById("feed-one");
+  if(!host || !start) return;
+  let card=lead.find(function(r){return r && r.id===start})||null;
+  if(!card){
+    try{
+      const look=await (await fetch("/data/feed/lookup.json")).json();
+      const spot=look && look[start];
+      if(spot){
+        const res=await fetch("/data/feed/"+spot[0]+"/"+spot[1]+".json");
+        if(res.ok){
+          const rows=await res.json();
+          card=(rows||[]).find(function(r){return r && (r.id===start || r.call_id===start)})||null;
+        }
+      }
+    }catch(e){}
+  }
+  host.innerHTML="";
+  if(!card){ host.textContent="That read is not on the feed."; return; }
+  host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card));
+}
+function revealStart(){}
 async function boot(){
+  const back=document.getElementById("feed-back");
+  if(back) back.onclick=function(ev){
+    if(sessionStorage.getItem("feed-spot") && history.length>1){ ev.preventDefault(); history.back(); }
+  };
+  if(pageMode==="read"){ await showRead(); return; }
   try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
   const sel=document.getElementById("f-set");
   if(sel){
@@ -983,11 +1114,115 @@ async function boot(){
     const details=document.getElementById("sec-"+(focusGroup()?focusGroup().id:""));
     if(details) paint(focusGroup(), details, PAGE);
   };
+  await restoreSpot();
 }
+window.addEventListener("pageshow", function(ev){
+  if(ev.persisted || cameBack()) restoreSpot();
+});
 boot();
 
 </script>`;
-  return chrome("Feed", body, "The Feed", stamp, "", feedNav(opts));
+  return chrome("Feed", body, page === "read" ? "Read" : (focusTitle || "The Feed"), stamp, "", feedNav(opts));
+}
+
+export function renderMine(stamp, opts = {}) {
+  const css = `
+  .mine-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:12px 0}
+  .mine-row a{font:600 18px/1.3 var(--serif);flex:1 1 180px}
+  .mine-row button,.mine-sort{min-height:44px}
+  .mine-row p{margin:0;flex:1 1 100%}
+  `;
+  const body = `<style>${css}</style><main class="wrap">
+<p><a href="/feed">Back</a></p>
+<h1>Tracked</h1>
+<p class="muted" id="mine-note">Your tracked reads.</p>
+<label class="mine-sort">Sort
+  <select id="mine-sort" aria-label="Sort tracked reads">
+    <option value="custom">Your order</option>
+    <option value="newest">Newest</option>
+    <option value="move">Biggest move</option>
+  </select>
+</label>
+<ul id="mine-list"></ul>
+</main>
+<script>
+const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
+let rows=[];
+let dragId="";
+function status(row){
+  const bits=[];
+  if(Number(row.pct)>0) bits.push(row.pct+"% "+(row.direction==="either"?"either way":row.direction));
+  else if(Number(row.price)>0) bits.push("price "+money(row.price));
+  if(row.listingsBelow && row.listingsAbove) bits.push("listings below "+row.listingsBelow+" or above "+row.listingsAbove);
+  else if(row.listingsBelow) bits.push("listings below "+row.listingsBelow);
+  else if(row.listingsAbove) bits.push("listings above "+row.listingsAbove);
+  return bits.length ? "Alert: "+bits.join(". ") : "Alert saved";
+}
+function saveOrder(){
+  fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({order:rows.map(function(row){return row.id})})}).catch(function(){});
+}
+function draw(){
+  const list=document.getElementById("mine-list");
+  list.innerHTML="";
+  rows.forEach(function(row, index){
+    const li=document.createElement("li");
+    li.className="mine-row";
+    li.draggable=true;
+    const listed=Number(row.listings)>=20 && row.listingsAsOf ? "Active listings: "+row.listings+" (as of "+row.listingsAsOf+")" : "";
+    li.innerHTML='<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
+    li.ondragstart=function(){ dragId=row.id; };
+    li.ondragover=function(ev){ ev.preventDefault(); };
+    li.ondrop=function(ev){
+      ev.preventDefault();
+      const from=rows.findIndex(function(item){return item.id===dragId});
+      const to=index;
+      if(from<0 || from===to) return;
+      const item=rows.splice(from,1)[0];
+      rows.splice(to,0,item);
+      saveOrder();
+      draw();
+    };
+    li.querySelector("[data-act=up]").onclick=function(){ move(index,-1); };
+    li.querySelector("[data-act=down]").onclick=function(){ move(index,1); };
+    li.querySelector("[data-act=remove]").onclick=function(){
+      fetch("/api/alerts",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:row.id})})
+        .then(function(res){return res.json()})
+        .then(function(data){ rows=(data&&data.rows)||rows.filter(function(item){return item.id!==row.id}); draw(); })
+        .catch(function(){});
+    };
+    list.appendChild(li);
+  });
+  document.getElementById("mine-note").textContent=rows.length ? rows.length+" tracked." : "Nothing tracked yet.";
+}
+function move(index, dir){
+  const next=index+dir;
+  if(next<0 || next>=rows.length) return;
+  const item=rows.splice(index,1)[0];
+  rows.splice(next,0,item);
+  saveOrder();
+  draw();
+}
+document.getElementById("mine-sort").onchange=function(ev){
+  const mode=ev.currentTarget.value;
+  if(mode==="newest") rows.sort(function(a,b){return String(b.at||"").localeCompare(String(a.at||""))});
+  else if(mode==="move") rows.sort(function(a,b){return Math.abs(Number(b.changePct)||0)-Math.abs(Number(a.changePct)||0)});
+  if(mode!=="custom") saveOrder();
+  draw();
+};
+fetch("/api/alerts").then(function(res){return res.json().then(function(data){return {ok:res.ok, data:data}})}).then(function(res){
+  if(!res.ok){
+    document.getElementById("mine-note").textContent="Sign in with Discord to see your tracked reads.";
+    document.getElementById("mine-sort").parentElement.hidden=true;
+    return;
+  }
+  rows=res.data.rows||[];
+  draw();
+}).catch(function(){
+  document.getElementById("mine-note").textContent="Sign in with Discord to see your tracked reads.";
+});
+</script>`;
+  return chrome("Tracked", body, "Tracked", stamp, "", feedNav(opts));
 }
 
 export function renderAll(bundle, stamp, opts = {}) {
