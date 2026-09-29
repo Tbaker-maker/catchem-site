@@ -641,23 +641,29 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card .chg{display:flex;flex-wrap:wrap;gap:8px}
   .feed-card .chg b{font-weight:600}
   .feed-acts{display:flex;flex-wrap:wrap;gap:8px}
-  .feed-acts button,.feed-acts a{min-height:44px;display:inline-flex;align-items:center}
+  .feed-acts button,.feed-acts a,.see-all{min-height:44px;display:inline-flex;align-items:center}
+  .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
+  .track-line{margin:0}
   .alert-box{display:none;gap:8px;flex-wrap:wrap}
   .alert-box.open{display:flex}
   .alert-box input{min-height:44px;max-width:140px}
   @media (max-width:420px){.feed-card h3{font-size:20px}}
   `;
+  const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };
+  const focusTitle = titles[String(opts.section || "")] || "";
   const body = `<style>${css}</style><main class="wrap feed-page">
-<h1>The Feed</h1>
+<h1>${focusTitle || "The Feed"}</h1>
+${focusTitle ? '<p><a href="/feed">The Feed</a></p>' : ""}
 <p class="muted" id="feed-count">TCGplayer market.</p>
-<form class="feed-filters" id="feed-filters">
+${focusTitle ? `<form class="feed-filters" id="feed-filters">
   <select id="f-kind" aria-label="Sealed or singles"><option value="">Sealed and singles</option><option value="sealed">Sealed</option><option value="single">Singles</option></select>
   <select id="f-set" aria-label="Set"><option value="">Every set</option></select>
   <input id="f-min" inputmode="decimal" aria-label="Minimum price" placeholder="Min price">
   <input id="f-max" inputmode="decimal" aria-label="Maximum price" placeholder="Max price">
   <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
-</form>
+</form>` : ""}
+<div id="feed-one"></div>
 <div id="feed-sections"></div>
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
@@ -670,31 +676,39 @@ ${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeU
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
+const focus=${JSON.stringify(String(opts.section || ""))};
 const GROUPS=[
-  {id:"today",title:"Today",note:"Daily reads",parts:["today"],open:true},
-  {id:"watch",title:"Watches",note:"Setups building over weeks",parts:["watch"]},
-  {id:"cook",title:"Cooks",note:"Setups over months",parts:["cook"]},
-  {id:"movers",title:"Biggest movers",note:"Up and down",parts:["up","down"]},
-  {id:"tempo",title:"Heating up / cooling off",note:"",parts:["heat","cool"]},
-  {id:"tracked",title:"Tracked calls",note:"How past reads have played out",parts:["tracked"]}
+  {id:"today",slug:"today",title:"Today",parts:["today"]},
+  {id:"watch",slug:"watches",title:"Watches",parts:["watch"]},
+  {id:"cook",slug:"cooks",title:"Cooks",parts:["cook"]},
+  {id:"movers",slug:"movers",title:"Movers",parts:["up","down"]},
+  {id:"tracked",slug:"tracked",title:"Tracked",parts:["tracked"]}
 ];
-const openIds=new Set(["today"]);
+const SAID={up:"Up",sideways:"Sideways",down:"Down"};
 const pages={};
-const painted={};
-const busy={};
+const HOME_CAP=6;
+const PAGE=24;
 let meta=null;
 let catalogue=null;
-let io=null;
 let drawing=false;
+function focusGroup(){
+  const key=String(focus||"");
+  return GROUPS.find(function(g){return g.id===key||g.slug===key})||null;
+}
 function filters(){
+  const kind=document.getElementById("f-kind");
+  if(!kind) return {kind:"",set:"",min:null,max:null,dir:"",sort:"move"};
   return {
-    kind:document.getElementById("f-kind").value,
+    kind:kind.value,
     set:document.getElementById("f-set").value,
     min:Number(document.getElementById("f-min").value),
     max:Number(document.getElementById("f-max").value),
     dir:document.getElementById("f-dir").value,
     sort:document.getElementById("f-sort").value
   };
+}
+function filteringOn(f){
+  return !!(f.kind||f.set||f.dir||(Number.isFinite(f.min)&&f.min>0)||(Number.isFinite(f.max)&&f.max>0));
 }
 function pass(card,f){
   if(!card) return false;
@@ -729,49 +743,68 @@ function flagLine(card){
   const p=Number.isFinite(Number(f.pct))?(" ("+pct(f.pct)+")"):"";
   return "Flagged "+html(f.on)+" at "+money(f.at)+", now "+money(f.now)+p+".";
 }
+function voteLine(choice, counts){
+  const up=Number(counts&&counts.up)||0;
+  const side=Number(counts&&counts.sideways)||0;
+  const down=Number(counts&&counts.down)||0;
+  const total=up+side+down;
+  const bits=[];
+  if(SAID[choice]) bits.push("You said "+SAID[choice]);
+  if(total>=10){
+    const best=[{k:"Up",n:up},{k:"Sideways",n:side},{k:"Down",n:down}].sort(function(a,b){return b.n-a.n})[0];
+    const share=Math.round((best.n/total)*100);
+    if(share>0) bits.push("Community: "+share+"% "+best.k);
+  }
+  return bits.join(". ");
+}
+function trackCopy(move, direction, price){
+  let what="Alert me if it moves 10% either way.";
+  if(Number(price)>0) what="Alert me if the price reaches "+money(price)+".";
+  else if(Number(move)>0 && direction==="up") what="Alert me if it moves "+move+"% up.";
+  else if(Number(move)>0 && direction==="down") what="Alert me if it moves "+move+"% down.";
+  else if(Number(move)>0) what="Alert me if it moves "+move+"% either way.";
+  return what+" We'll DM you on Discord.";
+}
 function cardEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
   const img=card.image?'<img alt="" src="'+String(card.image).replace(/"/g,"")+'" onerror="this.remove()">':'';
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
-  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><div class="feed-acts"><button type="button" data-act="follow">Follow</button><button type="button" data-vote="up">Up <span>0</span></button><button type="button" data-vote="sideways">Sideways <span>0</span></button><button type="button" data-vote="down">Down <span>0</span></button><button type="button" data-act="alert">Set alert</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="price" inputmode="decimal" aria-label="Alert price" placeholder="Price"><input name="pct" inputmode="decimal" aria-label="Alert percent" placeholder="Percent"><select name="direction" aria-label="Up or down"><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save alert</button></form><p class="alert-note muted"></p>';
+  el.innerHTML=img+'<h3>'+html(card.headline)+'</h3><p class="price">'+money(card.price)+'</p><p class="chg">'+changes(card)+'</p><p class="muted">'+html(src)+'</p><div class="slot"></div><p>'+html(card.why||"")+'</p><p>'+flagLine(card)+'</p><p class="track-line">'+html(trackCopy(10,"either"))+'</p><div class="feed-acts"><button type="button" data-act="track">Track this</button><button type="button" class="linkish" data-act="change">Change</button><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button>'+shortFor(card)+'<a href="'+html(card.href||"#")+'">Open the page</a></div><p class="vote muted"></p><form class="alert-box"><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select><button type="submit">Save</button></form><p class="alert-note muted"></p>';
   const slot=el.querySelector(".slot");
   if(card.hist) slot.appendChild(chart(card.hist, src));
-  el.querySelector("[data-act=alert]").onclick=()=>el.querySelector(".alert-box").classList.toggle("open");
-  el.querySelector("[data-act=follow]").onclick=()=>{
+  function saveAlert(body){
     const note=el.querySelector(".alert-note");
-    const btn=el.querySelector("[data-act=follow]");
-    fetch("/api/follow",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,sku:card.sku||""})})
-      .then(res=>res.json().then(j=>({ok:res.ok,j})))
-      .then(res=>{
-        if(!res.ok){ note.textContent=res.j.error||"Sign in with Discord to follow."; return; }
-        btn.textContent="Following";
-        note.textContent="Following. Discord messages come in a later update.";
-      })
-      .catch(()=>{ note.textContent="Sign in with Discord to follow."; });
-  };
-  el.querySelectorAll("[data-vote]").forEach(btn=>btn.onclick=()=>{
-    const note=el.querySelector(".vote");
-    fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,vote:btn.dataset.vote})})
-      .then(res=>res.json().then(j=>({ok:res.ok,j})))
-      .then(res=>{
-        if(!res.ok){ note.textContent=res.j.error||"Votes are not open yet."; return; }
-        el.querySelector('[data-vote=up] span').textContent=res.j.up||0;
-        el.querySelector('[data-vote=sideways] span').textContent=res.j.sideways||0;
-        el.querySelector('[data-vote=down] span').textContent=res.j.down||0;
+    fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
+      .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
+      .then(function(res){
+        if(!res.ok){ note.textContent=res.j.error||"Sign in with Discord to track this."; return; }
+        el.querySelector(".track-line").textContent=trackCopy(body.pct, body.direction, body.price);
+        el.querySelector("[data-act=track]").textContent="Tracking";
+        el.querySelector(".alert-box").classList.remove("open");
         note.textContent="";
       })
-      .catch(()=>{ note.textContent="Votes are not open yet."; });
+      .catch(function(){ note.textContent="Sign in with Discord to track this."; });
+  }
+  el.querySelector("[data-act=track]").onclick=function(){ saveAlert({id:card.id,sku:card.sku||"",pct:10,direction:"either"}); };
+  el.querySelector("[data-act=change]").onclick=function(){ el.querySelector(".alert-box").classList.toggle("open"); };
+  el.querySelectorAll("[data-vote]").forEach(function(btn){
+    btn.onclick=function(){
+      const note=el.querySelector(".vote");
+      fetch("/api/vote",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,vote:btn.dataset.vote})})
+        .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
+        .then(function(res){
+          if(!res.ok){ note.textContent=res.j.error||"Votes are not open yet."; return; }
+          note.textContent=voteLine(btn.dataset.vote, res.j);
+        })
+        .catch(function(){ note.textContent="Votes are not open yet."; });
+    };
   });
-  el.querySelector(".alert-box").onsubmit=(ev)=>{
+  el.querySelector(".alert-box").onsubmit=function(ev){
     ev.preventDefault();
     const form=ev.currentTarget;
-    const note=el.querySelector(".alert-note");
-    fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:card.id,sku:card.sku||"",price:form.price.value,pct:form.pct.value,direction:form.direction.value})})
-      .then(res=>res.json().then(j=>({ok:res.ok,status:res.status,j})))
-      .then(res=>{ note.textContent=res.ok?"Alert saved. Discord messages come in a later update.":(res.j.error||"Sign in with Discord to save an alert."); })
-      .catch(()=>{ note.textContent="Sign in with Discord to save an alert."; });
+    saveAlert({id:card.id,sku:card.sku||"",price:form.price.value,pct:form.pct.value,direction:form.direction.value});
   };
   return el;
 }
@@ -785,34 +818,38 @@ function trackedEl(row){
 function listFor(part){
   const f=filters();
   if(catalogue){
-    if(part==="tracked") return (catalogue.tracked||[]).filter(row=>!f.dir || row.direction===f.dir);
-    let ids=catalogue[part]||[];
-    let rows=ids.map(id=>catalogue.cards[id]).filter(card=>pass(card,f));
-    if(f.sort==="price") rows.sort((a,b)=>b.price-a.price);
-    else if(f.sort==="name") rows.sort((a,b)=>String(a.name||a.headline).localeCompare(String(b.name||b.headline)));
+    if(part==="tracked") return (catalogue.tracked||[]).filter(function(row){return !f.dir || row.direction===f.dir});
+    const ids=catalogue[part]||[];
+    let rows=ids.map(function(id){return catalogue.cards[id]}).filter(function(card){return pass(card,f)});
     return rows;
   }
-  return (pages[part]||[]).filter(card=>pass(card,f));
-}
-function step(){ return (meta && Number(meta.pageSize)>0) ? Number(meta.pageSize) : 24; }
-function filteringOn(f){
-  return !!(f.kind || f.set || f.dir || (Number.isFinite(f.min) && f.min>0) || (Number.isFinite(f.max) && f.max>0));
-}
-function sectionCount(group, rows){
-  const f=filters();
-  if(catalogue || filteringOn(f)) return rows.length;
-  if(meta && meta.sections) return group.parts.reduce((s,p)=>s+(Number(meta.sections[p])||0),0);
-  return rows.length;
+  return (pages[part]||[]).filter(function(card){return pass(card,f)});
 }
 function combined(group){
   const rows=[];
-  for(const part of group.parts) rows.push(...listFor(part));
+  const seen=new Set();
+  for(const part of group.parts){
+    for(const row of listFor(part)){
+      const key=row.id||row.call_id||row.headline||row.claim;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+  }
+  const f=filters();
+  if(f.sort==="price") rows.sort(function(a,b){return (b.price||0)-(a.price||0)});
+  else if(f.sort==="name") rows.sort(function(a,b){return String(a.name||a.headline||a.claim).localeCompare(String(b.name||b.headline||b.claim))});
+  else if(group.id==="movers") rows.sort(function(a,b){return Math.abs(b.score||b.changePct||b.pct||0)-Math.abs(a.score||a.changePct||a.pct||0)});
   return rows;
 }
-function knownEnd(group){
-  if(catalogue) return true;
-  if(!meta || !meta.sections) return false;
-  return group.parts.every(part => (pages[part]||[]).length >= (Number(meta.sections[part])||0));
+function sectionCount(group){
+  const f=filters();
+  if(catalogue || filteringOn(f)) return combined(group).length;
+  if(meta && meta.sections){
+    const n=group.parts.reduce(function(s,p){return s+(Number(meta.sections[p])||0)},0);
+    if(n>0) return n;
+  }
+  return combined(group).length;
 }
 async function loadSlice(part, n){
   const key=part+"#"+n;
@@ -833,181 +870,122 @@ async function loadSlice(part, n){
     merged.push(...slice);
   }
   pages[part]=merged;
+  if(part==="today" && !merged.length && lead.length) pages.today=lead.slice();
 }
-function arm(){
-  if(io) return;
-  io=new IntersectionObserver(function(entries){
-    for(const entry of entries){
-      const node=entry["tar"+"get"];
-      if(!entry.isIntersecting || !node) continue;
-      const group=GROUPS.find(g=>g.id===node.getAttribute("data-end"));
-      if(group) grow(group);
+async function ensure(group, want){
+  if(catalogue) return;
+  for(const part of group.parts){
+    let n=0;
+    while((pages[part]||[]).length<want){
+      const before=(pages[part]||[]).length;
+      const total=meta&&meta.sections?Number(meta.sections[part]||0):0;
+      if(total && before>=total) break;
+      if(Object.prototype.hasOwnProperty.call(pages, part+"#"+n)){
+        if((pages[part]||[]).length>=(n+1)*PAGE){ n++; continue; }
+        break;
+      }
+      await loadSlice(part, n);
+      if((pages[part]||[]).length===before) break;
+      n++;
     }
-  },{rootMargin:"700px 0px"});
+  }
 }
-function dropEnd(details){
-  const sent=details.querySelector("[data-end]");
-  if(!sent) return;
-  if(io) io.unobserve(sent);
-  sent.remove();
-}
-function ensureEnd(pile, group){
-  let sent=pile.querySelector("[data-end]");
-  if(sent) return sent;
-  sent=document.createElement("div");
-  sent.setAttribute("data-end", group.id);
-  sent.setAttribute("aria-hidden","true");
-  sent.style.cssText="height:1px;overflow:hidden";
-  pile.appendChild(sent);
-  if(io) io.observe(sent);
-  return sent;
-}
-function paintChunk(group, details){
+function paint(group, details, limit){
   const rows=combined(group);
   const pile=details.querySelector(".pile");
   const span=details.querySelector("summary span");
-  if(span) span.textContent=sectionCount(group, rows).toLocaleString("en-US");
-  const have=painted[group.id]||0;
-  const slice=rows.slice(have, have+step());
-  const sent=ensureEnd(pile, group);
-  for(const row of slice){
-    pile.insertBefore(row.claim && !row.headline ? trackedEl(row) : cardEl(row), sent);
+  const count=sectionCount(group);
+  if(span) span.textContent=count>0?count.toLocaleString("en-US"):"";
+  pile.innerHTML="";
+  for(const row of rows.slice(0, limit)){
+    pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
   }
-  painted[group.id]=have+slice.length;
-  if((painted[group.id]||0)>=rows.length && knownEnd(group)) dropEnd(details);
-  return slice.length;
-}
-async function fetchNext(group){
-  if(catalogue) return false;
-  let fetched=false;
-  for(const part of group.parts){
-    const have=(pages[part]||[]).length;
-    const total=meta&&meta.sections&&meta.sections[part]!=null?Number(meta.sections[part]):null;
-    if(total!=null && have>=total) continue;
-    const n=(have/step())|0;
-    if(Object.prototype.hasOwnProperty.call(pages, part+"#"+n)) continue;
-    const prior=have;
-    await loadSlice(part, n);
-    if((pages[part]||[]).length>prior) fetched=true;
+  const shown=Math.min(limit, rows.length);
+  if(!focusGroup() && count>HOME_CAP){
+    const a=document.createElement("a");
+    a.className="see-all";
+    a.href="/feed/s/"+group.slug;
+    a.textContent="See all";
+    pile.appendChild(a);
   }
-  return fetched;
-}
-async function fillOnce(group, details){
-  const have=painted[group.id]||0;
-  if(have>=combined(group).length){
-    const more=await fetchNext(group);
-    if(!more && have>=combined(group).length){
-      dropEnd(details);
-      return 0;
-    }
+  if(focusGroup() && (shown<rows.length || shown<sectionCount(group))){
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="see-all";
+    btn.textContent="Show more";
+    btn.onclick=async function(){
+      await ensure(group, shown+PAGE);
+      paint(group, details, shown+PAGE);
+    };
+    pile.appendChild(btn);
   }
-  const added=paintChunk(group, details);
-  if(!added) dropEnd(details);
-  return added;
-}
-async function grow(group){
-  if(busy[group.id]) return;
-  const details=document.getElementById("sec-"+group.id);
-  if(!details || !details.open) return;
-  busy[group.id]=true;
-  let added=0;
-  try{ added=await fillOnce(group, details); }
-  finally { busy[group.id]=false; }
-  if(!added) return;
-  const sent=details.querySelector("[data-end]");
-  if(!sent || !details.open) return;
-  const r=sent.getBoundingClientRect();
-  if(r.top < window.innerHeight+700) grow(group);
-}
-function nearEnd(details){
-  const sent=details.querySelector("[data-end]");
-  if(!sent) return false;
-  return sent.getBoundingClientRect().top < window.innerHeight+700;
 }
 async function onToggle(ev){
   if(drawing) return;
   const details=ev.currentTarget;
-  const group=GROUPS.find(g=>"sec-"+g.id===details.id);
-  if(!group) return;
-  if(details.open) openIds.add(group.id); else openIds.delete(group.id);
-  if(!details.open) return;
-  if(!(painted[group.id]>0)){
-    for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
-    paintChunk(group, details);
-  }
-  if(nearEnd(details)) grow(group);
+  const group=GROUPS.find(function(g){return "sec-"+g.id===details.id});
+  if(!group || !details.open) return;
+  for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
+  paint(group, details, focusGroup()?PAGE:HOME_CAP);
 }
 function draw(){
   drawing=true;
-  for(const group of GROUPS) painted[group.id]=0;
   const root=document.getElementById("feed-sections");
   root.innerHTML="";
-  for(const group of GROUPS){
+  const only=focusGroup();
+  const groups=only?[only]:GROUPS;
+  for(const group of groups){
+    const count=sectionCount(group);
+    if(!only && meta && meta.sections && !(count>0)) continue;
     const details=document.createElement("details");
     details.className="feed-sec";
     details.id="sec-"+group.id;
-    const count=sectionCount(group, combined(group));
-    details.innerHTML='<summary>'+html(group.title)+' · <span>'+count.toLocaleString("en-US")+'</span></summary><div class="pile"></div>';
+    details.innerHTML='<summary>'+html(group.title)+' · <span>'+(count>0?count.toLocaleString("en-US"):"")+'</span></summary><div class="pile"></div>';
     root.appendChild(details);
     details.addEventListener("toggle", onToggle);
-    if(openIds.has(group.id)) details.open=true;
-    if(details.open) paintChunk(group, details);
+    if(only) details.open=true;
   }
   drawing=false;
-  for(const group of GROUPS){
-    const details=document.getElementById("sec-"+group.id);
-    if(details && details.open && nearEnd(details)) grow(group);
+  if(only){
+    const details=document.getElementById("sec-"+only.id);
+    if(details) onToggle({currentTarget:details});
   }
   revealStart();
 }
-async function revealStart(){
+function revealStart(){
   if(!start) return;
-  let guard=0;
-  while(!document.getElementById("r-"+start) && guard<80){
-    guard++;
-    let moved=false;
-    for(const group of GROUPS){
-      const details=document.getElementById("sec-"+group.id);
-      if(!details) continue;
-      if(!details.open){ details.open=true; openIds.add(group.id); }
-      const before=painted[group.id]||0;
-      for(const part of group.parts) if(!pages[part]) await loadSlice(part, 0);
-      await fillOnce(group, details);
-      if((painted[group.id]||0)>before) moved=true;
-      if(document.getElementById("r-"+start)) break;
-    }
-    if(!moved) break;
-  }
-  const node=document.getElementById("r-"+start);
-  if(!node) return;
-  const box=node.closest("details");
-  if(box) box.open=true;
-  node.scrollIntoView();
+  const fromLead=lead.find(function(r){return r && r.id===start});
+  const host=document.getElementById("feed-one");
+  if(!fromLead || !host || host.childElementCount) return;
+  host.appendChild(cardEl(fromLead));
 }
 async function boot(){
-  arm();
   try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
   const sel=document.getElementById("f-set");
-  (meta&&meta.sets||[]).forEach(set=>{
-    const o=document.createElement("option");
-    o.value=set.name; o.textContent=set.name;
-    sel.appendChild(o);
-  });
+  if(sel){
+    (meta&&meta.sets||[]).forEach(function(set){
+      const o=document.createElement("option");
+      o.value=set.name; o.textContent=set.name;
+      sel.appendChild(o);
+    });
+  }
   if(meta && meta.source && document.getElementById("feed-count")) document.getElementById("feed-count").textContent=meta.source+".";
-  try{ await loadSlice("today", 0); }catch(e){}
-  if(!(pages.today||[]).length && lead.length){
-    pages["today#0"]=lead.slice();
-    pages.today=lead.slice();
+  const only=focusGroup();
+  if(only){
+    for(const part of only.parts) await loadSlice(part, 0);
   }
   draw();
-  document.getElementById("feed-filters").onchange=async()=>{
+  const form=document.getElementById("feed-filters");
+  if(form) form.onchange=async function(){
     if(!catalogue){
       try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
     }
-    draw();
+    const details=document.getElementById("sec-"+(focusGroup()?focusGroup().id:""));
+    if(details) paint(focusGroup(), details, PAGE);
   };
 }
 boot();
+
 </script>`;
   return chrome("Feed", body, "The Feed", stamp, "", feedNav(opts));
 }
