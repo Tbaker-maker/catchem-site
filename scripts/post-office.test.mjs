@@ -64,7 +64,7 @@ const fetchImpl = async (url) => {
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("editor is on the page", post.includes('src="/post-office/app"') && post.includes("Post Office editor") && post.includes("The full catalog:"));
+t("editor is on the page", post.includes('src="/post-office/app?v=') && post.includes("Post Office editor") && post.includes("The full catalog:"));
 t("post office footer names the build", post.includes('id="post-office-build"') && post.includes("Post Office build "));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
 t("catalog spelling", post.includes("The full catalog:") && !post.includes("catalogue"));
@@ -137,9 +137,16 @@ t("studio is closed until the server flag", gated.status === 404);
 const opened = await worker.fetch(new Request("https://catchemtcg.com/video/studio.html?video=1"), env);
 t("query string is not the gate", opened.status === 200);
 const build = await worker.fetch(new Request("https://catchemtcg.com/build"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
-t("build stays on this site", build.status === 301 && new URL(build.headers.get("location"), "https://catchemtcg.com").pathname === "/post-office");
+const buildHtml = await build.text();
+t("build is the editor", build.status === 200 && !build.headers.get("location") && buildHtml.includes('src="/post-office/app?v=') && buildHtml.includes("Post Office editor"));
 const buildHead = await worker.fetch(new Request("https://catchemtcg.com/build", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
-t("build head stays on this site", buildHead.status === 301 && new URL(buildHead.headers.get("location"), "https://catchemtcg.com").pathname === "/post-office");
+const buildHeadHtml = await buildHead.text();
+t("build head is the editor", buildHead.status === 200 && !buildHead.headers.get("location") && buildHeadHtml.includes('src="/post-office/app?v='));
+const slash = await worker.fetch(new Request("https://catchemtcg.com/post-office/"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
+const slashHtml = await slash.text();
+t("post office slash is the editor", slash.status === 200 && !slash.headers.get("location") && slashHtml.includes('src="/post-office/app?v=dev"'));
+const officeHead = await worker.fetch(new Request("https://catchemtcg.com/post-office", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
+t("post office head is the editor", officeHead.status === 200 && (await officeHead.text()).includes("Post Office editor"));
 const sneak = await worker.fetch(new Request("https://catchemtcg.com/feed?video=1"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("video query does not open the feed", sneak.status === 302 && new URL(sneak.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 
@@ -217,6 +224,61 @@ for (let i = 0; i < 4; i++) {
   if (res.status === 200) premiumOk++;
 }
 t("premium is not stuck at the free post cap", premiumOk === 4);
+
+const gateEnv = {
+  SESSION_SECRET: secret,
+  DISCORD_CLIENT_ID: "id",
+  DISCORD_CLIENT_SECRET: "sec",
+  PUBLIC_FETCH: fetchImpl,
+  ASSETS: env.ASSETS,
+  POST_OFFICE_ALLOWLIST: "111, pro",
+};
+const gate = await worker.fetch(new Request("https://catchemtcg.com/post-office"), gateEnv);
+const gateHtml = await gate.text();
+t("a set allowlist hides the editor", gate.status === 200 && !gate.headers.get("location") && gateHtml.includes("Post Office is invite-only for now.") && gateHtml.includes('href="https://discord.gg/fUSjxDX4Hy"') && gateHtml.includes("Join Discord") && gateHtml.includes('href="/auth/discord?next=/post-office"') && !gateHtml.includes("<iframe"));
+const gateHead = await worker.fetch(new Request("https://catchemtcg.com/post-office/", { method: "HEAD" }), gateEnv);
+const gateHeadHtml = await gateHead.text();
+t("gated head is not a 404", gateHead.status === 200 && gateHeadHtml.includes("invite-only") && !gateHeadHtml.includes("<iframe"));
+const gateBuild = await worker.fetch(new Request("https://catchemtcg.com/build"), gateEnv);
+const gateBuildHtml = await gateBuild.text();
+t("gated build is the invite", gateBuild.status === 200 && gateBuildHtml.includes("invite-only") && !gateBuildHtml.includes("<iframe"));
+const onList = "ce_session=" + await signSession({ sub: "d:111", premium: false }, secret);
+const allowedPage = await worker.fetch(new Request("https://catchemtcg.com/build", { headers: { cookie: onList } }), gateEnv);
+const allowedHtml = await allowedPage.text();
+t("allowlisted discord id gets the editor", allowedPage.status === 200 && allowedHtml.includes('src="/post-office/app?v=dev"') && allowedHtml.includes("Post Office editor"));
+const offList = "ce_session=" + await signSession({ sub: "d:222", premium: true }, secret);
+const deniedPage = await worker.fetch(new Request("https://catchemtcg.com/post-office", { headers: { cookie: offList } }), gateEnv);
+const deniedHtml = await deniedPage.text();
+t("another discord id stays on the invite", deniedHtml.includes("invite-only") && !deniedHtml.includes("<iframe") && !deniedHtml.includes("Sign in with Discord"));
+const gatedApp = await worker.fetch(new Request("https://catchemtcg.com/post-office/app"), gateEnv);
+const gatedAppHtml = await gatedApp.text();
+t("the app url is gated too", gatedApp.status === 200 && gatedAppHtml.includes("invite-only") && !gatedAppHtml.includes("var INDEX"));
+const blank = await worker.fetch(new Request("https://catchemtcg.com/post-office"), { ...gateEnv, POST_OFFICE_ALLOWLIST: "  " });
+t("a blank allowlist stays open", (await blank.text()).includes('src="/post-office/app?v=dev"'));
+const faq = await worker.fetch(new Request("https://catchemtcg.com/faq"), gateEnv);
+const faqHtml = await faq.text();
+t("faq stays public", faq.status === 200 && faqHtml.includes("Questions") && !faqHtml.includes("invite-only"));
+const blockedIdea = await worker.fetch(new Request("https://catchemtcg.com/api/ideas", {
+  method: "POST",
+  headers: { cookie: offList, "content-type": "application/json" },
+  body: JSON.stringify({ ids: ["tcgcsv-246723"] }),
+}), gateEnv);
+const blockedBody = await blockedIdea.json();
+t("ideas follow the allowlist", blockedIdea.status === 403 && /invite-only/.test(blockedBody.line));
+const allowedIdea = await worker.fetch(new Request("https://catchemtcg.com/api/ideas", {
+  method: "POST",
+  headers: { cookie: onList, "content-type": "application/json" },
+  body: JSON.stringify({ ids: ["tcgcsv-246723"] }),
+}), gateEnv);
+const allowedIdeaBody = await allowedIdea.json();
+t("allowlisted ideas still run", allowedIdea.status === 200 && allowedIdeaBody.ideas && allowedIdeaBody.ideas[0].includes("Umbreon"));
+const proCookie = "ce_session=" + await signSession({ sub: "pro", premium: true }, secret);
+const proText = await worker.fetch(new Request("https://catchemtcg.com/api/post-text", {
+  method: "POST",
+  headers: { cookie: proCookie, "content-type": "application/json" },
+  body: JSON.stringify({ ids: ["tcgcsv-517045"] }),
+}), gateEnv);
+t("listed premium post text still runs", proText.status === 200);
 
 const quota = await worker.fetch(new Request("https://catchemtcg.com/api/video/quota", { method: "POST", body: JSON.stringify({ action: "status" }) }), { SESSION_SECRET: secret });
 t("video quota is sign-in, not a cookie bucket", quota.status === 401);

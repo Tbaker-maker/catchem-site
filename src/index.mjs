@@ -2,12 +2,13 @@ import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
-import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
+import { beginDiscord, discordReady, finishDiscord, handleSession, handleSignIn, logout, officeAllowed } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
+import { readUser } from "./quota.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderOfficeGate, renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -165,8 +166,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
-  if (kind === "faq" || kind === "build" || kind === "creators") return html(renderRetired(kind, pageOpts));
-  if (kind === "post") return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
+  if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
+  if (kind === "post" || kind === "build") {
+    if (opts.officeAllowed === false) return html(renderOfficeGate(pageOpts));
+    return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
+  }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
   return null;
 }
@@ -181,7 +185,18 @@ export default {
     }
     const video = env?.VIDEO_ENABLED === "true";
     const feed = env?.FEED_ENABLED === "true";
-    if (request.method === "GET" && url.pathname === "/post-office/app") {
+    const readPage = request.method === "GET" || request.method === "HEAD";
+    const officePath = norm(url.pathname) === "/post-office" || norm(url.pathname) === "/build" || url.pathname === "/post-office/app";
+    const officeUser = readPage && officePath ? await readUser(request, env) : null;
+    const officeOpts = {
+      video,
+      feed,
+      officeAllowed: officeAllowed(officeUser, env),
+      ready: discordReady(env),
+      signedIn: !!officeUser,
+    };
+    if (readPage && url.pathname === "/post-office/app") {
+      if (!officeOpts.officeAllowed) return html(renderOfficeGate(officeOpts));
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);
@@ -247,10 +262,7 @@ export default {
         }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
     }
-    if ((request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/build") {
-      return Response.redirect(new URL("/post-office", url), 301);
-    }
-    if (request.method === "GET" || request.method === "HEAD") {
+    if (readPage) {
       if (!feed && gatedFeedPath(url.pathname)) return home302();
       const dest = redirectPath(url.pathname);
       if (dest) {
@@ -260,15 +272,15 @@ export default {
       if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
-      if (kind && kind !== "data" && request.method === "GET") {
+      if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed });
+          const page = await renderPath(url.pathname, fetchImpl, officePath ? officeOpts : { video, feed });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }
       }
-      if (kind === "data" && request.method === "GET") {
+      if (kind === "data") {
         try { return await renderPath(url.pathname, fetchImpl, { feed }); }
         catch { return new Response("Not found", { status: 404 }); }
       }

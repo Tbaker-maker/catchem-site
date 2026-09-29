@@ -3,7 +3,7 @@
 
 import { editionLabel, priceLine } from "./post-copy.mjs";
 import { commit, ideasSignInLine, peek, readUser, usageOf } from "./quota.mjs";
-import { discordReady } from "./auth.mjs";
+import { discordReady, INVITE_LINE, officeAllowed } from "./auth.mjs";
 
 const LITE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/search-lite.json";
 const POCKET = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/pocket-catalogue.json";
@@ -276,7 +276,11 @@ function splitThree(text) {
 }
 
 export async function handleIdeas(request, env, fetchImpl = fetch) {
-  const userGate = peek(await readUser(request, env), "ideas");
+  const user = await readUser(request, env);
+  if (!officeAllowed(user, env)) {
+    return json({ ok: false, signedIn: !!user, line: INVITE_LINE, ready: discordReady(env) }, 403);
+  }
+  const userGate = peek(user, "ideas");
   if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
@@ -293,13 +297,15 @@ export async function handleIdeas(request, env, fetchImpl = fetch) {
     }
   }
   if (!ideas) ideas = factIdeas(facts.cards);
-  const user = await readUser(request, env);
   commit(user, "ideas");
   return json({ ok: true, ideas, asOf: facts.asOf, quota: usageOf(user, "ideas"), model: fromModel ? "catalog-model" : "fact-pack" });
 }
 
 export async function handlePostText(request, env, fetchImpl = fetch) {
   const user = await readUser(request, env);
+  if (!officeAllowed(user, env)) {
+    return json({ ok: false, signedIn: !!user, line: INVITE_LINE, ready: discordReady(env) }, 403);
+  }
   const userGate = peek(user, "post-text");
   if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
   let body = {};
