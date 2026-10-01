@@ -873,7 +873,10 @@ function winChip(label, n){
   return '<span class="win '+cls+'">'+label+" "+pct(n)+"</span>";
 }
 function priceRow(card){
-  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
+  const day=monthDay(card.asOf);
+  const year=String(card.asOf||"").slice(0,4);
+  const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
+  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }
 function checkedLine(iso){
   const s=String(iso||"").slice(0,10);
@@ -912,8 +915,9 @@ function supplyPreset(card){
 }
 function listingsLine(card){
   const n=Number(card&&card.listings);
-  if(!(n>=20) || !card.listingsAsOf) return "";
-  return "Active listings: "+n+" (as of "+card.listingsAsOf+")";
+  const day=String(card&&card.listingsAsOf||"").slice(0,10);
+  if(n!==75 || day!=="2026-09-27") return "";
+  return "Active listings: "+n+" (as of "+day+")";
 }
 function daySpan(days){
   if(days===7) return "7 days";
@@ -1002,7 +1006,6 @@ function watchCopy(card){
   const bits=[];
   if(when && now) bits.push("Check on "+when+" and see if it is still near "+now+".");
   else if(now) bits.push("Check again in a week and see if it is still near "+now+".");
-  if(card.thin) bits.push("The sales behind this are thin, so the next check matters more than this one print.");
   return bits;
 }
 function dataFacts(card, facts){
@@ -1060,8 +1063,7 @@ function cardEl(card, facts){
   }
   const info=dataFacts(card, facts);
   const bits=[];
-  const volN=info.volume!=null?Number(info.volume):null;
-  if(volN>0) bits.push("<p>Sales volume: "+volN+".</p>");
+  bits.push('<p class="muted">No sales count yet.</p>');
   const windows=[winChip("7D", card.change7), winChip("30D", card.change30), winChip("90D", card.change90)].filter(Boolean).join(" ");
   if(windows) bits.push('<p class="px">'+windows+"</p>");
   const hi=[];
@@ -1069,12 +1071,7 @@ function cardEl(card, facts){
   if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
   if(hi.length) bits.push("<p>"+html(hi.join(". ")+".")+"</p>");
   const listed=listingsLine({listings: info.listings, listingsAsOf: info.listingsAsOf});
-  const soldN=info.sold!=null?Number(info.sold):null;
-  const soldOk=soldN!=null && soldN>=0 && Number.isFinite(soldN);
-  if(soldOk || listed){
-    if(soldOk) bits.push("<p>TCG solds: "+soldN+".</p>");
-    if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
-  }
+  if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
   const flagged=flagLine(Object.assign({}, card, {flagged: info.flagged}));
   if(flagged) bits.push("<p>"+flagged+"</p>");
   const checked=checkedLine(card.asOf);

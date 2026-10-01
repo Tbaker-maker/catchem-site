@@ -193,7 +193,7 @@ footer a{color:var(--gold)}
 </style>
 </head>
 <body>
-<a class="skip" href="#list">Skip to the waitlist</a>
+<a class="skip" href="#top">Skip to content</a>
 <header class="site-bar">
   <a class="logo" href="/">Catch'em<span>.</span></a>
   <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
@@ -221,7 +221,7 @@ footer a{color:var(--gold)}
       <a class="btn btn-primary" href="/sets">Browse sets</a>
       <a class="btn btn-ghost" href="/post-office">Post Office</a>
     </div>
-    <p class="beta" id="fresh"><b>Open</b><span id="fresh-line">Catalog counts load from the public bundle.</span></p>
+    <p class="beta" id="fresh"><b>Open</b><span id="fresh-line"></span></p>
   </div>
 </header>
 
@@ -377,6 +377,7 @@ footer a{color:var(--gold)}
   }
   fetch("/data/indexes.json").then(function(r){if(!r.ok) throw 0; return r.json()}).then(function(idx){
     var singles=pts(idx.singles), sealed=pts(idx.sealed);
+    var stamp=idx.asOf?(" As of "+when(idx.asOf)+".") : "";
     var box=document.getElementById("home-charts");
     var ranges=["7D","30D","90D","1Y","All"];
     function spanOf(all){if(all.length<2) return 0; return Math.round((Date.parse(all[all.length-1].d+"T00:00:00Z")-Date.parse(all[0].d+"T00:00:00Z"))/86400000)+1;}
@@ -388,7 +389,7 @@ footer a{color:var(--gold)}
         return span>=days;
       }).map(function(r){return '<button type="button" data-ix="'+which+'" data-range="'+r+'"'+(r==="All"?' aria-pressed="true"':"")+'>'+r+'</button>'}).join("");
     }
-    box.innerHTML='<div class="ix"><h2>Singles index</h2><p class="ix-read" id="ix-s-read"></p><div class="chart" id="ix-s"></div><div class="filters">'+buttons("s", singles)+'</div><p class="ix-note">Chain-linked index. TCGplayer market. The number is a level, not a price.</p></div><div class="ix"><h2>Sealed index</h2><p class="ix-read" id="ix-b-read"></p><div class="chart" id="ix-b"></div><div class="filters">'+buttons("b", sealed)+'</div><p class="ix-note">Chain-linked index. TCGplayer market. The number is a level, not a price.</p></div>';
+    box.innerHTML='<div class="ix"><h2>Singles index</h2><p class="ix-read" id="ix-s-read"></p><div class="chart" id="ix-s"></div><div class="filters">'+buttons("s", singles)+'</div><p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div><div class="ix"><h2>Sealed index</h2><p class="ix-read" id="ix-b-read"></p><div class="chart" id="ix-b"></div><div class="filters">'+buttons("b", sealed)+'</div><p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div>';
     function paint(which, range){
       var rows=filterPts(which==="s"?singles:sealed, range);
       var noun=which==="s"?"singles":"sealed";
