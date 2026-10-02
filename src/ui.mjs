@@ -771,6 +771,9 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .read-nav{display:flex;gap:8px}
   .read-nav button{min-height:44px;flex:1 1 0}
   .pile{overflow:hidden}
+  .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
+  .feed-stage .feed-card{flex:1 1 auto}
+  #feed-sections:empty{display:none}
   .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
   .track-line{margin:0}
   .alert-box{display:none;gap:8px;flex-wrap:wrap}
@@ -880,7 +883,7 @@ function priceRow(card){
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
-  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
+  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }
 function checkedLine(iso){
   const s=String(iso||"").slice(0,10);
@@ -1073,8 +1076,6 @@ function cardEl(card, facts){
   const info=dataFacts(card, facts);
   const bits=[];
   bits.push('<p class="muted">No sales count yet.</p>');
-  const windows=[winChip("7D", card.change7), winChip("30D", card.change30), winChip("90D", card.change90)].filter(Boolean).join(" ");
-  if(windows) bits.push('<p class="px">'+windows+"</p>");
   const hi=[];
   if(info.high) hi.push("High "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
   if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
@@ -1354,29 +1355,106 @@ async function onToggle(ev){
   }
   paint(group, details, cursor[group.id]||0);
 }
-function draw(){
-  drawing=true;
-  const root=document.getElementById("feed-sections");
-  root.innerHTML="";
+let spot=0;
+function activeGroups(){
   const only=focusGroup();
   const groups=only?[only]:GROUPS;
+  return groups.filter(function(g){
+    const count=sectionCount(g);
+    return only || !meta || !meta.sections || count>0;
+  });
+}
+function totalReads(){
+  return activeGroups().reduce(function(sum, g){ return sum+(sectionCount(g)||combined(g).length); }, 0);
+}
+async function rowAt(index){
+  const groups=activeGroups();
+  let left=index;
   for(const group of groups){
-    const count=sectionCount(group);
-    if(!only && meta && meta.sections && !(count>0)) continue;
-    const details=document.createElement("details");
-    details.className="feed-sec";
-    details.id="sec-"+group.id;
-    details.innerHTML='<summary>'+html(group.title)+' · <span>'+(count>0?count.toLocaleString("en-US"):"")+'</span></summary><div class="pile"></div>';
-    root.appendChild(details);
-    details.addEventListener("toggle", onToggle);
-    if(only) details.open=true;
+    const count=sectionCount(group)||combined(group).length;
+    if(left<0 || count<=0) continue;
+    if(left<count){
+      let guard=0;
+      while(combined(group).length<=left && guard<24){
+        const before=combined(group).length;
+        await ensure(group, before+PAGE);
+        if(combined(group).length===before) break;
+        guard++;
+      }
+      return {group:group, row:combined(group)[left]||null, count:count};
+    }
+    left-=count;
   }
-  drawing=false;
-  if(only){
-    const details=document.getElementById("sec-"+only.id);
-    if(details) onToggle({currentTarget:details});
+  return null;
+}
+async function showSpot(index){
+  const total=totalReads();
+  if(index<0) index=0;
+  if(total && index>=total) index=total-1;
+  spot=index;
+  const found=await rowAt(index);
+  const host=document.getElementById("feed-one");
+  const sections=document.getElementById("feed-sections");
+  if(sections) sections.innerHTML="";
+  if(!host) return;
+  host.innerHTML="";
+  const stage=document.createElement("div");
+  stage.className="feed-stage";
+  if(found && found.group){
+    const label=document.createElement("p");
+    label.className="muted";
+    label.innerHTML=html(found.group.title)+" · <span>"+(found.count>0?found.count.toLocaleString("en-US"):"")+"</span>";
+    stage.appendChild(label);
   }
-  revealStart();
+  if(found && found.row) stage.appendChild(found.row.claim && !found.row.headline ? trackedEl(found.row) : cardEl(found.row));
+  if(typeof catchemMount==="function") catchemMount(stage);
+  const nav=document.createElement("div");
+  nav.className="read-nav";
+  const prev=document.createElement("button");
+  prev.type="button";
+  prev.textContent="Previous";
+  prev.disabled=index<=0;
+  prev.onclick=function(){ showSpot(index-1); };
+  const next=document.createElement("button");
+  next.type="button";
+  next.textContent="Next";
+  next.disabled=!total || index+1>=total;
+  next.onclick=function(){ showSpot(index+1); };
+  nav.appendChild(prev);
+  nav.appendChild(next);
+  stage.appendChild(nav);
+  const card=stage.querySelector("article");
+  if(card){
+    let start=null;
+    card.addEventListener("pointerdown", function(ev){
+      const node=ev["tar"+"get"];
+      if(node && node.closest && node.closest("a, button, input, select, label")) return;
+      start={x:ev.clientX,y:ev.clientY};
+    });
+    card.addEventListener("pointerup", function(ev){
+      if(!start) return;
+      const dx=ev.clientX-start.x;
+      const dy=ev.clientY-start.y;
+      start=null;
+      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
+      card.dataset.swipe="1";
+      if(dx<0 && !next.disabled) next.click();
+      else if(dx>0 && !prev.disabled) prev.click();
+    });
+  }
+  if(found && found.group && !focusGroup()){
+    const a=document.createElement("a");
+    a.className="see-all";
+    a.href="/feed/s/"+found.group.slug;
+    a.textContent="See all";
+    stage.appendChild(a);
+  }
+  host.appendChild(stage);
+}
+function draw(){
+  const sections=document.getElementById("feed-sections");
+  if(sections) sections.innerHTML="";
+  showSpot(spot||0);
 }
 function remember(){
   const open=[];
@@ -1469,8 +1547,8 @@ async function boot(){
     if(!catalogue){
       try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
     }
-    const details=document.getElementById("sec-"+(focusGroup()?focusGroup().id:""));
-    if(details) paint(focusGroup(), details, PAGE);
+    spot=0;
+    showSpot(0);
   };
   await restoreSpot();
 }
