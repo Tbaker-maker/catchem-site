@@ -940,11 +940,16 @@ function priorMoney(card){
   return from>0?money(from):"";
 }
 function moveLine(card){
-  const pctN=Number(card.changePct);
-  if(!Number.isFinite(pctN)) return "";
-  const dir=pctN<0?"Down":"Up";
-  const abs=Math.round(Math.abs(pctN)*10)/10;
-  return dir+" "+abs+"% over "+daySpan(Number(card.windowDays)||0);
+  const path=String(card.path||"").trim();
+  if(path) return path;
+  const hist=card.hist||[];
+  if(hist.length>=2){
+    const a=hist[hist.length-2];
+    const b=hist[hist.length-1];
+    const way=Number(b[1])<Number(a[1])?"down":"up";
+    return "From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+".";
+  }
+  return "No path is stored for this series yet.";
 }
 function watchDay(iso){
   const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
@@ -1047,11 +1052,10 @@ function cardEl(card, facts){
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=moveLine(card);
-  const means=meansCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+'<div class="means"><b>What this means</b>'+means+"</div>"+priceRow(card);
+  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+priceRow(card);
   if(pageMode!=="read"){
     el.innerHTML=head+open;
     el.insertBefore(photoEl(card), el.firstChild);
