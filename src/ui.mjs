@@ -768,6 +768,9 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card .chg b{font-weight:600}
   .feed-acts{display:flex;flex-wrap:wrap;gap:8px}
   .feed-acts button,.feed-acts a,.see-all{min-height:44px;display:inline-flex;align-items:center}
+  .read-nav{display:flex;gap:8px}
+  .read-nav button{min-height:44px;flex:1 1 0}
+  .pile{overflow:hidden}
   .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
   .track-line{margin:0}
   .alert-box{display:none;gap:8px;flex-wrap:wrap}
@@ -820,6 +823,7 @@ const SAID={up:"Up",sideways:"Sideways",down:"Down"};
 const pages={};
 const HOME_CAP=6;
 const PAGE=24;
+const cursor={};
 let meta=null;
 let catalogue=null;
 let drawing=false;
@@ -1052,6 +1056,7 @@ function cardEl(card, facts){
     el.innerHTML=head+open;
     el.insertBefore(photoEl(card), el.firstChild);
     el.addEventListener("click", function(ev){
+    if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
       if(node && node.closest("button, a, form, input, select, label")) return;
       remember();
@@ -1077,13 +1082,12 @@ function cardEl(card, facts){
   const checked=checkedLine(card.asOf);
   if(checked) bits.push('<p class="muted">'+html(checked)+"</p>");
   bits.push('<p class="muted">'+html(src)+"</p>");
-  const watch=watchCopy(card).map(function(s){return "<p>"+html(s)+"</p>"}).join("");
   const extra=shortFor(card);
   const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+" or above "+supply.high+"</label>":"";
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(watch?'<h4>What to watch</h4>'+watch:"")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist && slot) slot.appendChild(chart(card.hist, src));
@@ -1267,7 +1271,7 @@ async function ensure(group, want){
     }
   }
 }
-function paint(group, details, limit){
+function paint(group, details, index){
   const rows=combined(group).filter(function(row){
     const id=row.id||row.call_id;
     const node=id&&document.getElementById("r-"+id);
@@ -1277,12 +1281,52 @@ function paint(group, details, limit){
   const span=details.querySelector("summary span");
   const count=sectionCount(group);
   if(span) span.textContent=count>0?count.toLocaleString("en-US"):"";
+  let i=Number(index);
+  if(!Number.isFinite(i) || i<0) i=0;
+  if(rows.length && i>=rows.length) i=rows.length-1;
+  cursor[group.id]=i;
   pile.innerHTML="";
-  for(const row of rows.slice(0, limit)){
-    pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
-  }
+  const row=rows[i];
+  if(row) pile.appendChild(row.claim && !row.headline ? trackedEl(row) : cardEl(row));
   if(typeof catchemMount==="function") catchemMount(pile);
-  const shown=Math.min(limit, rows.length);
+  const total=count>0?count:rows.length;
+  const nav=document.createElement("div");
+  nav.className="read-nav";
+  const prev=document.createElement("button");
+  prev.type="button";
+  prev.textContent="Previous";
+  prev.disabled=i<=0;
+  prev.onclick=function(){ paint(group, details, i-1); };
+  const next=document.createElement("button");
+  next.type="button";
+  next.textContent="Next";
+  next.disabled=i+1>=total;
+  next.onclick=async function(){
+    if(i+1>=rows.length) await ensure(group, rows.length+1);
+    paint(group, details, i+1);
+  };
+  nav.appendChild(prev);
+  nav.appendChild(next);
+  pile.appendChild(nav);
+  const card=pile.querySelector("article");
+  if(card){
+    let start=null;
+    card.addEventListener("pointerdown", function(ev){
+      const node=ev["tar"+"get"];
+      if(node && node.closest && node.closest("a, button, input, select, label")) return;
+      start={x:ev.clientX,y:ev.clientY};
+    });
+    card.addEventListener("pointerup", function(ev){
+      if(!start) return;
+      const dx=ev.clientX-start.x;
+      const dy=ev.clientY-start.y;
+      start=null;
+      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
+      card.dataset.swipe="1";
+      if(dx<0 && !next.disabled) next.click();
+      else if(dx>0 && !prev.disabled) prev.click();
+    });
+  }
   if(!focusGroup() && count>HOME_CAP){
     const a=document.createElement("a");
     a.className="see-all";
@@ -1290,33 +1334,21 @@ function paint(group, details, limit){
     a.textContent="See all";
     pile.appendChild(a);
   }
-  if(focusGroup() && (shown<rows.length || shown<sectionCount(group))){
-    const btn=document.createElement("button");
-    btn.type="button";
-    btn.className="see-all";
-    btn.textContent="Show more";
-    btn.onclick=async function(){
-      await ensure(group, shown+PAGE);
-      paint(group, details, shown+PAGE);
-    };
-    pile.appendChild(btn);
-  }
 }
 async function onToggle(ev){
   if(drawing) return;
   const details=ev.currentTarget;
   const group=GROUPS.find(function(g){return "sec-"+g.id===details.id});
   if(!group || !details.open) return;
-  const limit=focusGroup()?PAGE:HOME_CAP;
   let guard=0;
-  while(combined(group).length<limit && guard<24){
+  while(!combined(group).length && guard<24){
     const before=group.parts.reduce(function(s,p){return s+(pages[p]||[]).length},0);
     await ensure(group, before+PAGE);
     const after=group.parts.reduce(function(s,p){return s+(pages[p]||[]).length},0);
     if(after===before) break;
     guard++;
   }
-  paint(group, details, limit);
+  paint(group, details, cursor[group.id]||0);
 }
 function draw(){
   drawing=true;
