@@ -32,6 +32,114 @@ export function isFactRow(row) {
   return String(row.headline || row.path || "").trim().length > 0;
 }
 
+// The name the card already prints, without a collector suffix stuck on the end.
+export function monKey(name) {
+  let n = String(name || "").trim().replace(/\s+/g, " ");
+  n = n.replace(/\s+-\s+\d+\s*\/\s*\d+\s*$/, "");
+  n = n.replace(/\s+\([^)]*\)\s*$/, "").trim();
+  return n;
+}
+
+// A species string already on the Post Office card list. Nothing is filled in.
+export function pokemonNamed(name, species) {
+  const key = monKey(name).toLowerCase();
+  if (!key) return "";
+  let best = "";
+  for (const row of Array.isArray(species) ? species : []) {
+    const sp = String(row || "").trim();
+    if (!sp) continue;
+    const ls = sp.toLowerCase();
+    if (key === ls || key.startsWith(ls + " ") || key.startsWith(ls + "-")) {
+      if (sp.length > best.length) best = sp;
+    }
+  }
+  return best;
+}
+
+// Set name and card id only when this card's own fields already have them.
+export function cardMeta(card) {
+  const set = String(card && card.set || "").trim();
+  const sku = String(card && card.sku || "").trim();
+  const id = /^tcgcsv-\d+$/.test(sku) ? sku : "";
+  return { set, id };
+}
+
+// The sentence under the title. The name stays in the title, not here.
+// Prices, dates, and percents are the same characters the file already has.
+export function readUnderTitle(name, line) {
+  const text = String(line || "").replace(/\s+/g, " ").trim();
+  const title = String(name || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (title && text.toLowerCase() === title.toLowerCase()) return "";
+  const marker = "The latest price of " + title + " is";
+  if (title && text.startsWith(marker)) {
+    const rest = text.slice(marker.length).replace(/^[\s.]+/, "").trim();
+    return rest ? "The latest price is " + rest : "";
+  }
+  if (title && text.startsWith(title)) {
+    const next = text.charAt(title.length);
+    if (next && !/\s/.test(next)) return text;
+    return text.slice(title.length).trim();
+  }
+  return text;
+}
+
+// That Pokémon's priced cards, highest price already on the row first.
+// A row with no price stays off. Two prices for one id stay off.
+export function pricedMonCards(cards, name) {
+  const who = monKey(name);
+  if (!who) return [];
+  const rows = Array.isArray(cards) ? cards : Object.values(cards || {});
+  const byId = new Map();
+  for (const card of rows) {
+    if (!card || typeof card !== "object") continue;
+    if (!pokemonNamed(card.name, [who])) continue;
+    const price = Number(card.price);
+    if (!(price > 0)) continue;
+    const sku = String(card.sku || "");
+    const id = /^tcgcsv-\d+$/.test(sku) ? sku : "";
+    if (!id) continue;
+    const prev = byId.get(id);
+    if (prev && prev.drop) continue;
+    if (prev && Math.round(prev.price * 100) !== Math.round(price * 100)) {
+      byId.set(id, { drop: true });
+      continue;
+    }
+    if (!prev) {
+      byId.set(id, {
+        id,
+        name: String(card.name || ""),
+        set: String(card.set || "").trim(),
+        price,
+      });
+    }
+  }
+  const out = [];
+  for (const row of byId.values()) if (!row.drop) out.push(row);
+  out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return out;
+}
+
+// A cutout only when the Post Office visuals file already has kind cutout and a src.
+export function cutoutFor(rows, name) {
+  const mon = monKey(name).toLowerCase();
+  const list = Array.isArray(rows) ? rows : (rows && Array.isArray(rows.cards) ? rows.cards : []);
+  if (!mon) return null;
+  for (const row of list) {
+    if (!row || row.kind !== "cutout") continue;
+    const who = String(row.species || row.name || "").trim().toLowerCase();
+    if (who !== mon) continue;
+    const src = String(row.src || "").trim();
+    if (!src) return null;
+    const box = row.crop && typeof row.crop === "object" ? row.crop : null;
+    const crop = box && [box.x, box.y, box.w, box.h].every((n) => Number.isFinite(Number(n))) && Number(box.w) > 0 && Number(box.h) > 0
+      ? { x: Number(box.x), y: Number(box.y), w: Number(box.w), h: Number(box.h) }
+      : null;
+    return { src, crop };
+  }
+  return null;
+}
+
 export function keepFeedRead(row) {
   if (!row || typeof row !== "object") return false;
   if (!String(row.headline || row.path || "").trim()) return false;
@@ -876,13 +984,31 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const css = `
   .feed-page{padding-top:8px}
+  @media (max-width:1023px){.feed-page{padding-bottom:88px}}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
   .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
-  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
+  .feed-card img{width:auto;max-width:100%;max-height:280px;height:auto;object-fit:contain;background:transparent;border-radius:12px;align-self:center}
+  .feed-card img.cutout{width:auto;max-width:100%;height:auto;max-height:280px;object-fit:contain;background:transparent;border-radius:0}
+  .card-meta{margin:0;color:#d9b779;font:500 16px/1.35 var(--sans)}
+  .cut-miss{margin:0;color:#d9b779;font:500 16px/1.4 var(--sans)}
+  .cut-miss[hidden],.mon-pull[hidden],.mon-list[hidden]{display:none}
+  .mon-pull{max-width:100%}
+  .mon-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 22px;border-radius:10px;background:#d9b779;color:#1a1407;border:1px solid transparent;font:600 16px/1 var(--sans);cursor:pointer}
+  .mon-list{margin-top:8px;background:#12100e;border:1px solid #2f2b26;border-radius:10px;padding:4px;max-width:100%}
+  .mon-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;margin:0;padding:8px 12px;border-radius:10px;color:#d9b779;font:500 15px/1.3 var(--sans)}
+  .mon-row b{font:600 16px/1 var(--serif);color:#d9b779;white-space:nowrap}
+  @media (max-width:390px){
+    .feed-card,.mon-btn,.mon-list,.card-meta{max-width:100%}
+    .mon-row{align-items:flex-start}
+    .mon-row span{min-width:0;overflow-wrap:anywhere}
+  }
+  @media (min-width:1280px){
+    .feed-card{max-width:640px}
+  }
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
@@ -912,8 +1038,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .read-nav{display:flex;gap:8px}
   .read-nav button{min-height:44px;flex:1 1 0}
   .pile{overflow:hidden}
-  .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
-  .feed-stage .feed-card{flex:1 1 auto}
+  .feed-stage{min-height:0;display:flex;flex-direction:column}
+  .feed-stage .feed-card{flex:0 0 auto;width:100%}
   #feed-sections:empty{display:none}
   .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
   .track-line{margin:0}
@@ -966,6 +1092,109 @@ let flat=null;
 let hideFacts=false;
 let loopFilter="";
 let look=null;
+${monKey.toString()}
+${pokemonNamed.toString()}
+${cardMeta.toString()}
+${readUnderTitle.toString()}
+${pricedMonCards.toString()}
+${cutoutFor.toString()}
+const OFFICE="https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/";
+function officeSrc(src){
+  const s=String(src||"");
+  if(/^https?:\\/\\//i.test(s)) return s;
+  return OFFICE+(s.charAt(0)==="/"?s.slice(1):s);
+}
+let speciesOnce=null, cutOnce=null, feedOnce=null;
+function speciesRows(){
+  if(!speciesOnce) speciesOnce=fetch(OFFICE+"cards/full/index.json").then(function(r){return r.ok?r.json():[]}).then(function(rows){
+    const list=Array.isArray(rows)?rows:(rows&&Array.isArray(rows.cards)?rows.cards:[]);
+    const seen={};
+    const out=[];
+    for(let i=0;i<list.length;i++){
+      const sp=String(list[i]&&list[i].species||"").trim();
+      if(!sp||seen[sp]) continue;
+      seen[sp]=1;
+      out.push(sp);
+    }
+    return out;
+  }).catch(function(){return []});
+  return speciesOnce;
+}
+function cutRows(){
+  if(!cutOnce) cutOnce=fetch(OFFICE+"cards/visuals/index.json").then(function(r){return r.ok?r.json():[]}).catch(function(){return []});
+  return cutOnce;
+}
+function feedCards(){
+  if(catalogue&&catalogue.cards) return Promise.resolve(catalogue.cards);
+  if(!feedOnce) feedOnce=fetch("/data/feed/catalogue.json").then(function(r){return r.ok?r.json():{}}).then(function(doc){
+    if(doc&&doc.cards&&!catalogue) catalogue=doc;
+    return (doc&&doc.cards)||{};
+  }).catch(function(){return {}});
+  return feedOnce;
+}
+function metaLine(card){
+  const meta=cardMeta(card);
+  const bits=[];
+  if(meta.set) bits.push(html(meta.set));
+  if(meta.id) bits.push(html(meta.id));
+  return bits.length?'<p class="card-meta">'+bits.join(" · ")+"</p>":"";
+}
+function paintCut(miss, hit){
+  if(!hit||!hit.src){ miss.hidden=false; return; }
+  const img=document.createElement("img");
+  img.className="cutout";
+  img.alt="";
+  img.src=officeSrc(hit.src);
+  if(hit.crop){
+    img.style.objectFit="none";
+    img.style.objectPosition=(-hit.crop.x)+"px "+(-hit.crop.y)+"px";
+    img.style.width=hit.crop.w+"px";
+    img.style.height=hit.crop.h+"px";
+    img.style.maxWidth="100%";
+  }
+  img.onerror=function(){ img.remove(); miss.hidden=false; };
+  miss.insertAdjacentElement("beforebegin", img);
+}
+function wireCards(btn, list, who){
+  btn.addEventListener("click", function(){
+    const open=btn.getAttribute("aria-expanded")==="true";
+    btn.setAttribute("aria-expanded", open?"false":"true");
+    if(open){ list.hidden=true; return; }
+    if(list.dataset.filled==="1"){ if(list.childElementCount) list.hidden=false; return; }
+    list.dataset.filled="1";
+    feedCards().then(function(cards){
+      const rows=pricedMonCards(cards, who);
+      if(!rows.length){ list.hidden=true; return; }
+      list.innerHTML=rows.map(function(row){
+        const bits=[html(row.name)];
+        if(row.set) bits.push(html(row.set));
+        if(row.id) bits.push(html(row.id));
+        return '<p class="mon-row"><span>'+bits.join(" · ")+"</span><b>"+money(row.price)+"</b></p>";
+      }).join("");
+      list.hidden=false;
+    }).catch(function(){ list.hidden=true; });
+  });
+}
+function mountMon(el, card){
+  const miss=el.querySelector(".cut-miss");
+  const pull=el.querySelector(".mon-pull");
+  const btn=el.querySelector(".mon-btn");
+  const list=el.querySelector(".mon-list");
+  if(!miss||!pull||!btn||!list) return;
+  const direct=isFact(card)?monKey(card.name):"";
+  Promise.all([speciesRows(), cutRows()]).then(function(pair){
+    const who=direct||pokemonNamed(card.name, pair[0]);
+    if(!who){ miss.remove(); pull.remove(); return; }
+    pull.hidden=false;
+    paintCut(miss, cutoutFor(pair[1], who));
+    wireCards(btn, list, who);
+  }).catch(function(){
+    if(!direct){ miss.remove(); pull.remove(); return; }
+    pull.hidden=false;
+    miss.hidden=false;
+    wireCards(btn, list, direct);
+  });
+}
 function isFact(card){
   if(!card) return false;
   if(card.readKind!=="pokemon" && card.kind!=="pokemon") return false;
@@ -1126,7 +1355,7 @@ function priorMoney(card){
 }
 function moveLine(card){
   const path=String(card.path||"").trim();
-  if(path) return path;
+  if(path) return readUnderTitle(card.name||"", path);
   const hist=card.hist||[];
   if(hist.length>=2){
     const a=hist[hist.length-2];
@@ -1231,7 +1460,8 @@ function waveEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const line=String(card.path||card.headline||"");
+  const raw=String(card.path||card.headline||"");
+  const line=readUnderTitle(card.name||"", raw);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
   el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
@@ -1248,10 +1478,12 @@ function cardEl(card, facts){
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
+  const tools='<p class="cut-miss" hidden>The cutout is missing.</p><div class="mon-pull" hidden><button type="button" class="mon-btn" aria-expanded="false">Cards</button><div class="mon-list" hidden></div></div>';
+  const head=h3+metaLine(card)+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card))+tools;
   if(pageMode!=="read"){
     el.innerHTML=head+open;
     if(!isFact(card)) el.insertBefore(photoEl(card), el.firstChild);
+    mountMon(el, card);
     el.addEventListener("click", function(ev){
     if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
@@ -1265,6 +1497,7 @@ function cardEl(card, facts){
   }
   if(isFact(card)){
     el.innerHTML=head+(card.why?'<p class="muted">'+html(card.why)+"</p>":"");
+    mountMon(el, card);
     return el;
   }
   const info=dataFacts(card, facts);
@@ -1287,6 +1520,7 @@ function cardEl(card, facts){
   const dmLine="We'll DM you on Discord.";
   el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
+  mountMon(el, card);
   const slot=el.querySelector(".slot");
   if(card.hist && slot) slot.appendChild(chart(card.hist, src));
   const sheet=el.querySelector(".track-sheet");
