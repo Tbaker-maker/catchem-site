@@ -132,10 +132,14 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     }
     return out;
   }
-  const ranked = RANKED_FILTERS.has(filter);
+  // The front is the short loop: only reads this file already has.
+  // A catalogue id with no read stays out. One set still walks ranked ids.
+  // No seen-list is on file, so nothing is dropped for having been shown.
   if (!filter) {
     for (const row of kept) push(row);
+    return out;
   }
+  const ranked = RANKED_FILTERS.has(filter);
   const order = ranked ? browse?.ranked : browse?.unfiltered;
   if (Array.isArray(order)) {
     for (const id of order) {
@@ -1127,14 +1131,10 @@ function priorMoney(card){
 function moveLine(card){
   const path=String(card.path||"").trim();
   if(path) return path;
-  const hist=card.hist||[];
-  if(hist.length>=2){
-    const a=hist[hist.length-2];
-    const b=hist[hist.length-1];
-    const way=Number(b[1])<Number(a[1])?"down":"up";
-    return "From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+".";
-  }
-  return "No path is stored for this series yet.";
+  const head=String(card.headline||"").trim();
+  const name=String(card.name||"").trim();
+  if(head && head!==name) return head;
+  return "";
 }
 function watchDay(iso){
   const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
@@ -1144,16 +1144,8 @@ function watchDay(iso){
   return months[d.getUTCMonth()]+" "+d.getUTCDate();
 }
 function meansCopy(card){
-  const path=String(card.path||"").trim();
-  if(path) return [path];
-  const hist=card.hist||[];
-  if(hist.length>=2){
-    const a=hist[hist.length-2];
-    const b=hist[hist.length-1];
-    const way=Number(b[1])<Number(a[1])?"down":"up";
-    return ["From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+"."];
-  }
-  return ["No path is stored for this series yet."];
+  const line=moveLine(card);
+  return line?[line]:[];
 }
 function logoFor(card){
   if(card.logo) return String(card.logo);
@@ -1787,8 +1779,12 @@ function buildFlat(){
     return;
   }
   const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
-  if(!loopFilter) leadRows().forEach(add);
-  const order=browse ? (ranked ? browse.ranked : browse.unfiltered) : [];
+  if(!loopFilter){
+    leadRows().forEach(add);
+    flat=rows;
+    return;
+  }
+  const order=browse && ranked ? browse.ranked : [];
   (order||[]).forEach(function(id){
     if(typeof id!=="string" || !id) return;
     add({id:id, pending:true});
