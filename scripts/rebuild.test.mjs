@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { readFile } from "node:fs/promises";
 
@@ -161,6 +161,15 @@ const browseDoc = {
 };
 t("a fact already in the file stays, and a fact without counts does not", isFactRow(fact) && keepFeedRead(fact) && !isFactRow(emptyFact) && !keepFeedRead(emptyFact));
 t("keeping a fact does not invent a price", !(fact.price > 0));
+t("a pokemon fact says the English count and does not say catalogue", pokemonFactLine(fact) === "Duraludon has 19 English TCG cards." && !/catalog/i.test(pokemonFactLine(fact)));
+t("japanese stays off when that count is not on the row", !pokemonFactLine(fact).includes("Japanese"));
+t("a japanese count already on the row is said", pokemonFactLine({ ...fact, japaneseCount: 4 }) === "Duraludon has 19 English TCG cards and 4 Japanese TCG cards.");
+t("priced cards stay highest first and a blank price stays off", pricedMonCards([
+  ["a", "Duraludon", "Set A", "", "", "", 2],
+  ["b", "Duraludon V", "Set B", "", "", "", 9],
+  ["c", "Duraludon", "Set C", "", "", "", 0],
+  ["d", "Other", "Set D", "", "", "", 40],
+], "Duraludon").map((row) => row.id).join(",") === "b,a");
 const loop = buildFeedLoop([priced, fact, emptyFact], browseDoc, {});
 t("no filter keeps file order, then the shuffled ids", loop.map((r) => r.id).join(",") === "move-tcgcsv-10-7,pokemon-duraludon,move-tcgcsv-99-7");
 const rankedLoop = buildFeedLoop([priced, fact], browseDoc, { filter: "prices" });
@@ -175,6 +184,7 @@ const factHtml = renderFeed({ asOf: "2026-09-27", reads: [priced, fact, emptyFac
 const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
+t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && factHtml.includes("pricedMonCards") && factHtml.includes('className="mon-btn"') && factHtml.includes('aria-expanded","false"') && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && !factHtml.includes("card.why"));
 t("premium sees the hide control and the loop uses the file order", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.unfiltered") && factHtml.includes("browse.ranked") && !factHtml.includes('id="hide-facts" hidden'));
 const searchHtml = renderSearch();
 t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
