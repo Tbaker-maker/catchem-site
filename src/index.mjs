@@ -2,13 +2,12 @@ import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
-import { beginDiscord, discordReady, finishDiscord, handleSession, handleSignIn, logout, officeAllowed } from "./auth.mjs";
+import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { readUser } from "./quota.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
-  renderOfficeGate, renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -169,7 +168,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
-    if (opts.officeAllowed === false) return html(renderOfficeGate(pageOpts));
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
@@ -187,17 +185,7 @@ export default {
     const video = env?.VIDEO_ENABLED === "true";
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
-    const officePath = norm(url.pathname) === "/post-office" || norm(url.pathname) === "/build" || url.pathname === "/post-office/app";
-    const officeUser = readPage && officePath ? await readUser(request, env) : null;
-    const officeOpts = {
-      video,
-      feed,
-      officeAllowed: officeAllowed(officeUser, env),
-      ready: discordReady(env),
-      signedIn: !!officeUser,
-    };
     if (readPage && url.pathname === "/post-office/app") {
-      if (!officeOpts.officeAllowed) return html(renderOfficeGate(officeOpts));
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);
@@ -291,7 +279,7 @@ export default {
       const kind = pageKind(url.pathname);
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, officePath ? officeOpts : { video, feed });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
