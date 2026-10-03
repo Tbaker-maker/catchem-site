@@ -32,6 +32,41 @@ export function isFactRow(row) {
   return String(row.headline || row.path || "").trim().length > 0;
 }
 
+// English is cardCount when the file has no separate language split.
+// Japanese is said only when that count is already on the row.
+export function pokemonFactLine(row) {
+  const count = (value) => (Number.isInteger(value) && value >= 0 ? value : null);
+  if (!row || typeof row !== "object") return "";
+  const name = String(row.name || "").trim();
+  if (!name) return "";
+  let english = count(row.englishCount) ?? count(row.enCount);
+  const japanese = count(row.japaneseCount) ?? count(row.jaCount) ?? count(row.jpCount);
+  if (english == null) english = count(row.cardCount);
+  const parts = [];
+  if (english != null) parts.push(`${english} English TCG card${english === 1 ? "" : "s"}`);
+  if (japanese != null) parts.push(`${japanese} Japanese TCG card${japanese === 1 ? "" : "s"}`);
+  if (!parts.length) return "";
+  if (parts.length === 1) return `${name} has ${parts[0]}.`;
+  return `${name} has ${parts[0]} and ${parts[1]}.`;
+}
+
+// Highest price already on the row first. A row with no price stays off.
+export function pricedMonCards(rows, name) {
+  const mon = String(name || "").trim();
+  if (!mon) return [];
+  const out = [];
+  for (const row of rows || []) {
+    if (!Array.isArray(row)) continue;
+    const cardName = String(row[1] || "").trim();
+    if (cardName !== mon && !cardName.startsWith(mon + " ")) continue;
+    const price = Number(row[6]);
+    if (!(price > 0)) continue;
+    out.push({ id: String(row[0] || ""), name: cardName, set: String(row[2] || ""), price });
+  }
+  out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return out;
+}
+
 export function keepFeedRead(row) {
   if (!row || typeof row !== "object") return false;
   if (!String(row.headline || row.path || "").trim()) return false;
@@ -914,6 +949,11 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .pile{overflow:hidden}
   .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
   .feed-stage .feed-card{flex:1 1 auto}
+  .feed-stage .feed-card.fact-card{flex:0 0 auto;width:100%}
+  .mon-btn{background:#12100e;color:#d9b779;border:1px solid #d9b779;border-radius:10px;min-height:48px;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif}
+  .mon-list{display:flex;flex-direction:column;gap:6px;margin:0}
+  .mon-list[hidden]{display:none}
+  .mon-list p{margin:0;color:#d9b779}
   #feed-sections:empty{display:none}
   .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
   .track-line{margin:0}
@@ -974,6 +1014,8 @@ function isFact(card){
   if(c<1 || a<1 || d<1) return false;
   return !!(card.headline || card.path);
 }
+${pokemonFactLine.toString()}
+${pricedMonCards.toString()}
 function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
 function priceOk(n){ return Number(n)>0; }
 function isLag(card){
@@ -1236,6 +1278,47 @@ function waveEl(card){
   el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
+function mountMon(el, card){
+  const btn=document.createElement("button");
+  btn.type="button";
+  btn.className="mon-btn";
+  btn.setAttribute("aria-expanded","false");
+  btn.textContent="Cards";
+  const list=document.createElement("div");
+  list.className="mon-list";
+  list.hidden=true;
+  list.onclick=function(ev){ ev.stopPropagation(); };
+  btn.onclick=async function(ev){
+    ev.stopPropagation();
+    const open=btn.getAttribute("aria-expanded")==="true";
+    if(open){ btn.setAttribute("aria-expanded","false"); list.hidden=true; return; }
+    btn.setAttribute("aria-expanded","true");
+    list.hidden=false;
+    if(list.dataset.ready==="1") return;
+    list.dataset.ready="1";
+    let rows=[];
+    try{
+      const res=await fetch("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/paper-rows.json");
+      if(res.ok) rows=await res.json();
+    }catch(e){ rows=[]; }
+    const priced=pricedMonCards(Array.isArray(rows)?rows:[], card.name);
+    list.innerHTML="";
+    if(!priced.length){
+      const p=document.createElement("p");
+      p.className="muted";
+      p.textContent="No priced cards in the file.";
+      list.appendChild(p);
+      return;
+    }
+    priced.forEach(function(row){
+      const p=document.createElement("p");
+      p.textContent=money(row.price)+" "+row.name+(row.set?" · "+row.set:"");
+      list.appendChild(p);
+    });
+  };
+  el.appendChild(btn);
+  el.appendChild(list);
+}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
   const el=document.createElement("article");
@@ -1244,14 +1327,15 @@ function cardEl(card, facts){
   const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
-  const line=moveLine(card);
+  const line=isFact(card)?pokemonFactLine(card):moveLine(card);
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open;
-    if(!isFact(card)) el.insertBefore(photoEl(card), el.firstChild);
+    if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
+    else el.insertBefore(photoEl(card), el.firstChild);
     el.addEventListener("click", function(ev){
     if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
@@ -1264,7 +1348,9 @@ function cardEl(card, facts){
     return el;
   }
   if(isFact(card)){
-    el.innerHTML=head+(card.why?'<p class="muted">'+html(card.why)+"</p>":"");
+    el.classList.add("fact-card");
+    el.innerHTML=head;
+    mountMon(el, card);
     return el;
   }
   const info=dataFacts(card, facts);
