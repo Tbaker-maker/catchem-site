@@ -56,12 +56,24 @@ export function pricedMonCards(rows, name) {
   if (!mon) return [];
   const out = [];
   for (const row of rows || []) {
-    if (!Array.isArray(row)) continue;
-    const cardName = String(row[1] || "").trim();
+    let cardName = "";
+    let price = null;
+    let id = "";
+    let set = "";
+    if (Array.isArray(row)) {
+      cardName = String(row[1] || "").trim();
+      price = Number(row[6]);
+      id = String(row[0] || "");
+      set = String(row[2] || "");
+    } else if (row && typeof row === "object") {
+      cardName = String(row.name || "").trim();
+      price = Number(row.price);
+      id = String(row.id || "");
+      set = String(row.set || "");
+    } else continue;
     if (cardName !== mon && !cardName.startsWith(mon + " ")) continue;
-    const price = Number(row[6]);
     if (!(price > 0)) continue;
-    out.push({ id: String(row[0] || ""), name: cardName, set: String(row[2] || ""), price });
+    out.push({ id, name: cardName, set, price });
   }
   out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   return out;
@@ -1280,7 +1292,7 @@ function mountMon(el, card){
   list.className="mon-list";
   list.hidden=true;
   list.onclick=function(ev){ ev.stopPropagation(); };
-  btn.onclick=async function(ev){
+  btn.onclick=function(ev){
     ev.stopPropagation();
     const open=btn.getAttribute("aria-expanded")==="true";
     if(open){ btn.setAttribute("aria-expanded","false"); list.hidden=true; return; }
@@ -1288,17 +1300,12 @@ function mountMon(el, card){
     list.hidden=false;
     if(list.dataset.ready==="1") return;
     list.dataset.ready="1";
-    let rows=[];
-    try{
-      const res=await fetch("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/paper-rows.json");
-      if(res.ok) rows=await res.json();
-    }catch(e){ rows=[]; }
-    const priced=pricedMonCards(Array.isArray(rows)?rows:[], card.name);
+    const priced=pricedMonCards(Array.isArray(lead)?lead:[], card.name);
     list.innerHTML="";
     if(!priced.length){
       const p=document.createElement("p");
       p.className="muted";
-      p.textContent="No priced cards in the file.";
+      p.textContent="No priced cards are in the file.";
       list.appendChild(p);
       return;
     }
