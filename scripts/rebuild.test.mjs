@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, countPublishedReads } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { readFile } from "node:fs/promises";
 
@@ -124,6 +124,20 @@ const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"),
 t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && homeOff.includes("Join the Catch'em Club") && homeOff.includes("See Premium") && homeOff.includes("All site tools stay free.") && homeOff.includes("First 222") && !/lifetime|forever/i.test(homeOff) && !/more entries/i.test(homeOff) && !homeOff.includes("Discord Premium is $14.99"));
 t("the homepage What you get row leads with the Feed", homeOff.includes("<h3>Feed</h3>") && homeOff.includes("Daily market reads.") && homeOff.includes("Weekly and monthly wraps, built with the community.") && homeOff.includes('href="/feed">Open the Feed') && !homeOff.includes("<h3>Sets</h3>") && homeOff.includes('href="/sets">Sets</a>') && homeOff.includes("<h3>Post Office</h3>") && homeOff.includes("<h3>The Community</h3>"));
 t("the homepage hero and nav gain a feed link only when the flag is on", (homeOff.match(/href="\/feed"/g) || []).length === 1 && !homeOff.includes('class="btn btn-primary" href="/feed"') && (homeOn.match(/href="\/feed"/g) || []).length === 4 && homeOn.includes('class="btn btn-primary" href="/feed">Feed'));
+t("Post Office uses the same gold pill and the same page", homeOn.includes('class="btn btn-primary" href="/post-office">Post Office') && homeOff.includes('class="btn btn-primary" href="/post-office">Post Office') && !homeOn.includes('class="btn btn-ghost" href="/post-office"'));
+const abra = "Abra latest price fell from $1.94 on Sep 3 to $1.48 on Oct 3, down 23.7%.";
+t("the read starts at the price move and keeps the price, the date, and the percent", readUnderTitle("Abra", abra) === "latest price fell from $1.94 on Sep 3 to $1.48 on Oct 3, down 23.7%.");
+t("a name and number come off the front of the read", readUnderTitle("Talonflame - 091/088", "Talonflame - 091/088 latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.") === "latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.");
+t("the latest-price line drops the name and keeps the figures", readUnderTitle("Charizard", "The latest price of Charizard is $944.53 on Oct 3.") === "The latest price is $944.53 on Oct 3." && readUnderTitle("Keldeo (47)", "The latest price of Keldeo (47) is $3.16 on Oct 3.") === "The latest price is $3.16 on Oct 3.");
+t("a line that is only the title shows no read", readUnderTitle("Abra", "Abra") === "" && readUnderTitle("Abra", "Abra.") === "");
+t("a fact keeps its counts and does not start with the name", readUnderTitle("Talonflame", "Talonflame has 15 cards in the catalog, drawn by 14 artists, and the national dex number on those cards is 663.") === "has 15 cards in the catalog, drawn by 14 artists, and the national dex number on those cards is 663.");
+const counted = countPublishedReads({ cards: {
+  a: { id: "a", kind: "single", asOf: "2026-10-03", path: "A latest price fell from $1.00 on Sep 3 to $1.10 on Oct 3, up 10.0%." },
+  b: { id: "b", kind: "sealed", asOf: "2026-09-25", path: "B latest price fell from $2.00 on Sep 1 to $1.50 on Sep 25, down 25.0%." },
+  c: { id: "c", kind: "news", readKind: "news", asOf: "2026-10-03", path: "A headline." },
+}});
+t("catalogue counts use reads in the file, skip news, and name the latest file day", counted && counted.total === 2 && counted.onDay === 1 && counted.day === "2026-10-03");
+t("a file with no reads adds nothing", countPublishedReads({ cards: {} }) === null && countPublishedReads({ reads: [{ kind: "news", asOf: "2026-10-03" }] }) === null);
 const premium = await worker.fetch(new Request("https://catchemtcg.com/premium"), env);
 const premiumHtml = await premium.text();
 const lock = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
@@ -190,6 +204,7 @@ t("the live lead keeps the no-price fact and drops the empty one", keptFact && k
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
 t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && !factHtml.includes("card.why"));
 t("premium sees the hide control and the front does not walk the shuffled catalogue", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && !factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
+t("the feed filter keeps every row and uses the site pill", factHtml.includes('id="f-loop"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes("pill-menu-btn") && factHtml.includes("max-width:390px") && factHtml.includes("min-width:1280px") && factHtml.includes("background:#12100e") && factHtml.includes('button[aria-selected="true"]') && factHtml.includes("function readUnderTitle"));
 const searchHtml = renderSearch();
 t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
 

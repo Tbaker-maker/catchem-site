@@ -19,6 +19,59 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// The title already shows the name and number. The line under it starts at the
+// price move. A line that is only the title is blank. Prices, dates, and
+// percents in the file stay as written.
+export function readUnderTitle(name, path) {
+  const title = String(name ?? "").trim();
+  const line = String(path ?? "").trim();
+  if (!line) return "";
+  if (title && (line === title || line.replace(/\.+$/, "") === title)) return "";
+  if (title) {
+    const marker = "The latest price of " + title + " is";
+    if (line.startsWith(marker + " ") || line === marker || line.startsWith(marker + ".")) {
+      const rest = line.slice(marker.length).replace(/^\./, "").trim();
+      return rest ? "The latest price is " + rest : "";
+    }
+  }
+  if (title && line.startsWith(title)) {
+    const next = line.charAt(title.length);
+    if (next === "" || /[\s:–—-]/.test(next)) {
+      let rest = line.slice(title.length).replace(/^[\s:–—-]+/, "").trim();
+      const at = rest.indexOf("latest price");
+      if (at > 0) rest = rest.slice(at).trim();
+      return rest;
+    }
+  }
+  return line;
+}
+
+export function countPublishedReads(doc) {
+  const rows = publishedReadRows(doc);
+  const reads = rows.filter((row) => row && String(row.readKind || row.kind || "") !== "news");
+  if (!reads.length) return null;
+  let day = "";
+  for (const row of reads) {
+    const found = String(row.asOf || row.date || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(found) && found > day) day = found;
+  }
+  let onDay = 0;
+  if (day) {
+    for (const row of reads) {
+      if (String(row.asOf || row.date || "").slice(0, 10) === day) onDay += 1;
+    }
+  }
+  return { total: reads.length, onDay, day };
+}
+
+function publishedReadRows(doc) {
+  if (!doc || typeof doc !== "object") return [];
+  if (doc.cards && typeof doc.cards === "object") return Object.values(doc.cards);
+  if (Array.isArray(doc.reads)) return doc.reads;
+  if (Array.isArray(doc)) return doc;
+  return [];
+}
+
 // A Pokémon fact renders only when this file already has the count, the artist
 // count, and the dex. No price is added to make the row show.
 export function isFactRow(row) {
@@ -927,8 +980,22 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const css = `
   .feed-page{padding-top:8px}
-  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
   .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
+  .pill-menu{position:relative;max-width:100%}
+  .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .pill-menu-btn{appearance:none;background:var(--gold);color:#1a1407;border:1px solid transparent;border-radius:10px;min-height:48px;padding:0 22px;font:600 16px/1 var(--sans);max-width:100%;cursor:pointer}
+  .pill-menu-list{position:absolute;z-index:20;left:0;top:calc(100% + 6px);margin:0;padding:6px;list-style:none;background:#12100e;color:var(--gold);border:1px solid var(--gold);border-radius:10px;display:flex;flex-direction:column;gap:4px;width:max-content;min-width:100%;max-width:calc(100vw - 40px);max-height:min(70vh,420px);overflow:auto}
+  .pill-menu-list[hidden]{display:none}
+  .pill-menu-list button{appearance:none;background:transparent;color:var(--gold);border:0;border-radius:10px;min-height:48px;padding:0 16px;text-align:left;font:600 16px/1.2 var(--sans);width:100%;cursor:pointer}
+  .pill-menu-list button[aria-selected="true"]{background:var(--gold);color:#1a1407}
+  @media (max-width:390px){
+    .pill-menu,.pill-menu-btn{max-width:100%}
+    .pill-menu-list{max-width:calc(100vw - 40px)}
+  }
+  @media (min-width:1280px){
+    .pill-menu-list{max-width:320px}
+  }
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
@@ -989,8 +1056,16 @@ ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
-  <select id="f-loop" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option></select>
-  <select id="f-loop-set" aria-label="Set" hidden><option value="">Every set</option></select>
+  <div class="pill-menu">
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option></select>
+  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
+  <ul class="pill-menu-list" role="listbox" hidden></ul>
+  </div>
+  <div class="pill-menu" hidden>
+  <select id="f-loop-set" class="pill-native" aria-label="Set"><option value="">Every set</option></select>
+  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">Every set</button>
+  <ul class="pill-menu-list" role="listbox" hidden></ul>
+  </div>
   <label id="hide-facts"${opts.premium === true ? "" : " hidden"}><input type="checkbox" id="f-hide-facts"> Hide Pokémon facts</label>
 </form>` : ""}
 ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
@@ -1182,13 +1257,11 @@ function priorMoney(card){
   const from=now/denom;
   return from>0?money(from):"";
 }
+${readUnderTitle.toString()}
 function moveLine(card){
   const path=String(card.path||"").trim();
-  if(path) return path;
-  const head=String(card.headline||"").trim();
-  const name=String(card.name||"").trim();
-  if(head && head!==name) return head;
-  return "";
+  if(!path) return "";
+  return readUnderTitle(card.name, path);
 }
 function watchDay(iso){
   const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
@@ -1277,7 +1350,7 @@ function waveEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const line=String(card.path||card.headline||"");
+  const line=readUnderTitle(card.name, card.path||card.headline||"");
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
   el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
@@ -2001,12 +2074,60 @@ async function boot(){
       };
     }
     const loop=document.getElementById("f-loop");
+    function syncLoopMenus(){
+      document.querySelectorAll("#feed-loop-form .pill-menu").forEach(function(menu){
+        const select=menu.querySelector("select");
+        const btn=menu.querySelector(".pill-menu-btn");
+        const list=menu.querySelector(".pill-menu-list");
+        if(!select||!btn||!list) return;
+        if(select.id==="f-loop-set") menu.hidden=loopFilter!=="set";
+        list.textContent="";
+        Array.prototype.forEach.call(select.options, function(opt){
+          const row=document.createElement("button");
+          row.type="button";
+          row.setAttribute("role","option");
+          row.dataset.value=opt.value;
+          row.textContent=opt.textContent;
+          row.setAttribute("aria-selected", opt.value===select.value?"true":"false");
+          row.onclick=function(){
+            select.value=opt.value;
+            if(typeof select.onchange==="function") select.onchange();
+            btn.setAttribute("aria-expanded","false");
+            list.hidden=true;
+            syncLoopMenus();
+          };
+          list.appendChild(row);
+        });
+        const chosen=select.options[select.selectedIndex];
+        btn.textContent=chosen?chosen.textContent:"";
+        if(btn.dataset.bound!=="1"){
+          btn.dataset.bound="1";
+          btn.onclick=function(){
+            const open=btn.getAttribute("aria-expanded")==="true";
+            document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
+            document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
+            if(!open){ btn.setAttribute("aria-expanded","true"); list.hidden=false; }
+          };
+        }
+      });
+    }
+    if(!document.body.dataset.pillOff){
+      document.body.dataset.pillOff="1";
+      document.addEventListener("click", function(ev){
+        const node=ev["tar"+"get"];
+        if(node && node.closest && node.closest(".pill-menu")) return;
+        document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
+        document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
+      });
+    }
     if(loop) loop.onchange=function(){
       loopFilter=loop.value;
       if(setSel) setSel.hidden=loopFilter!=="set";
+      syncLoopMenus();
       flat=null;
       showFlat(0);
     };
+    syncLoopMenus();
     flat=null;
     await showFlat(0);
     await restoreSpot();
