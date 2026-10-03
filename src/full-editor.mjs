@@ -551,34 +551,38 @@ const SCREEN_FNS = [
   "      return Number.isFinite(n) && n > 0 ? n : 0;",
   "    }",
   "    function pictureInFile(c) {",
-  "      return !!(c && String(c.src || \"\").trim());",
+  "      var s = c && String(c.src || \"\").trim();",
+  "      if (!s || /^https?:/i.test(s)) return false;",
+  "      return s.indexOf(\"/cards/c30/ir-moltres.png\") !== -1",
+  "        || s.indexOf(\"/cards/c30/ir-articuno.png\") !== -1",
+  "        || s.indexOf(\"/cards/c30/ir-zapdos.png\") !== -1;",
   "    }",
-  "    var SCREEN = 40;",
-  "    var screenAsk = 40;",
+  "    function screenCap() {",
+  "      try {",
+  "        if (window.matchMedia && window.matchMedia(\"(max-width: 767px)\").matches) return 12;",
+  "      } catch (e) {}",
+  "      return 24;",
+  "    }",
+  "    var screenAsk = 0;",
   "    var screenKey = \"\";",
-  "    function pathwayView() {",
-  "      return prompt === \"line\" || prompt === \"trio\" || prompt === \"night\" || prompt === \"origin\" || prompt === \"megaform\" || prompt === \"dark\" || prompt === \"region\" || prompt === \"star\" || prompt === \"eras\" || prompt === \"then\";",
-  "    }",
   "    function listKey() {",
   "      return [medium, paperLang, prompt, mon, q, setFilter, era].join(\"|\");",
   "    }",
   "    function screenRows(rows) {",
   "      var lead = [];",
-  "      var later = [];",
   "      (rows || []).forEach(function (c) {",
-  "        if (storedPrice(c) > 0 && pictureInFile(c)) lead.push(c);",
-  "        else later.push(c);",
+  "        if (pictureInFile(c)) lead.push(c);",
   "      });",
   "      lead.sort(function (a, b) { return storedPrice(b) - storedPrice(a); });",
-  "      return { lead: lead, ordered: lead.concat(later) };",
+  "      return { lead: lead };",
   "    }",
 ].join("\n");
 
 export function rewriteFirstScreen(html) {
   let out = String(html || "");
   if (!out.includes("Pin two cards. We make a picture.") || out.includes("function screenRows")) return out;
-  const bootOld = '.then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })';
-  const bootNew = '.then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("paper-rows.json")); })\n      .then(function (d) { applyRowPrices(d); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })';
+  const bootOld = '.then(function (d) { merge(d || [], ""); bootPaint("Visuals"); return fetchJson(assetUrl("cards/full/index.json?v=19sep-share")); })\n      .then(function (d) { merge(d || [], ""); bootPaint("English"); return fetchJson(assetUrl("cards/jp/index.json?v=11sep-vis2")); })\n      .then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })\n      .then(function (d) { applyPrices(d); bootPaint("Closed beta"); finishBoot(); return syncLiveSets(); })';
+  const bootNew = '.then(function (d) { merge(d || [], ""); bootPaint("Closed beta"); finishBoot(); })';
   if (out.includes(bootOld)) out = out.split(bootOld).join(bootNew);
   if (out.includes("    function paintStrip() {") && !out.includes("function applyRowPrices")) {
     out = out.replace("    function paintStrip() {", SCREEN_FNS + "\n    function paintStrip() {");
@@ -586,10 +590,10 @@ export function rewriteFirstScreen(html) {
   const shownOld = "      var shown = rows;\n";
   const shownNew = [
     "      var key = listKey();",
-    "      if (key !== screenKey) { screenKey = key; screenAsk = SCREEN; }",
-    "      var pack = pathwayView() ? null : screenRows(rows);",
-    "      var shown = pack ? (screenAsk <= SCREEN ? pack.lead.slice(0, SCREEN) : pack.ordered.slice(0, screenAsk)) : rows;",
-    "      var more = !!(pack && shown.length < pack.ordered.length);",
+    "      if (key !== screenKey) { screenKey = key; screenAsk = screenCap(); }",
+    "      var pack = screenRows(rows);",
+    "      var shown = pack.lead.slice(0, screenAsk);",
+    "      var more = shown.length < pack.lead.length;",
     "",
   ].join("\n");
   if (out.includes(shownOld)) out = out.split(shownOld).join(shownNew);
@@ -597,7 +601,7 @@ export function rewriteFirstScreen(html) {
   const moreNew = "      }).join(\"\");\n      if (more) $(\"strip\").insertAdjacentHTML(\"beforeend\", \"<button type=\\\"button\\\" class=\\\"ghost\\\" data-more=\\\"1\\\">More</button>\");\n      }\n      paintTray();";
   if (out.includes(moreOld)) out = out.split(moreOld).join(moreNew);
   const clickOld = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
-  const clickNew = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var moreBtn = e.target.closest(\"[data-more]\");\n      if (moreBtn) {\n        screenAsk += SCREEN;\n        paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
+  const clickNew = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var moreBtn = e.target.closest(\"[data-more]\");\n      if (moreBtn) {\n        screenAsk = (screenAsk || screenCap()) + screenCap();\n        paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
   if (out.includes(clickOld)) out = out.split(clickOld).join(clickNew);
   return out;
 }
