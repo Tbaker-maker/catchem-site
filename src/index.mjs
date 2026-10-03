@@ -8,7 +8,7 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { readUser } from "./quota.mjs";
 import {
   clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
-  renderOfficeGate, renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -169,7 +169,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
-    if (opts.officeAllowed === false) return html(renderOfficeGate(pageOpts));
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
@@ -197,7 +196,6 @@ export default {
       signedIn: !!officeUser,
     };
     if (readPage && url.pathname === "/post-office/app") {
-      if (!officeOpts.officeAllowed) return html(renderOfficeGate(officeOpts));
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);

@@ -61,6 +61,10 @@ const fetchImpl = async (url) => {
   if (String(url).includes("search-lite.json")) return { ok: true, status: 200, json: async () => rows };
   if (String(url).includes("pocket-catalogue.json")) return { ok: true, status: 200, json: async () => ({ cards: { "tcgp-A1-285": { name: "Pikachu ex", setName: "Genetic Apex", number: "285", artist: "PLANETA CG Works", rarity: "Crown" } } }) };
   if (String(url).includes("counts.json")) return { ok: true, status: 200, json: async () => counts };
+  if (String(url).includes("/play.html")) {
+    if (!files.play) files.play = await (await fetch(String(url).split("?")[0])).text();
+    return { ok: true, status: 200, text: async () => files.play, json: async () => null };
+  }
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
@@ -243,13 +247,13 @@ const gateEnv = {
 };
 const gate = await worker.fetch(new Request("https://catchemtcg.com/post-office"), gateEnv);
 const gateHtml = await gate.text();
-t("a set allowlist hides the editor", gate.status === 200 && !gate.headers.get("location") && gateHtml.includes("Post Office is invite-only for now.") && gateHtml.includes('href="https://discord.gg/fUSjxDX4Hy"') && gateHtml.includes("Join Discord") && gateHtml.includes('href="/auth/discord?next=/post-office"') && !gateHtml.includes("<iframe"));
+t("a visitor off the list gets the editor", gate.status === 200 && !gate.headers.get("location") && gateHtml.includes('src="/post-office/app?v=dev"') && gateHtml.includes("Post Office editor") && !gateHtml.includes("invite-only"));
 const gateHead = await worker.fetch(new Request("https://catchemtcg.com/post-office/", { method: "HEAD" }), gateEnv);
 const gateHeadHtml = await gateHead.text();
-t("gated head is not a 404", gateHead.status === 200 && gateHeadHtml.includes("invite-only") && !gateHeadHtml.includes("<iframe"));
+t("head of the editor is not a 404", gateHead.status === 200 && gateHeadHtml.includes("<iframe") && !gateHeadHtml.includes("invite-only"));
 const gateBuild = await worker.fetch(new Request("https://catchemtcg.com/build"), gateEnv);
 const gateBuildHtml = await gateBuild.text();
-t("gated build is the invite", gateBuild.status === 200 && gateBuildHtml.includes("invite-only") && !gateBuildHtml.includes("<iframe"));
+t("build is the editor", gateBuild.status === 200 && gateBuildHtml.includes('src="/post-office/app?v=dev"') && !gateBuildHtml.includes("invite-only"));
 const onList = "ce_session=" + await signSession({ sub: "d:111", premium: false }, secret);
 const allowedPage = await worker.fetch(new Request("https://catchemtcg.com/build", { headers: { cookie: onList } }), gateEnv);
 const allowedHtml = await allowedPage.text();
@@ -257,10 +261,10 @@ t("allowlisted discord id gets the editor", allowedPage.status === 200 && allowe
 const offList = "ce_session=" + await signSession({ sub: "d:222", premium: true }, secret);
 const deniedPage = await worker.fetch(new Request("https://catchemtcg.com/post-office", { headers: { cookie: offList } }), gateEnv);
 const deniedHtml = await deniedPage.text();
-t("another discord id stays on the invite", deniedHtml.includes("invite-only") && !deniedHtml.includes("<iframe") && !deniedHtml.includes("Sign in with Discord"));
+t("another discord id gets the editor", deniedHtml.includes('src="/post-office/app?v=dev"') && !deniedHtml.includes("invite-only"));
 const gatedApp = await worker.fetch(new Request("https://catchemtcg.com/post-office/app"), gateEnv);
 const gatedAppHtml = await gatedApp.text();
-t("the app url is gated too", gatedApp.status === 200 && gatedAppHtml.includes("invite-only") && !gatedAppHtml.includes("var INDEX"));
+t("the app url is the editor", gatedApp.status === 200 && gatedAppHtml.includes('id="site-skin"') && gatedAppHtml.includes("Pin two cards") && !gatedAppHtml.includes("invite-only"));
 const blank = await worker.fetch(new Request("https://catchemtcg.com/post-office"), { ...gateEnv, POST_OFFICE_ALLOWLIST: "  " });
 t("a blank allowlist stays open", (await blank.text()).includes('src="/post-office/app?v=dev"'));
 const faq = await worker.fetch(new Request("https://catchemtcg.com/faq"), gateEnv);
