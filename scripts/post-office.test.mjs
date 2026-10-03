@@ -5,7 +5,7 @@ import worker, { renderPath } from "../src/index.mjs";
 import { artistNotable, clientHelpers, comparePair, downloadName, parseQuery, preferPrinting, priceLine } from "../src/post-copy.mjs";
 import { patchEditorHtml, patchPaperRows, PAPER_PATH, EDITOR_URL } from "../src/full-editor.mjs";
 import { resetQuota, signSession } from "../src/quota.mjs";
-import { factPost, factsFor, resetCatalogCache, STYLE_PROMPT } from "../src/ai.mjs";
+import { factIdeas, factPost, factsFor, resetCatalogCache, STYLE_PROMPT } from "../src/ai.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 let fail = 0;
@@ -293,6 +293,17 @@ t("video quota is sign-in, not a cookie bucket", quota.status === 401);
 
 const looked = await factsFor(["tcgcsv-246723"], fetchImpl);
 t("fact pack uses the live row", looked.cards[0].price === "TCGplayer market: $2,214.79 (2026-09-27)");
+const lineIdeas = factIdeas([
+  { id: "sv3pt5-166", name: "Bulbasaur", printing: "166/165", edition: "151", artist: "A", price: "No market price" },
+  { id: "sv3pt5-167", name: "Ivysaur", printing: "167/165", edition: "151", artist: "B", price: "No market price" },
+  { id: "sv3pt5-198", name: "Venusaur ex", printing: "198/165", edition: "151", artist: "C", price: "No market price" },
+], [
+  { id: "sv3pt5-166", card: { id: "sv3pt5-166", name: "Bulbasaur", printing: "166/165", edition: "151", artist: "A", price: "No market price" } },
+  { id: "sv3pt5-167", card: { id: "sv3pt5-167", name: "Ivysaur", printing: "167/165", edition: "151", artist: "B", price: "No market price" } },
+  { id: "sv3pt5-198", card: { id: "sv3pt5-198", name: "Venusaur ex", printing: "198/165", edition: "151", artist: "C", price: "No market price" } },
+  { id: "sv3pt5-missing", card: null },
+]);
+t("fallback idea names every pin", lineIdeas.length === 3 && lineIdeas.every((line) => line.includes("Bulbasaur") && line.includes("Ivysaur") && line.includes("Venusaur ex") && line.includes("No catalog row for sv3pt5-missing.") && line.includes("Pokémon")));
 
 if (fail) process.exit(1);
 console.log("post office ok");
