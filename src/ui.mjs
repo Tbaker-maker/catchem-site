@@ -1,5 +1,5 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
-import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+import { DISCORD_INVITE } from "./auth.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -620,15 +620,6 @@ export function renderRetired(kind, opts = {}) {
   const [title, line] = pages[kind] || pages.faq;
   const body = `<main class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
   return chrome("", body, title, "", "", feedNav(opts));
-}
-
-export function renderOfficeGate(opts = {}) {
-  const invite = INVITE_LINE.replace("Join Discord", `<a href="${esc(DISCORD)}">Join Discord</a>`);
-  const sign = opts.ready && !opts.signedIn
-    ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a></p>`
-    : "";
-  const body = `<main class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
-  return chrome("Post Office", body, "Post Office", "", "", feedNav(opts));
 }
 
 export function renderPost(stamp, mark = "", opts = {}) {
