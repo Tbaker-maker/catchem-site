@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, readUnderTitle, cardMeta, pricedMonCards, cutoutFor, pokemonNamed } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { readFile } from "node:fs/promises";
 
@@ -175,6 +175,23 @@ const factHtml = renderFeed({ asOf: "2026-09-27", reads: [priced, fact, emptyFac
 const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
+t("the feed filter choices stay", factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<"));
+const gyPath = "Gyarados latest price fell from $1.57 on Sep 18 to $1.36 on Sep 25, down 13.4%.";
+t("the sentence starts at the price move and does not say the name again", readUnderTitle("Gyarados", gyPath) === "latest price fell from $1.57 on Sep 18 to $1.36 on Sep 25, down 13.4%." && readUnderTitle("Talonflame - 091/088", "Talonflame - 091/088 latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.") === "latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%." && readUnderTitle("Gyarados", "Gyarados") === "" && readUnderTitle("Gyarados", "The latest price of Gyarados is $1.36 on Sep 25.") === "The latest price is $1.36 on Sep 25.");
+t("set and card id come only from fields already on the card", cardMeta({ set: "SV: Scarlet & Violet 151", sku: "tcgcsv-516693" }).set === "SV: Scarlet & Violet 151" && cardMeta({ set: "SV: Scarlet & Violet 151", sku: "tcgcsv-516693" }).id === "tcgcsv-516693" && cardMeta({ set: "", sku: "pokemon-gyarados" }).id === "" && cardMeta({ sku: "pokemon-gyarados" }).set === "");
+const monRows = {
+  a: { sku: "tcgcsv-1", name: "Gyarados", set: "151", price: 1.36 },
+  b: { sku: "tcgcsv-1", name: "Gyarados", set: "151", price: 1.36 },
+  c: { sku: "tcgcsv-2", name: "Gyarados V", set: "Evolving Skies", price: 18.94 },
+  d: { sku: "tcgcsv-3", name: "Dark Gyarados", set: "Team Rocket", price: 35 },
+  e: { sku: "tcgcsv-4", name: "Gyarados", set: "Base", price: 0 },
+  f: { sku: "tcgcsv-5", name: "Gyarados", set: "Base Set", price: 44.57 },
+  g: { sku: "tcgcsv-5", name: "Gyarados", set: "Base Set", price: 40 },
+};
+const listed = pricedMonCards(monRows, "Gyarados").map((row) => row.id + ":" + row.price);
+t("priced cards of that Pokémon stay highest first, and a blank or a disagreed price stays off", listed.join(",") === "tcgcsv-2:18.94,tcgcsv-1:1.36");
+t("a cutout is used only when the file already has one", cutoutFor([{ kind: "cutout", species: "Gyarados", src: "/cards/visuals/gyarados.png", crop: { x: 4, y: 8, w: 200, h: 180 } }], "Gyarados").src === "/cards/visuals/gyarados.png" && cutoutFor([{ kind: "cutout", species: "Gyarados", src: "" }], "Gyarados") === null && cutoutFor([{ name: "Gyarados", src: "/img/sv3pt5/130" }], "Gyarados") === null && pokemonNamed("Gyarados V (Full Art)", ["Gyarados", "Mew"]) === "Gyarados" && pokemonNamed("Mewtwo", ["Mew"]) === "");
+t("the card says the cutout is missing instead of drawing one", factHtml.includes("The cutout is missing.") && factHtml.includes('class="mon-btn"') && factHtml.includes(">Cards<") && factHtml.includes("cards/visuals/index.json") && factHtml.includes("flex:0 0 auto"));
 t("premium sees the hide control and the loop uses the file order", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.unfiltered") && factHtml.includes("browse.ranked") && !factHtml.includes('id="hide-facts" hidden'));
 const searchHtml = renderSearch();
 t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
