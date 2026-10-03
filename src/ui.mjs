@@ -283,7 +283,6 @@ export function renderSetShell(slug, stamp, opts = {}) {
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
-const money=n=>!(n>0)?"No market price":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){
   return String(s==null?"":s).replace(/[&<>"']/g,function(c){
     if(c==="&") return "&"+"amp;";
@@ -294,18 +293,29 @@ function html(s){
   });
 }
 let rows=[], shown=48;
+function stored(r){
+  const n=Number(r&&r.price);
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function byValue(a,b){
+  const x=stored(a), y=stored(b);
+  if(x==null&&y==null) return 0;
+  if(x==null) return 1;
+  if(y==null) return -1;
+  return y-x;
+}
 function draw(){
   const kind=document.getElementById("kind").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
   const sort=document.getElementById("sort").value;
   let list=rows.filter(r=>!kind||r.kind===kind);
   if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")).toLowerCase().includes(q));
-  list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
+  list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):byValue(a,b));
   const view=list.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
-    const img=r.pid?'<img alt="" width="64" height="64" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#211e1a" src="https://tcgplayer-cdn.tcgplayer.com/product/'+r.pid+'_in_200x200.jpg" onerror="this.remove()">':"";
-    return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
+    const img=r.pid?'<img alt="" width="64" height="64" loading="lazy" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#211e1a" src="https://tcgplayer-cdn.tcgplayer.com/product/'+r.pid+'_in_200x200.jpg" onerror="this.remove()">':"";
+    return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a></div>';
   }).join("") || '<p class="muted">Nothing matches.</p>';
   document.getElementById("more").hidden=shown>=list.length;
 }
@@ -552,19 +562,32 @@ export function renderSearch(opts = {}) {
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
 const searchCatalog=search.searchCatalog;
-const money=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
+function stored(r){
+  const n=Number(r&&r[6]);
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function byValue(a,b){
+  const x=stored(a), y=stored(b);
+  if(x==null&&y==null) return 0;
+  if(x==null) return 1;
+  if(y==null) return -1;
+  return y-x;
+}
+function take(list){
+  return (list||[]).slice(0,40).sort(byValue);
+}
 function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
-  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a><b>'+(money(r[6])||"No market price")+'</b></div>';
+  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
 }
 function draw(){
   const q=document.getElementById("q").value.trim();
   if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent=rows.length+" names loaded. Type at least 2 letters.";return}
   const found=typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]};
-  const shown=found.hits||[];
-  const near=found.nearest||[];
+  const shown=take(found.hits);
+  const near=take(found.nearest);
   if(!shown.length){
     document.getElementById("meta").textContent="Not in the TCGplayer catalog.";
     document.getElementById("list").innerHTML=(near.length?'<p class="muted">Nearest names</p>':"")+near.map(rowHtml).join("")||'<p class="muted">No nearby name.</p>';
