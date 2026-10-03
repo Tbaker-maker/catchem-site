@@ -277,9 +277,18 @@ export default {
       if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
+      let premium = false;
+      if (feed && kind === "feed") {
+        try {
+          const viewer = await readUser(request, env);
+          premium = viewer?.premium === true;
+        } catch {
+          premium = false;
+        }
+      }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.

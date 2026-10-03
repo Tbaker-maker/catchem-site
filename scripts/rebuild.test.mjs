@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { readFile } from "node:fs/promises";
 
@@ -65,7 +65,7 @@ const feed = await renderPath("/feed", fetchImpl, { feed: true });
 const feedHtml = await feed.text();
 t("the feed is a sectioned list", feed.status === 200 && feedHtml.includes("Today") && feedHtml.includes(" · <span>") && feedHtml.includes("See all") && feedHtml.includes(">Track<") && !feedHtml.includes("What this means") && feedHtml.includes("Where's it heading?") && feedHtml.includes("Tracking. We'll DM you.") && feedHtml.includes("We'll DM you on Discord.") && feedHtml.includes("You said ") && feedHtml.includes("Community: ") && !feedHtml.includes("Track this") && !feedHtml.includes(">Change<") && !feedHtml.includes("Load more") && !feedHtml.includes(">Loading") && !feedHtml.includes("IntersectionObserver") && !feedHtml.includes(">0<") && !feedHtml.includes("Follow") && !feedHtml.includes("Set alert") && feedHtml.includes("Flagged ") && feedHtml.includes(">Up<") && feedHtml.includes("Sideways") && feedHtml.includes("Watches") && feedHtml.includes("Cooks") && feedHtml.includes("Movers") && feedHtml.includes("Tracked") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN") && !feedHtml.includes("scroll-snap-type"));
 t("the feed names Pokémon and hides a missing image price", feedHtml.includes("Pokémon") && !/(\$0|\$null|\$NaN)/.test(feedHtml));
-t("a read names the path and the check, and 30D is colored", feedHtml.includes("Open the data") && !feedHtml.includes("Open the page") && feedHtml.includes("Checked ") && feedHtml.includes('class="win ') && feedHtml.includes("30D") && feedHtml.includes("90D") && !feedHtml.includes("What this means") && feedHtml.includes("No sales count yet") && feedHtml.includes(">Next<") && feedHtml.includes(">Previous<") && feedHtml.includes("Listings for sale") && feedHtml.includes("The data") && !feedHtml.includes("What to watch") && !feedHtml.includes("Sales volume") && !feedHtml.includes("The sales behind") && !feedHtml.includes("Buy it when") && !feedHtml.includes("buyout"));
+t("a read names the path and the check, and 30D is colored", feedHtml.includes("Open the data") && !feedHtml.includes("Open the page") && feedHtml.includes("Checked ") && feedHtml.includes('class="win ') && feedHtml.includes("30D") && feedHtml.includes("90D") && !feedHtml.includes("What this means") && !feedHtml.includes("No sales count yet") && !feedHtml.includes("Sales volume") && feedHtml.includes('textContent="Next"') && feedHtml.includes('textContent="Previous"') && feedHtml.includes("Listings for sale") && feedHtml.includes("The data") && !feedHtml.includes("What to watch") && !feedHtml.includes("The sales behind") && !feedHtml.includes("Buy it when") && !feedHtml.includes("buyout"));
 const deep = await (await renderPath("/feed/r/box-etb", fetchImpl, { feed: true })).text();
 t("a deep link starts on that read", deep.includes('id="start"') && deep.includes("box-etb") && deep.includes(">Back<") && deep.includes(">Track<") && !deep.includes("What this means") && deep.includes("Where's it heading?") && deep.includes("height:180px") && deep.includes(">Up<"));
 t("tracked reads are a signed-in list", (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("My tracked") === false && (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("Sign in with Discord to see your tracked reads."));
@@ -138,6 +138,68 @@ t("premium drops the internal notes", !premiumHtml.includes("does not take a pay
 t("premium has the joining cards and the faq", premiumHtml.includes("What you're joining") && premiumHtml.includes("Early beta access") && premiumHtml.includes("50 AI Ideas a day, not 3") && premiumHtml.includes("Post text is 100 a day, not 3") && premiumHtml.includes("35 a week") && premiumHtml.includes("Vault votes on what we build next") && premiumHtml.includes("What's free?") && premiumHtml.includes("Pause up to 2 months in any 12, your number and rate stay.") && premiumHtml.includes("Use /premium in Discord."));
 t("join premium uses the discord flow", premiumHtml.includes('class="prem-join" href="https://discord.gg/fUSjxDX4Hy"') && !premiumHtml.includes("checkout.stripe.com") && !/href="\/(feed|board|receipts|accuracy)/.test(premiumHtml));
 t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
+
+const fact = {
+  id: "pokemon-duraludon",
+  sku: "pokemon-duraludon",
+  readKind: "pokemon",
+  kind: "pokemon",
+  name: "Duraludon",
+  headline: "Duraludon has 19 cards in the catalog, drawn by 12 artists, and the national dex number on those cards is 884.",
+  path: "Duraludon has 19 cards in the catalog, drawn by 12 artists, and the national dex number on those cards is 884.",
+  cardCount: 19,
+  artistCount: 12,
+  dex: 884,
+  why: "Card count is cards in data/card-catalogue.json whose data/card-attrs.json dex is 884.",
+};
+const priced = { id: "move-tcgcsv-10-7", sku: "tcgcsv-10", kind: "single", name: "Alakazam", headline: "Alakazam is up.", price: 12.5, set: "Base Set", path: "Alakazam latest price rose from $10 on Sep 1 to $12.50 on Sep 2, up 25%." };
+const emptyFact = { id: "pokemon-missing", readKind: "pokemon", kind: "pokemon", name: "Missing", headline: "Missing has no counts." };
+const browseDoc = {
+  unfiltered: ["move-tcgcsv-99-7", "move-tcgcsv-10-7"],
+  ranked: ["move-tcgcsv-10-7", "move-tcgcsv-99-7"],
+  filters: { wave: { items: [] } },
+};
+t("a fact already in the file stays, and a fact without counts does not", isFactRow(fact) && keepFeedRead(fact) && !isFactRow(emptyFact) && !keepFeedRead(emptyFact));
+t("keeping a fact does not invent a price", !(fact.price > 0));
+const loop = buildFeedLoop([priced, fact, emptyFact], browseDoc, {});
+t("no filter keeps file order, then the shuffled ids", loop.map((r) => r.id).join(",") === "move-tcgcsv-10-7,pokemon-duraludon,move-tcgcsv-99-7");
+const rankedLoop = buildFeedLoop([priced, fact], browseDoc, { filter: "prices" });
+t("a ranked filter stays in ranked order and leaves the fact out", rankedLoop.map((r) => r.id).join(",") === "move-tcgcsv-10-7,move-tcgcsv-99-7" && rankedLoop.every((r) => !(r.readKind === "pokemon")));
+t("the pokemon filter is file order, not a shuffle", buildFeedLoop([priced, fact], browseDoc, { filter: "pokemon" }).map((r) => r.id).join(",") === "pokemon-duraludon");
+t("premium can hide fact rows", buildFeedLoop([priced, fact], browseDoc, { hideFacts: true }).every((r) => r.id !== "pokemon-duraludon"));
+t("the same name is still two cards when the ids differ", buildFeedLoop([
+  { id: "base5-3", name: "Blastoise", headline: "Dark Blastoise.", price: 4, kind: "single" },
+  { id: "sv3pt5-200", name: "Blastoise", headline: "151 Blastoise.", price: 9, kind: "single" },
+], null, {}).map((r) => r.id).join(",") === "base5-3,sv3pt5-200");
+const factHtml = renderFeed({ asOf: "2026-09-27", reads: [priced, fact, emptyFact] }, "", "", { premium: true });
+const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
+const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
+t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
+t("premium sees the hide control and the loop uses the file order", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.unfiltered") && factHtml.includes("browse.ranked") && !factHtml.includes('id="hide-facts" hidden'));
+const searchHtml = renderSearch();
+t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
+
+const lagLine = "SV: Prismatic Evolutions: Prismatic Evolutions Booster Pack latest price rose from $8.00 on Sep 3 to $9.00 on Oct 3, up 12.5%. The booster box is $134.46 on Oct 3, the same price as $134.46 on Sep 3. Singles in the set with a price on both days: 4 up, 0 down, 1 unchanged.";
+const lag = {
+  id: "lag-prismatic",
+  readKind: "lag",
+  kind: "lag",
+  name: "SV: Prismatic Evolutions",
+  headline: lagLine,
+  path: lagLine,
+  pack: { from: 8, fromDate: "2026-09-03", to: 9, toDate: "2026-10-03" },
+  box: { from: 134.46, fromDate: "2026-09-03", to: 134.46, toDate: "2026-10-03" },
+};
+const lagHalf = { id: "lag-half", readKind: "lag", kind: "lag", headline: "Pack only.", pack: { from: 8, fromDate: "2026-09-03", to: 9, toDate: "2026-10-03" } };
+const supply = { id: "supply-one", readKind: "supply", kind: "supply", headline: "Listing total for this product.", listings: 42, listingsAsOf: "2026-10-03" };
+const supplyBlank = { id: "supply-blank", readKind: "supply", kind: "supply", headline: "No listing total on the row." };
+t("a lag stays only when both prices and the dates are on the row", isLagRow(lag) && keepFeedRead(lag) && !isLagRow(lagHalf) && !keepFeedRead(lagHalf));
+t("a supply row is the listing total, and a missing total stays out", isSupplyRow(supply) && keepFeedRead(supply) && !isSupplyRow(supplyBlank) && !keepFeedRead(supplyBlank));
+t("two files that disagree on price or listings leave the product out", filesDisagree({ id: "tcgcsv-1", price: 10, listings: 5 }, { price: 11, listings: 5 }) && filesDisagree({ listings: 4 }, { listings: 9 }) && !filesDisagree({ price: 10 }, { price: 10 }) && !filesDisagree({ price: 10 }, { listings: 4 }));
+const built = renderFeed({ asOf: "2026-10-03", reads: [priced, fact, lag, lagHalf, supply, supplyBlank] }, "", "", {});
+const builtLead = JSON.parse(built.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
+t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "move-tcgcsv-10-7,pokemon-duraludon,lag-prismatic,supply-one");
+t("the feed build has no volume line", !built.includes("No sales count yet") && !built.includes("Sales volume") && !builtLead.some((r) => r.id === "lag-half" || r.id === "supply-blank"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");

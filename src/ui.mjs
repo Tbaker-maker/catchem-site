@@ -19,6 +19,134 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// A Pokémon fact renders only when this file already has the count, the artist
+// count, and the dex. No price is added to make the row show.
+export function isFactRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "pokemon" && row.kind !== "pokemon") return false;
+  const cardCount = row.cardCount;
+  const artistCount = row.artistCount;
+  const dex = row.dex;
+  if (!Number.isInteger(cardCount) || !Number.isInteger(artistCount) || !Number.isInteger(dex)) return false;
+  if (cardCount < 1 || artistCount < 1 || dex < 1) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
+export function keepFeedRead(row) {
+  if (!row || typeof row !== "object") return false;
+  if (!String(row.headline || row.path || "").trim()) return false;
+  if (isFactRow(row)) return true;
+  if (isLagRow(row)) return true;
+  if (isSupplyRow(row)) return true;
+  return money(row.price) != null;
+}
+
+function isoDay(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+}
+
+function statedPrice(value) {
+  return Number(value) > 0;
+}
+
+// A lag names the pack or singles price, the sealed price, and the dates.
+// Both prices have to already be on the row. A missing side stays out.
+export function isLagRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "lag" && row.kind !== "lag") return false;
+  const pack = row.pack;
+  const sealed = row.box || row.sealed;
+  if (!pack || !sealed) return false;
+  if (!statedPrice(pack.from) || !statedPrice(pack.to) || !statedPrice(sealed.from) || !statedPrice(sealed.to)) return false;
+  if (!isoDay(pack.fromDate) || !isoDay(pack.toDate) || !isoDay(sealed.fromDate) || !isoDay(sealed.toDate)) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
+// Supply is the listing total, and only when this row already states it.
+export function isSupplyRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "supply" && row.kind !== "supply") return false;
+  return Number.isInteger(row.listings) && row.listings >= 1;
+}
+
+export function filesDisagree(card, other) {
+  if (!card || !other || typeof card !== "object" || typeof other !== "object") return false;
+  const left = Number(card.price);
+  const right = Number(other.price);
+  if (left > 0 && right > 0 && Math.round(left * 100) !== Math.round(right * 100)) return true;
+  if (Number.isInteger(card.listings) && Number.isInteger(other.listings) && card.listings !== other.listings) return true;
+  return false;
+}
+
+const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave"]);
+
+export function buildFeedLoop(bundleReads, browse, opts = {}) {
+  const filter = String(opts.filter || "");
+  const hideFacts = opts.hideFacts === true;
+  const setName = String(opts.set || "");
+  const kept = (bundleReads || []).filter(keepFeedRead);
+  const seen = new Set();
+  const out = [];
+  const push = (row) => {
+    if (!row || typeof row !== "object") return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (row.pending) {
+      if (id) seen.add(id);
+      out.push(row);
+      return;
+    }
+    if (hideFacts && isFactRow(row)) return;
+    if (filter === "pokemon" && !isFactRow(row)) return;
+    if (filter === "prices" && (isFactRow(row) || !(Number(row.price) > 0))) return;
+    if (filter === "sealed" && row.kind !== "sealed") return;
+    if (filter === "set" && setName && row.set !== setName) return;
+    if (filter === "news" && row.readKind !== "news" && row.kind !== "news") return;
+    if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (filter === "pokemon") {
+    for (const row of kept) if (isFactRow(row)) push(row);
+    return out;
+  }
+  if (filter === "wave") {
+    const items = browse?.filters?.wave?.items;
+    if (Array.isArray(items)) {
+      items.forEach((item, n) => {
+        if (!item || (!item.title && !item.sentence)) return;
+        push({
+          id: `wave-${n}`,
+          waveItem: true,
+          readKind: "wave",
+          kind: "wave",
+          name: item.title || "",
+          headline: item.sentence || item.title || "",
+          path: item.sentence || "",
+          source: item.source || "",
+          asOf: String(item.date || "").slice(0, 10),
+          href: item.url || "",
+          reprint: item.reprint || "",
+        });
+      });
+    }
+    return out;
+  }
+  const ranked = RANKED_FILTERS.has(filter);
+  if (!filter) {
+    for (const row of kept) push(row);
+  }
+  const order = ranked ? browse?.ranked : browse?.unfiltered;
+  if (Array.isArray(order)) {
+    for (const id of order) {
+      if (typeof id !== "string" || !id || seen.has(id)) continue;
+      const row = kept.find((item) => item && item.id === id);
+      push(row || { id, pending: true });
+    }
+  }
+  return out;
+}
+
 export function clockLabel(iso) {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return "";
@@ -552,19 +680,32 @@ export function renderSearch(opts = {}) {
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
 const searchCatalog=search.searchCatalog;
-const money=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
+function stored(r){
+  const n=Number(r&&r[6]);
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function byValue(a,b){
+  const x=stored(a), y=stored(b);
+  if(x==null&&y==null) return 0;
+  if(x==null) return 1;
+  if(y==null) return -1;
+  return y-x;
+}
+function take(list){
+  return (list||[]).slice(0,40).sort(byValue);
+}
 function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
-  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a><b>'+(money(r[6])||"No market price")+'</b></div>';
+  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
 }
 function draw(){
   const q=document.getElementById("q").value.trim();
   if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent=rows.length+" names loaded. Type at least 2 letters.";return}
   const found=typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]};
-  const shown=found.hits||[];
-  const near=found.nearest||[];
+  const shown=take(found.hits);
+  const near=take(found.nearest);
   if(!shown.length){
     document.getElementById("meta").textContent="Not in the TCGplayer catalog.";
     document.getElementById("list").innerHTML=(near.length?'<p class="muted">Nearest names</p>':"")+near.map(rowHtml).join("")||'<p class="muted">No nearby name.</p>';
@@ -726,7 +867,7 @@ ${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="
 export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {
-    if (!r || !r.headline || !money(r.price)) return false;
+    if (!keepFeedRead(r)) return false;
     const key = String(r.href || r.id || r.headline);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -791,6 +932,11 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 <p class="muted" id="feed-count">TCGplayer market.</p>
+${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
+  <select id="f-loop" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option></select>
+  <select id="f-loop-set" aria-label="Set" hidden><option value="">Every set</option></select>
+  <label id="hide-facts"${opts.premium === true ? "" : " hidden"}><input type="checkbox" id="f-hide-facts"> Hide Pokémon facts</label>
+</form>` : ""}
 ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-kind" aria-label="Sealed or singles"><option value="">Sealed and singles</option><option value="sealed">Sealed</option><option value="single">Singles</option></select>
   <select id="f-set" aria-label="Set"><option value="">Every set</option></select>
@@ -814,6 +960,40 @@ function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
 const focus=${JSON.stringify(String(opts.section || ""))};
 const pageMode=${JSON.stringify(page)};
+const premium=${opts.premium === true ? "true" : "false"};
+let browse=null;
+let flat=null;
+let hideFacts=false;
+let loopFilter="";
+let look=null;
+function isFact(card){
+  if(!card) return false;
+  if(card.readKind!=="pokemon" && card.kind!=="pokemon") return false;
+  const c=card.cardCount, a=card.artistCount, d=card.dex;
+  if(!Number.isInteger(c) || !Number.isInteger(a) || !Number.isInteger(d)) return false;
+  if(c<1 || a<1 || d<1) return false;
+  return !!(card.headline || card.path);
+}
+function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
+function priceOk(n){ return Number(n)>0; }
+function isLag(card){
+  if(!card || (card.readKind!=="lag" && card.kind!=="lag")) return false;
+  const pack=card.pack, sealed=card.box||card.sealed;
+  if(!pack || !sealed) return false;
+  if(!priceOk(pack.from) || !priceOk(pack.to) || !priceOk(sealed.from) || !priceOk(sealed.to)) return false;
+  if(!dayOk(pack.fromDate) || !dayOk(pack.toDate) || !dayOk(sealed.fromDate) || !dayOk(sealed.toDate)) return false;
+  return !!(card.headline || card.path);
+}
+function isSupply(card){
+  return !!(card && (card.readKind==="supply" || card.kind==="supply") && Number.isInteger(card.listings) && card.listings>=1);
+}
+function filesDisagree(card, other){
+  if(!card || !other) return false;
+  const left=Number(card.price), right=Number(other.price);
+  if(left>0 && right>0 && Math.round(left*100)!==Math.round(right*100)) return true;
+  if(Number.isInteger(card.listings) && Number.isInteger(other.listings) && card.listings!==other.listings) return true;
+  return false;
+}
 if(history.scrollRestoration) history.scrollRestoration="manual";
 const GROUPS=[
   {id:"today",slug:"today",title:"Today",parts:["today"]},
@@ -880,6 +1060,7 @@ function winChip(label, n){
   return '<span class="win '+cls+'">'+label+" "+pct(n)+"</span>";
 }
 function priceRow(card){
+  if(!(Number(card.price)>0)) return "";
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
@@ -922,9 +1103,10 @@ function supplyPreset(card){
 }
 function listingsLine(card){
   const n=Number(card&&card.listings);
+  if(!Number.isInteger(n) || n<1) return "";
   const day=String(card&&card.listingsAsOf||"").slice(0,10);
-  if(n!==75 || day!=="2026-09-27") return "";
-  return "Active listings: "+n+" (as of "+day+")";
+  if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day)) return "Active listings: "+n+" (as of "+day+")";
+  return "Active listings: "+n;
 }
 function daySpan(days){
   if(days===7) return "7 days";
@@ -1042,12 +1224,20 @@ function dataFacts(card, facts){
     lowOn: lowOn,
     listings: row.listings!=null?row.listings:card.listings,
     listingsAsOf: row.listingsAsOf||card.listingsAsOf||"",
-    flagged: row.flagged||card.flagged||null,
-    volume: row.volume!=null?row.volume:card.volume,
-    sold: row.sold!=null?row.sold:(row.solds!=null?row.solds:card.sold)
+    flagged: row.flagged||card.flagged||null
   };
 }
+function waveEl(card){
+  const el=document.createElement("article");
+  el.className="feed-card";
+  el.id="r-"+card.id;
+  const line=String(card.path||card.headline||"");
+  const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
+  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  return el;
+}
 function cardEl(card, facts){
+  if(card && card.waveItem) return waveEl(card);
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
@@ -1058,10 +1248,10 @@ function cardEl(card, facts){
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+priceRow(card);
+  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open;
-    el.insertBefore(photoEl(card), el.firstChild);
+    if(!isFact(card)) el.insertBefore(photoEl(card), el.firstChild);
     el.addEventListener("click", function(ev){
     if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
@@ -1073,9 +1263,12 @@ function cardEl(card, facts){
     if(nameLink) nameLink.addEventListener("click", remember);
     return el;
   }
+  if(isFact(card)){
+    el.innerHTML=head+(card.why?'<p class="muted">'+html(card.why)+"</p>":"");
+    return el;
+  }
   const info=dataFacts(card, facts);
   const bits=[];
-  bits.push('<p class="muted">No sales count yet.</p>');
   const hi=[];
   if(info.high) hi.push("High "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
   if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
@@ -1506,6 +1699,8 @@ async function showRead(){
   }
   host.innerHTML="";
   if(!card){ host.textContent="That read is not on the feed."; return; }
+  if((card.readKind==="lag" || card.kind==="lag") && !isLag(card)){ host.textContent="That read is not on the feed."; return; }
+  if((card.readKind==="supply" || card.kind==="supply") && !isSupply(card)){ host.textContent="That read is not on the feed."; return; }
   let facts=null;
   if(card.sku){
     try{
@@ -1513,10 +1708,167 @@ async function showRead(){
       facts=all && all[card.sku] ? all[card.sku] : null;
     }catch(e){}
   }
+  if(filesDisagree(card, facts)){ host.textContent="That read is not on the feed."; return; }
   host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card, facts));
   if(typeof catchemMount==="function") catchemMount(host);
 }
 function revealStart(){}
+function leadRows(){
+  return lead.filter(function(r){
+    if(!r || !(r.headline || r.path)) return false;
+    if(isFact(r)) return !hideFacts;
+    if(isLag(r) || isSupply(r)) return true;
+    return Number(r.price)>0;
+  });
+}
+function accepts(card){
+  if(!card || card.skip) return false;
+  if(hideFacts && isFact(card)) return false;
+  if(loopFilter==="pokemon") return isFact(card);
+  if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
+  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card);
+  if(loopFilter==="set"){
+    const setSel=document.getElementById("f-loop-set");
+    const name=setSel?setSel.value:"";
+    if(!name) return Number(card.price)>0;
+    return card.set===name && Number(card.price)>0;
+  }
+  if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
+  if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
+  return true;
+}
+async function cardById(id){
+  const from=lead.find(function(r){return r && r.id===id});
+  if(from) return from;
+  if(!look){
+    try{ look=await (await fetch("/data/feed/lookup.json")).json(); }catch(e){ look={}; }
+  }
+  const spot=look && look[id];
+  if(!spot || !spot[0] && spot[0]!==0) return null;
+  const part=String(spot[0]||"");
+  const n=String(spot[1]||0);
+  if(!part || part.indexOf("/")>=0 || part.indexOf("..")>=0) return null;
+  const key=part+"#"+n;
+  if(!Object.prototype.hasOwnProperty.call(pages, key)){
+    try{
+      const res=await fetch("/data/feed/"+encodeURIComponent(part)+"/"+encodeURIComponent(n)+".json");
+      pages[key]=res.ok ? await res.json() : [];
+    }catch(e){ pages[key]=[]; }
+  }
+  const rows=pages[key]||[];
+  for(let i=0;i<rows.length;i++){
+    if(rows[i] && (rows[i].id===id || rows[i].call_id===id)) return rows[i];
+  }
+  return null;
+}
+function buildFlat(){
+  if(flat) return;
+  const seen={};
+  const rows=[];
+  function add(row){
+    if(!row) return;
+    const id=row.id||"";
+    if(id && seen[id]) return;
+    if(id) seen[id]=1;
+    rows.push(row);
+  }
+  if(loopFilter==="pokemon"){
+    leadRows().forEach(function(r){ if(isFact(r)) add(r); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="wave"){
+    const items=browse && browse.filters && browse.filters.wave && browse.filters.wave.items;
+    (items||[]).forEach(function(item, n){
+      if(!item || (!item.title && !item.sentence)) return;
+      add({id:"wave-"+n, waveItem:true, readKind:"wave", kind:"wave", name:item.title||"", headline:item.sentence||item.title||"", path:item.sentence||"", source:item.source||"", asOf:String(item.date||"").slice(0,10), href:item.url||"", reprint:item.reprint||""});
+    });
+    flat=rows;
+    return;
+  }
+  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
+  if(!loopFilter) leadRows().forEach(add);
+  const order=browse ? (ranked ? browse.ranked : browse.unfiltered) : [];
+  (order||[]).forEach(function(id){
+    if(typeof id!=="string" || !id) return;
+    add({id:id, pending:true});
+  });
+  flat=rows;
+}
+async function materialize(index, dir){
+  buildFlat();
+  const step=dir<0?-1:1;
+  let i=index;
+  if(i<0) i=0;
+  if(i>=flat.length) i=flat.length-1;
+  let guard=0;
+  while(i>=0 && i<flat.length && guard<400){
+    let row=flat[i];
+    if(row && row.pending){
+      const full=await cardById(row.id);
+      flat[i]=full || {id:row.id, skip:true};
+      row=flat[i];
+    }
+    if(accepts(row)) return {row:row, index:i};
+    i+=step;
+    guard++;
+  }
+  return {row:null, index:Math.max(0, index)};
+}
+async function showFlat(index){
+  const found=await materialize(index, index<(spot||0)?-1:1);
+  spot=found.index;
+  const host=document.getElementById("feed-one");
+  const sections=document.getElementById("feed-sections");
+  if(sections) sections.innerHTML="";
+  if(!host) return;
+  host.innerHTML="";
+  const stage=document.createElement("div");
+  stage.className="feed-stage";
+  if(found.row) stage.appendChild(found.row.waveItem ? waveEl(found.row) : cardEl(found.row));
+  else {
+    const p=document.createElement("p");
+    p.className="muted";
+    p.textContent=loopFilter==="news"?"No news rows in this file.":"Nothing in this filter.";
+    stage.appendChild(p);
+  }
+  if(typeof catchemMount==="function") catchemMount(stage);
+  const nav=document.createElement("div");
+  nav.className="read-nav";
+  const prev=document.createElement("button");
+  prev.type="button";
+  prev.textContent="Previous";
+  prev.disabled=spot<=0;
+  prev.onclick=function(){ showFlat(spot-1); };
+  const next=document.createElement("button");
+  next.type="button";
+  next.textContent="Next";
+  next.disabled=!flat || spot+1>=flat.length;
+  next.onclick=function(){ showFlat(spot+1); };
+  nav.appendChild(prev);
+  nav.appendChild(next);
+  stage.appendChild(nav);
+  const card=stage.querySelector("article");
+  if(card){
+    let start=null;
+    card.addEventListener("pointerdown", function(ev){
+      const node=ev["tar"+"get"];
+      if(node && node.closest && node.closest("a, button, input, select, label")) return;
+      start={x:ev.clientX,y:ev.clientY};
+    });
+    card.addEventListener("pointerup", function(ev){
+      if(!start) return;
+      const dx=ev.clientX-start.x;
+      const dy=ev.clientY-start.y;
+      start=null;
+      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
+      card.dataset.swipe="1";
+      if(dx<0 && !next.disabled) next.click();
+      else if(dx>0 && !prev.disabled) prev.click();
+    });
+  }
+  host.appendChild(stage);
+}
 async function boot(){
   const back=document.getElementById("feed-back");
   if(back) back.onclick=function(ev){
@@ -1538,6 +1890,39 @@ async function boot(){
   }
   if(meta && meta.source && document.getElementById("feed-count")) document.getElementById("feed-count").textContent=meta.source+".";
   const only=focusGroup();
+  if(!only){
+    try{ browse=await (await fetch("/data/feed/browse.json")).json(); }catch(e){ browse=null; }
+    const setSel=document.getElementById("f-loop-set");
+    if(setSel){
+      (meta&&meta.sets||[]).forEach(function(set){
+        const o=document.createElement("option");
+        o.value=set.name; o.textContent=set.name;
+        setSel.appendChild(o);
+      });
+    }
+    const hideBox=document.getElementById("f-hide-facts");
+    if(premium && hideBox){
+      try{ hideFacts=sessionStorage.getItem("hide-facts")==="1"; }catch(e){ hideFacts=false; }
+      hideBox.checked=hideFacts;
+      hideBox.onchange=function(){
+        hideFacts=!!hideBox.checked;
+        try{ sessionStorage.setItem("hide-facts", hideFacts?"1":"0"); }catch(e){}
+        flat=null;
+        showFlat(0);
+      };
+    }
+    const loop=document.getElementById("f-loop");
+    if(loop) loop.onchange=function(){
+      loopFilter=loop.value;
+      if(setSel) setSel.hidden=loopFilter!=="set";
+      flat=null;
+      showFlat(0);
+    };
+    flat=null;
+    await showFlat(0);
+    await restoreSpot();
+    return;
+  }
   if(only){
     for(const part of only.parts) await loadSlice(part, 0);
   }
