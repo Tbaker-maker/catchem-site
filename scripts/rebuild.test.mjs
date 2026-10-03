@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pricedMonCards, cutoutFor } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { readFile } from "node:fs/promises";
 
@@ -175,6 +175,17 @@ const factHtml = renderFeed({ asOf: "2026-09-27", reads: [priced, fact, emptyFac
 const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
+t("the fact sentence stays, and a missing cutout is said rather than drawn", factHtml.includes(fact.path) && factHtml.includes("The cutout is missing.") && factHtml.includes('class="mon-btn"') && factHtml.includes(">Cards<") && factHtml.includes("fact-card") && factHtml.includes(".feed-stage .feed-card.fact-card{flex:0 0 auto"));
+t("the feed filter choices stay", factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<"));
+const monRows = [
+  ["xy11-21", "Talonflame BREAK", "Steam Siege", "2016", "5ban Graphics", "Rare BREAK", 5.27],
+  ["me3-14", "Talonflame", "Perfect Order", "2026", "Shinji Kanda", "Uncommon", 0],
+  ["xy1-28", "Talonflame", "XY", "2014", "5ban Graphics", "Rare Holo", 1.53],
+  ["sv2-1", "Fletchinder", "Paldea Evolved", "2023", "", "", 2],
+];
+const listed = pricedMonCards(monRows, "Talonflame").map((row) => row.id + ":" + row.price);
+t("priced cards of that Pokémon stay in file order by price, and a blank price stays off", listed.join(",") === "xy11-21:5.27,xy1-28:1.53");
+t("a cutout is used only when the file already has one", cutoutFor([{ kind: "cutout", species: "Talonflame", src: "/cards/visuals/talonflame.png", crop: { x: 4, y: 8, w: 200, h: 180 } }], "Talonflame").src === "/cards/visuals/talonflame.png" && cutoutFor([{ name: "Talonflame", src: "/img/me3/14" }], "Talonflame") === null && cutoutFor([], "Talonflame") === null);
 t("premium sees the hide control and the loop uses the file order", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.unfiltered") && factHtml.includes("browse.ranked") && !factHtml.includes('id="hide-facts" hidden'));
 const searchHtml = renderSearch();
 t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
