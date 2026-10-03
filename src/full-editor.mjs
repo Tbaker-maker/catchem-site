@@ -533,6 +533,75 @@ function rewritePlayAssets(html) {
   return out;
 }
 
+const SCREEN_FNS = [
+  "    function applyRowPrices(rows) {",
+  "      var by = {};",
+  "      (rows || []).forEach(function (r) {",
+  "        if (!r || !r.length || !r[0]) return;",
+  "        var n = Number(r[6]);",
+  "        if (!Number.isFinite(n) || n <= 0) return;",
+  "        by[r[0]] = n;",
+  "      });",
+  "      CARDS.forEach(function (c) {",
+  "        if (by[c.id] != null) c.usd = by[c.id];",
+  "      });",
+  "    }",
+  "    function storedPrice(c) {",
+  "      var n = Number(c && c.usd);",
+  "      return Number.isFinite(n) && n > 0 ? n : 0;",
+  "    }",
+  "    function pictureInFile(c) {",
+  "      return !!(c && String(c.src || \"\").trim());",
+  "    }",
+  "    var SCREEN = 40;",
+  "    var screenAsk = 40;",
+  "    var screenKey = \"\";",
+  "    function pathwayView() {",
+  "      return prompt === \"line\" || prompt === \"trio\" || prompt === \"night\" || prompt === \"origin\" || prompt === \"megaform\" || prompt === \"dark\" || prompt === \"region\" || prompt === \"star\" || prompt === \"eras\" || prompt === \"then\";",
+  "    }",
+  "    function listKey() {",
+  "      return [medium, paperLang, prompt, mon, q, setFilter, era].join(\"|\");",
+  "    }",
+  "    function screenRows(rows) {",
+  "      var lead = [];",
+  "      var later = [];",
+  "      (rows || []).forEach(function (c) {",
+  "        if (storedPrice(c) > 0 && pictureInFile(c)) lead.push(c);",
+  "        else later.push(c);",
+  "      });",
+  "      lead.sort(function (a, b) { return storedPrice(b) - storedPrice(a); });",
+  "      return { lead: lead, ordered: lead.concat(later) };",
+  "    }",
+].join("\n");
+
+export function rewriteFirstScreen(html) {
+  let out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.") || out.includes("function screenRows")) return out;
+  const bootOld = '.then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })';
+  const bootNew = '.then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("paper-rows.json")); })\n      .then(function (d) { applyRowPrices(d); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })';
+  if (out.includes(bootOld)) out = out.split(bootOld).join(bootNew);
+  if (out.includes("    function paintStrip() {") && !out.includes("function applyRowPrices")) {
+    out = out.replace("    function paintStrip() {", SCREEN_FNS + "\n    function paintStrip() {");
+  }
+  const shownOld = "      var shown = rows;\n";
+  const shownNew = [
+    "      var key = listKey();",
+    "      if (key !== screenKey) { screenKey = key; screenAsk = SCREEN; }",
+    "      var pack = pathwayView() ? null : screenRows(rows);",
+    "      var shown = pack ? (screenAsk <= SCREEN ? pack.lead.slice(0, SCREEN) : pack.ordered.slice(0, screenAsk)) : rows;",
+    "      var more = !!(pack && shown.length < pack.ordered.length);",
+    "",
+  ].join("\n");
+  if (out.includes(shownOld)) out = out.split(shownOld).join(shownNew);
+  const moreOld = "      }).join(\"\");\n      }\n      paintTray();";
+  const moreNew = "      }).join(\"\");\n      if (more) $(\"strip\").insertAdjacentHTML(\"beforeend\", \"<button type=\\\"button\\\" class=\\\"ghost\\\" data-more=\\\"1\\\">More</button>\");\n      }\n      paintTray();";
+  if (out.includes(moreOld)) out = out.split(moreOld).join(moreNew);
+  const clickOld = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
+  const clickNew = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var moreBtn = e.target.closest(\"[data-more]\");\n      if (moreBtn) {\n        screenAsk += SCREEN;\n        paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
+  if (out.includes(clickOld)) out = out.split(clickOld).join(clickNew);
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
@@ -552,6 +621,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = rewritePlayAssets(out);
+  out = rewriteFirstScreen(out);
   out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';

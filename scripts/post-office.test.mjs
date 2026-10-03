@@ -101,6 +101,7 @@ const playRaw = await (await fetch(EDITOR_URL)).text();
 const playHtml = patchEditorHtml(playRaw, "2026-09-27", "Post Office build abc");
 t("play assets leave the page origin", playHtml.includes("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/") && !playHtml.includes("document.baseURI") && playHtml.includes('"/data/editor/tcg/"') && !playHtml.includes("images.pokemontcg.io") && !playHtml.includes('throw new Error("miss "'));
 t("play wears the site skin", playHtml.includes('id="site-skin"') && playHtml.includes("--accent:#d9b779") && playHtml.includes("body>header{display:none}") && playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
+t("first screen is forty priced pictures", playHtml.includes("function screenRows") && playHtml.includes("var SCREEN = 40") && playHtml.includes("applyRowPrices") && playHtml.includes("data-more") && playHtml.includes("screenAsk += SCREEN") && !playHtml.includes("var shown = rows;"));
 t("play keeps ideas on the pin list", playHtml.includes('id="dl"') && playHtml.includes("window.pins"));
 const pricedRows = patchPaperRows([
   ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
