@@ -533,6 +533,160 @@ function rewritePlayAssets(html) {
   return out;
 }
 
+function swapPlay(html, from, to) {
+  const out = String(html || "");
+  if (!out.includes(from)) return out;
+  return out.replace(from, to);
+}
+
+function rewritePlayDesk(html) {
+  let out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.")) return out;
+  out = swapPlay(
+    out,
+    '      return ids.indexOf("base5-3") !== -1 && ids.indexOf("sv3pt5-200") !== -1;',
+    "      return false;",
+  );
+  out = swapPlay(
+    out,
+    '      return ids.indexOf("base1-63") !== -1 && ids.indexOf("sv3pt5-170") !== -1;',
+    "      return false;",
+  );
+  out = swapPlay(
+    out,
+    '} else if (sel.length === 2 && sel.some(function (c) { return c.id === "base5-3"; }) && sel.some(function (c) { return c.id === "sv3pt5-200"; })) {',
+    '} else if (false && sel.length === 2 && sel.some(function (c) { return c.id === "base5-3"; }) && sel.some(function (c) { return c.id === "sv3pt5-200"; })) {',
+  );
+  out = swapPlay(
+    out,
+    '      pins = ["base1-63", "sv3pt5-170"];\n      resetPage();\n      var parent = SQUIRTLE_PARENT;\n      var self = SQUIRTLE_SELF;',
+    '      pins = ["base1-63"];\n      resetPage();\n      var parent = "";\n      var self = "";',
+  );
+  out = swapPlay(
+    out,
+    '      if ($("banner")) $("banner").textContent = "Tonight is on the desk. Same artist. Two Squirtle.";',
+    '      if ($("banner")) $("banner").textContent = "Tonight is on the desk. Base Squirtle.";',
+  );
+  out = swapPlay(
+    out,
+    '      if ($("compose-note")) $("compose-note").textContent = "Base 63/102 · 151 IR 170/165 · Mitsuhiro Arita. Fact sits under. Long-press.";',
+    '      if ($("compose-note")) $("compose-note").textContent = "Base 63/102 · Mitsuhiro Arita. Fact sits under. Long-press.";',
+  );
+  out = swapPlay(
+    out,
+    "    function rolePool(role) {",
+    `    function onPathway(c) {
+      var pathwayRarity = String((c && c.rarity) || "").toLowerCase();
+      if ((pathwayRarity === "common" || pathwayRarity === "uncommon" || pathwayRarity === "rare") && c && c.id && setIdOf(c)) return true;
+      return !isBulk(c);
+    }
+    function rolePool(role) {`,
+  );
+  out = swapPlay(
+    out,
+    "        return !isBulk(c) || role === who;",
+    "        return onPathway(c);",
+  );
+  out = swapPlay(
+    out,
+    '          var cards = t.mons.map(function (sp) { return hottest(paperOf(sp).filter(function (c) { return !isBulk(c); })); });',
+    '          var cards = t.mons.map(function (sp) { return hottest(paperOf(sp).filter(onPathway)); });',
+  );
+  out = swapPlay(
+    out,
+    '        var a = hottest(paperOf("Espeon").filter(function (c) { return !isBulk(c); }));',
+    '        var a = hottest(paperOf("Espeon").filter(onPathway));',
+  );
+  out = swapPlay(
+    out,
+    '        var b = hottest(paperOf("Umbreon").filter(function (c) { return !isBulk(c); }));',
+    '        var b = hottest(paperOf("Umbreon").filter(onPathway));',
+  );
+  out = swapPlay(
+    out,
+    `      function add(cards) {
+        if (!cards || cards.some(function (c) { return !c; })) return;
+        var k = cards.map(function (c) { return c.id; }).join("|");`,
+    `      function add(cards) {
+        if (!cards || cards.some(function (c) { return !c; })) return;
+        var ids = cards.map(function (c) { return c.id; });
+        if (ids.indexOf("base5-3") !== -1 && ids.indexOf("sv3pt5-200") !== -1) return;
+        if (ids.indexOf("base1-63") !== -1 && ids.indexOf("sv3pt5-170") !== -1) return;
+        var k = ids.join("|");`,
+  );
+  out = swapPlay(
+    out,
+    `        if (!darks.length || !normals.length) return [];
+        return [hottest(normals), hottest(darks)];`,
+    `        if (!darks.length || !normals.length) return [];
+        var darkPair = [hottest(normals), hottest(darks)];
+        var darkIds = darkPair.map(function (c) { return c && c.id; });
+        if (darkIds.indexOf("base5-3") !== -1 && darkIds.indexOf("sv3pt5-200") !== -1) return [];
+        return darkPair;`,
+  );
+  out = swapPlay(
+    out,
+    "      function knockMatte(im) {",
+    `      function cardEdgeCrop(im) {
+        try {
+          var w = im.width, h = im.height;
+          if (!w || !h) return false;
+          var c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          var x = c.getContext("2d");
+          x.drawImage(im, 0, 0);
+          var d = x.getImageData(0, 0, w, h).data;
+          function pix(xx, yy) {
+            var i = (yy * w + xx) * 4;
+            return [d[i], d[i + 1], d[i + 2], d[i + 3]];
+          }
+          var corners = [pix(1, 1), pix(Math.max(1, w - 2), 1), pix(1, Math.max(1, h - 2)), pix(Math.max(1, w - 2), Math.max(1, h - 2))];
+          var i, p, L, C;
+          for (i = 0; i < corners.length; i++) {
+            p = corners[i];
+            if (p[3] < 18) return false;
+            C = Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]);
+            L = (p[0] + p[1] + p[2]) / 3;
+            if (C <= 22 && L >= 242) return false;
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+      function knockMatte(im) {`,
+  );
+  out = swapPlay(
+    out,
+    `          var mats = sel.map(function (card, k) {
+            if (card.kind === "poster" || card.kind === "manga" || isGameBox(card)) return imgs[k];
+            if ((card.tags || "").indexOf("connecting") !== -1) return imgs[k];
+            return knockMatte(imgs[k]);
+          });`,
+    `          var cropMissing = false;
+          var mats = sel.map(function (card, k) {
+            if (card.kind === "poster" || card.kind === "manga" || isGameBox(card)) return imgs[k];
+            if ((card.tags || "").indexOf("connecting") !== -1) return imgs[k];
+            var scan = imgs[k];
+            if (scan && !cardEdgeCrop(scan)) cropMissing = true;
+            return scan;
+          });`,
+  );
+  out = swapPlay(
+    out,
+    `          $("compose-note").textContent = seatIsStudio()
+            ? "That's an edit, not a scan. Fact sits under the card. Premium file. Long-press."
+            : "That's an edit, not a scan. Fact sits under the card. Catch'Em stays — fun is free. Premium takes the mark off to monetize. Long-press.";`,
+    `          $("compose-note").textContent = cropMissing
+            ? "The crop is missing."
+            : (seatIsStudio()
+            ? "That's an edit, not a scan. Fact sits under the card. Premium file. Long-press."
+            : "That's an edit, not a scan. Fact sits under the card. Catch'Em stays — fun is free. Premium takes the mark off to monetize. Long-press.");`,
+  );
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
@@ -552,6 +706,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = rewritePlayAssets(out);
+  out = rewritePlayDesk(out);
   out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';
