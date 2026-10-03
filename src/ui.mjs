@@ -19,6 +19,32 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// A read may mention sales volume, thin sales, or copies sold. No file has a
+// sold count, so that sentence comes out. A price already in the file stays.
+// Nothing is written in its place.
+export function withoutSoldClaim(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+  const claim = /\b(?:sales volume|thin sales|few sales|sold counts?|cop(?:y|ies) sold)\b/i;
+  const parts = raw.split(/(?<=\.)\s+/);
+  const kept = [];
+  for (const sentence of parts) {
+    if (!claim.test(sentence)) {
+      kept.push(sentence);
+      continue;
+    }
+    let s = sentence;
+    s = s.replace(/,?\s*with\s+[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*on\s+(?:few|thin)\s+sales\b[^.]*/gi, "");
+    s = s.replace(/,?\s*(?:sales volume|thin sales|few sales|sold counts?)\b[^.]*/gi, "");
+    s = s.replace(/\s{2,}/g, " ").replace(/\s+([,.])/g, "$1").replace(/,\s*(?=\.)/g, "").replace(/,\s*$/g, "").trim();
+    if (!s || !/[A-Za-z]/.test(s) || claim.test(s)) continue;
+    kept.push(s);
+  }
+  return kept.join(" ").trim();
+}
+
 export function clockLabel(iso) {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return "";
@@ -552,19 +578,32 @@ export function renderSearch(opts = {}) {
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
 const searchCatalog=search.searchCatalog;
-const money=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
+function fileValue(r){
+  const n=Number(r&&r[6]);
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function byValue(a,b){
+  const x=fileValue(a), y=fileValue(b);
+  if(x==null&&y==null) return 0;
+  if(x==null) return 1;
+  if(y==null) return -1;
+  return y-x;
+}
+function take(list){
+  return (list||[]).slice(0,40).sort(byValue);
+}
 function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
-  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a><b>'+(money(r[6])||"No market price")+'</b></div>';
+  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
 }
 function draw(){
   const q=document.getElementById("q").value.trim();
   if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent=rows.length+" names loaded. Type at least 2 letters.";return}
   const found=typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]};
-  const shown=found.hits||[];
-  const near=found.nearest||[];
+  const shown=take(found.hits);
+  const near=take(found.nearest);
   if(!shown.length){
     document.getElementById("meta").textContent="Not in the TCGplayer catalog.";
     document.getElementById("list").innerHTML=(near.length?'<p class="muted">Nearest names</p>':"")+near.map(rowHtml).join("")||'<p class="muted">No nearby name.</p>';
@@ -731,7 +770,12 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).map((r) => ({
+    ...r,
+    headline: withoutSoldClaim(r.headline),
+    ...(r.path ? { path: withoutSoldClaim(r.path) } : {}),
+    ...(r.why ? { why: withoutSoldClaim(r.why) } : {}),
+  }));
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const css = `
   .feed-page{padding-top:8px}
@@ -810,6 +854,7 @@ const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 ${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeURIComponent(String(card.href||'').split('/').pop())+'\">Make a Short</a>';" : "const shortFor=()=>'';"}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
+${withoutSoldClaim.toString()}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
 const focus=${JSON.stringify(String(opts.section || ""))};
@@ -943,7 +988,7 @@ function priorMoney(card){
   return from>0?money(from):"";
 }
 function moveLine(card){
-  const path=String(card.path||"").trim();
+  const path=withoutSoldClaim(String(card.path||"").trim());
   if(path) return path;
   const hist=card.hist||[];
   if(hist.length>=2){
@@ -962,7 +1007,7 @@ function watchDay(iso){
   return months[d.getUTCMonth()]+" "+d.getUTCDate();
 }
 function meansCopy(card){
-  const path=String(card.path||"").trim();
+  const path=withoutSoldClaim(String(card.path||"").trim());
   if(path) return [path];
   const hist=card.hist||[];
   if(hist.length>=2){
@@ -1055,7 +1100,7 @@ function cardEl(card, facts){
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=moveLine(card);
-  const title=html(card.name||card.headline||"Read");
+  const title=html(card.name||withoutSoldClaim(card.headline)||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+priceRow(card);
@@ -1664,7 +1709,11 @@ fetch("/api/alerts").then(function(res){return res.json().then(function(data){re
 export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
   const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
-${reads.map((r) => `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(r.headline)}</b></a><b>${money(r.price) || ""}</b></div>`).join("")}
+${reads.map((r) => {
+    const line = withoutSoldClaim(r.headline);
+    if (!line) return "";
+    return `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
+  }).join("")}
 </main>`;
   return chrome("Feed", body, "All reads", stamp, "", feedNav(opts));
 }
