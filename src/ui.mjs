@@ -1,5 +1,6 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+import { feedNews } from "../data/feed-news.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -126,7 +127,34 @@ export function pokemonFactLine(row) {
   return `${name} has ${parts[0]} and ${parts[1]}.`;
 }
 
-// Highest price already on the row first. A row with no price stays off.
+// A cutout only when that field is already on the row. A product image is not a cutout.
+export function cutoutSrc(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return "";
+  const direct = row.cutout;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (direct && typeof direct === "object") {
+    const src = String(direct.src || "").trim();
+    if (src) return src;
+  }
+  if (row.kind === "cutout") {
+    const src = String(row.src || "").trim();
+    if (src) return src;
+  }
+  return "";
+}
+
+// The TCGplayer link only when that link is already on the row. A CDN image is not the link.
+export function tcgLink(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return "";
+  const keys = ["tcgplayer", "tcgplayerUrl", "productUrl", "url", "link", "href"];
+  for (let i = 0; i < keys.length; i++) {
+    const value = String(row[keys[i]] || "").trim();
+    if (/^https:\/\/(?:www\.)?tcgplayer\.com\//i.test(value)) return value;
+  }
+  return "";
+}
+
+// Highest price already on the row first, then cheapest. A row with no price stays off.
 export function pricedMonCards(rows, name) {
   const mon = String(name || "").trim();
   if (!mon) return [];
@@ -136,6 +164,9 @@ export function pricedMonCards(rows, name) {
     let price = null;
     let id = "";
     let set = "";
+    let sku = "";
+    let cutout = "";
+    let link = "";
     if (Array.isArray(row)) {
       cardName = String(row[1] || "").trim();
       price = Number(row[6]);
@@ -145,13 +176,190 @@ export function pricedMonCards(rows, name) {
       cardName = String(row.name || "").trim();
       price = Number(row.price);
       id = String(row.id || "");
-      set = String(row.set || "");
+      set = String(row.set || "").trim();
+      sku = String(row.sku || "").trim();
+      cutout = cutoutSrc(row);
+      link = tcgLink(row);
     } else continue;
     if (cardName !== mon && !cardName.startsWith(mon + " ")) continue;
     if (!(price > 0)) continue;
-    out.push({ id, name: cardName, set, price });
+    const item = { id, name: cardName, set, price };
+    if (sku) item.sku = sku;
+    if (cutout) item.cutout = cutout;
+    if (link) item.link = link;
+    out.push(item);
   }
   out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return out;
+}
+
+// The Post Office cutout on that Pokémon. A different card's picture is not one.
+export function factCutout(catalogue, name) {
+  const who = String(name || "").trim().toLowerCase();
+  if (!who || !catalogue) return "";
+  let cards = [];
+  if (Array.isArray(catalogue)) cards = catalogue;
+  else if (Array.isArray(catalogue.cards)) cards = catalogue.cards;
+  else if (catalogue.cards && typeof catalogue.cards === "object") cards = Object.values(catalogue.cards);
+  else return "";
+  for (let i = 0; i < cards.length; i++) {
+    const row = cards[i];
+    if (!row || typeof row !== "object") continue;
+    const species = String(row.species || "").trim().toLowerCase();
+    const named = String(row.name || "").trim().toLowerCase();
+    if (species !== who && named !== who) continue;
+    const src = cutoutSrc(row);
+    if (src) return src;
+  }
+  return "";
+}
+
+const NEWS_MONTHS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+function newsPartsToIso(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1000) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return "";
+  return dt.toISOString().slice(0, 10);
+}
+
+function shiftIso(iso, days) {
+  const t = Date.parse(String(iso) + "T00:00:00Z");
+  if (!Number.isFinite(t)) return "";
+  return new Date(t + days * 86400000).toISOString().slice(0, 10);
+}
+
+function statedDayList(text, yearFromFile) {
+  const src = String(text || "");
+  const out = [];
+  const monthRe = /\b(january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sept|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\s+(\d{4}))?/gi;
+  let m;
+  while ((m = monthRe.exec(src))) {
+    const mon = NEWS_MONTHS[m[1].toLowerCase()];
+    const year = m[3] ? Number(m[3]) : yearFromFile;
+    const iso = newsPartsToIso(year, mon, Number(m[2]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  const isoRe = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+  while ((m = isoRe.exec(src))) {
+    const iso = newsPartsToIso(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  const dotRe = /\b(\d{4})\.(\d{1,2})\.(\d{1,2})\b/g;
+  while ((m = dotRe.exec(src))) {
+    const iso = newsPartsToIso(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  return out;
+}
+
+function nonEnglishTitle(title) {
+  return /[぀-ヿ一-龯가-힣]/.test(String(title || ""));
+}
+
+function newsSourceUrl(item) {
+  const url = String(item && item.url || "").trim();
+  if (!/^https?:\/\//i.test(url)) return "";
+  return url;
+}
+
+function translationUncertain(item) {
+  if (String(item.note || "").includes("Translation is missing.")) return true;
+  const title = String(item.title || "");
+  const en = String(item.titleEn || "").trim();
+  if (nonEnglishTitle(title) && !en) return true;
+  return false;
+}
+
+function newsEnglishName(item) {
+  const title = String(item.title || "").trim();
+  const en = String(item.titleEn || "").trim();
+  if (nonEnglishTitle(title)) return en;
+  return title;
+}
+
+function newsPlace(item, name) {
+  const region = String(item.region || "");
+  const language = String(item.language || "");
+  if (region === "jp" || language === "ja" || String(name || "").startsWith("Japan:")) return "Japan news";
+  if (region === "kr" || language === "ko") return "Korea news";
+  if (language === "zh") return "Chinese news";
+  if (language === "ru") return "Russian news";
+  if (language === "ar") return "Arabic news";
+  if (language === "th" || region === "th") return "Thai news";
+  if (language && language !== "en") return language + " news";
+  return "";
+}
+
+function isNewReveal(item) {
+  const title = String(item.title || "") + " " + String(item.titleEn || "");
+  return /\breveal(?:ed|s|ing)?\b/i.test(title);
+}
+
+function releaseInNextTwoWeeks(item, asOf) {
+  const year = Number(String(asOf).slice(0, 4));
+  const text = [item.title, item.titleEn, item.sentence, item.setDate, item.statedDate].filter(Boolean).join(" ");
+  const end = shiftIso(asOf, 14);
+  if (!end) return false;
+  const days = statedDayList(text, year);
+  for (let i = 0; i < days.length; i++) {
+    if (days[i] > asOf && days[i] <= end) return true;
+  }
+  return false;
+}
+
+// A short slice of an item already in the news file. No headline, date, or link is added.
+export function newsSlice(doc) {
+  const root = Array.isArray(doc) ? { items: doc } : (doc && typeof doc === "object" ? doc : null);
+  if (!root) return [];
+  const asOf = isoDay(root.asOf) ? root.asOf : "";
+  if (!asOf) return [];
+  let items = Array.isArray(root.items) ? root.items : null;
+  if (!items && root.filters && root.filters.news && Array.isArray(root.filters.news.items)) {
+    items = root.filters.news.items;
+  }
+  if (!items) return [];
+  const cut = shiftIso(asOf, -14);
+  const seen = new Set();
+  const out = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || typeof item !== "object") continue;
+    if (item.kind && item.kind !== "news") continue;
+    const href = newsSourceUrl(item);
+    const date = String(item.date || "").slice(0, 10);
+    if (!href || !isoDay(date) || seen.has(href)) continue;
+    if (translationUncertain(item)) continue;
+    const name = newsEnglishName(item);
+    if (!name) continue;
+    const older = date < cut;
+    if (older && !isNewReveal(item) && !releaseInNextTwoWeeks(item, asOf)) continue;
+    seen.add(href);
+    const row = {
+      id: href,
+      readKind: "news",
+      kind: "news",
+      name,
+      asOf: date,
+      href,
+      source: String(item.source || "").trim(),
+    };
+    const original = String(item.originalTitle || "").trim();
+    if (original) row.originalTitle = original;
+    else if (nonEnglishTitle(item.title)) row.originalTitle = String(item.title || "").trim();
+    const place = newsPlace(item, name);
+    if (place) row.place = place;
+    out.push(row);
+  }
+  out.sort((a, b) => (a.asOf < b.asOf ? 1 : a.asOf > b.asOf ? -1 : (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)));
   return out;
 }
 
@@ -253,6 +461,13 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
         });
       });
     }
+    return out;
+  }
+  if (filter === "news") {
+    let baked = opts.news || null;
+    const block = browse && browse.filters ? browse.filters.news : null;
+    if (!baked && block && Array.isArray(block.items)) baked = { asOf: block.asOf || "", items: block.items };
+    for (const row of newsSlice(baked)) push(row);
     return out;
   }
   // The front is the short loop: only reads this file already has.
@@ -1022,6 +1237,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     return true;
   });
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
+  const newsLead = JSON.stringify(newsSlice(feedNews)).replace(/</g, "\\u003c");
   const css = `
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
@@ -1125,9 +1341,11 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
+<script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script>
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
+const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 ${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeURIComponent(String(card.href||'').split('/').pop())+'\">Make a Short</a>';" : "const shortFor=()=>'';"}
@@ -1150,6 +1368,9 @@ function isFact(card){
   if(c<1 || a<1 || d<1) return false;
   return !!(card.headline || card.path);
 }
+${cutoutSrc.toString()}
+${tcgLink.toString()}
+${factCutout.toString()}
 ${pokemonFactLine.toString()}
 ${pricedMonCards.toString()}
 function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
@@ -1432,15 +1653,43 @@ function mountMon(el, card){
     }
     priced.forEach(function(row){
       const p=document.createElement("p");
-      p.textContent=money(row.price)+" "+row.name+(row.set?" · "+row.set:"");
+      const parts=[];
+      if(row.cutout) parts.push('<img class="cutout" alt="" src="'+html(row.cutout)+'">');
+      else parts.push("The picture is missing.");
+      parts.push(money(row.price));
+      if(row.name) parts.push(html(row.name));
+      if(row.set) parts.push(html(row.set));
+      const cardId=row.sku||row.id||"";
+      if(cardId) parts.push(html(cardId));
+      let line=parts.join(" · ");
+      if(row.link) line+=' <a href="'+html(row.link)+'">'+html(row.link)+"</a>";
+      p.innerHTML=line;
       list.appendChild(p);
     });
   };
   el.appendChild(btn);
   el.appendChild(list);
 }
+function newsEl(card){
+  const el=document.createElement("article");
+  el.className="feed-card";
+  el.id="r-"+card.id;
+  const place=card.place?'<p>'+html(card.place)+"</p>":"";
+  const when=card.asOf?'<p>'+html(card.asOf)+"</p>":"";
+  const label=card.source||card.href||"";
+  const link=card.href?'<p><a href="'+html(card.href)+'">'+html(label)+"</a></p>":"";
+  el.innerHTML="<h3>"+html(card.name||"")+"</h3>"+place+when+link;
+  return el;
+}
+function factCutLine(card){
+  const src=factCutout(catalogue, card && card.name);
+  if(src) return '<img class="cutout" alt="" src="'+html(src)+'">';
+  const who=String(card && card.name || "").trim();
+  return '<p class="cut-miss">The cutout is missing. '+html(who)+"</p>";
+}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
+  if(card && (card.readKind==="news" || card.kind==="news")) return newsEl(card);
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
@@ -1452,7 +1701,8 @@ function cardEl(card, facts){
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
+  const cut=isFact(card)?factCutLine(card):"";
+  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
@@ -1993,6 +2243,11 @@ function buildFlat(){
     flat=rows;
     return;
   }
+  if(loopFilter==="news"){
+    (Array.isArray(newsRows)?newsRows:[]).forEach(function(row){ add(row); });
+    flat=rows;
+    return;
+  }
   const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
   if(!loopFilter){
     leadRows().forEach(add);
@@ -2036,11 +2291,14 @@ async function showFlat(index){
   host.innerHTML="";
   const stage=document.createElement("div");
   stage.className="feed-stage";
-  if(found.row) stage.appendChild(found.row.waveItem ? waveEl(found.row) : cardEl(found.row));
+  if(found.row){
+    const row=found.row;
+    stage.appendChild(row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row)));
+  }
   else {
     const p=document.createElement("p");
     p.className="muted";
-    p.textContent=loopFilter==="news"?"No news rows in this file.":"Nothing in this filter.";
+    p.textContent=loopFilter==="news"?"There is no news.":"Nothing in this filter.";
     stage.appendChild(p);
   }
   if(typeof catchemMount==="function") catchemMount(stage);

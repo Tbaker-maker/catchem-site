@@ -1,8 +1,9 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
+import { feedNews } from "../data/feed-news.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -15,6 +16,10 @@ const LOCKED = "The full catalog: every card and every artist. Pick one and the 
 
 function clean(html) {
   return String(html).replaceAll(LOCKED, "LOCKED");
+}
+
+function stripNews(html) {
+  return String(html).replace(/<script type="application\/json" id="feed-news">[\s\S]*?<\/script>/g, "");
 }
 
 const counts = { asOf: "2026-09-27", source: "TCGplayer market", items: 31265, single: 28030, sealed: 3235, slab: 0, sets: 2, artists: 1 };
@@ -88,7 +93,7 @@ const post = await (await renderPath("/post-office", fetchImpl)).text();
 t("post office drops the catalog line", !post.includes(LOCKED) && !post.includes('id="fresh"'));
 const method = await (await renderPath("/methodology", fetchImpl)).text();
 t("methodology uses the catalog counts", method.includes("28,030") && method.includes("3,235"));
-const badCopy = [feedHtml, cardPage, board, method, all].map(clean).filter((html) => BANNED.test(html));
+const badCopy = [stripNews(feedHtml), cardPage, board, method, all].map(clean).filter((html) => BANNED.test(html));
 t("pages skip the banned words", badCopy.length === 0);
 const postClean = clean(post);
 t("the locked pick line is the only exception", !BANNED.test(postClean));
@@ -200,6 +205,34 @@ t("priced cards stay highest first and a blank price stays off", pricedMonCards(
   ["c", "Duraludon", "Set C", "", "", "", 0],
   ["d", "Other", "Set D", "", "", "", 40],
 ], "Duraludon").map((row) => row.id).join(",") === "b,a");
+const pull = pricedMonCards([
+  { id: "move-1", sku: "tcgcsv-1", name: "Duraludon", set: "Base Set", price: 4, image: "https://tcgplayer-cdn.tcgplayer.com/product/1_in_400x400.jpg", href: "/c/tcgcsv-1" },
+  { id: "move-2", sku: "tcgcsv-2", name: "Duraludon", set: "Set B", price: 9, cutout: "/cards/visuals/duraludon.png", href: "https://www.tcgplayer.com/product/2" },
+  { name: "Duraludon", price: 0 },
+], "Duraludon");
+t("a pull-down row keeps the price, the set, and the card id, and does not invent a link or a cutout", pull.map((row) => row.id).join(",") === "move-2,move-1" && pull[0].sku === "tcgcsv-2" && pull[0].set === "Set B" && pull[0].price === 9 && pull[0].cutout === "/cards/visuals/duraludon.png" && pull[0].link === "https://www.tcgplayer.com/product/2" && !pull[1].cutout && !pull[1].link && tcgLink({ href: "/c/tcgcsv-1", image: "https://tcgplayer-cdn.tcgplayer.com/product/1_in_400x400.jpg" }) === "");
+t("a fact cutout is the one already on that Pokémon", factCutout([{ kind: "cutout", species: "Gyarados", src: "/cards/visuals/gyarados.png" }], "Gyarados") === "/cards/visuals/gyarados.png" && factCutout([{ name: "Gyarados", image: "https://tcgplayer-cdn.tcgplayer.com/product/1.jpg" }], "Gyarados") === "" && factCutout(null, "Talonflame") === "");
+const newsDoc = { asOf: "2026-10-02", items: [
+  { kind: "news", title: "New merch collection starring Dedenne.", url: "https://example.com/a", source: "Bulbagarden", date: "2026-10-02" },
+  { kind: "news", title: "Old recap.", url: "https://example.com/b", source: "PokeBeach", date: "2026-08-01", sentence: "The column looks at an event." },
+  { kind: "news", title: "「大会」開催！", url: "https://example.com/c", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp", note: "Translation is missing." },
+  { kind: "news", title: "「ここから」開催！", titleEn: "Japan: A first event is being held", originalTitle: "「ここから」開催！", url: "https://example.com/d", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp" },
+  { kind: "news", title: "A new card revealed", url: "https://example.com/e", source: "PokeBeach", date: "2026-08-20" },
+  { kind: "news", title: "A box date.", url: "https://example.com/f", source: "PokeBeach", date: "2026-08-01", sentence: "The source says the box releases on October 10, 2026." },
+]};
+const newsRows = newsSlice(newsDoc);
+t("a news slice keeps the English title, the date, and the source link", newsRows.find((row) => row.href === "https://example.com/a").name === "New merch collection starring Dedenne." && newsRows.find((row) => row.href === "https://example.com/a").asOf === "2026-10-02" && newsRows.find((row) => row.href === "https://example.com/a").source === "Bulbagarden");
+t("an uncertain translation stays off", !newsRows.some((row) => row.href === "https://example.com/c"));
+t("an old item stays off unless it is a new reveal or the source states a release inside two weeks", !newsRows.some((row) => row.href === "https://example.com/b") && newsRows.some((row) => row.href === "https://example.com/e") && newsRows.some((row) => row.href === "https://example.com/f"));
+const japan = newsRows.find((row) => row.href === "https://example.com/d");
+t("Japan news says it is Japan news and the file keeps the original title", japan && japan.place === "Japan news" && japan.name === "Japan: A first event is being held" && japan.originalTitle === "「ここから」開催！" && japan.href === "https://example.com/d");
+t("the news filter does not walk price rows", buildFeedLoop([priced, fact], browseDoc, { filter: "news" }).length === 0);
+t("the news filter uses the news file slice", buildFeedLoop([], null, { filter: "news", news: newsDoc }).some((row) => row.href === "https://example.com/d"));
+const liveNews = newsSlice(feedNews);
+const dedenne = liveNews.find((row) => row.href === "https://bulbagarden.net/threads/new-merch-collection-starring-dedenne-joltik-and-more-electric-types-coming-soon-to-pokemon-centers-in-japan.311717/");
+const japanFile = liveNews.find((row) => row.href === "https://www.pokemon-card.com/info/005559.html");
+t("the news file has the Dedenne card, its date, and its source link", dedenne && dedenne.asOf === "2026-10-02" && dedenne.source === "Bulbagarden" && dedenne.name.startsWith("New merch collection starring Dedenne"));
+t("the Japan card in the news file says Japan news and keeps the original title", japanFile && japanFile.place === "Japan news" && japanFile.asOf === "2026-10-02" && japanFile.originalTitle === "「ここからデビュー！はじめてポケカ体験会」開催！" && japanFile.name.startsWith("Japan:"));
 const rankedLoop = buildFeedLoop([priced, fact], browseDoc, { filter: "prices" });
 t("a ranked filter stays in ranked order and leaves the fact out", rankedLoop.map((r) => r.id).join(",") === "move-tcgcsv-10-7,move-tcgcsv-99-7" && rankedLoop.every((r) => !(r.readKind === "pokemon")));
 t("the pokemon filter is file order, not a shuffle", buildFeedLoop([priced, fact], browseDoc, { filter: "pokemon" }).map((r) => r.id).join(",") === "pokemon-duraludon");
@@ -214,6 +247,7 @@ const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
 t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && !factHtml.includes("card.why"));
+t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("The picture is missing.") && factHtml.includes("There is no news.") && factHtml.includes("factCutout(catalogue"));
 t("premium sees the hide control and the front does not walk the shuffled catalogue", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && !factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("the feed filter keeps every row and uses the site pill", factHtml.includes('id="f-loop"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes("pill-menu-btn") && factHtml.includes("max-width:390px") && factHtml.includes("min-width:1280px") && factHtml.includes("background:#12100e") && factHtml.includes('button[aria-selected="true"]') && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-08-23 <span class="chip m">AFFECTED A PUBLISHED NUMBER</span></div><div class="w">shipping comparison</div></div><div class="c"><div class="w">auto-fix rewrote a price</div></div><h2>Kept</h2>';
