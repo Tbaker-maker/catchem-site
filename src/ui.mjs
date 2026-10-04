@@ -409,6 +409,26 @@ export function filesDisagree(card, other) {
   return false;
 }
 
+// The card file is newer and names a different price for this same id.
+// An older card price does not throw out a later read. A fact is not a price.
+export function readStaleAgainstCard(read, card) {
+  if (!read || !card || typeof read !== "object" || typeof card !== "object") return false;
+  if (read.readKind === "pokemon" || read.kind === "pokemon") return false;
+  if (read.readKind === "news" || read.kind === "news") return false;
+  if (read.readKind === "lag" || read.kind === "lag") return false;
+  if (read.readKind === "supply" || read.kind === "supply") return false;
+  const priced = read.readKind === "price" || read.kind === "single" || read.kind === "sealed";
+  if (!priced) return false;
+  const left = Number(read.price);
+  const right = Number(card.price);
+  if (!(left > 0) || !(right > 0)) return false;
+  if (Math.round(left * 100) === Math.round(right * 100)) return false;
+  const readDay = String(read.asOf || "").slice(0, 10);
+  const cardDay = String(card.asOf || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(readDay) || !/^\d{4}-\d{2}-\d{2}$/.test(cardDay)) return false;
+  return cardDay >= readDay;
+}
+
 const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave"]);
 
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
@@ -1393,6 +1413,28 @@ function filesDisagree(card, other){
   if(Number.isInteger(card.listings) && Number.isInteger(other.listings) && card.listings!==other.listings) return true;
   return false;
 }
+${readStaleAgainstCard.toString()}
+const bucketCache={};
+async function publishedCard(sku){
+  const id=String(sku||"");
+  const n=Number((id.match(/([0-9]+)/)||[])[1]);
+  if(!n) return null;
+  const bucket=String(n%100).padStart(2,"0");
+  if(!Object.prototype.hasOwnProperty.call(bucketCache, bucket)){
+    try{
+      const res=await fetch("/data/buckets/"+bucket+".json");
+      bucketCache[bucket]=res.ok?await res.json():[];
+    }catch(e){ bucketCache[bucket]=[]; }
+  }
+  const rows=bucketCache[bucket]||[];
+  for(let i=0;i<rows.length;i++) if(rows[i] && rows[i].id===id) return rows[i];
+  return null;
+}
+async function stalePrice(row){
+  if(!row || !row.sku) return false;
+  const card=await publishedCard(row.sku);
+  return readStaleAgainstCard(row, card);
+}
 if(history.scrollRestoration) history.scrollRestoration="manual";
 const GROUPS=[
   {id:"today",slug:"today",title:"Today",parts:["today"]},
@@ -2166,6 +2208,7 @@ async function showRead(){
     }catch(e){}
   }
   if(filesDisagree(card, facts)){ host.textContent="That read is not on the feed."; return; }
+  if(await stalePrice(card)){ host.textContent="That read is not on the feed."; return; }
   host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card, facts));
   if(typeof catchemMount==="function") catchemMount(host);
 }
@@ -2275,7 +2318,10 @@ async function materialize(index, dir){
       flat[i]=full || {id:row.id, skip:true};
       row=flat[i];
     }
-    if(accepts(row)) return {row:row, index:i};
+    if(accepts(row)){
+      if(await stalePrice(row)){ i+=step; guard++; continue; }
+      return {row:row, index:i};
+    }
     i+=step;
     guard++;
   }
