@@ -23,6 +23,17 @@ export function money(n) {
 // price move. A line that is only the title is blank. Prices, dates, and
 // percents in the file stay as written.
 export function readUnderTitle(name, path) {
+  function dropName(title, line) {
+    const text = String(line ?? "").trim();
+    const who = String(title ?? "").trim();
+    if (!text || !who || !text.includes(who)) return text;
+    const escaped = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return text
+      .replace(new RegExp("(^|[^A-Za-z0-9])" + escaped + "(?=$|[^A-Za-z0-9])", "g"), "$1")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([.,])/g, "$1")
+      .trim();
+  }
   const title = String(name ?? "").trim();
   const line = String(path ?? "").trim();
   if (!line) return "";
@@ -31,7 +42,7 @@ export function readUnderTitle(name, path) {
     const marker = "The latest price of " + title + " is";
     if (line.startsWith(marker + " ") || line === marker || line.startsWith(marker + ".")) {
       const rest = line.slice(marker.length).replace(/^\./, "").trim();
-      return rest ? "The latest price is " + rest : "";
+      return rest ? dropName(title, "The latest price is " + rest) : "";
     }
   }
   if (title && line.startsWith(title)) {
@@ -40,10 +51,19 @@ export function readUnderTitle(name, path) {
       let rest = line.slice(title.length).replace(/^[\s:–—-]+/, "").trim();
       const at = rest.indexOf("latest price");
       if (at > 0) rest = rest.slice(at).trim();
-      return rest;
+      return dropName(title, rest);
     }
   }
-  return line;
+  return dropName(title, line);
+}
+
+// The set name and the card id already on the card. A blank field stays off.
+export function cardIdentity(card) {
+  if (!card || typeof card !== "object") return "";
+  const set = String(card.set ?? "").trim();
+  const id = String(card.sku ?? "").trim();
+  if (set && id) return set + " · " + id;
+  return set || id || "";
 }
 
 export function countPublishedReads(doc) {
@@ -1003,6 +1023,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
+  .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
   .means b{display:block;margin:0 0 6px}
   .means p{margin:0 0 8px}
@@ -1258,6 +1279,7 @@ function priorMoney(card){
   return from>0?money(from):"";
 }
 ${readUnderTitle.toString()}
+${cardIdentity.toString()}
 function moveLine(card){
   const path=String(card.path||"").trim();
   if(!path) return "";
@@ -1351,8 +1373,9 @@ function waveEl(card){
   el.className="feed-card";
   el.id="r-"+card.id;
   const line=readUnderTitle(card.name, card.path||card.headline||"");
+  const ident=cardIdentity(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
 function mountMon(el, card){
@@ -1400,10 +1423,11 @@ function cardEl(card, facts){
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=isFact(card)?pokemonFactLine(card):moveLine(card);
+  const ident=cardIdentity(card);
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
+  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
