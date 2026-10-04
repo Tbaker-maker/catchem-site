@@ -569,10 +569,7 @@ const SCREEN_FNS = [
   "      return [medium, paperLang, prompt, mon, q, setFilter, era].join(\"|\");",
   "    }",
   "    function screenRows(rows) {",
-  "      var lead = [];",
-  "      (rows || []).forEach(function (c) {",
-  "        if (pictureInFile(c)) lead.push(c);",
-  "      });",
+  "      var lead = (rows || []).slice();",
   "      lead.sort(function (a, b) { return storedPrice(b) - storedPrice(a); });",
   "      return { lead: lead };",
   "    }",
@@ -603,6 +600,71 @@ export function rewriteFirstScreen(html) {
   const clickOld = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
   const clickNew = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var moreBtn = e.target.closest(\"[data-more]\");\n      if (moreBtn) {\n        screenAsk = (screenAsk || screenCap()) + screenCap();\n        paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
   if (out.includes(clickOld)) out = out.split(clickOld).join(clickNew);
+  const thumbOld = [
+    "    function thumbOf(c) {",
+    "      var s = srcOf(c);",
+    '      if (s.indexOf("/img/") === 0 || s.indexOf("/thumb/") === 0) return tcgImg(s, true);',
+    '      if (s.indexOf("/cards/") === 0) return assetUrl(s);',
+    "      return s;",
+    "    }",
+  ].join("\n");
+  const thumbNew = [
+    "    function thumbOf(c) {",
+    "      var s = srcOf(c);",
+    "      if (!pictureInFile(c)) return \"\";",
+    '      if (s.indexOf("/cards/") === 0) return assetUrl(s);',
+    "      return \"\";",
+    "    }",
+  ].join("\n");
+  if (out.includes(thumbOld)) out = out.split(thumbOld).join(thumbNew);
+  const scanOld = [
+    "    function scanUrls(c) {",
+    "      var s = srcOf(c) || \"\";",
+    "      var out = [];",
+    "      function add(u) { if (u && out.indexOf(u) === -1) out.push(u); }",
+    "      if (!s) return out;",
+    "      if (/^https?:\\/\\//i.test(s)) { add(s); return out; }",
+    "      if (s.indexOf(\"/img/\") === 0 || s.indexOf(\"/thumb/\") === 0) {",
+    "        add(tcgImg(s, true));",
+    "        add(tcgImg(s, false));",
+    "      }",
+    "      add(hiresOf(c));",
+    "      if (s.charAt(0) === \"/\") add(s);",
+    "      add(assetUrl(s));",
+    "      return out;",
+    "    }",
+  ].join("\n");
+  const scanNew = [
+    "    function scanUrls(c) {",
+    "      var s = srcOf(c) || \"\";",
+    "      if (!pictureInFile(c)) return [];",
+    "      if (s.indexOf(\"/cards/\") === 0) return [assetUrl(s)];",
+    "      return [];",
+    "    }",
+  ].join("\n");
+  if (out.includes(scanOld)) out = out.split(scanOld).join(scanNew);
+  const faceOld = [
+    "        return \"<button type=\\\"button\\\" class=\\\"card\" + on + \"\\\" data-id=\\\"\" + c.id + \"\\\">\" + flag +",
+    "          \"<img class=\\\"\" + (print + still + pixel).trim() + \"\\\" alt=\\\"\" + esc(c.name || \"\") + \"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +",
+    "          \"<div class=\\\"meta\\\"><strong>\" + esc(c.name) + \"</strong>\" +",
+    "          \"<div class=\\\"fact\\\">\" + esc(factOf(c)) + \"</div></div></button>\";",
+  ].join("\n");
+  const faceNew = [
+    "        var shot = pictureInFile(c) ? thumbOf(c) : \"\";",
+    "        var face = shot ? \"<img class=\\\"\" + (print + still + pixel).trim() + \"\\\" alt=\\\"\" + esc(c.name || \"\") + \"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + shot + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"\";",
+    "        var line = shot ? factOf(c) : \"The picture is missing.\";",
+    "        return \"<button type=\\\"button\\\" class=\\\"card\" + on + \"\\\" data-id=\\\"\" + c.id + \"\\\">\" + flag +",
+    "          face +",
+    "          \"<div class=\\\"meta\\\"><strong>\" + esc(c.name) + \"</strong>\" +",
+    "          \"<div class=\\\"fact\\\">\" + esc(line) + \"</div></div></button>\";",
+  ].join("\n");
+  if (out.includes(faceOld)) out = out.split(faceOld).join(faceNew);
+  const dumpOld = "\"<img alt=\\\"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +";
+  const dumpNew = "(thumbOf(c) ? \"<img alt=\\\"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"<span class=\\\"note\\\">The picture is missing.</span>\") +";
+  if (out.includes(dumpOld)) out = out.split(dumpOld).join(dumpNew);
+  const slotOld = "\"<img src=\\\"\" + thumbOf(c) + \"\\\" alt=\\\"\" + (c.name || \"\") + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +";
+  const slotNew = "(thumbOf(c) ? \"<img src=\\\"\" + thumbOf(c) + \"\\\" alt=\\\"\" + (c.name || \"\") + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"<span class=\\\"note\\\">The picture is missing.</span>\") +";
+  if (out.includes(slotOld)) out = out.split(slotOld).join(slotNew);
   return out;
 }
 
