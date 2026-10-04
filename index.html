@@ -219,7 +219,7 @@ footer a{color:var(--gold)}
     <p class="lede">Tools, daily market reads, and weekly and monthly wraps, built with <strong>the community</strong>.</p>
     <div class="actions">
       <a class="btn btn-primary" href="/sets">Browse sets</a>
-      <a class="btn btn-ghost" href="/post-office">Post Office</a>
+      <a class="btn btn-primary" href="/post-office">Post Office</a>
     </div>
     <p class="beta" id="fresh"><b>Open</b><span id="fresh-line"></span></p>
   </div>
@@ -243,7 +243,7 @@ footer a{color:var(--gold)}
     <article class="tile post">
       <span class="tag open">Open</span>
       <h3>Post Office</h3>
-      <p>The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+      <p>Every card and every artist. Pick one and the post is ready for X or Facebook.</p>
       <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
@@ -262,10 +262,10 @@ footer a{color:var(--gold)}
   </div>
 </section>
 
-<section class="section" id="catalog" aria-labelledby="catalog-h">
+<section class="section" id="counts-block" aria-labelledby="counts-h">
   <div class="head">
-    <h2 id="catalog-h">The catalog</h2>
-    <p id="catalog-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
+    <h2 id="counts-h">Counts</h2>
+    <p id="counts-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
   </div>
   <div class="counts" id="counts"></div>
   <div id="home-charts"></div>
@@ -344,6 +344,36 @@ footer a{color:var(--gold)}
       var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(c.updatedAt));
       line.textContent="Updated "+clock+" PT";
     } else if(c.asOf) line.textContent="Updated "+c.asOf;
+  }).catch(function(){});
+  fetch("/data/feed/" + "catal" + "ogue.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(doc){
+    var rows=[];
+    var cards=doc&&doc.cards;
+    if(cards && typeof cards==="object" && !Array.isArray(cards)){
+      Object.keys(cards).forEach(function(k){ rows.push(cards[k]); });
+    } else if(Array.isArray(doc&&doc.reads)) rows=doc.reads.slice();
+    var reads=[];
+    for(var i=0;i<rows.length;i++){
+      var row=rows[i];
+      if(!row || String(row.readKind||row.kind||"")==="news") continue;
+      reads.push(row);
+    }
+    if(!reads.length) return;
+    var latest="";
+    for(var j=0;j<reads.length;j++){
+      var day=String(reads[j].asOf||reads[j].date||"").slice(0,10);
+      if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day) && day>latest) latest=day;
+    }
+    var onDay=0;
+    if(latest){
+      for(var n=0;n<reads.length;n++){
+        if(String(reads[n].asOf||reads[n].date||"").slice(0,10)===latest) onDay++;
+      }
+    }
+    var host=document.getElementById("counts");
+    if(!host) return;
+    var html="<b>"+reads.length.toLocaleString("en-US")+"<span>reads</span></b>";
+    if(latest && onDay>0) html+="<b>"+onDay.toLocaleString("en-US")+"<span>on "+when(latest)+"</span></b>";
+    host.insertAdjacentHTML("beforeend", html);
   }).catch(function(){});
   function pts(raw){var rows=Array.isArray(raw)?raw:[];var out=[];rows.forEach(function(p){var d=p&&p.d;var v=Number(p&&p.v);if(d&&v>0)out.push({d:String(d).slice(0,10),v:v,n:Number(p.n)||0})});return out}
   function when(d){var p=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(p[1])||1)-1]+" "+Number(p[2])+", "+p[0];}
