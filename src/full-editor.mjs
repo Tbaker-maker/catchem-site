@@ -668,6 +668,75 @@ export function rewriteFirstScreen(html) {
   return out;
 }
 
+export function rewriteLoadedLines(html) {
+  let out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.")) return out;
+  const pinOld = 'pins = ["base1-63", "sv3pt5-170"];';
+  if (out.includes(pinOld)) out = out.split(pinOld).join("pins = [];");
+  const lineOld = [
+    "    function pickLine(who) {",
+    "      var safe = path151For(who, \"line\");",
+    "      if (safe) return safe;",
+    "      var fam = evoFamily(who);",
+    "      if (!fam || fam.length < 2) return [];",
+    "      if (fam[0] === \"Eevee\" && fam.length > 3) {",
+    "        if (who === \"Eevee\") {",
+    "          var night = cohesiveCombos([\"Eevee\", \"Espeon\", \"Umbreon\"]);",
+    "          if (night.length) return night[0];",
+    "          var eevee = hottest(paperOf(\"Eevee\"));",
+    "          var tops = [\"Umbreon\", \"Espeon\", \"Sylveon\"].map(function (sp) { return hottest(rolePool(sp)); }).filter(Boolean);",
+    "          return [eevee].concat(tops.slice(0, 2)).filter(Boolean);",
+    "        }",
+    "        fam = [\"Eevee\", who];",
+    "      }",
+    "      var combos = cohesiveCombos(fam);",
+    "      return combos[0] || [];",
+    "    }",
+  ].join("\n");
+  const lineNew = [
+    "    function pickLine(who) {",
+    "      var safe = path151For(who, \"line\");",
+    "      return safe || [];",
+    "    }",
+  ].join("\n");
+  if (out.includes(lineOld)) out = out.split(lineOld).join(lineNew);
+  const offerOld = [
+    "        var fam = evoFamily(who);",
+    "        var linePath = path151For(who, \"line\");",
+    "        if (linePath) {",
+    "          offers.push({ v: \"line\", l: \"Evo line\", s: linePath.map(function (c) { return c.name; }).join(\" → \") });",
+    "        } else if (fam && fam.length >= 2) {",
+    "          var lineOk = fam.every(function (sp) { return rolePool(sp).length; });",
+    "          if (fam[0] === \"Eevee\" && fam.length > 3) lineOk = rolePool(\"Eevee\").length && rolePool(who === \"Eevee\" ? \"Umbreon\" : who).length;",
+    "          if (lineOk) {",
+    "            var lineLab = fam[0] === \"Eevee\" && who !== \"Eevee\" ? (\"Eevee → \" + who) : (fam[0] + \" → \" + fam[fam.length - 1]);",
+    "            offers.push({ v: \"line\", l: \"Evo line\", s: lineLab });",
+    "          }",
+    "        }",
+  ].join("\n");
+  const offerNew = [
+    "        var linePath = path151For(who, \"line\");",
+    "        if (linePath) {",
+    "          offers.push({ v: \"line\", l: \"Evo line\", s: linePath.map(function (c) { return c.name; }).join(\" → \") });",
+    "        }",
+  ].join("\n");
+  if (out.includes(offerOld)) out = out.split(offerOld).join(offerNew);
+  const trioOld = [
+    "      if (kind === \"trio\") {",
+    "        var birds = path151For(who, \"trio\");",
+    "        if (birds) return birds;",
+    "      }",
+  ].join("\n");
+  const trioNew = [
+    "      if (kind === \"trio\") {",
+    "        var birds = path151For(who, \"trio\");",
+    "        return birds || [];",
+    "      }",
+  ].join("\n");
+  if (out.includes(trioOld)) out = out.split(trioOld).join(trioNew);
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
@@ -688,6 +757,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = rewritePlayAssets(out);
   out = rewriteFirstScreen(out);
+  out = rewriteLoadedLines(out);
   out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';
