@@ -60,6 +60,7 @@ a{color:var(--gold)}
 
 /* HERO */
 .hero{position:relative;padding:64px 0 56px;display:grid;gap:28px}
+.mark{position:relative}
 .brand{font:600 clamp(56px,15vw,104px)/.9 var(--serif);letter-spacing:-.035em;margin:0;font-variation-settings:'opsz' 144}
 .brand span{color:var(--gold)}
 .kicker{font:600 12.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:0 0 16px}
@@ -78,27 +79,11 @@ h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin
 .beta b{font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--green);
   border:1px solid rgba(127,199,154,.4);border-radius:999px;padding:5px 9px;white-space:nowrap}
 
-/* Fanned card outlines. Pure CSS, decorative only. */
-.mark{position:relative}
-.fan{position:absolute;pointer-events:none;width:120px;height:168px;right:4px;top:40px;opacity:.9}
-.fan i{position:absolute;inset:0;border-radius:12px;border:1.5px solid;background:rgba(18,16,14,.55);transform-origin:50% 100%}
-.fan i:nth-child(1){border-color:rgba(217,183,121,.55);transform:rotate(-14deg) translateX(-18px)}
-.fan i:nth-child(2){border-color:rgba(224,103,91,.55);transform:rotate(0deg)}
-.fan i:nth-child(3){border-color:rgba(111,155,232,.55);transform:rotate(14deg) translateX(18px)}
-.fan i::after{content:"";position:absolute;inset:9px 9px 44%;border-radius:6px;border:1px solid currentColor;opacity:.35}
-.fan i:nth-child(1){color:var(--gold)}.fan i:nth-child(2){color:var(--red)}.fan i:nth-child(3){color:var(--blue)}
-
 @media (max-width:759px){
-  .mark{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
-  .fan{position:relative;width:92px;height:128px;right:auto;top:auto;margin:0 4px 6px 0;flex:none;opacity:.9;overflow:hidden}
-  .fan i{border-radius:10px}
-  .fan i:nth-child(1){transform:rotate(-12deg) translateX(-8px)}
-  .fan i:nth-child(3){transform:rotate(12deg) translateX(8px)}
   .actions .btn{flex:1 1 100%}
 }
 @media (min-width:760px){
   .hero{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;padding:96px 0 72px;align-items:start}
-  .fan{position:relative;right:auto;top:auto;margin:72px 0 0 34px;width:120px;height:168px}
 }
 
 /* SECTIONS */
@@ -211,7 +196,6 @@ footer a{color:var(--gold)}
 <header class="hero">
   <div class="mark">
     <p class="brand">Catch'em<span>.</span></p>
-    <div class="fan" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>
   <div>
     <p class="kicker">Built with the community</p>

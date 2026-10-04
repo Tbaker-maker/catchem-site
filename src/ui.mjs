@@ -19,21 +19,22 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function dropTitleName(title, line) {
+  const text = String(line ?? "").trim();
+  const who = String(title ?? "").trim();
+  if (!text || !who || !text.includes(who)) return text;
+  const escaped = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text
+    .replace(new RegExp("(^|[^A-Za-z0-9])" + escaped + "(?=$|[^A-Za-z0-9])", "g"), "$1")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,])/g, "$1")
+    .trim();
+}
+
 // The title already shows the name and number. The line under it starts at the
 // price move. A line that is only the title is blank. Prices, dates, and
 // percents in the file stay as written.
 export function readUnderTitle(name, path) {
-  function dropName(title, line) {
-    const text = String(line ?? "").trim();
-    const who = String(title ?? "").trim();
-    if (!text || !who || !text.includes(who)) return text;
-    const escaped = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return text
-      .replace(new RegExp("(^|[^A-Za-z0-9])" + escaped + "(?=$|[^A-Za-z0-9])", "g"), "$1")
-      .replace(/\s{2,}/g, " ")
-      .replace(/\s+([.,])/g, "$1")
-      .trim();
-  }
   const title = String(name ?? "").trim();
   const line = String(path ?? "").trim();
   if (!line) return "";
@@ -42,7 +43,7 @@ export function readUnderTitle(name, path) {
     const marker = "The latest price of " + title + " is";
     if (line.startsWith(marker + " ") || line === marker || line.startsWith(marker + ".")) {
       const rest = line.slice(marker.length).replace(/^\./, "").trim();
-      return rest ? dropName(title, "The latest price is " + rest) : "";
+      return rest ? dropTitleName(title, "The latest price is " + rest) : "";
     }
   }
   if (title && line.startsWith(title)) {
@@ -51,10 +52,10 @@ export function readUnderTitle(name, path) {
       let rest = line.slice(title.length).replace(/^[\s:–—-]+/, "").trim();
       const at = rest.indexOf("latest price");
       if (at > 0) rest = rest.slice(at).trim();
-      return dropName(title, rest);
+      return dropTitleName(title, rest);
     }
   }
-  return dropName(title, line);
+  return dropTitleName(title, line);
 }
 
 // The set name and the card id already on the card. A blank field stays off.
@@ -108,13 +109,15 @@ export function isFactRow(row) {
 // English is cardCount when the file has no separate language split.
 // Japanese is said only when that count is already on the row.
 export function pokemonFactLine(row) {
-  const count = (value) => (Number.isInteger(value) && value >= 0 ? value : null);
   if (!row || typeof row !== "object") return "";
   const name = String(row.name || "").trim();
   if (!name) return "";
-  let english = count(row.englishCount) ?? count(row.enCount);
-  const japanese = count(row.japaneseCount) ?? count(row.jaCount) ?? count(row.jpCount);
-  if (english == null) english = count(row.cardCount);
+  let english = Number.isInteger(row.englishCount) && row.englishCount >= 0 ? row.englishCount : null;
+  if (english == null && Number.isInteger(row.enCount) && row.enCount >= 0) english = row.enCount;
+  let japanese = Number.isInteger(row.japaneseCount) && row.japaneseCount >= 0 ? row.japaneseCount : null;
+  if (japanese == null && Number.isInteger(row.jaCount) && row.jaCount >= 0) japanese = row.jaCount;
+  if (japanese == null && Number.isInteger(row.jpCount) && row.jpCount >= 0) japanese = row.jpCount;
+  if (english == null && Number.isInteger(row.cardCount) && row.cardCount >= 0) english = row.cardCount;
   const parts = [];
   if (english != null) parts.push(`${english} English TCG card${english === 1 ? "" : "s"}`);
   if (japanese != null) parts.push(`${japanese} Japanese TCG card${japanese === 1 ? "" : "s"}`);
@@ -556,10 +559,31 @@ function draw(){
   const view=list.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
-    const img=r.pid?'<img alt="" width="64" height="64" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#211e1a" src="https://tcgplayer-cdn.tcgplayer.com/product/'+r.pid+'_in_200x200.jpg" onerror="this.remove()">':"";
+    const src=pictureSrc(r, data.logo);
+    const crop=cropStyle(r&&r.crop);
+    const img=src?'<img alt="" width="64" height="64" style="width:64px;height:64px;'+(crop?crop:"object-fit:contain")+';border-radius:8px;background:#211e1a" src="'+String(src).replace(/"/g,"")+'">':'<span class="muted">The picture is missing.</span>';
     return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
   }).join("") || '<p class="muted">Nothing matches.</p>';
   document.getElementById("more").hidden=shown>=list.length;
+}
+function pictureSrc(row, logo){
+  if(!row || typeof row!=="object") return "";
+  if(row.icon) return "";
+  const image=typeof row.image==="string"?row.image.trim():"";
+  const scan=typeof row.scan==="string"?row.scan.trim():"";
+  const src=image||scan;
+  if(!src) return "";
+  if(logo && src===String(logo)) return "";
+  return src;
+}
+function cropStyle(crop){
+  if(!crop || typeof crop!=="object") return "";
+  const x=Number(crop.x);
+  const y=Number(crop.y);
+  const w=Number(crop.w!=null?crop.w:crop.width);
+  const h=Number(crop.h!=null?crop.h:crop.height);
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!(w>0)||!(h>0)) return "";
+  return "object-fit:none;object-position:-"+x+"px -"+y+"px;width:"+w+"px;height:"+h+"px";
 }
 fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0; return r.json()}).then(data=>{
   document.getElementById("title").textContent=data.name;
@@ -1278,6 +1302,7 @@ function priorMoney(card){
   const from=now/denom;
   return from>0?money(from):"";
 }
+${dropTitleName.toString()}
 ${readUnderTitle.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
