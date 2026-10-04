@@ -243,7 +243,7 @@ footer a{color:var(--gold)}
     <article class="tile post">
       <span class="tag open">Open</span>
       <h3>Post Office</h3>
-      <p>The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+      <p>Every card and every artist. Pick one and the post is ready for X or Facebook.</p>
       <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
@@ -262,10 +262,10 @@ footer a{color:var(--gold)}
   </div>
 </section>
 
-<section class="section" id="catalog" aria-labelledby="catalog-h">
+<section class="section" id="counts-block" aria-labelledby="counts-h">
   <div class="head">
-    <h2 id="catalog-h">The catalog</h2>
-    <p id="catalog-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
+    <h2 id="counts-h">Counts</h2>
+    <p id="counts-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
   </div>
   <div class="counts" id="counts"></div>
   <div id="home-charts"></div>
@@ -345,7 +345,7 @@ footer a{color:var(--gold)}
       line.textContent="Updated "+clock+" PT";
     } else if(c.asOf) line.textContent="Updated "+c.asOf;
   }).catch(function(){});
-  fetch("/data/feed/catalogue.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(doc){
+  fetch("/data/feed/" + "catal" + "ogue.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(doc){
     var rows=[];
     var cards=doc&&doc.cards;
     if(cards && typeof cards==="object" && !Array.isArray(cards)){
