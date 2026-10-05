@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink } from "../src/ui.mjs";
+import { esc, renderAll, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
@@ -75,6 +75,29 @@ t("the feed names Pokémon and hides a missing image price", feedHtml.includes("
 t("a read names the path and the check, and 30D is colored", feedHtml.includes("Open the data") && !feedHtml.includes("Open the page") && feedHtml.includes("Checked ") && feedHtml.includes('class="win ') && feedHtml.includes("30D") && feedHtml.includes("90D") && !feedHtml.includes("What this means") && !feedHtml.includes("No sales count yet") && !feedHtml.includes("Sales volume") && feedHtml.includes('textContent="Next"') && feedHtml.includes('textContent="Previous"') && feedHtml.includes("Listings for sale") && feedHtml.includes("The data") && !feedHtml.includes("What to watch") && !feedHtml.includes("The sales behind") && !feedHtml.includes("Buy it when") && !feedHtml.includes("buyout"));
 const deep = await (await renderPath("/feed/r/box-etb", fetchImpl, { feed: true })).text();
 t("a deep link starts on that read", deep.includes('id="start"') && deep.includes("box-etb") && deep.includes(">Back<") && deep.includes(">Track<") && !deep.includes("What this means") && deep.includes("Where's it heading?") && deep.includes("height:180px") && deep.includes(">Up<"));
+
+const soldPath = "Prismatic Evolutions Elite Trainer Box latest price fell from $154.77 on Sep 3 to $134.46 on Oct 3, down 13.1%, with 2269 copies sold on TCGplayer over 3 months on Oct 2, not eBay and not a 7-day count.";
+const thinHead = "Blastoise (Boundaries Crossed, 2012, #31) is up 11.5% over 90 days, from $21.57 to $24.05, on few sales.";
+t("a copies-sold clause comes out and the price stays", withoutSoldClaim(soldPath) === "Prismatic Evolutions Elite Trainer Box latest price fell from $154.77 on Sep 3 to $134.46 on Oct 3, down 13.1%." && !withoutSoldClaim(soldPath).includes("2269"));
+t("few sales comes out and the price stays", withoutSoldClaim(thinHead) === "Blastoise (Boundaries Crossed, 2012, #31) is up 11.5% over 90 days, from $21.57 to $24.05." && !/\bfew sales\b/i.test(withoutSoldClaim(thinHead)));
+t("a sold-only sentence is removed and not replaced", withoutSoldClaim("Sales volume is 40. Thin sales. 12 copies sold.") === "");
+t("a price path with no sold claim stays", withoutSoldClaim("Talonflame latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.") === "Talonflame latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.");
+const soldRead = {
+  id: "move-tcgcsv-593355-30",
+  headline: thinHead,
+  path: soldPath,
+  price: 134.46,
+  name: "Prismatic Evolutions Elite Trainer Box",
+  source: "TCGplayer market",
+  asOf: "2026-10-03",
+  href: "/p/tcgcsv-593355",
+};
+const soldFeed = renderFeed({ asOf: "2026-10-03", reads: [soldRead] }, "", "", { feed: true });
+const soldLead = JSON.parse(soldFeed.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
+t("the live read drops the sold sentence and keeps the price path", soldLead.length === 1 && soldLead[0].path === "Prismatic Evolutions Elite Trainer Box latest price fell from $154.77 on Sep 3 to $134.46 on Oct 3, down 13.1%." && !soldLead[0].path.includes("copies sold") && !soldLead[0].headline.includes("few sales") && soldLead[0].price === 134.46);
+const soldAll = renderAll({ asOf: "2026-10-03", reads: [{ id: "only-sold", headline: "Sales volume is 40 copies sold.", price: 10 }] }, "");
+t("all reads leaves out a sentence that is only a sold claim", !soldAll.includes("copies sold") && !soldAll.includes("Sales volume") && !soldAll.includes(">40<"));
+
 t("tracked reads are a signed-in list", (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("My tracked") === false && (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("Sign in with Discord to see your tracked reads."));
 const all = await (await renderPath("/feed/all", fetchImpl, { feed: true })).text();
 t("all reads is a list", all.includes("All reads") && all.includes("Alakazam"));
