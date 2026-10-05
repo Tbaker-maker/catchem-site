@@ -20,6 +20,33 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// A read may mention sales volume, thin sales, or copies sold. No file has a
+// sold count, so that sentence comes out. A price already in the file stays.
+// Nothing is written in its place.
+export function withoutSoldClaim(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+  const claim = /\b(?:sales volume|thin sales|few sales|sold counts?|cop(?:y|ies) sold)\b/i;
+  const parts = raw.split(/(?<=\.)\s+/);
+  const kept = [];
+  for (const sentence of parts) {
+    if (!claim.test(sentence)) {
+      kept.push(sentence);
+      continue;
+    }
+    let s = sentence;
+    s = s.replace(/,?\s*with\s+[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*on\s+(?:few|thin)\s+sales\b[^.]*/gi, "");
+    s = s.replace(/,?\s*(?:sales volume|thin sales|few sales|sold counts?)\b[^.]*/gi, "");
+    s = s.replace(/\s{2,}/g, " ").replace(/\s+([,.])/g, "$1").replace(/,\s*(?=\.)/g, "").replace(/,\s*$/g, "").trim();
+    if (!s || !/[A-Za-z]/.test(s) || claim.test(s)) continue;
+    kept.push(s);
+  }
+  return kept.join(" ").trim();
+}
+
+
 function dropTitleName(title, line) {
   const text = String(line ?? "").trim();
   const who = String(title ?? "").trim();
@@ -1280,7 +1307,12 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).map((r) => ({
+    ...r,
+    headline: withoutSoldClaim(r.headline),
+    ...(r.path ? { path: withoutSoldClaim(r.path) } : {}),
+    ...(r.why ? { why: withoutSoldClaim(r.why) } : {}),
+  }));
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const newsLead = JSON.stringify(newsSlice(feedNews)).replace(/</g, "\\u003c");
   const css = `
@@ -1591,9 +1623,10 @@ function priorMoney(card){
 }
 ${dropTitleName.toString()}
 ${readUnderTitle.toString()}
+${withoutSoldClaim.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
-  const path=String(card.path||"").trim();
+  const path=withoutSoldClaim(String(card.path||"").trim());
   if(!path) return "";
   return readUnderTitle(card.name, path);
 }
@@ -1766,7 +1799,7 @@ function cardEl(card, facts){
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
   const shown=sameSentence||line;
-  const title=html(card.name||card.headline||"Read");
+  const title=html(card.name||withoutSoldClaim(card.headline)||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const cut=isFact(card)?factCutLine(card):"";
@@ -2655,7 +2688,11 @@ fetch("/api/alerts").then(function(res){return res.json().then(function(data){re
 export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
   const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
-${reads.map((r) => `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(r.headline)}</b></a><b>${money(r.price) || ""}</b></div>`).join("")}
+${reads.map((r) => {
+    const line = withoutSoldClaim(r.headline);
+    if (!line) return "";
+    return `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
+  }).join("")}
 </main>`;
   return chrome("Feed", body, "All reads", stamp, "", feedNav(opts));
 }
