@@ -490,11 +490,19 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of newsSlice(baked)) push(row);
     return out;
   }
-  // The front is the short loop: only reads this file already has.
-  // A catalogue id with no read stays out. One set still walks ranked ids.
-  // No seen-list is on file, so nothing is dropped for having been shown.
+  // The short front is the reads already on this bundle. It is not the whole
+  // file. Unranked ids follow in the shuffled order the file already stored.
+  // A ranked filter below keeps that order. No price is added for a bare id.
   if (!filter) {
     for (const row of kept) push(row);
+    const rest = browse?.unfiltered;
+    if (Array.isArray(rest)) {
+      for (const id of rest) {
+        if (typeof id !== "string" || !id || seen.has(id)) continue;
+        const row = kept.find((item) => item && item.id === id);
+        push(row || { id, pending: true });
+      }
+    }
     return out;
   }
   const ranked = RANKED_FILTERS.has(filter);
@@ -2295,6 +2303,11 @@ function buildFlat(){
   const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
   if(!loopFilter){
     leadRows().forEach(add);
+    const order=browse && browse.unfiltered;
+    (order||[]).forEach(function(id){
+      if(typeof id!=="string" || !id) return;
+      add({id:id, pending:true});
+    });
     flat=rows;
     return;
   }
