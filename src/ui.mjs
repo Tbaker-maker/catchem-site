@@ -1737,11 +1737,15 @@ function cardEl(card, facts){
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=isFact(card)?pokemonFactLine(card):moveLine(card);
   const ident=cardIdentity(card);
+  const headline=String(card.headline||"").trim();
+  const pathText=String(card.path||"").trim();
+  const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
+  const shown=sameSentence||line;
   const title=html(card.name||card.headline||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const cut=isFact(card)?factCutLine(card):"";
-  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
+  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
