@@ -1370,7 +1370,6 @@ function isFact(card){
 }
 ${cutoutSrc.toString()}
 ${tcgLink.toString()}
-${factCutout.toString()}
 ${pokemonFactLine.toString()}
 ${pricedMonCards.toString()}
 function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
@@ -1682,8 +1681,6 @@ function newsEl(card){
   return el;
 }
 function factCutLine(card){
-  const src=factCutout(catalogue, card && card.name);
-  if(src) return '<img class="cutout" alt="" src="'+html(src)+'">';
   const who=String(card && card.name || "").trim();
   return '<p class="cut-miss">The cutout is missing. '+html(who)+"</p>";
 }
