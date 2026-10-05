@@ -6,7 +6,7 @@ import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
-  clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
+  clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
   renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
@@ -87,6 +87,28 @@ export function addFeedEntry(html) {
   return out;
 }
 
+
+async function omitStalePriceReads(reads, fetchImpl) {
+  const list = Array.isArray(reads) ? reads : [];
+  const buckets = new Map();
+  const out = [];
+  for (const read of list) {
+    const sku = String(read?.sku || "");
+    if (!/^tcgcsv-\d+$/.test(sku)) {
+      out.push(read);
+      continue;
+    }
+    const n = Number(sku.slice("tcgcsv-".length));
+    const bucket = String(n % 100).padStart(2, "0");
+    if (!buckets.has(bucket)) buckets.set(bucket, loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []));
+    const rows = await buckets.get(bucket);
+    const card = Array.isArray(rows) ? rows.find((row) => row && row.id === sku) : null;
+    if (readStaleAgainstCard(read, card)) continue;
+    out.push(read);
+  }
+  return out;
+}
+
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
   if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
@@ -108,15 +130,17 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
-    if (path === "/feed/all") return html(renderAll(bundle, stamp, pageOpts));
+    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
+    const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
+    if (path === "/feed/all") return html(renderAll(freshBundle, stamp, pageOpts));
     if (path === "/feed/mine") return html(renderMine(stamp, pageOpts));
     if (path.startsWith("/feed/s/")) {
       const section = decodeURIComponent(path.slice("/feed/s/".length));
-      return html(renderFeed(bundle, "", stamp, { ...pageOpts, section }));
+      return html(renderFeed(freshBundle, "", stamp, { ...pageOpts, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    if (id) return html(renderFeed(bundle, id, stamp, { ...pageOpts, page: "read" }));
-    return html(renderFeed(bundle, "", stamp, pageOpts));
+    if (id) return html(renderFeed(freshBundle, id, stamp, { ...pageOpts, page: "read" }));
+    return html(renderFeed(freshBundle, "", stamp, pageOpts));
   }
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);

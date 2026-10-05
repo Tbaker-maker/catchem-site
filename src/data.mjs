@@ -1,6 +1,10 @@
 const BASE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/";
 const mem = new Map();
 
+export function resetJsonCache() {
+  mem.clear();
+}
+
 export async function loadJson(rel, fetchImpl = fetch) {
   if (mem.has(rel)) return mem.get(rel);
   const res = await fetchImpl(BASE + rel, { cf: { cacheTtl: 300 } });

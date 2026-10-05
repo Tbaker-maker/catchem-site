@@ -1,8 +1,9 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink } from "../src/ui.mjs";
+import { esc, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
+import { resetJsonCache } from "../src/data.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 
 let fail = 0;
@@ -277,6 +278,40 @@ const built = renderFeed({ asOf: "2026-10-03", reads: [priced, fact, lag, lagHal
 const builtLead = JSON.parse(built.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
 t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "move-tcgcsv-10-7,pokemon-duraludon,lag-prismatic,supply-one");
 t("the feed build has no volume line", !built.includes("No sales count yet") && !built.includes("Sales volume") && !builtLead.some((r) => r.id === "lag-half" || r.id === "supply-blank"));
+
+
+t("a newer card price disagrees with the older read", readStaleAgainstCard(
+  { sku: "tcgcsv-516693", readKind: "price", kind: "single", price: 1.36, asOf: "2026-09-25" },
+  { id: "tcgcsv-516693", price: 0.39, asOf: "2026-09-27" },
+) === true);
+t("an older card price does not drop a later read", readStaleAgainstCard(
+  { sku: "tcgcsv-684406", readKind: "price", kind: "single", price: 1.92, asOf: "2026-10-03" },
+  { id: "tcgcsv-684406", price: 1.44, asOf: "2026-09-27" },
+) === false);
+t("a fact is not dropped as a stale price", readStaleAgainstCard(
+  { sku: "pokemon-gyarados", readKind: "pokemon", kind: "pokemon", asOf: "2026-09-25" },
+  { id: "tcgcsv-516693", price: 0.39, asOf: "2026-09-27" },
+) === false);
+const staleFiles = {
+  ...files,
+  "reads.json": { asOf: "2026-10-03", reads: [
+    { id: "move-tcgcsv-684406-7", sku: "tcgcsv-684406", kind: "single", readKind: "price", name: "Talonflame - 091/088", headline: "Talonflame price.", path: "Talonflame - 091/088 latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.", price: 1.92, asOf: "2026-10-03" },
+    { id: "move-tcgcsv-516693-7", sku: "tcgcsv-516693", kind: "single", readKind: "price", name: "Gyarados", headline: "Gyarados price.", path: "Gyarados latest price fell from $1.57 on Sep 18 to $1.36 on Sep 25, down 13.4%.", price: 1.36, asOf: "2026-09-25" },
+    { id: "pokemon-gyarados", sku: "pokemon-gyarados", readKind: "pokemon", kind: "pokemon", name: "Gyarados", headline: "Gyarados has 42 cards in the catalog, drawn by 22 artists, and the national dex number on those cards is 130.", path: "Gyarados has 42 cards in the catalog, drawn by 22 artists, and the national dex number on those cards is 130.", cardCount: 42, artistCount: 22, dex: 130 },
+  ]},
+  "buckets/06.json": [{ id: "tcgcsv-684406", name: "Talonflame - 091/088", price: 1.44, asOf: "2026-09-27" }],
+  "buckets/93.json": [{ id: "tcgcsv-516693", name: "Gyarados", price: 0.39, asOf: "2026-09-27" }],
+};
+const staleFetch = async (url) => {
+  const rel = String(url).split("/public/")[1];
+  if (!staleFiles[rel]) return { ok: false, status: 404, json: async () => null, text: async () => "" };
+  return { ok: true, status: 200, json: async () => staleFiles[rel], text: async () => JSON.stringify(staleFiles[rel]) };
+};
+resetJsonCache();
+const staleHtml = await (await renderPath("/feed", staleFetch, { feed: true })).text();
+const staleLead = JSON.parse(staleHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
+t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
+t("the feed asks the card file before it shows that price", staleHtml.includes("function readStaleAgainstCard") && staleHtml.includes("function stalePrice"));
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
