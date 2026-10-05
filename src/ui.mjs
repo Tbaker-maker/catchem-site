@@ -431,6 +431,40 @@ export function readStaleAgainstCard(read, card) {
 
 const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave"]);
 
+function waveRead(item, n) {
+  return {
+    id: `wave-${n}`,
+    waveItem: true,
+    readKind: "wave",
+    kind: "wave",
+    name: item.title || "",
+    headline: item.sentence || item.title || "",
+    path: item.sentence || "",
+    source: item.source || "",
+    asOf: String(item.date || "").slice(0, 10),
+    href: item.url || "",
+    reprint: item.reprint || "",
+  };
+}
+
+export function waveReads(browse) {
+  const items = browse?.filters?.wave?.items;
+  if (!Array.isArray(items)) return [];
+  const out = [];
+  items.forEach((item, n) => {
+    if (!item || (!item.title && !item.sentence)) return;
+    out.push(waveRead(item, n));
+  });
+  return out;
+}
+
+function newsReads(browse, opts) {
+  let baked = opts && opts.news ? opts.news : null;
+  const block = browse && browse.filters ? browse.filters.news : null;
+  if (!baked && block && Array.isArray(block.items)) baked = { asOf: block.asOf || "", items: block.items };
+  return newsSlice(baked);
+}
+
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
   const filter = String(opts.filter || "");
   const hideFacts = opts.hideFacts === true;
@@ -462,47 +496,32 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     return out;
   }
   if (filter === "wave") {
-    const items = browse?.filters?.wave?.items;
-    if (Array.isArray(items)) {
-      items.forEach((item, n) => {
-        if (!item || (!item.title && !item.sentence)) return;
-        push({
-          id: `wave-${n}`,
-          waveItem: true,
-          readKind: "wave",
-          kind: "wave",
-          name: item.title || "",
-          headline: item.sentence || item.title || "",
-          path: item.sentence || "",
-          source: item.source || "",
-          asOf: String(item.date || "").slice(0, 10),
-          href: item.url || "",
-          reprint: item.reprint || "",
-        });
-      });
-    }
+    for (const row of waveReads(browse)) push(row);
     return out;
   }
   if (filter === "news") {
-    let baked = opts.news || null;
-    const block = browse && browse.filters ? browse.filters.news : null;
-    if (!baked && block && Array.isArray(block.items)) baked = { asOf: block.asOf || "", items: block.items };
-    for (const row of newsSlice(baked)) push(row);
+    for (const row of newsReads(browse, opts)) push(row);
     return out;
   }
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
+  // News and wave rows already in the files are mixed into that walk.
   // A ranked filter below keeps that order. No price is added for a bare id.
   if (!filter) {
     for (const row of kept) push(row);
+    const extras = newsReads(browse, opts).concat(waveReads(browse));
+    let ei = 0;
     const rest = browse?.unfiltered;
     if (Array.isArray(rest)) {
       for (const id of rest) {
         if (typeof id !== "string" || !id || seen.has(id)) continue;
+        const before = out.length;
         const row = kept.find((item) => item && item.id === id);
         push(row || { id, pending: true });
+        if (out.length !== before && ei < extras.length) push(extras[ei++]);
       }
     }
+    while (ei < extras.length) push(extras[ei++]);
     return out;
   }
   const ranked = RANKED_FILTERS.has(filter);
@@ -2303,11 +2322,23 @@ function buildFlat(){
   const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
   if(!loopFilter){
     leadRows().forEach(add);
+    // Mix news and wave rows already on the file into the shuffled walk.
+    const extras=[];
+    (Array.isArray(newsRows)?newsRows:[]).forEach(function(row){ extras.push(row); });
+    const waveItems=browse && browse.filters && browse.filters.wave && browse.filters.wave.items;
+    (waveItems||[]).forEach(function(item, n){
+      if(!item || (!item.title && !item.sentence)) return;
+      extras.push({id:"wave-"+n, waveItem:true, readKind:"wave", kind:"wave", name:item.title||"", headline:item.sentence||item.title||"", path:item.sentence||"", source:item.source||"", asOf:String(item.date||"").slice(0,10), href:item.url||"", reprint:item.reprint||""});
+    });
+    let ei=0;
     const order=browse && browse.unfiltered;
     (order||[]).forEach(function(id){
-      if(typeof id!=="string" || !id) return;
+      if(typeof id!=="string" || !id || seen[id]) return;
+      const before=rows.length;
       add({id:id, pending:true});
+      if(rows.length!==before && ei<extras.length) add(extras[ei++]);
     });
+    while(ei<extras.length) add(extras[ei++]);
     flat=rows;
     return;
   }
