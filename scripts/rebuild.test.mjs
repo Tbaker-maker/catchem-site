@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderAll, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim } from "../src/ui.mjs";
+import { esc, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
@@ -42,19 +42,64 @@ const files = {
   "artists.json": artists,
   "artists/ken-sugimori.json": artist,
   "buckets/10.json": [card],
+  "buckets/13.json": [{ id: "tcgcsv-503313", name: "151 Elite Trainer Box", set: "151", setSlug: "sv-scarlet-violet-151", kind: "sealed", price: 87.5, pid: 503313, source: "TCGplayer market", asOf: "2026-10-06", hist: [["2026-08-20", 90], ["2026-08-21", 88]] }],
   "reads.json": reads,
   "movers.json": movers,
   "receipts.json": receipts,
   "redirects.json": { products: { "sv3pt5-etb": "/p/tcgcsv-504467" }, sets: { base1: "/sets/base-set" } },
 };
 
+const diveFiles = {
+  "index.json": { asOf: "2026-10-06", count: 1, ids: ["sv3pt5-etb"], byTcgcsv: { "tcgcsv-503313": "sv3pt5-etb" } },
+  "sv3pt5-etb.json": {
+    id: "sv3pt5-etb",
+    name: "151 Elite Trainer Box",
+    asOf: "2026-10-06",
+    href: "/dive/sv3pt5-etb",
+    tcgcsvId: "tcgcsv-503313",
+    series: [
+      { date: "2026-08-20", price: 90, listingCount: 40, source: "ebay-browse-ask" },
+      { date: "2026-08-21", price: 88, listingCount: 38, source: "ebay-browse-ask" },
+    ],
+    latest: { id: "sv3pt5-etb", name: "151 Elite Trainer Box", set: "151", subtype: "etb", priceMedian: 87.5, listingCount: 35, source: "ebay-browse-api", marketplace: "EBAY_US", dataStatus: "live" },
+    buyout: { id: "sv3pt5-etb", browseTotalNow: 324, browseTotalBefore: 323, level: "unscored", ebayCalled: true },
+    volume: null,
+    volumeNote: "Sold counts need Insights scope.",
+    outlier: null,
+    outlierHook: "Optional file data/price-outliers.json",
+  },
+};
+
 const fetchImpl = async (url) => {
-  const rel = String(url).split("/public/")[1];
+  const s = String(url);
+  const diveRel = s.split("/research/pulse/dive/")[1];
+  if (diveRel) {
+    const doc = diveFiles[diveRel];
+    if (!doc) return { ok: false, status: 404, json: async () => null, text: async () => "" };
+    return { ok: true, status: 200, json: async () => doc, text: async () => JSON.stringify(doc) };
+  }
+  const rel = s.split("/public/")[1];
   if (!files[rel]) return { ok: false, status: 404, json: async () => null, text: async () => "" };
   return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
 };
 
 t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
+t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pageKind("/dive/sv3pt5-etb.html") === "dive");
+{
+  const divePage = await renderPath("/dive/sv3pt5-etb", fetchImpl, { feed: true });
+  const diveHtml = await divePage.text();
+  t("dive page renders series chart and table", divePage.status === 200 && diveHtml.includes("151 Elite Trainer Box") && diveHtml.includes("eBay Browse ask median") && diveHtml.includes("2026-08-20") && diveHtml.includes("data-chart") && diveHtml.includes("<table") && diveHtml.includes("Volume / solds: not available") && !diveHtml.includes("$undefined"));
+  const miss = await renderPath("/dive/no-such-sku", fetchImpl, { feed: true });
+  t("missing dive is 404", miss.status === 404);
+  const cardPage = await (await renderPath("/p/tcgcsv-503313", fetchImpl, { feed: true })).text();
+  // card may 404 if bucket missing — only check diveHref when card renders; seed bucket
+}
+
+{
+  const cardPage = await (await renderPath("/p/tcgcsv-503313", fetchImpl, { feed: true })).text();
+  t("catalog sealed page links Deeper look when dive exists", cardPage.includes("Deeper look") && cardPage.includes("/dive/sv3pt5-etb") && cardPage.includes("See the chart"));
+}
+
 t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
 t("pulse is redirected, not the baked shorts", !isFeedPath("/pulse") && !isFeedPath("/feed"));
 t("app and try still go to the feed", redirectPath("/app/") === "/feed" && redirectPath("/try/index.html") === "/feed");
