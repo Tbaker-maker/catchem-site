@@ -1,12 +1,12 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { loadJson, proxyPublic } from "./data.mjs";
+import { loadJson, loadDive, loadDiveIndex, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import {
-  clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
+  clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
@@ -35,6 +35,7 @@ export function pageKind(pathname) {
   if (path.startsWith("/artists/")) return "artist";
   if (path.startsWith("/c/")) return "card";
   if (path.startsWith("/p/")) return "product";
+  if (path.startsWith("/dive/")) return "dive";
   if (path === "/board" || path === "/movers") return "movers";
   if (path === "/search") return "search";
   if (path === "/receipts") return "receipts";
@@ -132,15 +133,17 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const bundle = await loadJson("reads.json", fetchImpl);
     const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
     const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
-    if (path === "/feed/all") return html(renderAll(freshBundle, stamp, pageOpts));
-    if (path === "/feed/mine") return html(renderMine(stamp, pageOpts));
+    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
+    const withDive = { ...pageOpts, diveMap };
+    if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
+    if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
       const section = decodeURIComponent(path.slice("/feed/s/".length));
-      return html(renderFeed(freshBundle, "", stamp, { ...pageOpts, section }));
+      return html(renderFeed(freshBundle, "", stamp, { ...withDive, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    if (id) return html(renderFeed(freshBundle, id, stamp, { ...pageOpts, page: "read" }));
-    return html(renderFeed(freshBundle, "", stamp, pageOpts));
+    if (id) return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read" }));
+    return html(renderFeed(freshBundle, "", stamp, withDive));
   }
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
@@ -169,6 +172,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp, pageOpts)); }
     catch { return html(renderArtist(null, stamp, pageOpts), 404); }
   }
+  if (kind === "dive") {
+    const diveId = decodeURIComponent(path.slice("/dive/".length));
+    try {
+      const doc = await loadDive(diveId, fetchImpl);
+      return html(renderDive(doc, stamp, pageOpts));
+    } catch {
+      return html(renderDive(null, stamp, pageOpts), 404);
+    }
+  }
   if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
     const cardId = decodeURIComponent(raw);
@@ -183,7 +195,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const card = (rows || []).find((row) => row.id === cardId);
     const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
     const fact = facts && cardId ? facts[cardId] : null;
-    return html(renderCard(card, stamp, { ...pageOpts, fact }), card ? 200 : 404);
+    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
+    const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
+    const diveHref = sealedId ? `/dive/${sealedId}` : "";
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref }), card ? 200 : 404);
   }
   if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp, pageOpts));
   if (kind === "search") return html(renderSearch(pageOpts));

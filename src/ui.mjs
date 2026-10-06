@@ -1000,6 +1000,7 @@ ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept wit
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
 ${chartBox(hist, "TCGplayer market, daily", card.release || "")}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
@@ -1299,6 +1300,50 @@ ${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ide
   return chrome("", body, "Discord Premium", "", "", feedNav(opts));
 }
 
+export function renderDive(doc, stamp, opts = {}) {
+  if (!doc || !doc.id) {
+    return chrome("", `<main class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts));
+  }
+  const series = Array.isArray(doc.series) ? doc.series : [];
+  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
+  const latest = doc.latest || {};
+  const buyout = doc.buyout || null;
+  const outlier = doc.outlier || null;
+  const price = money(latest.priceMedian);
+  const listings = latest.listingCount != null ? String(latest.listingCount) : "—";
+  const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
+  const rows = series.slice().reverse().map((r) => {
+    const lc = r.listingCount != null ? String(r.listingCount) : "—";
+    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || "—"}</td><td>${esc(lc)}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
+  }).join("");
+  const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
+  const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
+  const outlierLine = outlier
+    ? `<p><b>Outlier:</b> ${esc(String(outlier.flag))} — ${esc(outlier.note || "")}${outlier.asOf ? ` (${esc(outlier.asOf)})` : ""}</p>`
+    : `<p class="muted">Outlier flags: none yet. ${esc(doc.outlierHook || "Hook: data/price-outliers.json when present.")}</p>`;
+  const buyoutLine = browse
+    ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
+    : `<p class="muted">Browse total: not on file for this product.</p>`;
+  const body = `<main class="wrap">
+<p class="muted"><a href="/feed">Feed</a> · <a href="/board">Board</a> · Deep dive</p>
+<h1>${esc(doc.name || doc.id)}</h1>
+<p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
+<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
+<p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
+${buyoutLine}
+${chartBox(hist, "eBay Browse ask median, daily")}
+<table style="width:100%;border-collapse:collapse;margin:16px 0">
+<thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
+</table>
+${volumeLine}
+${outlierLine}
+${catalog}
+<p class="muted">Charts-only hub is deferred. This page is the launch-lean deep-dive a read can open.</p>
+</main>`;
+  return chrome("", body, `${doc.name || doc.id} — Deep dive`, stamp, "", feedNav(opts));
+}
+
 export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {
@@ -1315,6 +1360,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   }));
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const newsLead = JSON.stringify(newsSlice(feedNews)).replace(/</g, "\\u003c");
+  const diveLead = JSON.stringify(opts.diveMap || { ids: [], byTcgcsv: {} }).replace(/</g, "\u003c");
   const css = `
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
@@ -1418,6 +1464,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
+<script type="application/json" id="dive-map">${diveLead}</script>
 <script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script>
@@ -1430,6 +1477,28 @@ function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
 const focus=${JSON.stringify(String(opts.section || ""))};
+
+function diveMapDoc(){
+  try{ return JSON.parse((document.getElementById("dive-map")||{}).textContent||"{}"); }catch(e){ return {ids:[],byTcgcsv:{}}; }
+}
+const __diveMap=diveMapDoc();
+const __diveIds=new Set(Array.isArray(__diveMap.ids)?__diveMap.ids:[]);
+const __diveByTcg=__diveMap.byTcgcsv&&typeof __diveMap.byTcgcsv==="object"?__diveMap.byTcgcsv:{};
+function diveIdFor(card){
+  if(!card) return "";
+  if(card.diveId && __diveIds.has(card.diveId)) return card.diveId;
+  if(card.id && __diveIds.has(card.id)) return card.id;
+  const href=String(card.href||"");
+  const m=href.match(/\/p\/([^/?#]+)/);
+  let pid=m?decodeURIComponent(m[1]):"";
+  if(pid.endsWith(".html")) pid=pid.slice(0,-5);
+  if(pid && __diveIds.has(pid)) return pid;
+  if(pid && __diveByTcg[pid]) return __diveByTcg[pid];
+  const sku=String(card.sku||"");
+  if(sku && __diveByTcg[sku]) return __diveByTcg[sku];
+  if(card.id && __diveByTcg[card.id]) return __diveByTcg[card.id];
+  return "";
+}
 const pageMode=${JSON.stringify(page)};
 const premium=${opts.premium === true ? "true" : "false"};
 let browse=null;
@@ -1804,10 +1873,12 @@ function cardEl(card, facts){
   const title=html(card.name||withoutSoldClaim(card.headline)||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
+  const diveId=diveIdFor(card);
+  const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?factCutLine(card):"";
   const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
-    el.innerHTML=head+open;
+    el.innerHTML=head+open+diveLink;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
     else el.insertBefore(photoEl(card), el.firstChild);
     el.addEventListener("click", function(ev){
@@ -1845,7 +1916,7 @@ function cardEl(card, facts){
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML=head+diveLink+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist && slot) slot.appendChild(chart(card.hist, src));
