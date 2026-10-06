@@ -1318,9 +1318,12 @@ export function renderDive(doc, stamp, opts = {}) {
   }).join("");
   const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
   const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
+  const outlierNote = outlier && (outlier.note || (outlier.pctGap != null
+    ? `Price flagged: ${Math.abs(Number(outlier.pctGap))}% ${Number(outlier.pctGap) < 0 || outlier.direction === "low" ? "below" : "above"} recent median — review`
+    : null));
   const outlierLine = outlier
-    ? `<p><b>Outlier:</b> ${esc(String(outlier.flag))} — ${esc(outlier.note || "")}${outlier.asOf ? ` (${esc(outlier.asOf)})` : ""}</p>`
-    : `<p class="muted">Outlier flags: none yet. ${esc(doc.outlierHook || "Hook: data/price-outliers.json when present.")}</p>`;
+    ? `<p style="border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin:12px 0"><b>${esc(outlierNote || `Outlier: ${String(outlier.flag)}`)}</b>${outlier.asOf ? ` <span class="muted">(${esc(outlier.asOf)})</span>` : ""}${outlier.provisionalLabel ? `<br><span class="muted">${esc(String(outlier.provisionalLabel))}</span>` : ""}</p>`
+    : `<p class="muted">Outlier flags: none yet.</p>`;
   const buyoutLine = browse
     ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
     : `<p class="muted">Browse total: not on file for this product.</p>`;

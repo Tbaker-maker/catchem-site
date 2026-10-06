@@ -66,7 +66,7 @@ const diveFiles = {
     volume: null,
     volumeNote: "Sold counts need Insights scope.",
     outlier: null,
-    outlierHook: "Optional file data/price-outliers.json",
+    outlierHook: "Optional file data/derived/sealed-price-outliers.json",
   },
 };
 
@@ -85,10 +85,32 @@ const fetchImpl = async (url) => {
 
 t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
 t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pageKind("/dive/sv3pt5-etb.html") === "dive");
+
+{
+  const flagged = renderDive({
+    id: "sv5-pc-etb",
+    name: "Temporal Forces Pokemon Center Elite Trainer Box",
+    asOf: "2026-10-06",
+    series: [{ date: "2026-10-06", price: 499.99, listingCount: 6, source: "ebay-browse-ask" }],
+    latest: { id: "sv5-pc-etb", set: "Temporal Forces", subtype: "pc-etb", priceMedian: 499.99, listingCount: 6 },
+    volume: null,
+    volumeNote: "Sold counts need Insights scope.",
+    outlier: {
+      flag: "high",
+      note: "Price flagged: 95.5% above recent median — review",
+      asOf: "2026-10-06",
+      pctGap: 95.5,
+      direction: "high",
+      provisionalLabel: "review — possible bad listing; review — possible real move",
+    },
+  }, "stamp", { feed: true });
+  t("dive shows clear price flag", flagged.includes("Price flagged: 95.5% above recent median — review") && flagged.includes("review — possible bad listing") && !flagged.includes("Outlier flags: none yet"));
+}
 {
   const divePage = await renderPath("/dive/sv3pt5-etb", fetchImpl, { feed: true });
   const diveHtml = await divePage.text();
   t("dive page renders series chart and table", divePage.status === 200 && diveHtml.includes("151 Elite Trainer Box") && diveHtml.includes("eBay Browse ask median") && diveHtml.includes("2026-08-20") && diveHtml.includes("data-chart") && diveHtml.includes("<table") && diveHtml.includes("Volume / solds: not available") && !diveHtml.includes("$undefined"));
+  t("dive without outlier stays quiet", diveHtml.includes("Outlier flags: none yet") && !diveHtml.includes("Price flagged:"));
   const miss = await renderPath("/dive/no-such-sku", fetchImpl, { feed: true });
   t("missing dive is 404", miss.status === 404);
   const cardPage = await (await renderPath("/p/tcgcsv-503313", fetchImpl, { feed: true })).text();
