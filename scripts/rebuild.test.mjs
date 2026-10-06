@@ -105,6 +105,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     },
   }, "stamp", { feed: true });
   t("dive shows clear price flag", flagged.includes("Price flagged: 95.5% above recent median — review") && flagged.includes("review — possible bad listing") && !flagged.includes("Outlier flags: none yet"));
+  t("dive share card has og tags", flagged.includes('property="og:title"') && flagged.includes("Temporal Forces Pokemon Center Elite Trainer Box — Deep dive · Catch&#39;em") && flagged.includes('property="og:description"') && flagged.includes("eBay Browse ask median") && flagged.includes('property="og:image" content="https://catchemtcg.com/og.png"') && flagged.includes('name="twitter:card" content="summary_large_image"') && flagged.includes('rel="canonical" href="https://catchemtcg.com/dive/sv5-pc-etb"'));
 }
 {
   const divePage = await renderPath("/dive/sv3pt5-etb", fetchImpl, { feed: true });
@@ -207,6 +208,7 @@ const on = { ...env, FEED_ENABLED: "true" };
 const opened = await worker.fetch(new Request("https://catchemtcg.com/feed"), on);
 const openedHtml = await opened.text();
 t("the worker serves the feed when the flag is on", openedHtml.includes("The Feed") && openedHtml.includes(" · <span>") && !openedHtml.includes("Load more"));
+t("feed share card has og tags", openedHtml.includes('property="og:title"') && openedHtml.includes("The Feed · Catch&#39;em") && openedHtml.includes('property="og:description"') && openedHtml.includes("Daily market reads") && openedHtml.includes('content="https://catchemtcg.com/feed"') && openedHtml.includes('property="og:image" content="https://catchemtcg.com/og.png"') && openedHtml.includes('name="twitter:card" content="summary_large_image"'));
 const movedOn = await worker.fetch(new Request("https://catchemtcg.com/movers"), on);
 t("movers redirects to the board when the flag is on", movedOn.status === 301 && movedOn.headers.get("location").endsWith("/board"));
 const pulseOn = await worker.fetch(new Request("https://catchemtcg.com/pulse"), on);

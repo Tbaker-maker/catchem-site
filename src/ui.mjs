@@ -768,13 +768,40 @@ function feedNav(opts) {
   return opts?.feed === true || opts?.FEED_ENABLED === "true";
 }
 
-function chrome(active, body, title, stamp, extraFoot = "", feed = false) {
+function shareMetaTags(title, share) {
+  if (!share || typeof share !== "object") return "";
+  const pageTitle = `${title} · Catch'em`;
+  const desc = String(share.description || "").trim();
+  const url = String(share.url || "").trim();
+  const image = String(share.image || "https://catchemtcg.com/og.png").trim();
+  if (!desc || !url) return "";
+  const alt = String(share.imageAlt || "Catch'em. A home for collectors, rippers and flippers.").trim();
+  return `<meta name="description" content="${esc(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc("Catch'em")}">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:title" content="${esc(pageTitle)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(alt)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(pageTitle)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(image)}">
+<link rel="canonical" href="${esc(url)}">`;
+}
+
+function chrome(active, body, title, stamp, extraFoot = "", feed = false, share = null) {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
   const feedLink = feed ? item("/feed", "Feed") : "";
   const fresh = stamp ? `<div class="wrap" style="padding-bottom:0"><p class="muted" id="fresh" style="margin:0">${esc(stamp)}</p></div>` : "";
   const foot = extraFoot ? `<p id="post-office-build">${esc(extraFoot)}</p>` : "";
+  const shareTags = shareMetaTags(title, share);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
+${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}</style><script>${CHART_JS}</script></head><body>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
@@ -1302,7 +1329,10 @@ ${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ide
 
 export function renderDive(doc, stamp, opts = {}) {
   if (!doc || !doc.id) {
-    return chrome("", `<main class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts));
+    return chrome("", `<main class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts), {
+      description: "That deep-dive payload is not on file yet. Open the Feed for live market reads.",
+      url: "https://catchemtcg.com/feed",
+    });
   }
   const series = Array.isArray(doc.series) ? doc.series : [];
   const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
@@ -1344,7 +1374,17 @@ ${outlierLine}
 ${catalog}
 <p class="muted">Charts-only hub is deferred. This page is the launch-lean deep-dive a read can open.</p>
 </main>`;
-  return chrome("", body, `${doc.name || doc.id} — Deep dive`, stamp, "", feedNav(opts));
+  const diveTitle = `${doc.name || doc.id} — Deep dive`;
+  const diveDesc = [
+    latest.set || "",
+    latest.subtype || "",
+    price ? `eBay Browse ask median ${price}` : "eBay Browse ask series",
+    "asks, not solds",
+  ].filter(Boolean).join(" · ");
+  return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
+    description: diveDesc,
+    url: `https://catchemtcg.com/dive/${encodeURIComponent(doc.id)}`,
+  });
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {
@@ -2658,7 +2698,17 @@ window.addEventListener("pageshow", function(ev){
 boot();
 
 </script>`;
-  return chrome("Feed", body, page === "read" ? "Read" : (focusTitle || "The Feed"), stamp, "", feedNav(opts));
+  const feedTitle = page === "read" ? "Read" : (focusTitle || "The Feed");
+  const feedDesc = page === "read"
+    ? "One market read from Catch'em. TCGplayer market prices stay labeled separately from eBay asks."
+    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks are not solds.";
+  const feedUrl = page === "read" && startId
+    ? `https://catchemtcg.com/feed?id=${encodeURIComponent(startId)}`
+    : "https://catchemtcg.com/feed";
+  return chrome("Feed", body, feedTitle, stamp, "", feedNav(opts), {
+    description: feedDesc,
+    url: feedUrl,
+  });
 }
 
 export function renderMine(stamp, opts = {}) {
