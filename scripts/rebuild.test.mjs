@@ -1,5 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim } from "../src/ui.mjs";
+import { esc, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
@@ -336,6 +336,49 @@ const mixed = buildFeedLoop([priced, fact], waveBrowse, { news: newsDoc });
 t("the default walk keeps the short front and every price id", mixed[0].id === "move-tcgcsv-10-7" && mixed[1].id === "pokemon-duraludon" && mixed.some((r) => r.id === "move-tcgcsv-99-7" && r.pending === true && r.price == null));
 t("the default walk mixes news and wave rows already in the files", mixed.some((r) => r.readKind === "news" && r.href === "https://example.com/d") && mixed.some((r) => r.readKind === "wave" && r.href === "https://example.com/wave" && !(r.price > 0)) && mixed.filter((r) => r.readKind === "news").every((r) => !(r.price > 0)));
 t("a ranked prices filter still leaves news and wave out", buildFeedLoop([priced, fact], waveBrowse, { filter: "prices", news: newsDoc }).every((r) => r.readKind !== "news" && r.readKind !== "wave"));
+const outlier = {
+  id: "outlier-sv5-pc-etb",
+  sku: "sv5-pc-etb",
+  diveId: "sv5-pc-etb",
+  readKind: "outlier",
+  kind: "outlier",
+  name: "Temporal Forces Pokemon Center Elite Trainer Box",
+  headline: "Temporal Forces Pokemon Center Elite Trainer Box ask $499.99 on Oct 6 sits 95.5% above its recent median $255.75 — review.",
+  path: "Temporal Forces Pokemon Center Elite Trainer Box ask $499.99 on Oct 6 sits 95.5% above its recent median $255.75 — review.",
+  price: 499.99,
+  asOf: "2026-10-06",
+  flagged: { on: "2026-10-06", at: 499.99, first: true },
+};
+const dive = {
+  id: "dive-sv5-pc-etb",
+  sku: "sv5-pc-etb",
+  diveId: "sv5-pc-etb",
+  readKind: "dive",
+  kind: "dive",
+  name: "Temporal Forces Pokemon Center Elite Trainer Box",
+  headline: "Temporal Forces Pokemon Center Elite Trainer Box: $499.99 on Oct 6. Deeper look on the chart.",
+  path: "Temporal Forces Pokemon Center Elite Trainer Box: $499.99 on Oct 6. Deeper look on the chart.",
+  price: 499.99,
+  asOf: "2026-10-06",
+  href: "/dive/sv5-pc-etb",
+};
+t("outlier and dive rows keep their ids", isOutlierRow(outlier) && isDiveRow(dive) && keepFeedRead(outlier) && keepFeedRead(dive) && outlier.sku === "sv5-pc-etb" && dive.diveId === "sv5-pc-etb");
+t("no invented solds on outlier or dive copy", !/\bsolds?\b/i.test(outlier.path) && !/\bsolds?\b/i.test(dive.path));
+const flagBrowse = {
+  unfiltered: ["move-tcgcsv-10-7"],
+  ranked: ["move-tcgcsv-10-7"],
+  filters: {
+    flagged: { items: [outlier], empty: "No flagged prices." },
+    dive: { items: [dive], empty: "No deep dives." },
+    wave: { items: [] },
+  },
+};
+t("flagged filter returns outlier rows by id", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "flagged" }).map((r) => r.id).includes("outlier-sv5-pc-etb"));
+t("dive filter returns dive rows by id", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "dive" }).map((r) => r.id).includes("dive-sv5-pc-etb"));
+t("prices filter leaves outlier and dive out", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "prices" }).every((r) => r.readKind !== "outlier" && r.readKind !== "dive"));
+t("default mix includes non-price types when present", buildFeedLoop([priced, fact, outlier, dive], flagBrowse, { news: newsDoc }).some((r) => r.readKind === "news") && buildFeedLoop([priced, fact, outlier, dive], flagBrowse, {}).some((r) => r.readKind === "outlier" || r.readKind === "dive"));
+t("flagged and dive empty shelves stay honest", flaggedReads({ filters: { flagged: { items: [] } } }, []).length === 0 && diveReads({ filters: { dive: { items: [] } } }, []).length === 0);
+
 const liveNews = newsSlice(feedNews);
 const dedenne = liveNews.find((row) => row.href === "https://bulbagarden.net/threads/new-merch-collection-starring-dedenne-joltik-and-more-electric-types-coming-soon-to-pokemon-centers-in-japan.311717/");
 const japanFile = liveNews.find((row) => row.href === "https://www.pokemon-card.com/info/005559.html");
@@ -354,12 +397,13 @@ const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
-t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && !factHtml.includes("card.why"));
-t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && factHtml.includes("The picture is missing.") && factHtml.includes("There is no news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
+t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
+t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && factHtml.includes("The picture is missing.") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && factHtml.includes("The cutout is missing.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("premium sees the hide control and the unranked loop walks the shuffled file", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
-t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news and wave rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
-t("the feed filter keeps every row and uses the site pill", factHtml.includes('id="f-loop"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes("pill-menu-btn") && factHtml.includes("max-width:390px") && factHtml.includes("min-width:1280px") && factHtml.includes("background:#12100e") && factHtml.includes('button[aria-selected="true"]') && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
+t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
+t("the feed filter keeps every row and uses the site pill", factHtml.includes('id="f-loop"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && factHtml.includes("pill-menu-btn") && factHtml.includes("max-width:390px") && factHtml.includes("min-width:1280px") && factHtml.includes("background:#12100e") && factHtml.includes('button[aria-selected="true"]') && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
+t("ATH ATL copy uses filled triangle words", factHtml.includes("▲ high") && factHtml.includes("▼ low"));
 const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-08-23 <span class="chip m">AFFECTED A PUBLISHED NUMBER</span></div><div class="w">shipping comparison</div></div><div class="c"><div class="w">auto-fix rewrote a price</div></div><h2>Kept</h2>';
 const hiddenNotes = hidePublishedNotes(shippingCard);
 t("a public page drops the correction log and the shipping card", !hiddenNotes.includes("Correction log") && !hiddenNotes.includes("AFFECTED A PUBLISHED NUMBER") && !/auto-fix/i.test(hiddenNotes) && hiddenNotes.includes("Kept"));

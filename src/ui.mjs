@@ -390,12 +390,28 @@ export function newsSlice(doc) {
   return out;
 }
 
+export function isOutlierRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "outlier" && row.kind !== "outlier") return false;
+  if (!String(row.id || "").trim()) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
+export function isDiveRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "dive" && row.kind !== "dive") return false;
+  if (!String(row.diveId || row.id || "").trim()) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
 export function keepFeedRead(row) {
   if (!row || typeof row !== "object") return false;
   if (!String(row.headline || row.path || "").trim()) return false;
   if (isFactRow(row)) return true;
   if (isLagRow(row)) return true;
   if (isSupplyRow(row)) return true;
+  if (isOutlierRow(row)) return true;
+  if (isDiveRow(row)) return true;
   return money(row.price) != null;
 }
 
@@ -456,7 +472,7 @@ export function readStaleAgainstCard(read, card) {
   return cardDay >= readDay;
 }
 
-const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave"]);
+const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave", "flagged", "dive"]);
 
 function waveRead(item, n) {
   return {
@@ -492,6 +508,40 @@ function newsReads(browse, opts) {
   return newsSlice(baked);
 }
 
+export function flaggedReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.flagged?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isOutlierRow(row) && !(row && row.flagged && row.flagged.on && Number(row.price) > 0)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) {
+    if (isOutlierRow(row) || (row && row.flagged && row.flagged.on)) push(row);
+  }
+  return out;
+}
+
+export function diveReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.dive?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isDiveRow(row)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) if (isDiveRow(row)) push(row);
+  return out;
+}
+
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
   const filter = String(opts.filter || "");
   const hideFacts = opts.hideFacts === true;
@@ -510,11 +560,13 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     }
     if (hideFacts && isFactRow(row)) return;
     if (filter === "pokemon" && !isFactRow(row)) return;
-    if (filter === "prices" && (isFactRow(row) || !(Number(row.price) > 0))) return;
+    if (filter === "prices" && (isFactRow(row) || isOutlierRow(row) || isDiveRow(row) || row.readKind === "news" || row.readKind === "wave" || !(Number(row.price) > 0))) return;
     if (filter === "sealed" && row.kind !== "sealed") return;
     if (filter === "set" && setName && row.set !== setName) return;
     if (filter === "news" && row.readKind !== "news" && row.kind !== "news") return;
     if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
+    if (filter === "flagged" && !isOutlierRow(row) && !(row.flagged && row.flagged.on)) return;
+    if (filter === "dive" && !isDiveRow(row)) return;
     if (id) seen.add(id);
     out.push(row);
   };
@@ -530,13 +582,24 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of newsReads(browse, opts)) push(row);
     return out;
   }
+  if (filter === "flagged") {
+    for (const row of flaggedReads(browse, kept)) push(row);
+    return out;
+  }
+  if (filter === "dive") {
+    for (const row of diveReads(browse, kept)) push(row);
+    return out;
+  }
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
-  // News and wave rows already in the files are mixed into that walk.
+  // News, wave, flagged, and dive rows already in the files are mixed in.
   // A ranked filter below keeps that order. No price is added for a bare id.
   if (!filter) {
     for (const row of kept) push(row);
-    const extras = newsReads(browse, opts).concat(waveReads(browse));
+    const extras = newsReads(browse, opts)
+      .concat(waveReads(browse))
+      .concat(flaggedReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(diveReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
     let ei = 0;
     const rest = browse?.unfiltered;
     if (Array.isArray(rest)) {
@@ -1001,7 +1064,7 @@ export function renderCard(card, stamp, opts = {}) {
   const lowOn = fact?.lowOn || computed?.lowOn || "";
   const since = fact?.daysSinceHigh ?? computed?.daysSinceHigh;
   const breakBits = [];
-  if (high && highOn && low && lowOn) breakBits.push(`<p>High ${money(high)} on ${esc(highOn)}. Low ${money(low)} on ${esc(lowOn)}.</p>`);
+  if (high && highOn && low && lowOn) breakBits.push(`<p>▲ high ${money(high)} on ${esc(highOn)}. ▼ low ${money(low)} on ${esc(lowOn)}.</p>`);
   if (Number.isFinite(Number(since))) breakBits.push(`<p>${Number(since)} days since the high.</p>`);
   const listings = Number(fact?.listings);
   if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
@@ -1484,7 +1547,7 @@ ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <div class="pill-menu">
-  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option></select>
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option></select>
   <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
   <ul class="pill-menu-list" role="listbox" hidden></ul>
   </div>
@@ -1944,8 +2007,8 @@ function cardEl(card, facts){
   const info=dataFacts(card, facts);
   const bits=[];
   const hi=[];
-  if(info.high) hi.push("High "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
-  if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
+  if(info.high) hi.push("▲ high "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
+  if(info.low) hi.push("▼ low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
   if(hi.length) bits.push("<p>"+html(hi.join(". ")+".")+"</p>");
   const listed=listingsLine({listings: info.listings, listingsAsOf: info.listingsAsOf});
   if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
@@ -2393,6 +2456,7 @@ function leadRows(){
     if(!r || !(r.headline || r.path)) return false;
     if(isFact(r)) return !hideFacts;
     if(isLag(r) || isSupply(r)) return true;
+    if(r.readKind==="outlier" || r.kind==="outlier" || r.readKind==="dive" || r.kind==="dive") return true;
     return Number(r.price)>0;
   });
 }
@@ -2401,7 +2465,7 @@ function accepts(card){
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
   if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
-  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card);
+  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
     const setSel=document.getElementById("f-loop-set");
     const name=setSel?setSel.value:"";
@@ -2410,6 +2474,8 @@ function accepts(card){
   }
   if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
   if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
+  if(loopFilter==="flagged") return card.readKind==="outlier" || card.kind==="outlier" || !!(card.flagged && card.flagged.on);
+  if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive";
   return true;
 }
 async function cardById(id){
@@ -2466,10 +2532,28 @@ function buildFlat(){
     flat=rows;
     return;
   }
-  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
+  if(loopFilter==="flagged"){
+    const items=browse && browse.filters && browse.filters.flagged && browse.filters.flagged.items;
+    (items||[]).forEach(function(row){ add(row); });
+    leadRows().forEach(function(r){
+      if(r && (r.readKind==="outlier" || r.kind==="outlier" || (r.flagged && r.flagged.on))) add(r);
+    });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="dive"){
+    const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+    (items||[]).forEach(function(row){ add(row); });
+    leadRows().forEach(function(r){
+      if(r && (r.readKind==="dive" || r.kind==="dive")) add(r);
+    });
+    flat=rows;
+    return;
+  }
+  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave"||loopFilter==="flagged"||loopFilter==="dive";
   if(!loopFilter){
     leadRows().forEach(add);
-    // Mix news and wave rows already on the file into the shuffled walk.
+    // Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.
     const extras=[];
     (Array.isArray(newsRows)?newsRows:[]).forEach(function(row){ extras.push(row); });
     const waveItems=browse && browse.filters && browse.filters.wave && browse.filters.wave.items;
@@ -2477,6 +2561,10 @@ function buildFlat(){
       if(!item || (!item.title && !item.sentence)) return;
       extras.push({id:"wave-"+n, waveItem:true, readKind:"wave", kind:"wave", name:item.title||"", headline:item.sentence||item.title||"", path:item.sentence||"", source:item.source||"", asOf:String(item.date||"").slice(0,10), href:item.url||"", reprint:item.reprint||""});
     });
+    const flaggedItems=browse && browse.filters && browse.filters.flagged && browse.filters.flagged.items;
+    (flaggedItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
+    const diveItems=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+    (diveItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
     let ei=0;
     const order=browse && browse.unfiltered;
     (order||[]).forEach(function(id){
@@ -2536,7 +2624,7 @@ async function showFlat(index){
   else {
     const p=document.createElement("p");
     p.className="muted";
-    p.textContent=loopFilter==="news"?"There is no news.":"Nothing in this filter.";
+    p.textContent=loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.";
     stage.appendChild(p);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
