@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { neutralizeCopy, writePublicRoutes } from "./public-routes.mjs";
+import { AFFILIATION, ensureAffiliation } from "../src/affiliation.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -12,6 +13,8 @@ const t = (name, cond) => {
 t("Demand replaces Buy Pressure", neutralizeCopy("Buy Pressure est.") === "Demand est.");
 t("HEAT replaces BULLISH", neutralizeCopy("BULLISH·long") === "HEAT·long");
 t("HEAT replaces bullish", neutralizeCopy("not bullish") == "not HEAT");
+t("a page with no footer gets one", ensureAffiliation("<h1>Pulse</h1>").includes(AFFILIATION));
+t("a page that already says it is not duplicated", ensureAffiliation(`<footer><p>${AFFILIATION}</p></footer>`).split(AFFILIATION).length === 2);
 
 const dir = await mkdtemp(join(tmpdir(), "routes-"));
 await writeFile(join(dir, "pulse.html"), "<h1>Pulse</h1><p>Buy Pressure</p><b>BULLISH</b>");
@@ -27,7 +30,7 @@ for (const rel of ["try.html", "try/index.html", "app.html", "app/index.html"]) 
   t(`${rel} redirects to the feed`, html.includes('url=/feed') && !html.includes("Pulse") && !html.includes("BULLISH"));
 }
 const pulse = await readFile(join(dir, "pulse.html"), "utf8");
-t("pulse itself is neutralized", pulse.includes("Demand") && pulse.includes("HEAT"));
+t("pulse itself is neutralized", pulse.includes("Demand") && pulse.includes("HEAT") && pulse.includes(AFFILIATION));
 await rm(dir, { recursive: true, force: true });
 if (fail) process.exit(1);
 console.log("public routes ok");

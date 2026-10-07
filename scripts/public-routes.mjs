@@ -4,6 +4,7 @@
 // on the way out so a data-repo page cannot put them back on the public URL.
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { ensureAffiliation } from "../src/affiliation.mjs";
 
 export function neutralizeCopy(html) {
   return String(html)
@@ -69,16 +70,17 @@ export async function writePublicRoutes(outDir) {
   for (const path of await htmlFiles(outDir)) {
     let raw;
     try { raw = await readFile(path, "utf8"); } catch { continue; }
-    const next = hidePublishedNotes(neutralizeCopy(raw));
+    const next = ensureAffiliation(hidePublishedNotes(neutralizeCopy(raw)));
     if (next !== raw) await writeFile(path, next);
   }
   let feed;
   try { feed = await readFile(join(outDir, "pulse.html"), "utf8"); } catch { feed = FALLBACK; }
   feed = hidePublishedNotes(neutralizeCopy(feed));
+  feed = ensureAffiliation(feed);
   for (const rel of ROUTE_FILES) {
     const path = join(outDir, rel);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, rel.startsWith("feed") ? feed : REDIRECT);
+    await writeFile(path, ensureAffiliation(rel.startsWith("feed") ? feed : REDIRECT));
   }
   return ROUTE_FILES;
 }
