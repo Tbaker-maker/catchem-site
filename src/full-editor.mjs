@@ -1,4 +1,5 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
+import { ensureAffiliation } from "./affiliation.mjs";
 
 // The Post Office editor (Catchem-data research/assets/play.html).
 // Card scans are proxied same-origin so the picture canvas can read them.
@@ -769,7 +770,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
     out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;
   }
-  return out;
+  return ensureAffiliation(out);
 }
 
 export function editorCacheKey() {

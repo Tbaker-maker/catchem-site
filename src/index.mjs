@@ -5,12 +5,13 @@ import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
+import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
-const html = (body, status = 200) => new Response(body, {
+const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   status,
   headers: {
     "content-type": "text/html; charset=utf-8",
@@ -341,7 +342,7 @@ export default {
     if (feed && request.method === "GET" && isFeedPath(url.pathname)) {
       try {
         const body = await loadLatestFeed(fetchImpl);
-        return new Response(body, {
+        return new Response(ensureAffiliation(body), {
           headers: {
             "content-type": "text/html; charset=utf-8",
             "cache-control": "no-store",
@@ -357,7 +358,7 @@ export default {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(addFeedEntry(await asset.text()), { status: asset.status, headers });
+        return new Response(ensureAffiliation(addFeedEntry(await asset.text())), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -367,6 +368,7 @@ export default {
     if (type.includes("text/html")) {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
+      return new Response(ensureAffiliation(await asset.text()), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
   },
