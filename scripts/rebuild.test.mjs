@@ -574,6 +574,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("rendered pages link no dead path", dead.length === 0);
   if (dead.length) console.error(dead.join("\n"));
   t("a path the site cannot serve fails the check", deadLocals(["/no-such-page"], pageKind).join() === "/no-such-page" && deadLocals(["/sets", "/corrections"], pageKind).length === 0);
+  t("a script template is not a path", localPaths(`<a href="/dive/'+encodeURIComponent(diveId)+'">x</a><a href="/sets">Sets</a>`).join() === "/sets");
 }
 
 if (fail) process.exit(1);

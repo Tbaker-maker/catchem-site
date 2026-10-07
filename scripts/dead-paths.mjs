@@ -21,6 +21,8 @@ export function localPaths(html) {
     if (!href.startsWith("/") || href.startsWith("//")) continue;
     href = href.split("#")[0].split("?")[0];
     if (!href || href.startsWith("/data/") || href.startsWith("/api/") || href.startsWith("/auth/")) continue;
+    // Script templates such as href="/dive/'+encodeURIComponent(id)+'" are not links.
+    if (!/^\/[A-Za-z0-9._~%-]+(?:\/[A-Za-z0-9._~%-]+)*$/.test(href)) continue;
     out.add(href);
   }
   return [...out];
