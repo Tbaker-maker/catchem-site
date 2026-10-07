@@ -533,6 +533,210 @@ function rewritePlayAssets(html) {
   return out;
 }
 
+const SCREEN_FNS = [
+  "    function applyRowPrices(rows) {",
+  "      var by = {};",
+  "      (rows || []).forEach(function (r) {",
+  "        if (!r || !r.length || !r[0]) return;",
+  "        var n = Number(r[6]);",
+  "        if (!Number.isFinite(n) || n <= 0) return;",
+  "        by[r[0]] = n;",
+  "      });",
+  "      CARDS.forEach(function (c) {",
+  "        if (by[c.id] != null) c.usd = by[c.id];",
+  "      });",
+  "    }",
+  "    function storedPrice(c) {",
+  "      var n = Number(c && c.usd);",
+  "      return Number.isFinite(n) && n > 0 ? n : 0;",
+  "    }",
+  "    function pictureInFile(c) {",
+  "      var s = c && String(c.src || \"\").trim();",
+  "      if (!s || /^https?:/i.test(s)) return false;",
+  "      return s.indexOf(\"/cards/c30/ir-moltres.png\") !== -1",
+  "        || s.indexOf(\"/cards/c30/ir-articuno.png\") !== -1",
+  "        || s.indexOf(\"/cards/c30/ir-zapdos.png\") !== -1;",
+  "    }",
+  "    function screenCap() {",
+  "      try {",
+  "        if (window.matchMedia && window.matchMedia(\"(max-width: 767px)\").matches) return 12;",
+  "      } catch (e) {}",
+  "      return 24;",
+  "    }",
+  "    var screenAsk = 0;",
+  "    var screenKey = \"\";",
+  "    function listKey() {",
+  "      return [medium, paperLang, prompt, mon, q, setFilter, era].join(\"|\");",
+  "    }",
+  "    function screenRows(rows) {",
+  "      var lead = (rows || []).slice();",
+  "      lead.sort(function (a, b) { return storedPrice(b) - storedPrice(a); });",
+  "      return { lead: lead };",
+  "    }",
+].join("\n");
+
+export function rewriteFirstScreen(html) {
+  let out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.") || out.includes("function screenRows")) return out;
+  const bootOld = '.then(function (d) { merge(d || [], ""); bootPaint("Visuals"); return fetchJson(assetUrl("cards/full/index.json?v=19sep-share")); })\n      .then(function (d) { merge(d || [], ""); bootPaint("English"); return fetchJson(assetUrl("cards/jp/index.json?v=11sep-vis2")); })\n      .then(function (d) { merge(d || [], " jp"); return fetchJson(assetUrl("cards/prices.json?v=16sep-price")); })\n      .then(function (d) { applyPrices(d); bootPaint("Closed beta"); finishBoot(); return syncLiveSets(); })';
+  const bootNew = '.then(function (d) { merge(d || [], ""); bootPaint("Closed beta"); finishBoot(); })';
+  if (out.includes(bootOld)) out = out.split(bootOld).join(bootNew);
+  if (out.includes("    function paintStrip() {") && !out.includes("function applyRowPrices")) {
+    out = out.replace("    function paintStrip() {", SCREEN_FNS + "\n    function paintStrip() {");
+  }
+  const shownOld = "      var shown = rows;\n";
+  const shownNew = [
+    "      var key = listKey();",
+    "      if (key !== screenKey) { screenKey = key; screenAsk = screenCap(); }",
+    "      var pack = screenRows(rows);",
+    "      var shown = pack.lead.slice(0, screenAsk);",
+    "      var more = shown.length < pack.lead.length;",
+    "",
+  ].join("\n");
+  if (out.includes(shownOld)) out = out.split(shownOld).join(shownNew);
+  const moreOld = "      }).join(\"\");\n      }\n      paintTray();";
+  const moreNew = "      }).join(\"\");\n      if (more) $(\"strip\").insertAdjacentHTML(\"beforeend\", \"<button type=\\\"button\\\" class=\\\"ghost\\\" data-more=\\\"1\\\">More</button>\");\n      }\n      paintTray();";
+  if (out.includes(moreOld)) out = out.split(moreOld).join(moreNew);
+  const clickOld = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
+  const clickNew = "        paintMons(); paintSets(); paintPrompts(); paintStrip();\n        return;\n      }\n      var moreBtn = e.target.closest(\"[data-more]\");\n      if (moreBtn) {\n        screenAsk = (screenAsk || screenCap()) + screenCap();\n        paintStrip();\n        return;\n      }\n      var b = e.target.closest(\"[data-id]\");";
+  if (out.includes(clickOld)) out = out.split(clickOld).join(clickNew);
+  const thumbOld = [
+    "    function thumbOf(c) {",
+    "      var s = srcOf(c);",
+    '      if (s.indexOf("/img/") === 0 || s.indexOf("/thumb/") === 0) return tcgImg(s, true);',
+    '      if (s.indexOf("/cards/") === 0) return assetUrl(s);',
+    "      return s;",
+    "    }",
+  ].join("\n");
+  const thumbNew = [
+    "    function thumbOf(c) {",
+    "      var s = srcOf(c);",
+    "      if (!pictureInFile(c)) return \"\";",
+    '      if (s.indexOf("/cards/") === 0) return assetUrl(s);',
+    "      return \"\";",
+    "    }",
+  ].join("\n");
+  if (out.includes(thumbOld)) out = out.split(thumbOld).join(thumbNew);
+  const scanOld = [
+    "    function scanUrls(c) {",
+    "      var s = srcOf(c) || \"\";",
+    "      var out = [];",
+    "      function add(u) { if (u && out.indexOf(u) === -1) out.push(u); }",
+    "      if (!s) return out;",
+    "      if (/^https?:\\/\\//i.test(s)) { add(s); return out; }",
+    "      if (s.indexOf(\"/img/\") === 0 || s.indexOf(\"/thumb/\") === 0) {",
+    "        add(tcgImg(s, true));",
+    "        add(tcgImg(s, false));",
+    "      }",
+    "      add(hiresOf(c));",
+    "      if (s.charAt(0) === \"/\") add(s);",
+    "      add(assetUrl(s));",
+    "      return out;",
+    "    }",
+  ].join("\n");
+  const scanNew = [
+    "    function scanUrls(c) {",
+    "      var s = srcOf(c) || \"\";",
+    "      if (!pictureInFile(c)) return [];",
+    "      if (s.indexOf(\"/cards/\") === 0) return [assetUrl(s)];",
+    "      return [];",
+    "    }",
+  ].join("\n");
+  if (out.includes(scanOld)) out = out.split(scanOld).join(scanNew);
+  const faceOld = [
+    "        return \"<button type=\\\"button\\\" class=\\\"card\" + on + \"\\\" data-id=\\\"\" + c.id + \"\\\">\" + flag +",
+    "          \"<img class=\\\"\" + (print + still + pixel).trim() + \"\\\" alt=\\\"\" + esc(c.name || \"\") + \"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +",
+    "          \"<div class=\\\"meta\\\"><strong>\" + esc(c.name) + \"</strong>\" +",
+    "          \"<div class=\\\"fact\\\">\" + esc(factOf(c)) + \"</div></div></button>\";",
+  ].join("\n");
+  const faceNew = [
+    "        var shot = pictureInFile(c) ? thumbOf(c) : \"\";",
+    "        var face = shot ? \"<img class=\\\"\" + (print + still + pixel).trim() + \"\\\" alt=\\\"\" + esc(c.name || \"\") + \"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + shot + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"\";",
+    "        var line = shot ? factOf(c) : \"The picture is missing.\";",
+    "        return \"<button type=\\\"button\\\" class=\\\"card\" + on + \"\\\" data-id=\\\"\" + c.id + \"\\\">\" + flag +",
+    "          face +",
+    "          \"<div class=\\\"meta\\\"><strong>\" + esc(c.name) + \"</strong>\" +",
+    "          \"<div class=\\\"fact\\\">\" + esc(line) + \"</div></div></button>\";",
+  ].join("\n");
+  if (out.includes(faceOld)) out = out.split(faceOld).join(faceNew);
+  const dumpOld = "\"<img alt=\\\"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +";
+  const dumpNew = "(thumbOf(c) ? \"<img alt=\\\"\\\" loading=\\\"lazy\\\" decoding=\\\"async\\\" src=\\\"\" + thumbOf(c) + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"<span class=\\\"note\\\">The picture is missing.</span>\") +";
+  if (out.includes(dumpOld)) out = out.split(dumpOld).join(dumpNew);
+  const slotOld = "\"<img src=\\\"\" + thumbOf(c) + \"\\\" alt=\\\"\" + (c.name || \"\") + \"\\\" onload=\\\"killPrintedBack(this)\\\" onerror=\\\"this.style.visibility='hidden'\\\" />\" +";
+  const slotNew = "(thumbOf(c) ? \"<img src=\\\"\" + thumbOf(c) + \"\\\" alt=\\\"\" + (c.name || \"\") + \"\\\" onload=\\\"killPrintedBack(this)\\\" />\" : \"<span class=\\\"note\\\">The picture is missing.</span>\") +";
+  if (out.includes(slotOld)) out = out.split(slotOld).join(slotNew);
+  return out;
+}
+
+export function rewriteLoadedLines(html) {
+  let out = String(html || "");
+  if (!out.includes("Pin two cards. We make a picture.")) return out;
+  const pinOld = 'pins = ["base1-63", "sv3pt5-170"];';
+  if (out.includes(pinOld)) out = out.split(pinOld).join("pins = [];");
+  const lineOld = [
+    "    function pickLine(who) {",
+    "      var safe = path151For(who, \"line\");",
+    "      if (safe) return safe;",
+    "      var fam = evoFamily(who);",
+    "      if (!fam || fam.length < 2) return [];",
+    "      if (fam[0] === \"Eevee\" && fam.length > 3) {",
+    "        if (who === \"Eevee\") {",
+    "          var night = cohesiveCombos([\"Eevee\", \"Espeon\", \"Umbreon\"]);",
+    "          if (night.length) return night[0];",
+    "          var eevee = hottest(paperOf(\"Eevee\"));",
+    "          var tops = [\"Umbreon\", \"Espeon\", \"Sylveon\"].map(function (sp) { return hottest(rolePool(sp)); }).filter(Boolean);",
+    "          return [eevee].concat(tops.slice(0, 2)).filter(Boolean);",
+    "        }",
+    "        fam = [\"Eevee\", who];",
+    "      }",
+    "      var combos = cohesiveCombos(fam);",
+    "      return combos[0] || [];",
+    "    }",
+  ].join("\n");
+  const lineNew = [
+    "    function pickLine(who) {",
+    "      var safe = path151For(who, \"line\");",
+    "      return safe || [];",
+    "    }",
+  ].join("\n");
+  if (out.includes(lineOld)) out = out.split(lineOld).join(lineNew);
+  const offerOld = [
+    "        var fam = evoFamily(who);",
+    "        var linePath = path151For(who, \"line\");",
+    "        if (linePath) {",
+    "          offers.push({ v: \"line\", l: \"Evo line\", s: linePath.map(function (c) { return c.name; }).join(\" → \") });",
+    "        } else if (fam && fam.length >= 2) {",
+    "          var lineOk = fam.every(function (sp) { return rolePool(sp).length; });",
+    "          if (fam[0] === \"Eevee\" && fam.length > 3) lineOk = rolePool(\"Eevee\").length && rolePool(who === \"Eevee\" ? \"Umbreon\" : who).length;",
+    "          if (lineOk) {",
+    "            var lineLab = fam[0] === \"Eevee\" && who !== \"Eevee\" ? (\"Eevee → \" + who) : (fam[0] + \" → \" + fam[fam.length - 1]);",
+    "            offers.push({ v: \"line\", l: \"Evo line\", s: lineLab });",
+    "          }",
+    "        }",
+  ].join("\n");
+  const offerNew = [
+    "        var linePath = path151For(who, \"line\");",
+    "        if (linePath) {",
+    "          offers.push({ v: \"line\", l: \"Evo line\", s: linePath.map(function (c) { return c.name; }).join(\" → \") });",
+    "        }",
+  ].join("\n");
+  if (out.includes(offerOld)) out = out.split(offerOld).join(offerNew);
+  const trioOld = [
+    "      if (kind === \"trio\") {",
+    "        var birds = path151For(who, \"trio\");",
+    "        if (birds) return birds;",
+    "      }",
+  ].join("\n");
+  const trioNew = [
+    "      if (kind === \"trio\") {",
+    "        var birds = path151For(who, \"trio\");",
+    "        return birds || [];",
+    "      }",
+  ].join("\n");
+  if (out.includes(trioOld)) out = out.split(trioOld).join(trioNew);
+  return out;
+}
+
 export function patchEditorHtml(html, asOf, mark = "") {
   const date = String(asOf || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("price date");
@@ -552,6 +756,8 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = rewritePlayAssets(out);
+  out = rewriteFirstScreen(out);
+  out = rewriteLoadedLines(out);
   out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';

@@ -1,5 +1,6 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+import { feedNews } from "../data/feed-news.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -19,6 +20,163 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// A read may mention sales volume, thin sales, or copies sold. No file has a
+// sold count, so that sentence comes out. A price already in the file stays.
+// Nothing is written in its place.
+export function withoutSoldClaim(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+  const claim = /\b(?:sales volume|thin sales|few sales|sold counts?|cop(?:y|ies) sold)\b/i;
+  const parts = raw.split(/(?<=\.)\s+/);
+  const kept = [];
+  for (const sentence of parts) {
+    if (!claim.test(sentence)) {
+      kept.push(sentence);
+      continue;
+    }
+    let s = sentence;
+    s = s.replace(/,?\s*with\s+[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*[\d,]+\s+cop(?:y|ies)\s+sold\b[^.]*/gi, "");
+    s = s.replace(/,?\s*on\s+(?:few|thin)\s+sales\b[^.]*/gi, "");
+    s = s.replace(/,?\s*(?:sales volume|thin sales|few sales|sold counts?)\b[^.]*/gi, "");
+    s = s.replace(/\s{2,}/g, " ").replace(/\s+([,.])/g, "$1").replace(/,\s*(?=\.)/g, "").replace(/,\s*$/g, "").trim();
+    if (!s || !/[A-Za-z]/.test(s) || claim.test(s)) continue;
+    kept.push(s);
+  }
+  return kept.join(" ").trim();
+}
+
+// A volume read is the one place a sold count may stay: a TCGplayer count that
+// carries its window and source on the row (Catchem-data builds it from
+// data/derived/tcgplayer-volume.json). Any other sold sentence still comes out.
+// Self-contained: the client script gets this function by toString().
+export function isVolumeRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "volume" && row.kind !== "volume") return false;
+  const s = row.sold;
+  if (!s || s.source !== "TCGplayer sales via PokemonPriceTracker" || s.condition !== "Near Mint") return false;
+  if (!Number.isInteger(s.count30d) || s.count30d <= 0) return false;
+  const w = s.window30d || {};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(w.from || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(w.to || ""))) return false;
+  return String(row.headline || row.path || "").includes(s.count30d + " Near Mint cop");
+}
+
+export function shapeCash(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x <= 0) return "";
+  return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const SHAPE_KINDS = ["quiet", "mix", "conditions", "soldflat", "solddown", "setshare", "spread", "askmove", "mktmove", "still"];
+
+// A shape read keeps its sentence only when the honesty line and the receipt numbers are on the row.
+export function isShapeRow(row) {
+  if (!row || typeof row !== "object") return false;
+  const kind = String(row.readKind || "");
+  if (kind !== row.kind || !SHAPE_KINDS.includes(kind)) return false;
+  const path = String(row.path || row.headline || "");
+  const rec = row.receipt;
+  if (!path || !rec || typeof rec !== "object") return false;
+  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && path.includes("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
+  if (kind === "mix") {
+    if (!path.includes("This is the mix of copies that sold, not the copy in your hand.")) return false;
+    if (!Array.isArray(rec.conditions) || rec.conditions.length < 2) return false;
+    for (let i = 0; i < rec.conditions.length; i += 1) {
+      const bit = rec.conditions[i];
+      if (!bit || !path.includes(String(bit.sold) + " " + bit.condition)) return false;
+    }
+    return true;
+  }
+  if (kind === "conditions") return path.includes("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
+  if (kind === "soldflat") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.price));
+  if (kind === "solddown") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
+  if (kind === "setshare") return path.includes("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
+  if (kind === "spread") return path.includes("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
+  if (kind === "askmove") return path.includes("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
+  if (kind === "mktmove") return path.includes("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
+  if (kind === "still") return path.includes("Asks and listing count. Not sales.") && path.includes(shapeCash(rec.price)) && path.includes(String(rec.listingCount));
+  return false;
+}
+
+export function soldSafeText(row, text) {
+  return isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+}
+
+
+function dropTitleName(title, line) {
+  const text = String(line ?? "").trim();
+  const who = String(title ?? "").trim();
+  if (!text || !who || !text.includes(who)) return text;
+  const escaped = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text
+    .replace(new RegExp("(^|[^A-Za-z0-9])" + escaped + "(?=$|[^A-Za-z0-9])", "g"), "$1")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,])/g, "$1")
+    .trim();
+}
+
+// The title already shows the name and number. The line under it starts at the
+// price move. A line that is only the title is blank. Prices, dates, and
+// percents in the file stay as written.
+export function readUnderTitle(name, path) {
+  const title = String(name ?? "").trim();
+  const line = String(path ?? "").trim();
+  if (!line) return "";
+  if (title && (line === title || line.replace(/\.+$/, "") === title)) return "";
+  if (title) {
+    const marker = "The latest price of " + title + " is";
+    if (line.startsWith(marker + " ") || line === marker || line.startsWith(marker + ".")) {
+      const rest = line.slice(marker.length).replace(/^\./, "").trim();
+      return rest ? dropTitleName(title, "The latest price is " + rest) : "";
+    }
+  }
+  if (title && line.startsWith(title)) {
+    const next = line.charAt(title.length);
+    if (next === "" || /[\s:–—-]/.test(next)) {
+      let rest = line.slice(title.length).replace(/^[\s:–—-]+/, "").trim();
+      const at = rest.indexOf("latest price");
+      if (at > 0) rest = rest.slice(at).trim();
+      return dropTitleName(title, rest);
+    }
+  }
+  return dropTitleName(title, line);
+}
+
+// The set name and the card id already on the card. A blank field stays off.
+export function cardIdentity(card) {
+  if (!card || typeof card !== "object") return "";
+  const set = String(card.set ?? "").trim();
+  const id = String(card.sku ?? "").trim();
+  if (set && id) return set + " · " + id;
+  return set || id || "";
+}
+
+export function countPublishedReads(doc) {
+  const rows = publishedReadRows(doc);
+  const reads = rows.filter((row) => row && String(row.readKind || row.kind || "") !== "news");
+  if (!reads.length) return null;
+  let day = "";
+  for (const row of reads) {
+    const found = String(row.asOf || row.date || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(found) && found > day) day = found;
+  }
+  let onDay = 0;
+  if (day) {
+    for (const row of reads) {
+      if (String(row.asOf || row.date || "").slice(0, 10) === day) onDay += 1;
+    }
+  }
+  return { total: reads.length, onDay, day };
+}
+
+function publishedReadRows(doc) {
+  if (!doc || typeof doc !== "object") return [];
+  if (doc.cards && typeof doc.cards === "object") return Object.values(doc.cards);
+  if (Array.isArray(doc.reads)) return doc.reads;
+  if (Array.isArray(doc)) return doc;
+  return [];
+}
+
 // A Pokémon fact renders only when this file already has the count, the artist
 // count, and the dex. No price is added to make the row show.
 export function isFactRow(row) {
@@ -32,12 +190,286 @@ export function isFactRow(row) {
   return String(row.headline || row.path || "").trim().length > 0;
 }
 
+// English is cardCount when the file has no separate language split.
+// Japanese is said only when that count is already on the row.
+export function pokemonFactLine(row) {
+  if (!row || typeof row !== "object") return "";
+  const name = String(row.name || "").trim();
+  if (!name) return "";
+  let english = Number.isInteger(row.englishCount) && row.englishCount >= 0 ? row.englishCount : null;
+  if (english == null && Number.isInteger(row.enCount) && row.enCount >= 0) english = row.enCount;
+  let japanese = Number.isInteger(row.japaneseCount) && row.japaneseCount >= 0 ? row.japaneseCount : null;
+  if (japanese == null && Number.isInteger(row.jaCount) && row.jaCount >= 0) japanese = row.jaCount;
+  if (japanese == null && Number.isInteger(row.jpCount) && row.jpCount >= 0) japanese = row.jpCount;
+  if (english == null && Number.isInteger(row.cardCount) && row.cardCount >= 0) english = row.cardCount;
+  const parts = [];
+  if (english != null) parts.push(`${english} English TCG card${english === 1 ? "" : "s"}`);
+  if (japanese != null) parts.push(`${japanese} Japanese TCG card${japanese === 1 ? "" : "s"}`);
+  if (!parts.length) return "";
+  if (parts.length === 1) return `${name} has ${parts[0]}.`;
+  return `${name} has ${parts[0]} and ${parts[1]}.`;
+}
+
+// A cutout only when that field is already on the row. A product image is not a cutout.
+export function cutoutSrc(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return "";
+  const direct = row.cutout;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (direct && typeof direct === "object") {
+    const src = String(direct.src || "").trim();
+    if (src) return src;
+  }
+  if (row.kind === "cutout") {
+    const src = String(row.src || "").trim();
+    if (src) return src;
+  }
+  return "";
+}
+
+// The TCGplayer link only when that link is already on the row. A CDN image is not the link.
+export function tcgLink(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return "";
+  const keys = ["tcgplayer", "tcgplayerUrl", "productUrl", "url", "link", "href"];
+  for (let i = 0; i < keys.length; i++) {
+    const value = String(row[keys[i]] || "").trim();
+    if (/^https:\/\/(?:www\.)?tcgplayer\.com\//i.test(value)) return value;
+  }
+  return "";
+}
+
+// Highest price already on the row first, then cheapest. A row with no price stays off.
+export function pricedMonCards(rows, name) {
+  const mon = String(name || "").trim();
+  if (!mon) return [];
+  const out = [];
+  for (const row of rows || []) {
+    let cardName = "";
+    let price = null;
+    let id = "";
+    let set = "";
+    let sku = "";
+    let cutout = "";
+    let link = "";
+    if (Array.isArray(row)) {
+      cardName = String(row[1] || "").trim();
+      price = Number(row[6]);
+      id = String(row[0] || "");
+      set = String(row[2] || "");
+    } else if (row && typeof row === "object") {
+      cardName = String(row.name || "").trim();
+      price = Number(row.price);
+      id = String(row.id || "");
+      set = String(row.set || "").trim();
+      sku = String(row.sku || "").trim();
+      cutout = cutoutSrc(row);
+      link = tcgLink(row);
+    } else continue;
+    if (cardName !== mon && !cardName.startsWith(mon + " ")) continue;
+    if (!(price > 0)) continue;
+    const item = { id, name: cardName, set, price };
+    if (sku) item.sku = sku;
+    if (cutout) item.cutout = cutout;
+    if (link) item.link = link;
+    out.push(item);
+  }
+  out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return out;
+}
+
+// The Post Office cutout on that Pokémon. A different card's picture is not one.
+export function factCutout(catalogue, name) {
+  const who = String(name || "").trim().toLowerCase();
+  if (!who || !catalogue) return "";
+  let cards = [];
+  if (Array.isArray(catalogue)) cards = catalogue;
+  else if (Array.isArray(catalogue.cards)) cards = catalogue.cards;
+  else if (catalogue.cards && typeof catalogue.cards === "object") cards = Object.values(catalogue.cards);
+  else return "";
+  for (let i = 0; i < cards.length; i++) {
+    const row = cards[i];
+    if (!row || typeof row !== "object") continue;
+    const species = String(row.species || "").trim().toLowerCase();
+    const named = String(row.name || "").trim().toLowerCase();
+    if (species !== who && named !== who) continue;
+    const src = cutoutSrc(row);
+    if (src) return src;
+  }
+  return "";
+}
+
+const NEWS_MONTHS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+function newsPartsToIso(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1000) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return "";
+  return dt.toISOString().slice(0, 10);
+}
+
+function shiftIso(iso, days) {
+  const t = Date.parse(String(iso) + "T00:00:00Z");
+  if (!Number.isFinite(t)) return "";
+  return new Date(t + days * 86400000).toISOString().slice(0, 10);
+}
+
+function statedDayList(text, yearFromFile) {
+  const src = String(text || "");
+  const out = [];
+  const monthRe = /\b(january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sept|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\s+(\d{4}))?/gi;
+  let m;
+  while ((m = monthRe.exec(src))) {
+    const mon = NEWS_MONTHS[m[1].toLowerCase()];
+    const year = m[3] ? Number(m[3]) : yearFromFile;
+    const iso = newsPartsToIso(year, mon, Number(m[2]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  const isoRe = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+  while ((m = isoRe.exec(src))) {
+    const iso = newsPartsToIso(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  const dotRe = /\b(\d{4})\.(\d{1,2})\.(\d{1,2})\b/g;
+  while ((m = dotRe.exec(src))) {
+    const iso = newsPartsToIso(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (iso && out.indexOf(iso) < 0) out.push(iso);
+  }
+  return out;
+}
+
+function nonEnglishTitle(title) {
+  return /[぀-ヿ一-龯가-힣]/.test(String(title || ""));
+}
+
+function newsSourceUrl(item) {
+  const url = String(item && item.url || "").trim();
+  if (!/^https?:\/\//i.test(url)) return "";
+  return url;
+}
+
+function translationUncertain(item) {
+  if (String(item.note || "").includes("Translation is missing.")) return true;
+  const title = String(item.title || "");
+  const en = String(item.titleEn || "").trim();
+  if (nonEnglishTitle(title) && !en) return true;
+  return false;
+}
+
+function newsEnglishName(item) {
+  const title = String(item.title || "").trim();
+  const en = String(item.titleEn || "").trim();
+  if (nonEnglishTitle(title)) return en;
+  return title;
+}
+
+function newsPlace(item, name) {
+  const region = String(item.region || "");
+  const language = String(item.language || "");
+  if (region === "jp" || language === "ja" || String(name || "").startsWith("Japan:")) return "Japan news";
+  if (region === "kr" || language === "ko") return "Korea news";
+  if (language === "zh") return "Chinese news";
+  if (language === "ru") return "Russian news";
+  if (language === "ar") return "Arabic news";
+  if (language === "th" || region === "th") return "Thai news";
+  if (language && language !== "en") return language + " news";
+  return "";
+}
+
+function isNewReveal(item) {
+  const title = String(item.title || "") + " " + String(item.titleEn || "");
+  return /\breveal(?:ed|s|ing)?\b/i.test(title);
+}
+
+function releaseInNextTwoWeeks(item, asOf) {
+  const year = Number(String(asOf).slice(0, 4));
+  const text = [item.title, item.titleEn, item.sentence, item.setDate, item.statedDate].filter(Boolean).join(" ");
+  const end = shiftIso(asOf, 14);
+  if (!end) return false;
+  const days = statedDayList(text, year);
+  for (let i = 0; i < days.length; i++) {
+    if (days[i] > asOf && days[i] <= end) return true;
+  }
+  return false;
+}
+
+// A short slice of an item already in the news file. No headline, date, or link is added.
+export function newsSlice(doc) {
+  const root = Array.isArray(doc) ? { items: doc } : (doc && typeof doc === "object" ? doc : null);
+  if (!root) return [];
+  const asOf = isoDay(root.asOf) ? root.asOf : "";
+  if (!asOf) return [];
+  let items = Array.isArray(root.items) ? root.items : null;
+  if (!items && root.filters && root.filters.news && Array.isArray(root.filters.news.items)) {
+    items = root.filters.news.items;
+  }
+  if (!items) return [];
+  const cut = shiftIso(asOf, -14);
+  const seen = new Set();
+  const out = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || typeof item !== "object") continue;
+    if (item.kind && item.kind !== "news") continue;
+    const href = newsSourceUrl(item);
+    const date = String(item.date || "").slice(0, 10);
+    if (!href || !isoDay(date) || seen.has(href)) continue;
+    if (translationUncertain(item)) continue;
+    const name = newsEnglishName(item);
+    if (!name) continue;
+    const older = date < cut;
+    if (older && !isNewReveal(item) && !releaseInNextTwoWeeks(item, asOf)) continue;
+    seen.add(href);
+    const row = {
+      id: href,
+      readKind: "news",
+      kind: "news",
+      name,
+      asOf: date,
+      href,
+      source: String(item.source || "").trim(),
+    };
+    const original = String(item.originalTitle || "").trim();
+    if (original) row.originalTitle = original;
+    else if (nonEnglishTitle(item.title)) row.originalTitle = String(item.title || "").trim();
+    const place = newsPlace(item, name);
+    if (place) row.place = place;
+    out.push(row);
+  }
+  out.sort((a, b) => (a.asOf < b.asOf ? 1 : a.asOf > b.asOf ? -1 : (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)));
+  return out;
+}
+
+export function isOutlierRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "outlier" && row.kind !== "outlier") return false;
+  if (!String(row.id || "").trim()) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
+export function isDiveRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "dive" && row.kind !== "dive") return false;
+  if (!String(row.diveId || row.id || "").trim()) return false;
+  return String(row.headline || row.path || "").trim().length > 0;
+}
+
 export function keepFeedRead(row) {
   if (!row || typeof row !== "object") return false;
   if (!String(row.headline || row.path || "").trim()) return false;
   if (isFactRow(row)) return true;
   if (isLagRow(row)) return true;
   if (isSupplyRow(row)) return true;
+  if (isOutlierRow(row)) return true;
+  if (isDiveRow(row)) return true;
+  if (isVolumeRow(row)) return true;
+  if (isShapeRow(row)) return true;
   return money(row.price) != null;
 }
 
@@ -78,7 +510,132 @@ export function filesDisagree(card, other) {
   return false;
 }
 
-const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave"]);
+// The card file is newer and names a different price for this same id.
+// An older card price does not throw out a later read. A fact is not a price.
+export function readStaleAgainstCard(read, card) {
+  if (!read || !card || typeof read !== "object" || typeof card !== "object") return false;
+  if (read.readKind === "pokemon" || read.kind === "pokemon") return false;
+  if (read.readKind === "news" || read.kind === "news") return false;
+  if (read.readKind === "lag" || read.kind === "lag") return false;
+  if (read.readKind === "supply" || read.kind === "supply") return false;
+  const priced = read.readKind === "price" || read.kind === "single" || read.kind === "sealed";
+  if (!priced) return false;
+  const left = Number(read.price);
+  const right = Number(card.price);
+  if (!(left > 0) || !(right > 0)) return false;
+  if (Math.round(left * 100) === Math.round(right * 100)) return false;
+  const readDay = String(read.asOf || "").slice(0, 10);
+  const cardDay = String(card.asOf || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(readDay) || !/^\d{4}-\d{2}-\d{2}$/.test(cardDay)) return false;
+  return cardDay >= readDay;
+}
+
+const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave", "flagged", "dive", "volume"]);
+
+function waveRead(item, n) {
+  return {
+    id: `wave-${n}`,
+    waveItem: true,
+    readKind: "wave",
+    kind: "wave",
+    name: item.title || "",
+    headline: item.sentence || item.title || "",
+    path: item.sentence || "",
+    source: item.source || "",
+    asOf: String(item.date || "").slice(0, 10),
+    href: item.url || "",
+    reprint: item.reprint || "",
+  };
+}
+
+export function waveReads(browse) {
+  const items = browse?.filters?.wave?.items;
+  if (!Array.isArray(items)) return [];
+  const out = [];
+  items.forEach((item, n) => {
+    if (!item || (!item.title && !item.sentence)) return;
+    out.push(waveRead(item, n));
+  });
+  return out;
+}
+
+function newsReads(browse, opts) {
+  let baked = opts && opts.news ? opts.news : null;
+  const block = browse && browse.filters ? browse.filters.news : null;
+  if (!baked && block && Array.isArray(block.items)) baked = { asOf: block.asOf || "", items: block.items };
+  return newsSlice(baked);
+}
+
+export function flaggedReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.flagged?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isOutlierRow(row) && !(row && row.flagged && row.flagged.on && Number(row.price) > 0)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) {
+    if (isOutlierRow(row) || (row && row.flagged && row.flagged.on)) push(row);
+  }
+  return out;
+}
+
+export function diveReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.dive?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isDiveRow(row)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) if (isDiveRow(row)) push(row);
+  return out;
+}
+
+export function volumeReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.volume?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isVolumeRow(row)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) if (isVolumeRow(row)) push(row);
+  return out;
+}
+
+export function shapeReads(browse, bundleReads, kind = "") {
+  const want = String(kind || "");
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isShapeRow(row)) return;
+    if (want && row.readKind !== want) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  const kinds = want ? [want] : SHAPE_KINDS;
+  for (const key of kinds) {
+    const items = browse?.filters?.[key]?.items;
+    if (Array.isArray(items)) for (const row of items) push(row);
+  }
+  for (const row of bundleReads || []) push(row);
+  return out;
+}
 
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
   const filter = String(opts.filter || "");
@@ -98,11 +655,15 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     }
     if (hideFacts && isFactRow(row)) return;
     if (filter === "pokemon" && !isFactRow(row)) return;
-    if (filter === "prices" && (isFactRow(row) || !(Number(row.price) > 0))) return;
+    if (filter === "prices" && (isFactRow(row) || isOutlierRow(row) || isDiveRow(row) || row.readKind === "news" || row.readKind === "wave" || !(Number(row.price) > 0))) return;
     if (filter === "sealed" && row.kind !== "sealed") return;
     if (filter === "set" && setName && row.set !== setName) return;
     if (filter === "news" && row.readKind !== "news" && row.kind !== "news") return;
     if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
+    if (filter === "flagged" && !isOutlierRow(row) && !(row.flagged && row.flagged.on)) return;
+    if (filter === "dive" && !isDiveRow(row)) return;
+    if (filter === "volume" && !isVolumeRow(row)) return;
+    if (SHAPE_KINDS.includes(filter) && (!isShapeRow(row) || row.readKind !== filter)) return;
     if (id) seen.add(id);
     out.push(row);
   };
@@ -111,31 +672,56 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     return out;
   }
   if (filter === "wave") {
-    const items = browse?.filters?.wave?.items;
-    if (Array.isArray(items)) {
-      items.forEach((item, n) => {
-        if (!item || (!item.title && !item.sentence)) return;
-        push({
-          id: `wave-${n}`,
-          waveItem: true,
-          readKind: "wave",
-          kind: "wave",
-          name: item.title || "",
-          headline: item.sentence || item.title || "",
-          path: item.sentence || "",
-          source: item.source || "",
-          asOf: String(item.date || "").slice(0, 10),
-          href: item.url || "",
-          reprint: item.reprint || "",
-        });
-      });
+    for (const row of waveReads(browse)) push(row);
+    return out;
+  }
+  if (filter === "news") {
+    for (const row of newsReads(browse, opts)) push(row);
+    return out;
+  }
+  if (filter === "flagged") {
+    for (const row of flaggedReads(browse, kept)) push(row);
+    return out;
+  }
+  if (filter === "dive") {
+    for (const row of diveReads(browse, kept)) push(row);
+    return out;
+  }
+  if (filter === "volume") {
+    for (const row of volumeReads(browse, kept)) push(row);
+    return out;
+  }
+  if (SHAPE_KINDS.includes(filter)) {
+    for (const row of shapeReads(browse, kept, filter)) push(row);
+    return out;
+  }
+  // The short front is the reads already on this bundle. It is not the whole
+  // file. Unranked ids follow in the shuffled order the file already stored.
+  // News, wave, flagged, dive, and volume rows already in the files are mixed in.
+  // A ranked filter below keeps that order. No price is added for a bare id.
+  if (!filter) {
+    for (const row of kept) push(row);
+    const extras = newsReads(browse, opts)
+      .concat(waveReads(browse))
+      .concat(flaggedReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(diveReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(volumeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(shapeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
+    let ei = 0;
+    const rest = browse?.unfiltered;
+    if (Array.isArray(rest)) {
+      for (const id of rest) {
+        if (typeof id !== "string" || !id || seen.has(id)) continue;
+        const before = out.length;
+        const row = kept.find((item) => item && item.id === id);
+        push(row || { id, pending: true });
+        if (out.length !== before && ei < extras.length) push(extras[ei++]);
+      }
     }
+    while (ei < extras.length) push(extras[ei++]);
     return out;
   }
   const ranked = RANKED_FILTERS.has(filter);
-  if (!filter) {
-    for (const row of kept) push(row);
-  }
   const order = ranked ? browse?.ranked : browse?.unfiltered;
   if (Array.isArray(order)) {
     for (const id of order) {
@@ -352,13 +938,40 @@ function feedNav(opts) {
   return opts?.feed === true || opts?.FEED_ENABLED === "true";
 }
 
-function chrome(active, body, title, stamp, extraFoot = "", feed = false) {
+function shareMetaTags(title, share) {
+  if (!share || typeof share !== "object") return "";
+  const pageTitle = `${title} · Catch'em`;
+  const desc = String(share.description || "").trim();
+  const url = String(share.url || "").trim();
+  const image = String(share.image || "https://catchemtcg.com/og.png").trim();
+  if (!desc || !url) return "";
+  const alt = String(share.imageAlt || "Catch'em. A home for collectors, rippers and flippers.").trim();
+  return `<meta name="description" content="${esc(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc("Catch'em")}">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:title" content="${esc(pageTitle)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(alt)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(pageTitle)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(image)}">
+<link rel="canonical" href="${esc(url)}">`;
+}
+
+function chrome(active, body, title, stamp, extraFoot = "", feed = false, share = null) {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
   const feedLink = feed ? item("/feed", "Feed") : "";
   const fresh = stamp ? `<div class="wrap" style="padding-bottom:0"><p class="muted" id="fresh" style="margin:0">${esc(stamp)}</p></div>` : "";
   const foot = extraFoot ? `<p id="post-office-build">${esc(extraFoot)}</p>` : "";
+  const shareTags = shareMetaTags(title, share);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
+${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}</style><script>${CHART_JS}</script></head><body>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
@@ -432,10 +1045,31 @@ function draw(){
   const view=list.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
-    const img=r.pid?'<img alt="" width="64" height="64" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#211e1a" src="https://tcgplayer-cdn.tcgplayer.com/product/'+r.pid+'_in_200x200.jpg" onerror="this.remove()">':"";
+    const src=pictureSrc(r, data.logo);
+    const crop=cropStyle(r&&r.crop);
+    const img=src?'<img alt="" width="64" height="64" style="width:64px;height:64px;'+(crop?crop:"object-fit:contain")+';border-radius:8px;background:#211e1a" src="'+String(src).replace(/"/g,"")+'">':'<span class="muted">The picture is missing.</span>';
     return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
   }).join("") || '<p class="muted">Nothing matches.</p>';
   document.getElementById("more").hidden=shown>=list.length;
+}
+function pictureSrc(row, logo){
+  if(!row || typeof row!=="object") return "";
+  if(row.icon) return "";
+  const image=typeof row.image==="string"?row.image.trim():"";
+  const scan=typeof row.scan==="string"?row.scan.trim():"";
+  const src=image||scan;
+  if(!src) return "";
+  if(logo && src===String(logo)) return "";
+  return src;
+}
+function cropStyle(crop){
+  if(!crop || typeof crop!=="object") return "";
+  const x=Number(crop.x);
+  const y=Number(crop.y);
+  const w=Number(crop.w!=null?crop.w:crop.width);
+  const h=Number(crop.h!=null?crop.h:crop.height);
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!(w>0)||!(h>0)) return "";
+  return "object-fit:none;object-position:-"+x+"px -"+y+"px;width:"+w+"px;height:"+h+"px";
 }
 fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0; return r.json()}).then(data=>{
   document.getElementById("title").textContent=data.name;
@@ -537,7 +1171,7 @@ export function renderCard(card, stamp, opts = {}) {
   const lowOn = fact?.lowOn || computed?.lowOn || "";
   const since = fact?.daysSinceHigh ?? computed?.daysSinceHigh;
   const breakBits = [];
-  if (high && highOn && low && lowOn) breakBits.push(`<p>High ${money(high)} on ${esc(highOn)}. Low ${money(low)} on ${esc(lowOn)}.</p>`);
+  if (high && highOn && low && lowOn) breakBits.push(`<p>▲ high ${money(high)} on ${esc(highOn)}. ▼ low ${money(low)} on ${esc(lowOn)}.</p>`);
   if (Number.isFinite(Number(since))) breakBits.push(`<p>${Number(since)} days since the high.</p>`);
   const listings = Number(fact?.listings);
   if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
@@ -555,7 +1189,7 @@ export function renderCard(card, stamp, opts = {}) {
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span>${chips}</p>
-<p class="muted">TCGplayer market${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}${checked ? `. ${esc(checked)}` : ""}</p>
+<p class="muted">${esc(card.source || "TCGplayer market")}${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}${checked ? `. ${esc(checked)}` : ""}</p>
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
 <p class="muted">${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")})` : "No sold data yet"}</p>
@@ -563,6 +1197,7 @@ ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept wit
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
 ${chartBox(hist, "TCGplayer market, daily", card.release || "")}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
@@ -836,7 +1471,6 @@ ${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Your First 222 nu
 ${card('<path d="M4 16V7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5V12H7.2L4 14.6z"/><path d="M9 11.5h8.5A1.5 1.5 0 0 1 19 13V18l-2.4-2H10.5A1.5 1.5 0 0 1 9 14.5z"/>', "Private member channels", "The rooms that open with the seat.")}
 ${card('<path d="M12 3l1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3z"/>', "Early beta access", "Try new Feed features, bots and tools before anyone else, and help shape them. Beta channel, feedback votes, a first look at new reads, alerts, and Post Office tools.")}
 ${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ideas a day, not 3. Post text is 100 a day, not 3. Video export is 5 a day and 35 a week, not 1 a day and 2 a week.")}
-${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="3"/>', "Vault votes on what we build next", "The club weighs in on the next tool, the next bot, and the next read.")}
 </div>
 <h2>Your price stays locked</h2>
 <div class="prem-lock">
@@ -845,10 +1479,6 @@ ${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="
 </div>
 <h2>Members also get</h2>
 <div class="prem-also">
-<ul>
-<li>monthly Stadium giveaway auto-entry</li>
-<li>member-only drops</li>
-</ul>
 <p>Watching the Stadium for free is fine.</p>
 </div>
 <h2>Questions</h2>
@@ -864,6 +1494,71 @@ ${card('<path d="M7 12.5l3 3 7-7"/><rect x="4" y="4" width="16" height="16" rx="
   return chrome("", body, "Discord Premium", "", "", feedNav(opts));
 }
 
+export function renderDive(doc, stamp, opts = {}) {
+  if (!doc || !doc.id) {
+    return chrome("", `<main class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts), {
+      description: "That deep-dive payload is not on file yet. Open the Feed for live market reads.",
+      url: "https://catchemtcg.com/feed",
+    });
+  }
+  const series = Array.isArray(doc.series) ? doc.series : [];
+  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
+  const latest = doc.latest || {};
+  const buyout = doc.buyout || null;
+  const outlier = doc.outlier || null;
+  const price = money(latest.priceMedian);
+  const listings = latest.listingCount != null ? String(latest.listingCount) : "—";
+  const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
+  const rows = series.slice().reverse().map((r) => {
+    const lc = r.listingCount != null ? String(r.listingCount) : "—";
+    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || "—"}</td><td>${esc(lc)}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
+  }).join("");
+  const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
+  const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
+  const outlierNote = outlier && (outlier.note || (outlier.pctGap != null
+    ? `Price flagged: ${Math.abs(Number(outlier.pctGap))}% ${Number(outlier.pctGap) < 0 || outlier.direction === "low" ? "below" : "above"} recent median — review`
+    : null));
+  const outlierLine = outlier
+    ? `<p style="border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin:12px 0"><b>${esc(outlierNote || `Outlier: ${String(outlier.flag)}`)}</b>${outlier.asOf ? ` <span class="muted">(${esc(outlier.asOf)})</span>` : ""}${outlier.provisionalLabel ? `<br><span class="muted">${esc(String(outlier.provisionalLabel))}</span>` : ""}</p>`
+    : `<p class="muted">Outlier flags: none yet.</p>`;
+  const change = doc.listingChange || null;
+  const changeLine = change && change.label === "net change in active eBay listings (estimate)" && Number.isInteger(change.net) && Number.isInteger(change.days) && change.days >= 2
+    ? `<p>${esc(change.label)}: <b>${change.net > 0 ? "+" : ""}${esc(String(change.net))}</b> over ${esc(String(change.days))} days of eBay Browse totals (${esc(change.from || "")} to ${esc(change.to || "")})</p>`
+    : "";
+  const buyoutLine = browse
+    ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
+    : `<p class="muted">Browse total: not on file for this product.</p>`;
+  const body = `<main class="wrap">
+<p class="muted"><a href="/feed">Feed</a> · <a href="/board">Board</a> · Deep dive</p>
+<h1>${esc(doc.name || doc.id)}</h1>
+<p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
+<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
+<p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
+${buyoutLine}
+${changeLine}
+${chartBox(hist, "eBay Browse ask median, daily")}
+<table style="width:100%;border-collapse:collapse;margin:16px 0">
+<thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
+</table>
+${volumeLine}
+${outlierLine}
+${catalog}
+<p class="muted">Charts-only hub is deferred. This page is the launch-lean deep-dive a read can open.</p>
+</main>`;
+  const diveTitle = `${doc.name || doc.id} — Deep dive`;
+  const diveDesc = [
+    latest.set || "",
+    latest.subtype || "",
+    price ? `eBay Browse ask median ${price}` : "eBay Browse ask series",
+    "asks, not solds",
+  ].filter(Boolean).join(" · ");
+  return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
+    description: diveDesc,
+    url: `https://catchemtcg.com/dive/${encodeURIComponent(doc.id)}`,
+  });
+}
+
 export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {
@@ -872,12 +1567,33 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).map((r) => ({
+    ...r,
+    headline: soldSafeText(r, r.headline),
+    ...(r.path ? { path: soldSafeText(r, r.path) } : {}),
+    ...(r.why ? { why: soldSafeText(r, r.why) } : {}),
+  }));
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
+  const newsLead = JSON.stringify(newsSlice(feedNews)).replace(/</g, "\\u003c");
+  const diveLead = JSON.stringify(opts.diveMap || { ids: [], byTcgcsv: {} }).replace(/</g, "\u003c");
   const css = `
   .feed-page{padding-top:8px}
-  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
   .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
+  .pill-menu{position:relative;max-width:100%}
+  .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .pill-menu-btn{appearance:none;background:var(--gold);color:#1a1407;border:1px solid transparent;border-radius:10px;min-height:48px;padding:0 22px;font:600 16px/1 var(--sans);max-width:100%;cursor:pointer}
+  .pill-menu-list{position:absolute;z-index:20;left:0;top:calc(100% + 6px);margin:0;padding:6px;list-style:none;background:#12100e;color:var(--gold);border:1px solid var(--gold);border-radius:10px;display:flex;flex-direction:column;gap:4px;width:max-content;min-width:100%;max-width:calc(100vw - 40px);max-height:min(70vh,420px);overflow:auto}
+  .pill-menu-list[hidden]{display:none}
+  .pill-menu-list button{appearance:none;background:transparent;color:var(--gold);border:0;border-radius:10px;min-height:48px;padding:0 16px;text-align:left;font:600 16px/1.2 var(--sans);width:100%;cursor:pointer}
+  .pill-menu-list button[aria-selected="true"]{background:var(--gold);color:#1a1407}
+  @media (max-width:390px){
+    .pill-menu,.pill-menu-btn{max-width:100%}
+    .pill-menu-list{max-width:calc(100vw - 40px)}
+  }
+  @media (min-width:1280px){
+    .pill-menu-list{max-width:320px}
+  }
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
@@ -885,6 +1601,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
+  .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
   .means b{display:block;margin:0 0 6px}
   .means p{margin:0 0 8px}
@@ -914,6 +1631,11 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .pile{overflow:hidden}
   .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
   .feed-stage .feed-card{flex:1 1 auto}
+  .feed-stage .feed-card.fact-card{flex:0 0 auto;width:100%}
+  .mon-btn{background:#12100e;color:#d9b779;border:1px solid #d9b779;border-radius:10px;min-height:48px;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif}
+  .mon-list{display:flex;flex-direction:column;gap:6px;margin:0}
+  .mon-list[hidden]{display:none}
+  .mon-list p{margin:0;color:#d9b779}
   #feed-sections:empty{display:none}
   .linkish{background:none;border:0;color:var(--gold);font:600 14px var(--sans);padding:0 4px}
   .track-line{margin:0}
@@ -933,8 +1655,16 @@ ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
-  <select id="f-loop" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option></select>
-  <select id="f-loop-set" aria-label="Set" hidden><option value="">Every set</option></select>
+  <div class="pill-menu">
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
+  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
+  <ul class="pill-menu-list" role="listbox" hidden></ul>
+  </div>
+  <div class="pill-menu" hidden>
+  <select id="f-loop-set" class="pill-native" aria-label="Set"><option value="">Every set</option></select>
+  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">Every set</button>
+  <ul class="pill-menu-list" role="listbox" hidden></ul>
+  </div>
   <label id="hide-facts"${opts.premium === true ? "" : " hidden"}><input type="checkbox" id="f-hide-facts"> Hide Pokémon facts</label>
 </form>` : ""}
 ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
@@ -949,9 +1679,12 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
+<script type="application/json" id="dive-map">${diveLead}</script>
+<script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script>
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
+const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 ${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeURIComponent(String(card.href||'').split('/').pop())+'\">Make a Short</a>';" : "const shortFor=()=>'';"}
@@ -959,6 +1692,31 @@ function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
 const focus=${JSON.stringify(String(opts.section || ""))};
+
+function diveMapDoc(){
+  try{ return JSON.parse((document.getElementById("dive-map")||{}).textContent||"{}"); }catch(e){ return {ids:[],byTcgcsv:{}}; }
+}
+const __diveMap=diveMapDoc();
+const __diveIds=new Set(Array.isArray(__diveMap.ids)?__diveMap.ids:[]);
+const __diveByTcg=__diveMap.byTcgcsv&&typeof __diveMap.byTcgcsv==="object"?__diveMap.byTcgcsv:{};
+function diveIdFor(card){
+  if(!card) return "";
+  if(card.diveId && __diveIds.has(card.diveId)) return card.diveId;
+  if(card.id && __diveIds.has(card.id)) return card.id;
+  const href=String(card.href||"");
+  // No backslashes here: this line sits inside a template literal, which ate
+  // the escapes in /\\/p\\/…/ and shipped "//p/…" — a syntax error that stopped the
+  // whole feed script.
+  const m=href.match(new RegExp("/p/([^/?#]+)"));
+  let pid=m?decodeURIComponent(m[1]):"";
+  if(pid.endsWith(".html")) pid=pid.slice(0,-5);
+  if(pid && __diveIds.has(pid)) return pid;
+  if(pid && __diveByTcg[pid]) return __diveByTcg[pid];
+  const sku=String(card.sku||"");
+  if(sku && __diveByTcg[sku]) return __diveByTcg[sku];
+  if(card.id && __diveByTcg[card.id]) return __diveByTcg[card.id];
+  return "";
+}
 const pageMode=${JSON.stringify(page)};
 const premium=${opts.premium === true ? "true" : "false"};
 let browse=null;
@@ -974,6 +1732,10 @@ function isFact(card){
   if(c<1 || a<1 || d<1) return false;
   return !!(card.headline || card.path);
 }
+${cutoutSrc.toString()}
+${tcgLink.toString()}
+${pokemonFactLine.toString()}
+${pricedMonCards.toString()}
 function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
 function priceOk(n){ return Number(n)>0; }
 function isLag(card){
@@ -993,6 +1755,28 @@ function filesDisagree(card, other){
   if(left>0 && right>0 && Math.round(left*100)!==Math.round(right*100)) return true;
   if(Number.isInteger(card.listings) && Number.isInteger(other.listings) && card.listings!==other.listings) return true;
   return false;
+}
+${readStaleAgainstCard.toString()}
+const bucketCache={};
+async function publishedCard(sku){
+  const id=String(sku||"");
+  const n=Number((id.match(/([0-9]+)/)||[])[1]);
+  if(!n) return null;
+  const bucket=String(n%100).padStart(2,"0");
+  if(!Object.prototype.hasOwnProperty.call(bucketCache, bucket)){
+    try{
+      const res=await fetch("/data/buckets/"+bucket+".json");
+      bucketCache[bucket]=res.ok?await res.json():[];
+    }catch(e){ bucketCache[bucket]=[]; }
+  }
+  const rows=bucketCache[bucket]||[];
+  for(let i=0;i<rows.length;i++) if(rows[i] && rows[i].id===id) return rows[i];
+  return null;
+}
+async function stalePrice(row){
+  if(!row || !row.sku) return false;
+  const card=await publishedCard(row.sku);
+  return readStaleAgainstCard(row, card);
 }
 if(history.scrollRestoration) history.scrollRestoration="manual";
 const GROUPS=[
@@ -1064,7 +1848,9 @@ function priceRow(card){
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
-  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
+  const src=String(card.source||"").trim();
+  const srcBit=src?'<span class="muted"> · '+html(src)+"</span>":"";
+  return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+srcBit+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }
 function checkedLine(iso){
   const s=String(iso||"").slice(0,10);
@@ -1124,17 +1910,17 @@ function priorMoney(card){
   const from=now/denom;
   return from>0?money(from):"";
 }
+${dropTitleName.toString()}
+${readUnderTitle.toString()}
+${withoutSoldClaim.toString()}
+${isVolumeRow.toString()}
+${shapeCash.toString()}
+${isShapeRow.toString()}
+${cardIdentity.toString()}
 function moveLine(card){
-  const path=String(card.path||"").trim();
-  if(path) return path;
-  const hist=card.hist||[];
-  if(hist.length>=2){
-    const a=hist[hist.length-2];
-    const b=hist[hist.length-1];
-    const way=Number(b[1])<Number(a[1])?"down":"up";
-    return "From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+".";
-  }
-  return "No path is stored for this series yet.";
+  const path=isVolumeRow(card)||isShapeRow(card)?String(card.path||"").trim():withoutSoldClaim(String(card.path||"").trim());
+  if(!path) return "";
+  return readUnderTitle(card.name, path);
 }
 function watchDay(iso){
   const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
@@ -1144,16 +1930,8 @@ function watchDay(iso){
   return months[d.getUTCMonth()]+" "+d.getUTCDate();
 }
 function meansCopy(card){
-  const path=String(card.path||"").trim();
-  if(path) return [path];
-  const hist=card.hist||[];
-  if(hist.length>=2){
-    const a=hist[hist.length-2];
-    const b=hist[hist.length-1];
-    const way=Number(b[1])<Number(a[1])?"down":"up";
-    return ["From "+money(a[1])+" on "+a[0]+" to "+money(b[1])+" on "+b[0]+", the last step is "+way+"."];
-  }
-  return ["No path is stored for this series yet."];
+  const line=moveLine(card);
+  return line?[line]:[];
 }
 function logoFor(card){
   if(card.logo) return String(card.logo);
@@ -1231,27 +2009,99 @@ function waveEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const line=String(card.path||card.headline||"");
+  const line=readUnderTitle(card.name, card.path||card.headline||"");
+  const ident=cardIdentity(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
-function cardEl(card, facts){
-  if(card && card.waveItem) return waveEl(card);
+function mountMon(el, card){
+  const btn=document.createElement("button");
+  btn.type="button";
+  btn.className="mon-btn";
+  btn.setAttribute("aria-expanded","false");
+  btn.textContent="Cards";
+  const list=document.createElement("div");
+  list.className="mon-list";
+  list.hidden=true;
+  list.onclick=function(ev){ ev.stopPropagation(); };
+  btn.onclick=function(ev){
+    ev.stopPropagation();
+    const open=btn.getAttribute("aria-expanded")==="true";
+    if(open){ btn.setAttribute("aria-expanded","false"); list.hidden=true; return; }
+    btn.setAttribute("aria-expanded","true");
+    list.hidden=false;
+    if(list.dataset.ready==="1") return;
+    list.dataset.ready="1";
+    const priced=pricedMonCards(Array.isArray(lead)?lead:[], card.name);
+    list.innerHTML="";
+    if(!priced.length){
+      const p=document.createElement("p");
+      p.className="muted";
+      p.textContent="No priced cards are in the file.";
+      list.appendChild(p);
+      return;
+    }
+    priced.forEach(function(row){
+      const p=document.createElement("p");
+      const parts=[];
+      if(row.cutout) parts.push('<img class="cutout" alt="" src="'+html(row.cutout)+'">');
+      else parts.push("The picture is missing.");
+      parts.push(money(row.price));
+      if(row.name) parts.push(html(row.name));
+      if(row.set) parts.push(html(row.set));
+      const cardId=row.sku||row.id||"";
+      if(cardId) parts.push(html(cardId));
+      let line=parts.join(" · ");
+      if(row.link) line+=' <a href="'+html(row.link)+'">'+html(row.link)+"</a>";
+      p.innerHTML=line;
+      list.appendChild(p);
+    });
+  };
+  el.appendChild(btn);
+  el.appendChild(list);
+}
+function newsEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
+  const place=card.place?'<p>'+html(card.place)+"</p>":"";
+  const when=card.asOf?'<p>'+html(card.asOf)+"</p>":"";
+  const label=card.source||card.href||"";
+  const link=card.href?'<p><a href="'+html(card.href)+'">'+html(label)+"</a></p>":"";
+  el.innerHTML="<h3>"+html(card.name||"")+"</h3>"+place+when+link;
+  return el;
+}
+function factCutLine(card){
+  const who=String(card && card.name || "").trim();
+  return '<p class="cut-miss">The cutout is missing. '+html(who)+"</p>";
+}
+function cardEl(card, facts){
+  if(card && card.waveItem) return waveEl(card);
+  if(card && (card.readKind==="news" || card.kind==="news")) return newsEl(card);
+  const el=document.createElement("article");
+  el.className="feed-card";
+  el.id="r-"+card.id;
+  const src=isVolumeRow(card)?card.sold.source+", Near Mint, "+card.sold.window30d.from+" to "+card.sold.window30d.to:(card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:"")));
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
-  const line=moveLine(card);
-  const title=html(card.name||card.headline||"Read");
+  const line=isFact(card)?pokemonFactLine(card):moveLine(card);
+  const ident=cardIdentity(card);
+  const headline=String(card.headline||"").trim();
+  const pathText=String(card.path||"").trim();
+  const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
+  const shown=sameSentence||line;
+  const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
-  const head=h3+(line?'<p class="one-line">'+html(line)+"</p>":"")+(isFact(card)?"":priceRow(card));
+  const diveId=diveIdFor(card);
+  const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
+  const cut=isFact(card)?factCutLine(card):"";
+  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
-    el.innerHTML=head+open;
-    if(!isFact(card)) el.insertBefore(photoEl(card), el.firstChild);
+    el.innerHTML=head+open+diveLink;
+    if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
+    else el.insertBefore(photoEl(card), el.firstChild);
     el.addEventListener("click", function(ev){
     if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
@@ -1264,14 +2114,16 @@ function cardEl(card, facts){
     return el;
   }
   if(isFact(card)){
-    el.innerHTML=head+(card.why?'<p class="muted">'+html(card.why)+"</p>":"");
+    el.classList.add("fact-card");
+    el.innerHTML=head;
+    mountMon(el, card);
     return el;
   }
   const info=dataFacts(card, facts);
   const bits=[];
   const hi=[];
-  if(info.high) hi.push("High "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
-  if(info.low) hi.push("Low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
+  if(info.high) hi.push("▲ high "+money(info.high)+(info.highOn?" on "+monthDay(info.highOn):""));
+  if(info.low) hi.push("▼ low "+money(info.low)+(info.lowOn?" on "+monthDay(info.lowOn):""));
   if(hi.length) bits.push("<p>"+html(hi.join(". ")+".")+"</p>");
   const listed=listingsLine({listings: info.listings, listingsAsOf: info.listingsAsOf});
   if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
@@ -1285,7 +2137,7 @@ function cardEl(card, facts){
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML=head+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML=head+diveLink+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   el.insertBefore(photoEl(card), el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist && slot) slot.appendChild(chart(card.hist, src));
@@ -1709,6 +2561,7 @@ async function showRead(){
     }catch(e){}
   }
   if(filesDisagree(card, facts)){ host.textContent="That read is not on the feed."; return; }
+  if(await stalePrice(card)){ host.textContent="That read is not on the feed."; return; }
   host.appendChild(card.claim && !card.headline ? trackedEl(card) : cardEl(card, facts));
   if(typeof catchemMount==="function") catchemMount(host);
 }
@@ -1718,6 +2571,9 @@ function leadRows(){
     if(!r || !(r.headline || r.path)) return false;
     if(isFact(r)) return !hideFacts;
     if(isLag(r) || isSupply(r)) return true;
+    if(r.readKind==="outlier" || r.kind==="outlier" || r.readKind==="dive" || r.kind==="dive") return true;
+    if(isVolumeRow(r)) return true;
+    if(isShapeRow(r)) return true;
     return Number(r.price)>0;
   });
 }
@@ -1726,7 +2582,7 @@ function accepts(card){
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
   if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
-  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card);
+  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
     const setSel=document.getElementById("f-loop-set");
     const name=setSel?setSel.value:"";
@@ -1735,6 +2591,10 @@ function accepts(card){
   }
   if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
   if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
+  if(loopFilter==="flagged") return card.readKind==="outlier" || card.kind==="outlier" || !!(card.flagged && card.flagged.on);
+  if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive";
+  if(loopFilter==="volume") return isVolumeRow(card);
+  if(loopFilter==="quiet"||loopFilter==="mix"||loopFilter==="conditions"||loopFilter==="soldflat"||loopFilter==="solddown"||loopFilter==="setshare"||loopFilter==="spread"||loopFilter==="askmove"||loopFilter==="mktmove"||loopFilter==="still") return isShapeRow(card) && (card.readKind===loopFilter || card.kind===loopFilter);
   return true;
 }
 async function cardById(id){
@@ -1786,9 +2646,80 @@ function buildFlat(){
     flat=rows;
     return;
   }
-  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave";
-  if(!loopFilter) leadRows().forEach(add);
-  const order=browse ? (ranked ? browse.ranked : browse.unfiltered) : [];
+  if(loopFilter==="news"){
+    (Array.isArray(newsRows)?newsRows:[]).forEach(function(row){ add(row); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="flagged"){
+    const items=browse && browse.filters && browse.filters.flagged && browse.filters.flagged.items;
+    (items||[]).forEach(function(row){ add(row); });
+    leadRows().forEach(function(r){
+      if(r && (r.readKind==="outlier" || r.kind==="outlier" || (r.flagged && r.flagged.on))) add(r);
+    });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="dive"){
+    const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+    (items||[]).forEach(function(row){ add(row); });
+    leadRows().forEach(function(r){
+      if(r && (r.readKind==="dive" || r.kind==="dive")) add(r);
+    });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="volume"){
+    const items=browse && browse.filters && browse.filters.volume && browse.filters.volume.items;
+    (items||[]).forEach(function(row){ if(isVolumeRow(row)) add(row); });
+    leadRows().forEach(function(r){ if(isVolumeRow(r)) add(r); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="quiet"||loopFilter==="mix"||loopFilter==="conditions"||loopFilter==="soldflat"||loopFilter==="solddown"||loopFilter==="setshare"||loopFilter==="spread"||loopFilter==="askmove"||loopFilter==="mktmove"||loopFilter==="still"){
+    const block=browse && browse.filters && browse.filters[loopFilter];
+    const items=block && block.items;
+    (items||[]).forEach(function(row){ if(isShapeRow(row)) add(row); });
+    leadRows().forEach(function(r){ if(isShapeRow(r) && (r.readKind===loopFilter || r.kind===loopFilter)) add(r); });
+    flat=rows;
+    return;
+  }
+  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave"||loopFilter==="flagged"||loopFilter==="dive"||loopFilter==="volume";
+  if(!loopFilter){
+    leadRows().forEach(add);
+    // Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.
+    const extras=[];
+    (Array.isArray(newsRows)?newsRows:[]).forEach(function(row){ extras.push(row); });
+    const waveItems=browse && browse.filters && browse.filters.wave && browse.filters.wave.items;
+    (waveItems||[]).forEach(function(item, n){
+      if(!item || (!item.title && !item.sentence)) return;
+      extras.push({id:"wave-"+n, waveItem:true, readKind:"wave", kind:"wave", name:item.title||"", headline:item.sentence||item.title||"", path:item.sentence||"", source:item.source||"", asOf:String(item.date||"").slice(0,10), href:item.url||"", reprint:item.reprint||""});
+    });
+    const flaggedItems=browse && browse.filters && browse.filters.flagged && browse.filters.flagged.items;
+    (flaggedItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
+    const diveItems=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+    (diveItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
+    const volumeItems=browse && browse.filters && browse.filters.volume && browse.filters.volume.items;
+    (volumeItems||[]).forEach(function(row){ if(isVolumeRow(row) && !seen[row.id]) extras.push(row); });
+    const shapeKinds=["quiet","mix","conditions","soldflat","solddown","setshare","spread","askmove","mktmove","still"];
+    shapeKinds.forEach(function(kind){
+      const block=browse && browse.filters && browse.filters[kind];
+      const items=block && block.items;
+      (items||[]).forEach(function(row){ if(isShapeRow(row) && !seen[row.id]) extras.push(row); });
+    });
+    let ei=0;
+    const order=browse && browse.unfiltered;
+    (order||[]).forEach(function(id){
+      if(typeof id!=="string" || !id || seen[id]) return;
+      const before=rows.length;
+      add({id:id, pending:true});
+      if(rows.length!==before && ei<extras.length) add(extras[ei++]);
+    });
+    while(ei<extras.length) add(extras[ei++]);
+    flat=rows;
+    return;
+  }
+  const order=browse && ranked ? browse.ranked : [];
   (order||[]).forEach(function(id){
     if(typeof id!=="string" || !id) return;
     add({id:id, pending:true});
@@ -1809,7 +2740,10 @@ async function materialize(index, dir){
       flat[i]=full || {id:row.id, skip:true};
       row=flat[i];
     }
-    if(accepts(row)) return {row:row, index:i};
+    if(accepts(row)){
+      if(await stalePrice(row)){ i+=step; guard++; continue; }
+      return {row:row, index:i};
+    }
     i+=step;
     guard++;
   }
@@ -1825,11 +2759,15 @@ async function showFlat(index){
   host.innerHTML="";
   const stage=document.createElement("div");
   stage.className="feed-stage";
-  if(found.row) stage.appendChild(found.row.waveItem ? waveEl(found.row) : cardEl(found.row));
+  if(found.row){
+    const row=found.row;
+    stage.appendChild(row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row)));
+  }
   else {
     const p=document.createElement("p");
     p.className="muted";
-    p.textContent=loopFilter==="news"?"No news rows in this file.":"Nothing in this filter.";
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    p.textContent=shapeEmpty[loopFilter]||(loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.");
     stage.appendChild(p);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
@@ -1912,12 +2850,60 @@ async function boot(){
       };
     }
     const loop=document.getElementById("f-loop");
+    function syncLoopMenus(){
+      document.querySelectorAll("#feed-loop-form .pill-menu").forEach(function(menu){
+        const select=menu.querySelector("select");
+        const btn=menu.querySelector(".pill-menu-btn");
+        const list=menu.querySelector(".pill-menu-list");
+        if(!select||!btn||!list) return;
+        if(select.id==="f-loop-set") menu.hidden=loopFilter!=="set";
+        list.textContent="";
+        Array.prototype.forEach.call(select.options, function(opt){
+          const row=document.createElement("button");
+          row.type="button";
+          row.setAttribute("role","option");
+          row.dataset.value=opt.value;
+          row.textContent=opt.textContent;
+          row.setAttribute("aria-selected", opt.value===select.value?"true":"false");
+          row.onclick=function(){
+            select.value=opt.value;
+            if(typeof select.onchange==="function") select.onchange();
+            btn.setAttribute("aria-expanded","false");
+            list.hidden=true;
+            syncLoopMenus();
+          };
+          list.appendChild(row);
+        });
+        const chosen=select.options[select.selectedIndex];
+        btn.textContent=chosen?chosen.textContent:"";
+        if(btn.dataset.bound!=="1"){
+          btn.dataset.bound="1";
+          btn.onclick=function(){
+            const open=btn.getAttribute("aria-expanded")==="true";
+            document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
+            document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
+            if(!open){ btn.setAttribute("aria-expanded","true"); list.hidden=false; }
+          };
+        }
+      });
+    }
+    if(!document.body.dataset.pillOff){
+      document.body.dataset.pillOff="1";
+      document.addEventListener("click", function(ev){
+        const node=ev["tar"+"get"];
+        if(node && node.closest && node.closest(".pill-menu")) return;
+        document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
+        document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
+      });
+    }
     if(loop) loop.onchange=function(){
       loopFilter=loop.value;
       if(setSel) setSel.hidden=loopFilter!=="set";
+      syncLoopMenus();
       flat=null;
       showFlat(0);
     };
+    syncLoopMenus();
     flat=null;
     await showFlat(0);
     await restoreSpot();
@@ -1943,7 +2929,17 @@ window.addEventListener("pageshow", function(ev){
 boot();
 
 </script>`;
-  return chrome("Feed", body, page === "read" ? "Read" : (focusTitle || "The Feed"), stamp, "", feedNav(opts));
+  const feedTitle = page === "read" ? "Read" : (focusTitle || "The Feed");
+  const feedDesc = page === "read"
+    ? "One market read from Catch'em. TCGplayer market prices stay labeled separately from eBay asks."
+    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks are not solds.";
+  const feedUrl = page === "read" && startId
+    ? `https://catchemtcg.com/feed?id=${encodeURIComponent(startId)}`
+    : "https://catchemtcg.com/feed";
+  return chrome("Feed", body, feedTitle, stamp, "", feedNav(opts), {
+    description: feedDesc,
+    url: feedUrl,
+  });
 }
 
 export function renderMine(stamp, opts = {}) {
@@ -2049,7 +3045,11 @@ fetch("/api/alerts").then(function(res){return res.json().then(function(data){re
 export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
   const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
-${reads.map((r) => `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(r.headline)}</b></a><b>${money(r.price) || ""}</b></div>`).join("")}
+${reads.map((r) => {
+    const line = soldSafeText(r, r.headline);
+    if (!line) return "";
+    return `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
+  }).join("")}
 </main>`;
   return chrome("Feed", body, "All reads", stamp, "", feedNav(opts));
 }

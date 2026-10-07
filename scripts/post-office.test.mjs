@@ -32,7 +32,7 @@ t("printing preference keeps the crown ahead of a flat tie", preferPrinting([
 const home = await readFile(join(root, "index.html"), "utf8");
 t("homepage h1", home.includes("<h1>A home for collectors, rippers and flippers.</h1>"));
 t("homepage title dropped the old line", !home.includes("Know what to rip"));
-t("homepage says catalog", home.includes("The full catalog:") && !home.includes("catalogue"));
+t("homepage says catalog", !/catalog/i.test(home));
 t("nav close wins on small screens", home.lastIndexOf(".site-bar nav{display:none") > home.indexOf(".site-bar nav{display:none"));
 t("dock hide is the last dock display", home.lastIndexOf(".dock{display:none") > home.lastIndexOf(".dock{display:flex"));
 t("homepage does not link the hidden pages", !/href="\/(board|receipts|accuracy|movers)/.test(home) && home.includes('href="/feed">Open the Feed'));
@@ -101,6 +101,11 @@ const playRaw = await (await fetch(EDITOR_URL)).text();
 const playHtml = patchEditorHtml(playRaw, "2026-09-27", "Post Office build abc");
 t("play assets leave the page origin", playHtml.includes("https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/") && !playHtml.includes("document.baseURI") && playHtml.includes('"/data/editor/tcg/"') && !playHtml.includes("images.pokemontcg.io") && !playHtml.includes('throw new Error("miss "'));
 t("play wears the site skin", playHtml.includes('id="site-skin"') && playHtml.includes("--accent:#d9b779") && playHtml.includes("body>header{display:none}") && playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
+t("first screen is twelve on a phone and twenty-four on a desktop", playHtml.includes("function screenRows") && playHtml.includes("return 12") && playHtml.includes("return 24") && playHtml.includes("max-width: 767px") && !playHtml.includes("var SCREEN = 40") && !playHtml.includes("cards/full/index.json") && !playHtml.includes("cards/jp/index.json") && playHtml.includes("screenAsk") && playHtml.includes("/cards/c30/ir-moltres.png") && playHtml.includes("/cards/c30/ir-articuno.png") && playHtml.includes("/cards/c30/ir-zapdos.png") && !playHtml.includes("var shown = rows;"));
+t("a card with no picture file stays and does not fetch one", playHtml.includes("The picture is missing.") && playHtml.includes("if (!pictureInFile(c)) return \"\";") && !playHtml.includes("if (pictureInFile(c)) lead.push") && playHtml.includes("data-more"));
+t("151 pathways stay on their own ids", playHtml.includes('["sv3pt5-129", "sv3pt5-130"]') && playHtml.includes('["sv3pt5-79", "sv3pt5-80"]') && playHtml.includes('["sv3pt5-170", "sv3pt5-171", "sv3pt5-200"]') && playHtml.includes('c.id === "base5-3"') && playHtml.includes('c.id === "base1-63"'));
+t("tonight leaves base squirtle off", !playHtml.includes('pins = ["base1-63", "sv3pt5-170"]') && playHtml.includes("function pinTonight"));
+t("an unresolved 151 line is not offered", playHtml.includes("return safe || [];") && !playHtml.includes("var fam = evoFamily(who);") && playHtml.includes("return birds || [];") && playHtml.includes('["sv3pt5-144", "sv3pt5-202", "sv3pt5-146"]') && playHtml.includes('name:"Blastoise ex"'));
 t("play keeps ideas on the pin list", playHtml.includes('id="dl"') && playHtml.includes("window.pins"));
 const pricedRows = patchPaperRows([
   ["neo4-113", "Shining Tyranitar", "Neo Destiny", "2002", "Ken Sugimori", "Rare Shining", 4249.99],
