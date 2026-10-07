@@ -812,7 +812,10 @@ function catchemDraw(host,pts,release,caption){
       if(pts[i].d>=release){ rel='<line x1="'+(96+i*step).toFixed(1)+'" y1="18" x2="'+(96+i*step).toFixed(1)+'" y2="'+(h-30)+'" stroke="#6f9be8" stroke-dasharray="3 3"/>'; break; }
     }
   }
-  var money=function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
+  var indexLevel=/index/i.test(String(caption||""));
+  var money=indexLevel
+    ? function(n){var v=Number(n); if(!Number.isFinite(v)) return ""; var r=Math.round(v*10)/10; return r.toLocaleString("en-US",{maximumFractionDigits:1});}
+    : function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
   function when(d){var parts=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(parts[1])||1)-1]+" "+Number(parts[2])+", "+parts[0];}
   var label=(caption||"TCGplayer market, daily").replace(/"/g,"");
   host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="6" y="20" fill="#efe9de" font-size="14">'+money(max)+'</text><text x="6" y="'+(h-32)+'" fill="#efe9de" font-size="14">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"></path><text x="96" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[0].d.slice(5)+'</text><text x="'+(w-72)+'" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
@@ -1034,7 +1037,7 @@ function html(s){
     return "&"+"#39;";
   });
 }
-let rows=[], shown=48;
+let rows=[], shown=48, setLogo="";
 function draw(){
   const kind=document.getElementById("kind").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
@@ -1045,7 +1048,7 @@ function draw(){
   const view=list.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
-    const src=pictureSrc(r, data.logo);
+    const src=pictureSrc(r, setLogo);
     const crop=cropStyle(r&&r.crop);
     const img=src?'<img alt="" width="64" height="64" style="width:64px;height:64px;'+(crop?crop:"object-fit:contain")+';border-radius:8px;background:#211e1a" src="'+String(src).replace(/"/g,"")+'">':'<span class="muted">The picture is missing.</span>';
     return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
@@ -1073,6 +1076,7 @@ function cropStyle(crop){
 }
 fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0; return r.json()}).then(data=>{
   document.getElementById("title").textContent=data.name;
+  setLogo=typeof data.logo==="string"?data.logo:"";
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
   document.getElementById("lines").innerHTML=(data.logo?'<img alt="" width="120" height="48" src="'+String(data.logo).replace(/"/g,"")+'" style="height:48px;width:auto;background:#211e1a;border-radius:8px">':"")+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
@@ -1084,7 +1088,10 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   if(typeof catchemMount==="function") catchemMount(document.getElementById("charts"));
   rows=(data.items||[]).filter(r=>r&&r.name);
   draw();
-}).catch(()=>{document.getElementById("title").textContent="This set did not load."});
+}).catch(function(){
+  var title=document.getElementById("title");
+  if(title && title.textContent==="Set") title.textContent="This set did not load.";
+});
 ["kind","q","sort"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 </script>`;
@@ -1579,21 +1586,17 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const css = `
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
-  .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
-  .pill-menu{position:relative;max-width:100%}
+  #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+  .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 0;margin:0}
+  .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
+  .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
   .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .pill-menu-btn{appearance:none;background:var(--gold);color:#1a1407;border:1px solid transparent;border-radius:10px;min-height:48px;padding:0 22px;font:600 16px/1 var(--sans);max-width:100%;cursor:pointer}
-  .pill-menu-list{position:absolute;z-index:20;left:0;top:calc(100% + 6px);margin:0;padding:6px;list-style:none;background:#12100e;color:var(--gold);border:1px solid var(--gold);border-radius:10px;display:flex;flex-direction:column;gap:4px;width:max-content;min-width:100%;max-width:calc(100vw - 40px);max-height:min(70vh,420px);overflow:auto}
-  .pill-menu-list[hidden]{display:none}
-  .pill-menu-list button{appearance:none;background:transparent;color:var(--gold);border:0;border-radius:10px;min-height:48px;padding:0 16px;text-align:left;font:600 16px/1.2 var(--sans);width:100%;cursor:pointer}
-  .pill-menu-list button[aria-selected="true"]{background:var(--gold);color:#1a1407}
-  @media (max-width:390px){
-    .pill-menu,.pill-menu-btn{max-width:100%}
-    .pill-menu-list{max-width:calc(100vw - 40px)}
-  }
-  @media (min-width:1280px){
-    .pill-menu-list{max-width:320px}
-  }
+  .set-picker{display:flex;flex-direction:column;gap:8px}
+  .set-picker[hidden]{display:none}
+  .set-picker input{min-height:44px;width:100%;max-width:100%}
+  .set-hits{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
+  .set-hits button{min-height:44px;text-align:left;width:100%}
+  .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
@@ -1655,16 +1658,13 @@ ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
-  <div class="pill-menu">
-  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
-  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
-  <ul class="pill-menu-list" role="listbox" hidden></ul>
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Waves & reprints</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
+  <div class="chip-row" role="toolbar" aria-label="Filter"></div>
+  <div id="set-picker" class="set-picker" hidden>
+    <input id="set-q" aria-label="Find a set" placeholder="Find a set" autocomplete="off">
+    <div id="set-hits" class="set-hits" role="listbox"></div>
   </div>
-  <div class="pill-menu" hidden>
   <select id="f-loop-set" class="pill-native" aria-label="Set"><option value="">Every set</option></select>
-  <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">Every set</button>
-  <ul class="pill-menu-list" role="listbox" hidden></ul>
-  </div>
   <label id="hide-facts"${opts.premium === true ? "" : " hidden"}><input type="checkbox" id="f-hide-facts"> Hide Pokémon facts</label>
 </form>` : ""}
 ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
@@ -1723,6 +1723,8 @@ let browse=null;
 let flat=null;
 let hideFacts=false;
 let loopFilter="";
+let wantedSet="";
+let filterGen=0;
 let look=null;
 function isFact(card){
   if(!card) return false;
@@ -1915,6 +1917,7 @@ ${readUnderTitle.toString()}
 ${withoutSoldClaim.toString()}
 ${isVolumeRow.toString()}
 ${shapeCash.toString()}
+const SHAPE_KINDS=${JSON.stringify(SHAPE_KINDS)};
 ${isShapeRow.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
@@ -2584,8 +2587,7 @@ function accepts(card){
   if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
   if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
-    const setSel=document.getElementById("f-loop-set");
-    const name=setSel?setSel.value:"";
+    const name=wantedSet;
     if(!name) return Number(card.price)>0;
     return card.set===name && Number(card.price)>0;
   }
@@ -2750,7 +2752,9 @@ async function materialize(index, dir){
   return {row:null, index:Math.max(0, index)};
 }
 async function showFlat(index){
+  const gen=filterGen;
   const found=await materialize(index, index<(spot||0)?-1:1);
+  if(gen!==filterGen) return;
   spot=found.index;
   const host=document.getElementById("feed-one");
   const sections=document.getElementById("feed-sections");
@@ -2768,7 +2772,8 @@ async function showFlat(index){
     p.className="muted";
     const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
     p.textContent=shapeEmpty[loopFilter]||(loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.");
-    stage.appendChild(p);
+    host.appendChild(p);
+    return;
   }
   if(typeof catchemMount==="function") catchemMount(stage);
   const nav=document.createElement("div");
@@ -2850,62 +2855,82 @@ async function boot(){
       };
     }
     const loop=document.getElementById("f-loop");
-    function syncLoopMenus(){
-      document.querySelectorAll("#feed-loop-form .pill-menu").forEach(function(menu){
-        const select=menu.querySelector("select");
-        const btn=menu.querySelector(".pill-menu-btn");
-        const list=menu.querySelector(".pill-menu-list");
-        if(!select||!btn||!list) return;
-        if(select.id==="f-loop-set") menu.hidden=loopFilter!=="set";
-        list.textContent="";
-        Array.prototype.forEach.call(select.options, function(opt){
-          const row=document.createElement("button");
-          row.type="button";
-          row.setAttribute("role","option");
-          row.dataset.value=opt.value;
-          row.textContent=opt.textContent;
-          row.setAttribute("aria-selected", opt.value===select.value?"true":"false");
-          row.onclick=function(){
-            select.value=opt.value;
-            if(typeof select.onchange==="function") select.onchange();
-            btn.setAttribute("aria-expanded","false");
-            list.hidden=true;
-            syncLoopMenus();
-          };
-          list.appendChild(row);
-        });
-        const chosen=select.options[select.selectedIndex];
-        btn.textContent=chosen?chosen.textContent:"";
-        if(btn.dataset.bound!=="1"){
-          btn.dataset.bound="1";
-          btn.onclick=function(){
-            const open=btn.getAttribute("aria-expanded")==="true";
-            document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
-            document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
-            if(!open){ btn.setAttribute("aria-expanded","true"); list.hidden=false; }
-          };
-        }
+    const picker=document.getElementById("set-picker");
+    const setQ=document.getElementById("set-q");
+    const chipRow=document.querySelector("#feed-loop-form .chip-row");
+    function knownFilter(f){
+      if(!loop) return "";
+      return Array.prototype.some.call(loop.options, function(o){ return o.value===f; }) ? f : "";
+    }
+    function paintChips(){
+      if(!chipRow||!loop) return;
+      chipRow.textContent="";
+      Array.prototype.forEach.call(loop.options, function(opt){
+        const b=document.createElement("button");
+        b.type="button";
+        b.dataset.value=opt.value;
+        b.textContent=opt.textContent;
+        b.setAttribute("aria-pressed", opt.value===loop.value ? "true" : "false");
+        b.onclick=function(){ applyFilter(opt.value, setSel ? setSel.value : "", true); };
+        chipRow.appendChild(b);
       });
     }
-    if(!document.body.dataset.pillOff){
-      document.body.dataset.pillOff="1";
-      document.addEventListener("click", function(ev){
-        const node=ev["tar"+"get"];
-        if(node && node.closest && node.closest(".pill-menu")) return;
-        document.querySelectorAll("#feed-loop-form .pill-menu-btn").forEach(function(b){ b.setAttribute("aria-expanded","false"); });
-        document.querySelectorAll("#feed-loop-form .pill-menu-list").forEach(function(l){ l.hidden=true; });
+    function fillSetHits(q){
+      const box=document.getElementById("set-hits");
+      if(!box||!setSel) return;
+      const query=String(q||"").trim().toLowerCase();
+      box.textContent="";
+      let n=0;
+      Array.prototype.forEach.call(setSel.options, function(opt){
+        if(!opt.value) return;
+        if(query && opt.textContent.toLowerCase().indexOf(query)<0) return;
+        const b=document.createElement("button");
+        b.type="button";
+        b.setAttribute("role","option");
+        b.textContent=opt.textContent;
+        b.setAttribute("aria-selected", opt.value===setSel.value ? "true" : "false");
+        b.onclick=function(){ applyFilter("set", opt.value, true); };
+        box.appendChild(b);
+        n++;
       });
+      if(!n){
+        const p=document.createElement("p");
+        p.className="muted";
+        p.textContent="No set matches.";
+        box.appendChild(p);
+      }
     }
-    if(loop) loop.onchange=function(){
-      loopFilter=loop.value;
-      if(setSel) setSel.hidden=loopFilter!=="set";
-      syncLoopMenus();
+    function writeUrl(f, setName, push){
+      const url=new URL(location.href);
+      if(f) url.searchParams.set("f", f); else url.searchParams.delete("f");
+      if(f==="set" && setName) url.searchParams.set("set", setName); else url.searchParams.delete("set");
+      const next=url.pathname+url.search+url.hash;
+      const cur=location.pathname+location.search+location.hash;
+      if(next===cur) return;
+      if(push) history.pushState({f:f}, "", next);
+      else history.replaceState({f:f}, "", next);
+    }
+    async function applyFilter(f, setName, push){
+      filterGen++;
+      const next=knownFilter(f);
+      if(loop) loop.value=next;
+      loopFilter=next;
+      wantedSet=loopFilter==="set" ? String(setName||"") : "";
+      if(setSel && wantedSet && Array.prototype.some.call(setSel.options, function(o){ return o.value===wantedSet; })) setSel.value=wantedSet;
+      if(picker) picker.hidden=loopFilter!=="set";
+      paintChips();
+      if(loopFilter==="set") fillSetHits(setQ ? setQ.value : "");
+      writeUrl(loopFilter, wantedSet, push);
       flat=null;
-      showFlat(0);
-    };
-    syncLoopMenus();
-    flat=null;
-    await showFlat(0);
+      await showFlat(0);
+    }
+    if(setQ) setQ.addEventListener("input", function(){ fillSetHits(setQ.value); });
+    window.addEventListener("popstate", function(){
+      const q=new URLSearchParams(location.search);
+      applyFilter(q.get("f")||"", q.get("set")||"", false);
+    });
+    const startQ=new URLSearchParams(location.search);
+    await applyFilter(startQ.get("f")||"", startQ.get("set")||"", false);
     await restoreSpot();
     return;
   }
