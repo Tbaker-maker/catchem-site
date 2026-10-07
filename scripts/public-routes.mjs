@@ -2,7 +2,7 @@
 // Cloudflare assets have no SPA fallback, so each path needs a real file.
 // The Feed is the morning pulse. Banned market-hype words are rewritten
 // on the way out so a data-repo page cannot put them back on the public URL.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export function neutralizeCopy(html) {
@@ -12,6 +12,28 @@ export function neutralizeCopy(html) {
     .replaceAll("BULLISH", "HEAT")
     .replaceAll("Bullish", "HEAT")
     .replaceAll("bullish", "HEAT");
+}
+
+export function hidePublishedNotes(html) {
+  let out = String(html || "");
+  out = out.replace(/<h2>\s*Correction log\s*<\/h2>[\s\S]*?(?=<h2\b|<div class="foot"|$)/gi, "");
+  out = out.replace(/<div class="c">[\s\S]*?<\/div>/gi, (block) => {
+    if (/AFFECTED A PUBLISHED NUMBER/i.test(block)) return "";
+    if (/auto-fix|autofix/i.test(block)) return "";
+    return block;
+  });
+  return out;
+}
+
+async function htmlFiles(dir, out = []) {
+  let entries = [];
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return out; }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) await htmlFiles(path, out);
+    else if (entry.name.endsWith(".html")) out.push(path);
+  }
+  return out;
 }
 
 const ROUTE_FILES = [
@@ -44,16 +66,15 @@ const REDIRECT = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 `;
 
 export async function writePublicRoutes(outDir) {
-  for (const name of ["index.html", "pulse.html", "methodology.html", "board.html"]) {
-    const path = join(outDir, name);
+  for (const path of await htmlFiles(outDir)) {
     let raw;
     try { raw = await readFile(path, "utf8"); } catch { continue; }
-    const next = neutralizeCopy(raw);
+    const next = hidePublishedNotes(neutralizeCopy(raw));
     if (next !== raw) await writeFile(path, next);
   }
   let feed;
   try { feed = await readFile(join(outDir, "pulse.html"), "utf8"); } catch { feed = FALLBACK; }
-  feed = neutralizeCopy(feed);
+  feed = hidePublishedNotes(neutralizeCopy(feed));
   for (const rel of ROUTE_FILES) {
     const path = join(outDir, rel);
     await mkdir(dirname(path), { recursive: true });

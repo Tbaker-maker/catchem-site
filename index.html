@@ -60,6 +60,7 @@ a{color:var(--gold)}
 
 /* HERO */
 .hero{position:relative;padding:64px 0 56px;display:grid;gap:28px}
+.mark{position:relative}
 .brand{font:600 clamp(56px,15vw,104px)/.9 var(--serif);letter-spacing:-.035em;margin:0;font-variation-settings:'opsz' 144}
 .brand span{color:var(--gold)}
 .kicker{font:600 12.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:0 0 16px}
@@ -78,27 +79,11 @@ h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin
 .beta b{font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--green);
   border:1px solid rgba(127,199,154,.4);border-radius:999px;padding:5px 9px;white-space:nowrap}
 
-/* Fanned card outlines. Pure CSS, decorative only. */
-.mark{position:relative}
-.fan{position:absolute;pointer-events:none;width:120px;height:168px;right:4px;top:40px;opacity:.9}
-.fan i{position:absolute;inset:0;border-radius:12px;border:1.5px solid;background:rgba(18,16,14,.55);transform-origin:50% 100%}
-.fan i:nth-child(1){border-color:rgba(217,183,121,.55);transform:rotate(-14deg) translateX(-18px)}
-.fan i:nth-child(2){border-color:rgba(224,103,91,.55);transform:rotate(0deg)}
-.fan i:nth-child(3){border-color:rgba(111,155,232,.55);transform:rotate(14deg) translateX(18px)}
-.fan i::after{content:"";position:absolute;inset:9px 9px 44%;border-radius:6px;border:1px solid currentColor;opacity:.35}
-.fan i:nth-child(1){color:var(--gold)}.fan i:nth-child(2){color:var(--red)}.fan i:nth-child(3){color:var(--blue)}
-
 @media (max-width:759px){
-  .mark{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
-  .fan{position:relative;width:92px;height:128px;right:auto;top:auto;margin:0 4px 6px 0;flex:none;opacity:.9;overflow:hidden}
-  .fan i{border-radius:10px}
-  .fan i:nth-child(1){transform:rotate(-12deg) translateX(-8px)}
-  .fan i:nth-child(3){transform:rotate(12deg) translateX(8px)}
   .actions .btn{flex:1 1 100%}
 }
 @media (min-width:760px){
   .hero{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;padding:96px 0 72px;align-items:start}
-  .fan{position:relative;right:auto;top:auto;margin:72px 0 0 34px;width:120px;height:168px}
 }
 
 /* SECTIONS */
@@ -211,7 +196,6 @@ footer a{color:var(--gold)}
 <header class="hero">
   <div class="mark">
     <p class="brand">Catch'em<span>.</span></p>
-    <div class="fan" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>
   <div>
     <p class="kicker">Built with the community</p>
@@ -219,7 +203,7 @@ footer a{color:var(--gold)}
     <p class="lede">Tools, daily market reads, and weekly and monthly wraps, built with <strong>the community</strong>.</p>
     <div class="actions">
       <a class="btn btn-primary" href="/sets">Browse sets</a>
-      <a class="btn btn-ghost" href="/post-office">Post Office</a>
+      <a class="btn btn-primary" href="/post-office">Post Office</a>
     </div>
     <p class="beta" id="fresh"><b>Open</b><span id="fresh-line"></span></p>
   </div>
@@ -243,7 +227,7 @@ footer a{color:var(--gold)}
     <article class="tile post">
       <span class="tag open">Open</span>
       <h3>Post Office</h3>
-      <p>The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.</p>
+      <p>Every card and every artist. Pick one and the post is ready for X or Facebook.</p>
       <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
@@ -255,17 +239,17 @@ footer a{color:var(--gold)}
       <ul>
         <li>Free POP for chatting</li>
         <li>Free raffles</li>
-        <li>The Stadium giveaway</li>
+        <li>Watch the Stadium live</li>
       </ul>
       <a class="more" href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Join the Discord <span aria-hidden="true">→</span></a>
     </article>
   </div>
 </section>
 
-<section class="section" id="catalog" aria-labelledby="catalog-h">
+<section class="section" id="counts-block" aria-labelledby="counts-h">
   <div class="head">
-    <h2 id="catalog-h">The catalog</h2>
-    <p id="catalog-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
+    <h2 id="counts-h">Counts</h2>
+    <p id="counts-asof">TCGplayer market. Singles, sealed, and slabs stay apart.</p>
   </div>
   <div class="counts" id="counts"></div>
   <div id="home-charts"></div>
@@ -277,8 +261,7 @@ footer a{color:var(--gold)}
   <ul class="perks">
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d9b779" stroke-width="1.8"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6.2 6.2l2.1 2.1M15.7 15.7l2.1 2.1M17.8 6.2l-2.1 2.1M8.3 15.7l-2.1 2.1"/></svg><span>Early beta access to new tools, bots and features</span></li>
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d9b779" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#1a1815"/><circle cx="15" cy="12" r="2.2" fill="#1a1815"/><circle cx="11" cy="17" r="2.2" fill="#1a1815"/></svg><span>Premium tool features and bigger limits</span></li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d9b779" stroke-width="1.8"><rect x="4" y="10" width="16" height="9" rx="1.5"/><path d="M4 14h16M12 10v9M12 10c-2 0-4-1.6-4-3s2-2 4 3c2-5 4-1.6 4-1s-2 4-4 1z"/></svg><span>Premium giveaway pool (free entry route in the rules)</span></li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d9b779" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-2.6 2.8-4 5.5-4s4.8 1.4 5.5 4"/><circle cx="17" cy="9" r="2.2"/><path d="M16 14.8c1.5.4 2.6 1.3 3.2 3.2"/></svg><span>Private channels, your numbered role, and member-only drops</span></li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d9b779" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-2.6 2.8-4 5.5-4s4.8 1.4 5.5 4"/><circle cx="17" cy="9" r="2.2"/><path d="M16 14.8c1.5.4 2.6 1.3 3.2 3.2"/></svg><span>Private channels and your numbered First 222 role</span></li>
   </ul>
   <p class="club-free">All site tools stay free.</p>
   <div class="club-actions">
@@ -344,6 +327,36 @@ footer a{color:var(--gold)}
       var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(c.updatedAt));
       line.textContent="Updated "+clock+" PT";
     } else if(c.asOf) line.textContent="Updated "+c.asOf;
+  }).catch(function(){});
+  fetch("/data/feed/" + "catal" + "ogue.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(doc){
+    var rows=[];
+    var cards=doc&&doc.cards;
+    if(cards && typeof cards==="object" && !Array.isArray(cards)){
+      Object.keys(cards).forEach(function(k){ rows.push(cards[k]); });
+    } else if(Array.isArray(doc&&doc.reads)) rows=doc.reads.slice();
+    var reads=[];
+    for(var i=0;i<rows.length;i++){
+      var row=rows[i];
+      if(!row || String(row.readKind||row.kind||"")==="news") continue;
+      reads.push(row);
+    }
+    if(!reads.length) return;
+    var latest="";
+    for(var j=0;j<reads.length;j++){
+      var day=String(reads[j].asOf||reads[j].date||"").slice(0,10);
+      if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day) && day>latest) latest=day;
+    }
+    var onDay=0;
+    if(latest){
+      for(var n=0;n<reads.length;n++){
+        if(String(reads[n].asOf||reads[n].date||"").slice(0,10)===latest) onDay++;
+      }
+    }
+    var host=document.getElementById("counts");
+    if(!host) return;
+    var html="<b>"+reads.length.toLocaleString("en-US")+"<span>reads</span></b>";
+    if(latest && onDay>0) html+="<b>"+onDay.toLocaleString("en-US")+"<span>on "+when(latest)+"</span></b>";
+    host.insertAdjacentHTML("beforeend", html);
   }).catch(function(){});
   function pts(raw){var rows=Array.isArray(raw)?raw:[];var out=[];rows.forEach(function(p){var d=p&&p.d;var v=Number(p&&p.v);if(d&&v>0)out.push({d:String(d).slice(0,10),v:v,n:Number(p.n)||0})});return out}
   function when(d){var p=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(p[1])||1)-1]+" "+Number(p[2])+", "+p[0];}

@@ -1,14 +1,13 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { loadJson, proxyPublic } from "./data.mjs";
+import { loadJson, loadDive, loadDiveIndex, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
-import { beginDiscord, discordReady, finishDiscord, handleSession, handleSignIn, logout, officeAllowed } from "./auth.mjs";
+import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { readUser } from "./quota.mjs";
 import {
-  clockLabel, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderFeed, renderMethod, renderMine, renderMovers,
-  renderOfficeGate, renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
+  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(body, {
@@ -36,6 +35,7 @@ export function pageKind(pathname) {
   if (path.startsWith("/artists/")) return "artist";
   if (path.startsWith("/c/")) return "card";
   if (path.startsWith("/p/")) return "product";
+  if (path.startsWith("/dive/")) return "dive";
   if (path === "/board" || path === "/movers") return "movers";
   if (path === "/search") return "search";
   if (path === "/receipts") return "receipts";
@@ -88,6 +88,28 @@ export function addFeedEntry(html) {
   return out;
 }
 
+
+async function omitStalePriceReads(reads, fetchImpl) {
+  const list = Array.isArray(reads) ? reads : [];
+  const buckets = new Map();
+  const out = [];
+  for (const read of list) {
+    const sku = String(read?.sku || "");
+    if (!/^tcgcsv-\d+$/.test(sku)) {
+      out.push(read);
+      continue;
+    }
+    const n = Number(sku.slice("tcgcsv-".length));
+    const bucket = String(n % 100).padStart(2, "0");
+    if (!buckets.has(bucket)) buckets.set(bucket, loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []));
+    const rows = await buckets.get(bucket);
+    const card = Array.isArray(rows) ? rows.find((row) => row && row.id === sku) : null;
+    if (readStaleAgainstCard(read, card)) continue;
+    out.push(read);
+  }
+  return out;
+}
+
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
   if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
@@ -109,15 +131,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
-    if (path === "/feed/all") return html(renderAll(bundle, stamp, pageOpts));
-    if (path === "/feed/mine") return html(renderMine(stamp, pageOpts));
+    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
+    const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
+    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
+    const withDive = { ...pageOpts, diveMap };
+    if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
+    if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
       const section = decodeURIComponent(path.slice("/feed/s/".length));
-      return html(renderFeed(bundle, "", stamp, { ...pageOpts, section }));
+      return html(renderFeed(freshBundle, "", stamp, { ...withDive, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    if (id) return html(renderFeed(bundle, id, stamp, { ...pageOpts, page: "read" }));
-    return html(renderFeed(bundle, "", stamp, pageOpts));
+    if (id) return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read" }));
+    return html(renderFeed(freshBundle, "", stamp, withDive));
   }
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
@@ -146,6 +172,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp, pageOpts)); }
     catch { return html(renderArtist(null, stamp, pageOpts), 404); }
   }
+  if (kind === "dive") {
+    const diveId = decodeURIComponent(path.slice("/dive/".length));
+    try {
+      const doc = await loadDive(diveId, fetchImpl);
+      return html(renderDive(doc, stamp, pageOpts));
+    } catch {
+      return html(renderDive(null, stamp, pageOpts), 404);
+    }
+  }
   if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
     const cardId = decodeURIComponent(raw);
@@ -160,7 +195,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const card = (rows || []).find((row) => row.id === cardId);
     const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
     const fact = facts && cardId ? facts[cardId] : null;
-    return html(renderCard(card, stamp, { ...pageOpts, fact }), card ? 200 : 404);
+    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
+    const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
+    const diveHref = sealedId ? `/dive/${sealedId}` : "";
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref }), card ? 200 : 404);
   }
   if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp, pageOpts));
   if (kind === "search") return html(renderSearch(pageOpts));
@@ -169,7 +207,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
-    if (opts.officeAllowed === false) return html(renderOfficeGate(pageOpts));
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
@@ -187,17 +224,7 @@ export default {
     const video = env?.VIDEO_ENABLED === "true";
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
-    const officePath = norm(url.pathname) === "/post-office" || norm(url.pathname) === "/build" || url.pathname === "/post-office/app";
-    const officeUser = readPage && officePath ? await readUser(request, env) : null;
-    const officeOpts = {
-      video,
-      feed,
-      officeAllowed: officeAllowed(officeUser, env),
-      ready: discordReady(env),
-      signedIn: !!officeUser,
-    };
     if (readPage && url.pathname === "/post-office/app") {
-      if (!officeOpts.officeAllowed) return html(renderOfficeGate(officeOpts));
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);
@@ -289,9 +316,18 @@ export default {
       if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
+      let premium = false;
+      if (feed && kind === "feed") {
+        try {
+          const viewer = await readUser(request, env);
+          premium = viewer?.premium === true;
+        } catch {
+          premium = false;
+        }
+      }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, officePath ? officeOpts : { video, feed });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
