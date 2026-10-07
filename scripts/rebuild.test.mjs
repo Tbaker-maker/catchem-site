@@ -1,8 +1,9 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
+import { localPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
 import { feedNews } from "../data/feed-news.mjs";
@@ -461,12 +462,12 @@ const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
-t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
+t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
 t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && factHtml.includes("The picture is missing.") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && factHtml.includes("The cutout is missing.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("premium sees the hide control and the unranked loop walks the shuffled file", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
-t("the feed filter keeps every row and uses the site pill", factHtml.includes('id="f-loop"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Wave and reprint<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && factHtml.includes("pill-menu-btn") && factHtml.includes("max-width:390px") && factHtml.includes("min-width:1280px") && factHtml.includes("background:#12100e") && factHtml.includes('button[aria-selected="true"]') && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
+t("the feed filter is a pinned chip row and each filter has a URL", factHtml.includes('id="f-loop"') && factHtml.includes('class="chip-row"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes('value="wave">Waves & reprints') && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && factHtml.includes('value="quiet">No sales') && factHtml.includes('value="still">Nothing moved') && factHtml.includes("position:sticky") && factHtml.includes("overflow-x:auto") && factHtml.includes("min-height:44px") && factHtml.includes("URLSearchParams(location.search)") && factHtml.includes('.get("f")') && factHtml.includes("history.pushState") && factHtml.includes('id="set-picker"') && factHtml.includes('aria-label="Find a set"') && factHtml.includes("Nothing in this filter.") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes("pill-menu") && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("ATH ATL copy uses filled triangle words", factHtml.includes("▲ high") && factHtml.includes("▼ low"));
 const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-08-23 <span class="chip m">AFFECTED A PUBLISHED NUMBER</span></div><div class="w">shipping comparison</div></div><div class="c"><div class="w">auto-fix rewrote a price</div></div><h2>Kept</h2>';
 const hiddenNotes = hidePublishedNotes(shippingCard);
@@ -539,6 +540,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
     search: renderSearch({ feed: true }),
     mine: renderMine("stamp", { feed: true }),
     sets: renderSets({ sets: [] }, "stamp", { feed: true }),
+    set: renderSetShell("base", "stamp"),
   };
   const broken = [];
   for (const [name, page] of Object.entries(pages)) {
@@ -553,6 +555,26 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   }
   t("every inline client script parses", broken.length === 0);
   if (broken.length) console.error(broken.join("\n"));
+}
+
+{
+  const shell = renderSetShell("me-30th-celebration", "Updated");
+  t("a set page draws the list without wiping a loaded title", shell.includes('let rows=[], shown=48, setLogo=""') && shell.includes("pictureSrc(r, setLogo)") && !shell.includes("pictureSrc(r, data.logo)") && shell.includes('title.textContent==="Set"') && shell.includes("This set did not load."));
+  t("an index chart is a level and a price chart keeps $", shell.includes("indexLevel=/index/i.test") && shell.includes("maximumFractionDigits:1") && shell.includes('"$"+Number(n)'));
+  const linked = [
+    factHtml,
+    renderSearch(),
+    renderMethod(null),
+    renderPremium(""),
+    renderPost("", ""),
+    renderSets(sets, ""),
+    shell,
+  ].join("\n");
+  const dead = deadLocals(localPaths(linked), pageKind);
+  t("rendered pages link no dead path", dead.length === 0);
+  if (dead.length) console.error(dead.join("\n"));
+  t("a path the site cannot serve fails the check", deadLocals(["/no-such-page"], pageKind).join() === "/no-such-page" && deadLocals(["/sets", "/corrections"], pageKind).length === 0);
+  t("a script template is not a path", localPaths(`<a href="/dive/'+encodeURIComponent(diveId)+'">x</a><a href="/sets">Sets</a>`).join() === "/sets");
 }
 
 if (fail) process.exit(1);
