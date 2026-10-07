@@ -1,6 +1,6 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
@@ -277,7 +277,7 @@ t("premium has the joining cards and the faq", premiumHtml.includes("What you're
 
 t("premium does not claim free entry or AMOE", !/free entry|AMOE|no purchase necessary|mail-?in/i.test(premiumHtml));
 t("premium does not invent ungated perks", !premiumHtml.includes("Vault votes") && !premiumHtml.includes("member-only drops") && !premiumHtml.includes("Premium votes"));
-t("premium keeps Stadium auto-entry and watch-only", premiumHtml.includes("monthly Stadium giveaway auto-entry") && premiumHtml.includes("Watching the Stadium for free is fine."));
+t("premium does not promise a Stadium giveaway auto-entry", !premiumHtml.includes("monthly Stadium giveaway auto-entry") && !premiumHtml.includes("giveaway auto-entry") && premiumHtml.includes("Watching the Stadium for free is fine."));
 t("join premium uses the discord flow", premiumHtml.includes('class="prem-join" href="https://discord.gg/fUSjxDX4Hy"') && !premiumHtml.includes("checkout.stripe.com") && !/href="\/(feed|board|receipts|accuracy)/.test(premiumHtml));
 t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
 
@@ -420,6 +420,28 @@ t("default mix includes the volume read", buildFeedLoop([priced], volBrowse, {})
 t("no volume shelf means no volume rows", volumeReads({ filters: {} }, []).length === 0 && buildFeedLoop([priced], flagBrowse, { filter: "volume" }).length === 0);
 const volAll = renderAll({ asOf: "2026-10-06", reads: [volume, { id: "only-sold", headline: "Sales volume is 40 copies sold.", price: 10 }] }, "");
 t("all reads keeps the attributed volume line and drops the bare sold claim", volAll.includes("815 Near Mint copies sold on TCGplayer") && !volAll.includes("Sales volume is 40"));
+
+const quiet = {
+  id: "quiet-tcgcsv-1",
+  sku: "tcgcsv-1",
+  readKind: "quiet",
+  kind: "quiet",
+  name: "Piplup",
+  set: "Diamond & Pearl",
+  path: "No TCGplayer sales recorded in 7 days. That is not a scarcity claim. Piplup stayed $2.03 in Near Mint over Sep 28–Oct 4.",
+  headline: "No TCGplayer sales recorded in 7 days. That is not a scarcity claim. Piplup stayed $2.03 in Near Mint over Sep 28–Oct 4.",
+  why: "No TCGplayer sales recorded in 7 days. That is not a scarcity claim. Piplup stayed $2.03 in Near Mint over Sep 28–Oct 4.",
+  asOf: "2026-10-04",
+  href: "/c/tcgcsv-1",
+  receipt: { days: 7, price: 2.03, from: "2026-09-28", to: "2026-10-04" },
+};
+const quietForged = { ...quiet, id: "quiet-forged", path: "No sales. Scarce.", headline: "No sales. Scarce.", why: "No sales. Scarce.", receipt: { days: 7, price: 2.03 } };
+t("a shape row keeps its sentence only with the clause and the price", isShapeRow(quiet) && keepFeedRead(quiet) && soldSafeText(quiet, quiet.path) === quiet.path && !isShapeRow(quietForged) && soldSafeText(quietForged, "12 copies sold.") === "");
+const shapeBrowse = { ...flagBrowse, filters: { ...flagBrowse.filters, quiet: { items: [quiet, quietForged], empty: "No quiet Near Mint window is on file." } } };
+t("the quiet filter returns the verified row only", buildFeedLoop([priced], shapeBrowse, { filter: "quiet" }).map((r) => r.id).join() === "quiet-tcgcsv-1");
+t("prices filter leaves a shape row out", buildFeedLoop([priced, quiet], shapeBrowse, { filter: "prices" }).every((r) => r.readKind !== "quiet"));
+t("default mix includes the shape read", buildFeedLoop([priced], shapeBrowse, {}).some((r) => r.id === "quiet-tcgcsv-1"));
+t("the feed lists the new filters", renderFeed({ asOf: "2026-10-06", reads: [priced] }, "").includes('value="quiet">No sales') && renderFeed({ asOf: "2026-10-06", reads: [priced] }, "").includes('value="still">Nothing moved'));
 
 const liveNews = newsSlice(feedNews);
 const dedenne = liveNews.find((row) => row.href === "https://bulbagarden.net/threads/new-merch-collection-starring-dedenne-joltik-and-more-electric-types-coming-soon-to-pokemon-centers-in-japan.311717/");
