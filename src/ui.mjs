@@ -61,8 +61,45 @@ export function isVolumeRow(row) {
   return String(row.headline || row.path || "").includes(s.count30d + " Near Mint cop");
 }
 
+export function shapeCash(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x <= 0) return "";
+  return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const SHAPE_KINDS = ["quiet", "mix", "conditions", "soldflat", "solddown", "setshare", "spread", "askmove", "mktmove", "still"];
+
+// A shape read keeps its sentence only when the honesty line and the receipt numbers are on the row.
+export function isShapeRow(row) {
+  if (!row || typeof row !== "object") return false;
+  const kind = String(row.readKind || "");
+  if (kind !== row.kind || !SHAPE_KINDS.includes(kind)) return false;
+  const path = String(row.path || row.headline || "");
+  const rec = row.receipt;
+  if (!path || !rec || typeof rec !== "object") return false;
+  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && path.includes("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
+  if (kind === "mix") {
+    if (!path.includes("This is the mix of copies that sold, not the copy in your hand.")) return false;
+    if (!Array.isArray(rec.conditions) || rec.conditions.length < 2) return false;
+    for (let i = 0; i < rec.conditions.length; i += 1) {
+      const bit = rec.conditions[i];
+      if (!bit || !path.includes(String(bit.sold) + " " + bit.condition)) return false;
+    }
+    return true;
+  }
+  if (kind === "conditions") return path.includes("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
+  if (kind === "soldflat") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.price));
+  if (kind === "solddown") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
+  if (kind === "setshare") return path.includes("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
+  if (kind === "spread") return path.includes("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
+  if (kind === "askmove") return path.includes("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
+  if (kind === "mktmove") return path.includes("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
+  if (kind === "still") return path.includes("Asks and listing count. Not sales.") && path.includes(shapeCash(rec.price)) && path.includes(String(rec.listingCount));
+  return false;
+}
+
 export function soldSafeText(row, text) {
-  return isVolumeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+  return isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
 }
 
 
@@ -432,6 +469,7 @@ export function keepFeedRead(row) {
   if (isOutlierRow(row)) return true;
   if (isDiveRow(row)) return true;
   if (isVolumeRow(row)) return true;
+  if (isShapeRow(row)) return true;
   return money(row.price) != null;
 }
 
@@ -578,6 +616,27 @@ export function volumeReads(browse, bundleReads) {
   return out;
 }
 
+export function shapeReads(browse, bundleReads, kind = "") {
+  const want = String(kind || "");
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isShapeRow(row)) return;
+    if (want && row.readKind !== want) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  const kinds = want ? [want] : SHAPE_KINDS;
+  for (const key of kinds) {
+    const items = browse?.filters?.[key]?.items;
+    if (Array.isArray(items)) for (const row of items) push(row);
+  }
+  for (const row of bundleReads || []) push(row);
+  return out;
+}
+
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
   const filter = String(opts.filter || "");
   const hideFacts = opts.hideFacts === true;
@@ -604,6 +663,7 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     if (filter === "flagged" && !isOutlierRow(row) && !(row.flagged && row.flagged.on)) return;
     if (filter === "dive" && !isDiveRow(row)) return;
     if (filter === "volume" && !isVolumeRow(row)) return;
+    if (SHAPE_KINDS.includes(filter) && (!isShapeRow(row) || row.readKind !== filter)) return;
     if (id) seen.add(id);
     out.push(row);
   };
@@ -631,6 +691,10 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of volumeReads(browse, kept)) push(row);
     return out;
   }
+  if (SHAPE_KINDS.includes(filter)) {
+    for (const row of shapeReads(browse, kept, filter)) push(row);
+    return out;
+  }
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
   // News, wave, flagged, dive, and volume rows already in the files are mixed in.
@@ -641,7 +705,8 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
       .concat(waveReads(browse))
       .concat(flaggedReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
       .concat(diveReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
-      .concat(volumeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
+      .concat(volumeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(shapeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
     let ei = 0;
     const rest = browse?.unfiltered;
     if (Array.isArray(rest)) {
@@ -1414,9 +1479,6 @@ ${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ide
 </div>
 <h2>Members also get</h2>
 <div class="prem-also">
-<ul>
-<li>monthly Stadium giveaway auto-entry</li>
-</ul>
 <p>Watching the Stadium for free is fine.</p>
 </div>
 <h2>Questions</h2>
@@ -1594,7 +1656,7 @@ ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <div class="pill-menu">
-  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option></select>
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
   <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
   <ul class="pill-menu-list" role="listbox" hidden></ul>
   </div>
@@ -1852,9 +1914,11 @@ ${dropTitleName.toString()}
 ${readUnderTitle.toString()}
 ${withoutSoldClaim.toString()}
 ${isVolumeRow.toString()}
+${shapeCash.toString()}
+${isShapeRow.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
-  const path=isVolumeRow(card)?String(card.path||"").trim():withoutSoldClaim(String(card.path||"").trim());
+  const path=isVolumeRow(card)||isShapeRow(card)?String(card.path||"").trim():withoutSoldClaim(String(card.path||"").trim());
   if(!path) return "";
   return readUnderTitle(card.name, path);
 }
@@ -2027,7 +2091,7 @@ function cardEl(card, facts){
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
   const shown=sameSentence||line;
-  const title=html(card.name||(isVolumeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
+  const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
@@ -2509,6 +2573,7 @@ function leadRows(){
     if(isLag(r) || isSupply(r)) return true;
     if(r.readKind==="outlier" || r.kind==="outlier" || r.readKind==="dive" || r.kind==="dive") return true;
     if(isVolumeRow(r)) return true;
+    if(isShapeRow(r)) return true;
     return Number(r.price)>0;
   });
 }
@@ -2517,7 +2582,7 @@ function accepts(card){
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
   if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
-  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
+  if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
     const setSel=document.getElementById("f-loop-set");
     const name=setSel?setSel.value:"";
@@ -2529,6 +2594,7 @@ function accepts(card){
   if(loopFilter==="flagged") return card.readKind==="outlier" || card.kind==="outlier" || !!(card.flagged && card.flagged.on);
   if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive";
   if(loopFilter==="volume") return isVolumeRow(card);
+  if(loopFilter==="quiet"||loopFilter==="mix"||loopFilter==="conditions"||loopFilter==="soldflat"||loopFilter==="solddown"||loopFilter==="setshare"||loopFilter==="spread"||loopFilter==="askmove"||loopFilter==="mktmove"||loopFilter==="still") return isShapeRow(card) && (card.readKind===loopFilter || card.kind===loopFilter);
   return true;
 }
 async function cardById(id){
@@ -2610,6 +2676,14 @@ function buildFlat(){
     flat=rows;
     return;
   }
+  if(loopFilter==="quiet"||loopFilter==="mix"||loopFilter==="conditions"||loopFilter==="soldflat"||loopFilter==="solddown"||loopFilter==="setshare"||loopFilter==="spread"||loopFilter==="askmove"||loopFilter==="mktmove"||loopFilter==="still"){
+    const block=browse && browse.filters && browse.filters[loopFilter];
+    const items=block && block.items;
+    (items||[]).forEach(function(row){ if(isShapeRow(row)) add(row); });
+    leadRows().forEach(function(r){ if(isShapeRow(r) && (r.readKind===loopFilter || r.kind===loopFilter)) add(r); });
+    flat=rows;
+    return;
+  }
   const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave"||loopFilter==="flagged"||loopFilter==="dive"||loopFilter==="volume";
   if(!loopFilter){
     leadRows().forEach(add);
@@ -2627,6 +2701,12 @@ function buildFlat(){
     (diveItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
     const volumeItems=browse && browse.filters && browse.filters.volume && browse.filters.volume.items;
     (volumeItems||[]).forEach(function(row){ if(isVolumeRow(row) && !seen[row.id]) extras.push(row); });
+    const shapeKinds=["quiet","mix","conditions","soldflat","solddown","setshare","spread","askmove","mktmove","still"];
+    shapeKinds.forEach(function(kind){
+      const block=browse && browse.filters && browse.filters[kind];
+      const items=block && block.items;
+      (items||[]).forEach(function(row){ if(isShapeRow(row) && !seen[row.id]) extras.push(row); });
+    });
     let ei=0;
     const order=browse && browse.unfiltered;
     (order||[]).forEach(function(id){
@@ -2686,7 +2766,8 @@ async function showFlat(index){
   else {
     const p=document.createElement("p");
     p.className="muted";
-    p.textContent=loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.";
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    p.textContent=shapeEmpty[loopFilter]||(loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.");
     stage.appendChild(p);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
