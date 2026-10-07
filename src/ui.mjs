@@ -46,6 +46,25 @@ export function withoutSoldClaim(text) {
   return kept.join(" ").trim();
 }
 
+// A volume read is the one place a sold count may stay: a TCGplayer count that
+// carries its window and source on the row (Catchem-data builds it from
+// data/derived/tcgplayer-volume.json). Any other sold sentence still comes out.
+// Self-contained: the client script gets this function by toString().
+export function isVolumeRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.readKind !== "volume" && row.kind !== "volume") return false;
+  const s = row.sold;
+  if (!s || s.source !== "TCGplayer sales via PokemonPriceTracker" || s.condition !== "Near Mint") return false;
+  if (!Number.isInteger(s.count30d) || s.count30d <= 0) return false;
+  const w = s.window30d || {};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(w.from || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(w.to || ""))) return false;
+  return String(row.headline || row.path || "").includes(s.count30d + " Near Mint cop");
+}
+
+export function soldSafeText(row, text) {
+  return isVolumeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+}
+
 
 function dropTitleName(title, line) {
   const text = String(line ?? "").trim();
@@ -412,6 +431,7 @@ export function keepFeedRead(row) {
   if (isSupplyRow(row)) return true;
   if (isOutlierRow(row)) return true;
   if (isDiveRow(row)) return true;
+  if (isVolumeRow(row)) return true;
   return money(row.price) != null;
 }
 
@@ -472,7 +492,7 @@ export function readStaleAgainstCard(read, card) {
   return cardDay >= readDay;
 }
 
-const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave", "flagged", "dive"]);
+const RANKED_FILTERS = new Set(["prices", "sealed", "set", "news", "wave", "flagged", "dive", "volume"]);
 
 function waveRead(item, n) {
   return {
@@ -542,6 +562,22 @@ export function diveReads(browse, bundleReads) {
   return out;
 }
 
+export function volumeReads(browse, bundleReads) {
+  const fromBrowse = browse?.filters?.volume?.items;
+  const out = [];
+  const seen = new Set();
+  const push = (row) => {
+    if (!isVolumeRow(row)) return;
+    const id = String(row.id || "");
+    if (id && seen.has(id)) return;
+    if (id) seen.add(id);
+    out.push(row);
+  };
+  if (Array.isArray(fromBrowse)) for (const row of fromBrowse) push(row);
+  for (const row of bundleReads || []) if (isVolumeRow(row)) push(row);
+  return out;
+}
+
 export function buildFeedLoop(bundleReads, browse, opts = {}) {
   const filter = String(opts.filter || "");
   const hideFacts = opts.hideFacts === true;
@@ -567,6 +603,7 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
     if (filter === "flagged" && !isOutlierRow(row) && !(row.flagged && row.flagged.on)) return;
     if (filter === "dive" && !isDiveRow(row)) return;
+    if (filter === "volume" && !isVolumeRow(row)) return;
     if (id) seen.add(id);
     out.push(row);
   };
@@ -590,16 +627,21 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of diveReads(browse, kept)) push(row);
     return out;
   }
+  if (filter === "volume") {
+    for (const row of volumeReads(browse, kept)) push(row);
+    return out;
+  }
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
-  // News, wave, flagged, and dive rows already in the files are mixed in.
+  // News, wave, flagged, dive, and volume rows already in the files are mixed in.
   // A ranked filter below keeps that order. No price is added for a bare id.
   if (!filter) {
     for (const row of kept) push(row);
     const extras = newsReads(browse, opts)
       .concat(waveReads(browse))
       .concat(flaggedReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
-      .concat(diveReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
+      .concat(diveReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))))
+      .concat(volumeReads(browse, kept).filter((row) => !seen.has(String(row.id || ""))));
     let ei = 0;
     const rest = browse?.unfiltered;
     if (Array.isArray(rest)) {
@@ -1417,6 +1459,10 @@ export function renderDive(doc, stamp, opts = {}) {
   const outlierLine = outlier
     ? `<p style="border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin:12px 0"><b>${esc(outlierNote || `Outlier: ${String(outlier.flag)}`)}</b>${outlier.asOf ? ` <span class="muted">(${esc(outlier.asOf)})</span>` : ""}${outlier.provisionalLabel ? `<br><span class="muted">${esc(String(outlier.provisionalLabel))}</span>` : ""}</p>`
     : `<p class="muted">Outlier flags: none yet.</p>`;
+  const change = doc.listingChange || null;
+  const changeLine = change && change.label === "net change in active eBay listings (estimate)" && Number.isInteger(change.net) && Number.isInteger(change.days) && change.days >= 2
+    ? `<p>${esc(change.label)}: <b>${change.net > 0 ? "+" : ""}${esc(String(change.net))}</b> over ${esc(String(change.days))} days of eBay Browse totals (${esc(change.from || "")} to ${esc(change.to || "")})</p>`
+    : "";
   const buyoutLine = browse
     ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
     : `<p class="muted">Browse total: not on file for this product.</p>`;
@@ -1427,6 +1473,7 @@ export function renderDive(doc, stamp, opts = {}) {
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
 <p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
 ${buyoutLine}
+${changeLine}
 ${chartBox(hist, "eBay Browse ask median, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
 <thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
@@ -1460,9 +1507,9 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     return true;
   }).map((r) => ({
     ...r,
-    headline: withoutSoldClaim(r.headline),
-    ...(r.path ? { path: withoutSoldClaim(r.path) } : {}),
-    ...(r.why ? { why: withoutSoldClaim(r.why) } : {}),
+    headline: soldSafeText(r, r.headline),
+    ...(r.path ? { path: soldSafeText(r, r.path) } : {}),
+    ...(r.why ? { why: soldSafeText(r, r.why) } : {}),
   }));
   const lead = JSON.stringify(reads).replace(/</g, "\\u003c");
   const newsLead = JSON.stringify(newsSlice(feedNews)).replace(/</g, "\\u003c");
@@ -1547,7 +1594,7 @@ ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <div class="pill-menu">
-  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option></select>
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Wave and reprint</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option></select>
   <button type="button" class="pill-menu-btn" aria-haspopup="listbox" aria-expanded="false">All</button>
   <ul class="pill-menu-list" role="listbox" hidden></ul>
   </div>
@@ -1595,7 +1642,10 @@ function diveIdFor(card){
   if(card.diveId && __diveIds.has(card.diveId)) return card.diveId;
   if(card.id && __diveIds.has(card.id)) return card.id;
   const href=String(card.href||"");
-  const m=href.match(/\/p\/([^/?#]+)/);
+  // No backslashes here: this line sits inside a template literal, which ate
+  // the escapes in /\\/p\\/…/ and shipped "//p/…" — a syntax error that stopped the
+  // whole feed script.
+  const m=href.match(new RegExp("/p/([^/?#]+)"));
   let pid=m?decodeURIComponent(m[1]):"";
   if(pid.endsWith(".html")) pid=pid.slice(0,-5);
   if(pid && __diveIds.has(pid)) return pid;
@@ -1801,9 +1851,10 @@ function priorMoney(card){
 ${dropTitleName.toString()}
 ${readUnderTitle.toString()}
 ${withoutSoldClaim.toString()}
+${isVolumeRow.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
-  const path=withoutSoldClaim(String(card.path||"").trim());
+  const path=isVolumeRow(card)?String(card.path||"").trim():withoutSoldClaim(String(card.path||"").trim());
   if(!path) return "";
   return readUnderTitle(card.name, path);
 }
@@ -1967,7 +2018,7 @@ function cardEl(card, facts){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const src=card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:""));
+  const src=isVolumeRow(card)?card.sold.source+", Near Mint, "+card.sold.window30d.from+" to "+card.sold.window30d.to:(card.source || ("TCGplayer market"+(card.asOf?", "+card.asOf:"")));
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=isFact(card)?pokemonFactLine(card):moveLine(card);
@@ -1976,7 +2027,7 @@ function cardEl(card, facts){
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
   const shown=sameSentence||line;
-  const title=html(card.name||withoutSoldClaim(card.headline)||"Read");
+  const title=html(card.name||(isVolumeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>";
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
@@ -2457,6 +2508,7 @@ function leadRows(){
     if(isFact(r)) return !hideFacts;
     if(isLag(r) || isSupply(r)) return true;
     if(r.readKind==="outlier" || r.kind==="outlier" || r.readKind==="dive" || r.kind==="dive") return true;
+    if(isVolumeRow(r)) return true;
     return Number(r.price)>0;
   });
 }
@@ -2476,6 +2528,7 @@ function accepts(card){
   if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
   if(loopFilter==="flagged") return card.readKind==="outlier" || card.kind==="outlier" || !!(card.flagged && card.flagged.on);
   if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive";
+  if(loopFilter==="volume") return isVolumeRow(card);
   return true;
 }
 async function cardById(id){
@@ -2550,7 +2603,14 @@ function buildFlat(){
     flat=rows;
     return;
   }
-  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave"||loopFilter==="flagged"||loopFilter==="dive";
+  if(loopFilter==="volume"){
+    const items=browse && browse.filters && browse.filters.volume && browse.filters.volume.items;
+    (items||[]).forEach(function(row){ if(isVolumeRow(row)) add(row); });
+    leadRows().forEach(function(r){ if(isVolumeRow(r)) add(r); });
+    flat=rows;
+    return;
+  }
+  const ranked=loopFilter==="prices"||loopFilter==="sealed"||loopFilter==="set"||loopFilter==="news"||loopFilter==="wave"||loopFilter==="flagged"||loopFilter==="dive"||loopFilter==="volume";
   if(!loopFilter){
     leadRows().forEach(add);
     // Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.
@@ -2565,6 +2625,8 @@ function buildFlat(){
     (flaggedItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
     const diveItems=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
     (diveItems||[]).forEach(function(row){ if(row && !seen[row.id]) extras.push(row); });
+    const volumeItems=browse && browse.filters && browse.filters.volume && browse.filters.volume.items;
+    (volumeItems||[]).forEach(function(row){ if(isVolumeRow(row) && !seen[row.id]) extras.push(row); });
     let ei=0;
     const order=browse && browse.unfiltered;
     (order||[]).forEach(function(id){
@@ -2624,7 +2686,7 @@ async function showFlat(index){
   else {
     const p=document.createElement("p");
     p.className="muted";
-    p.textContent=loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.";
+    p.textContent=loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.";
     stage.appendChild(p);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
@@ -2903,7 +2965,7 @@ export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
   const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
 ${reads.map((r) => {
-    const line = withoutSoldClaim(r.headline);
+    const line = soldSafeText(r, r.headline);
     if (!line) return "";
     return `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
   }).join("")}
