@@ -1,5 +1,6 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
-import { esc, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
+import vm from "node:vm";
+import { esc, renderSets, renderMine, isVolumeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { readFile } from "node:fs/promises";
@@ -105,6 +106,18 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     },
   }, "stamp", { feed: true });
   t("dive shows clear price flag", flagged.includes("Price flagged: 95.5% above recent median — review") && flagged.includes("review — possible bad listing") && !flagged.includes("Outlier flags: none yet"));
+  const withChange = renderDive({
+    id: "cel25-etb", name: "Celebrations Elite Trainer Box", asOf: "2026-10-06",
+    series: [{ date: "2026-10-06", price: 161.99, listingCount: 29 }],
+    latest: { id: "cel25-etb", set: "Celebrations", subtype: "etb", priceMedian: 161.99, listingCount: 29 },
+    volume: null, volumeNote: "Sold counts need Insights scope.",
+    listingChange: { label: "net change in active eBay listings (estimate)", net: 191, from: "2026-10-04", to: "2026-10-06", days: 3, startTotal: 3881, endTotal: 4072, readEligible: false },
+  }, "stamp", { feed: true });
+  t("dive shows the listing-change estimate with its exact label and day count", withChange.includes("net change in active eBay listings (estimate): <b>+191</b> over 3 days of eBay Browse totals (2026-10-04 to 2026-10-06)"));
+  const changeBit = withChange.slice(withChange.indexOf("net change in active eBay listings"), withChange.indexOf("</p>", withChange.indexOf("net change in active eBay listings")));
+  t("the estimate never says sold or sell-through", !/\bsold\b|sell-through/i.test(changeBit));
+  const wrongLabel = renderDive({ id: "x", name: "X", series: [], latest: {}, listingChange: { label: "sold", net: 5, days: 3, from: "a", to: "b" } }, "stamp", { feed: true });
+  t("an estimate without the exact label is not shown", !wrongLabel.includes("over 3 days of eBay Browse totals"));
   t("dive share card has og tags", flagged.includes('property="og:title"') && flagged.includes("Temporal Forces Pokemon Center Elite Trainer Box — Deep dive · Catch&#39;em") && flagged.includes('property="og:description"') && flagged.includes("eBay Browse ask median") && flagged.includes('property="og:image" content="https://catchemtcg.com/og.png"') && flagged.includes('name="twitter:card" content="summary_large_image"') && flagged.includes('rel="canonical" href="https://catchemtcg.com/dive/sv5-pc-etb"'));
 }
 {
@@ -223,7 +236,7 @@ const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/")
 const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, FEED_ENABLED: "true" })).text();
 t("the homepage price line points at premium", homeOff.includes('href="/premium"') && homeOff.includes("$14.99/mo") && homeOff.includes("Join the Catch'em Club") && homeOff.includes("See Premium") && homeOff.includes("All site tools stay free.") && homeOff.includes("First 222") && !/lifetime|forever/i.test(homeOff) && !/more entries/i.test(homeOff) && !homeOff.includes("Discord Premium is $14.99"));
 
-t("homepage does not claim a free Premium entry route", !homeOff.includes("free entry route") && !/AMOE|no purchase necessary/i.test(homeOff) && homeOff.includes("Monthly Stadium giveaway auto-entry for Premium") && homeOff.includes("Watch the Stadium live"));
+t("homepage does not claim a free Premium entry route", !homeOff.includes("free entry route") && !/AMOE|no purchase necessary/i.test(homeOff) && !homeOff.includes("giveaway auto-entry") && homeOff.includes("Watch the Stadium live"));
 t("the homepage What you get row leads with the Feed", homeOff.includes("<h3>Feed</h3>") && homeOff.includes("Daily market reads.") && homeOff.includes("Weekly and monthly wraps, built with the community.") && homeOff.includes('href="/feed">Open the Feed') && !homeOff.includes("<h3>Sets</h3>") && homeOff.includes('href="/sets">Sets</a>') && homeOff.includes("<h3>Post Office</h3>") && homeOff.includes("<h3>The Community</h3>"));
 t("the homepage hero and nav gain a feed link only when the flag is on", (homeOff.match(/href="\/feed"/g) || []).length === 1 && !homeOff.includes('class="btn btn-primary" href="/feed"') && (homeOn.match(/href="\/feed"/g) || []).length === 4 && homeOn.includes('class="btn btn-primary" href="/feed">Feed'));
 t("Post Office uses the same gold pill and the same page", homeOn.includes('class="btn btn-primary" href="/post-office">Post Office') && homeOff.includes('class="btn btn-primary" href="/post-office">Post Office') && !homeOn.includes('class="btn btn-ghost" href="/post-office"'));
@@ -379,6 +392,35 @@ t("prices filter leaves outlier and dive out", buildFeedLoop([priced, outlier, d
 t("default mix includes non-price types when present", buildFeedLoop([priced, fact, outlier, dive], flagBrowse, { news: newsDoc }).some((r) => r.readKind === "news") && buildFeedLoop([priced, fact, outlier, dive], flagBrowse, {}).some((r) => r.readKind === "outlier" || r.readKind === "dive"));
 t("flagged and dive empty shelves stay honest", flaggedReads({ filters: { flagged: { items: [] } } }, []).length === 0 && diveReads({ filters: { dive: { items: [] } } }, []).length === 0);
 
+// ── volume reads: a TCGplayer count with its window and source may say "sold" ──
+const volume = {
+  id: "volume-tcgcsv-662182",
+  sku: "tcgcsv-662182",
+  readKind: "volume",
+  kind: "volume",
+  name: "Mega Charizard X ex",
+  set: "ME02: Phantasmal Flames",
+  headline: "Mega Charizard X ex (ME02: Phantasmal Flames, 013/094): 815 Near Mint copies sold on TCGplayer in the 30 days Sep 5–Oct 4, 133 of them in the last 7 (Sep 28–Oct 4).",
+  path: "Mega Charizard X ex (ME02: Phantasmal Flames, 013/094): 815 Near Mint copies sold on TCGplayer in the 30 days Sep 5–Oct 4, 133 of them in the last 7 (Sep 28–Oct 4).",
+  why: "TCGplayer sales via PokemonPriceTracker. TCGplayer's daily sold counts for the Holofoil printing in Near Mint, added up; days with no sale add nothing.",
+  asOf: "2026-10-04",
+  href: "/c/tcgcsv-662182",
+  sold: { condition: "Near Mint", printing: "Holofoil", count30d: 815, window30d: { from: "2026-09-05", to: "2026-10-04" }, count7d: 133, window7d: { from: "2026-09-28", to: "2026-10-04" }, source: "TCGplayer sales via PokemonPriceTracker" },
+};
+t("a verified volume row is kept and keeps its sold sentence", isVolumeRow(volume) && keepFeedRead(volume) && soldSafeText(volume, volume.path) === volume.path);
+const forged = { ...volume, id: "volume-forged", sold: { ...volume.sold, source: "eBay" } };
+const mismatch = { ...volume, id: "volume-mismatch", sold: { ...volume.sold, count30d: 900 } };
+const noWindow = { ...volume, id: "volume-nowindow", sold: { ...volume.sold, window30d: {} } };
+t("a volume row without the source, a matching count, or a window is not trusted", !isVolumeRow(forged) && !isVolumeRow(mismatch) && !isVolumeRow(noWindow) && soldSafeText(forged, forged.path) === "");
+t("a sold sentence on any other row still comes out", soldSafeText(priced, "Sales volume is 40. 12 copies sold.") === "");
+const volBrowse = { ...flagBrowse, filters: { ...flagBrowse.filters, volume: { items: [volume, forged], empty: "No sold counts on file." } } };
+t("volume filter returns verified volume rows only", buildFeedLoop([priced, outlier, dive], volBrowse, { filter: "volume" }).map((r) => r.id).join() === "volume-tcgcsv-662182");
+t("prices filter leaves volume out", buildFeedLoop([priced, volume], volBrowse, { filter: "prices" }).every((r) => r.readKind !== "volume"));
+t("default mix includes the volume read", buildFeedLoop([priced], volBrowse, {}).some((r) => r.id === "volume-tcgcsv-662182"));
+t("no volume shelf means no volume rows", volumeReads({ filters: {} }, []).length === 0 && buildFeedLoop([priced], flagBrowse, { filter: "volume" }).length === 0);
+const volAll = renderAll({ asOf: "2026-10-06", reads: [volume, { id: "only-sold", headline: "Sales volume is 40 copies sold.", price: 10 }] }, "");
+t("all reads keeps the attributed volume line and drops the bare sold claim", volAll.includes("815 Near Mint copies sold on TCGplayer") && !volAll.includes("Sales volume is 40"));
+
 const liveNews = newsSlice(feedNews);
 const dedenne = liveNews.find((row) => row.href === "https://bulbagarden.net/threads/new-merch-collection-starring-dedenne-joltik-and-more-electric-types-coming-soon-to-pokemon-centers-in-japan.311717/");
 const japanFile = liveNews.find((row) => row.href === "https://www.pokemon-card.com/info/005559.html");
@@ -465,6 +507,31 @@ const staleHtml = await (await renderPath("/feed", staleFetch, { feed: true })).
 const staleLead = JSON.parse(staleHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
 t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
 t("the feed asks the card file before it shows that price", staleHtml.includes("function readStaleAgainstCard") && staleHtml.includes("function stalePrice"));
+
+// ── every inline client script must parse ──
+// A regex written inside a template literal loses its backslashes; on Oct 6
+// "/\\/p\\/…/" shipped as "//p/…" and the whole feed script stopped.
+{
+  const pages = {
+    feed: renderFeed({ asOf: "2026-10-06", reads: [volume, outlier, dive] }, "", "stamp", { feed: true }),
+    search: renderSearch({ feed: true }),
+    mine: renderMine("stamp", { feed: true }),
+    sets: renderSets({ sets: [] }, "stamp", { feed: true }),
+  };
+  const broken = [];
+  for (const [name, page] of Object.entries(pages)) {
+    for (const m of String(page).matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)) {
+      if (/application\/(ld\+)?json/.test(m[1])) continue;
+      let code = m[2];
+      if (/^\s*[\[{]/.test(code)) continue;
+      // Module scripts: drop the import lines and parse the body as an async function.
+      if (/type=["']module["']/.test(m[1])) code = "(async()=>{" + code.replace(/^\s*import\s[^;]+;\s*$/gm, "") + "\n})";
+      try { new vm.Script(code); } catch (e) { broken.push(`${name}: ${e.message}`); }
+    }
+  }
+  t("every inline client script parses", broken.length === 0);
+  if (broken.length) console.error(broken.join("\n"));
+}
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
