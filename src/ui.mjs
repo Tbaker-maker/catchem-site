@@ -2,6 +2,7 @@ import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { brandedTile, cataloguePath, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
+import { pokemonCatalogLine, pokemonSlug, sortPokemonCards } from "./pokemon.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -959,6 +960,24 @@ h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .row .tile,.row .shot{flex:none;width:64px;height:88px}
 img.shot{object-fit:contain;background:#12100e;border-radius:8px;display:block}
 img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
+.poke-hero{display:flex;justify-content:center;margin:8px 0 4px}
+.poke-hero .tile-card{width:min(220px,100%)}
+.mon-sort{display:flex;gap:8px;margin:8px 0 12px}
+.mon-sort button{min-height:44px;padding:0 14px}
+.mon-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mon-tile{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.mon-tile .mon-open{display:flex;flex-direction:column;gap:4px;min-width:0;color:inherit;text-decoration:none}
+.mon-tile img.shot,.mon-tile .tile{width:100%;max-width:none;height:auto;aspect-ratio:63/88;object-fit:contain}
+.mon-tile .tile-card{width:100%;aspect-ratio:63/88}
+.mon-tile b{font:600 15px/1.25 var(--serif)}
+.mon-tile .set,.mon-tile .num{color:var(--muted,#b7b1a6);font:500 13px/1.3 var(--sans)}
+.mon-tile .px{display:flex;flex-direction:column;gap:1px;font:500 12px/1.3 var(--sans);color:#b7b1a6}
+.mon-tile .px .cash{font:600 16px/1.2 var(--sans);color:var(--gold)}
+.mon-tile .shop{min-height:44px;display:inline-flex;align-items:center}
+@media (min-width:768px){.mon-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){.mon-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:1280px){.mon-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (min-width:1600px){.mon-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .news-tile{box-sizing:border-box;width:100%;height:220px;border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;background:#1a1815;border:1px solid #2f2b26;color:#efe9de}
 .news-tile .mark{margin:0;font:600 22px/1 var(--serif);letter-spacing:-.03em}
 .news-tile .dot{color:#d9b779}
@@ -1283,6 +1302,91 @@ function histWithFact(hist, fact) {
   return pts;
 }
 
+const PRICE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function priceDay(iso) {
+  const s = String(iso || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  return PRICE_MONTHS[Number(s.slice(5, 7)) - 1] + " " + Number(s.slice(8, 10)) + ", " + s.slice(0, 4);
+}
+
+function pokemonPriceHtml(card) {
+  if (!(card && card.price > 0)) return "No price yet";
+  const bits = [];
+  if (card.source) bits.push(`<span>${esc(card.source)}</span>`);
+  const cash = money(card.price);
+  if (cash) bits.push(`<b class="cash">${esc(cash)}</b>`);
+  if (card.finish) bits.push(`<span>${esc(card.finish)}</span>`);
+  const when = priceDay(card.priceDate);
+  if (when) bits.push(`<span>${esc(when)}</span>`);
+  return bits.join("");
+}
+
+function pokemonFace(card) {
+  const alt = [card.name, card.set].filter(Boolean).join(", ");
+  if (card.image) return imageTag(card.image, "card", alt, { kind: "single", name: card.name, catalogueCrop: true, crop: true });
+  return brandedTile("card", { kind: "single", name: card.name });
+}
+
+export function renderPokemon(page, stamp, opts = {}) {
+  if (!page) {
+    return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, "Not found", stamp, "", feedNav(opts));
+  }
+  const cards = sortPokemonCards(page.cards || [], "price");
+  const hero = page.cutout
+    ? `<img class="cutout" alt="${esc(page.name)}" width="220" height="220" loading="lazy" decoding="async" src="${esc(page.cutout)}">`
+    : brandedTile("card", { kind: "single", name: page.name });
+  const tiles = cards.map((card) => {
+    const open = `<a class="mon-open" href="/c/${esc(card.id)}">${pokemonFace(card)}<b>${esc(card.name)}</b><span class="set">${esc(card.set)}</span><span class="num">${esc(card.number)}</span><span class="px">${pokemonPriceHtml(card)}</span></a>`;
+    const shop = card.link ? `<a class="shop" href="${esc(card.link)}">TCGplayer</a>` : "";
+    const release = /^\d{4}-\d{2}-\d{2}$/.test(String(card.release || "")) ? card.release : "9999-99-99";
+    return `<article class="mon-tile" data-price="${card.price > 0 ? card.price : ""}" data-release="${esc(release)}" data-set="${esc(card.set)}" data-num="${esc(card.number)}" data-name="${esc(card.name)}">${open}${shop}</article>`;
+  }).join("");
+  const line = pokemonCatalogLine(page);
+  const body = `<main class="wrap poke-page">
+<div class="poke-hero">${hero}</div>
+<h1>${esc(page.name)}</h1>
+${line ? `<p>${esc(line)}</p>` : ""}
+<section id="cards">
+<h2>Cards</h2>
+<div class="mon-sort" role="group" aria-label="Sort cards">
+<button type="button" id="sort-price" aria-pressed="true">Price</button>
+<button type="button" id="sort-set" aria-pressed="false">Set order</button>
+</div>
+<div class="mon-grid" id="mon-grid">${tiles}</div>
+</section>
+<script>
+(function(){
+  var box=document.getElementById("mon-grid");
+  var priceBtn=document.getElementById("sort-price");
+  var setBtn=document.getElementById("sort-set");
+  if(!box||!priceBtn||!setBtn) return;
+  function num(v){ var n=Number(v); return n>0?n:-1; }
+  function sort(mode){
+    var tiles=[].slice.call(box.children);
+    tiles.sort(function(a,b){
+      if(mode==="set"){
+        return (a.dataset.release||"").localeCompare(b.dataset.release||"")
+          || (a.dataset.set||"").localeCompare(b.dataset.set||"")
+          || String(a.dataset.num||"").localeCompare(String(b.dataset.num||""), undefined, {numeric:true})
+          || (a.dataset.name||"").localeCompare(b.dataset.name||"");
+      }
+      var d=num(b.dataset.price)-num(a.dataset.price);
+      if(d) return d;
+      return (a.dataset.name||"").localeCompare(b.dataset.name||"");
+    });
+    tiles.forEach(function(el){ box.appendChild(el); });
+    priceBtn.setAttribute("aria-pressed", mode==="price"?"true":"false");
+    setBtn.setAttribute("aria-pressed", mode==="set"?"true":"false");
+  }
+  priceBtn.addEventListener("click", function(){ sort("price"); });
+  setBtn.addEventListener("click", function(){ sort("set"); });
+})();
+</script>
+</main>`;
+  return chrome("", body, page.name, stamp, "", feedNav(opts));
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
@@ -1310,10 +1414,13 @@ export function renderCard(card, stamp, opts = {}) {
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
+  const setBit = card.setSlug
+    ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
+    : esc(card.set || "");
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "" });
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const body = `<main class="wrap">
-<p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
+<p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span>${chips}</p>
 <p class="muted">${esc(card.source || "TCGplayer market")}${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}${checked ? `. ${esc(checked)}` : ""}</p>
@@ -1323,7 +1430,7 @@ ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${img}
-${chartBox(hist, "TCGplayer market, daily", card.release || "")}
+${(hist || []).length >= 2 ? chartBox(hist, "TCGplayer market, daily", card.release || "") : ""}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
@@ -1812,7 +1919,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
   .feed-stage .feed-card{flex:1 1 auto}
   .feed-stage .feed-card.fact-card{flex:0 0 auto;width:100%}
-  .mon-btn{background:#12100e;color:#d9b779;border:1px solid #d9b779;border-radius:10px;min-height:48px;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif}
+  .mon-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;background:#12100e;color:#d9b779;border:1px solid #d9b779;border-radius:10px;min-height:48px;padding:0 16px;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif;text-decoration:none}
   .mon-list{display:flex;flex-direction:column;gap:6px;margin:0}
   .mon-list[hidden]{display:none}
   .mon-list p{margin:0;color:#d9b779}
@@ -1920,6 +2027,7 @@ ${cutoutSrc.toString()}
 ${tcgLink.toString()}
 ${pokemonFactLine.toString()}
 ${pricedMonCards.toString()}
+${pokemonSlug.toString()}
 function dayOk(v){ return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(v||"")); }
 function priceOk(n){ return Number(n)>0; }
 function isLag(card){
@@ -2105,7 +2213,9 @@ ${isSealedProductRow.toString()}
 ${shownRead.toString()}
 ${cardIdentity.toString()}
 function setLine(card){
-  return String(card&&card.set||"").trim();
+  const set=String(card&&card.set||"").trim();
+  if(/^tcgcsv-\d+$/i.test(set) || /^pokemon-[a-z0-9-]+$/i.test(set)) return "";
+  return set;
 }
 function moveLine(card){
   const path=String(card&&(card.path||card.headline)||"").trim();
@@ -2220,50 +2330,13 @@ function waveEl(card){
   return el;
 }
 function mountMon(el, card){
-  const btn=document.createElement("button");
-  btn.type="button";
-  btn.className="mon-btn";
-  btn.setAttribute("aria-expanded","false");
-  btn.textContent="Cards";
-  const list=document.createElement("div");
-  list.className="mon-list";
-  list.hidden=true;
-  list.onclick=function(ev){ ev.stopPropagation(); };
-  btn.onclick=function(ev){
-    ev.stopPropagation();
-    const open=btn.getAttribute("aria-expanded")==="true";
-    if(open){ btn.setAttribute("aria-expanded","false"); list.hidden=true; return; }
-    btn.setAttribute("aria-expanded","true");
-    list.hidden=false;
-    if(list.dataset.ready==="1") return;
-    list.dataset.ready="1";
-    const priced=pricedMonCards(Array.isArray(lead)?lead:[], card.name);
-    list.innerHTML="";
-    if(!priced.length){
-      const p=document.createElement("p");
-      p.className="muted";
-      p.textContent="No priced cards are in the file.";
-      list.appendChild(p);
-      return;
-    }
-    priced.forEach(function(row){
-      const p=document.createElement("p");
-      const parts=[];
-      if(row.cutout) parts.push('<img class="cutout" alt="" width="46" height="64" loading="lazy" decoding="async" src="'+html(row.cutout)+'">');
-      else parts.push(brandedTile("row",{kind:"single",name:row.name}));
-      parts.push(money(row.price));
-      if(row.name) parts.push(html(row.name));
-      if(row.set) parts.push(html(row.set));
-      const cardId=row.sku||row.id||"";
-      if(cardId) parts.push(html(cardId));
-      let line=parts.join(" · ");
-      if(row.link) line+=' <a href="'+html(row.link)+'">'+html(row.link)+"</a>";
-      p.innerHTML=line;
-      list.appendChild(p);
-    });
-  };
-  el.appendChild(btn);
-  el.appendChild(list);
+  const slug=pokemonSlug(card&&card.name);
+  if(!slug) return;
+  const link=document.createElement("a");
+  link.className="mon-btn";
+  link.href="/pokemon/"+encodeURIComponent(slug);
+  link.textContent="Cards";
+  el.appendChild(link);
 }
 function newsEl(card){
   const el=document.createElement("article");
@@ -2277,8 +2350,9 @@ function newsEl(card){
   return el;
 }
 function factCutLine(card){
-  const who=String(card && card.name || "").trim();
-  return '<p class="cut-miss">The cutout is missing. '+html(who)+"</p>";
+  const src=cutoutSrc(card);
+  if(src) return '<img class="cutout" alt="'+html(String(card&&card.name||""))+'" width="220" height="220" loading="lazy" decoding="async" src="'+html(src)+'">';
+  return brandedTile("card",{kind:"single",name:card&&card.name});
 }
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
@@ -2301,7 +2375,7 @@ function cardEl(card, facts){
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?factCutLine(card):"";
-  const head=(isFact(card)?brandedTile("card",{kind:"single",name:card&&card.name}):"")+h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
+  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }

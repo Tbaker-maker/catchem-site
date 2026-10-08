@@ -1,8 +1,12 @@
+import { buildPokemonPages } from "./pokemon.mjs";
+
 const BASE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/";
 const mem = new Map();
+let pokemonBundle = null;
 
 export function resetJsonCache() {
   mem.clear();
+  pokemonBundle = null;
 }
 
 export async function loadJson(rel, fetchImpl = fetch) {
@@ -52,4 +56,22 @@ export async function loadDive(id, fetchImpl = fetch) {
   const data = await res.json();
   mem.set(key, data);
   return data;
+}
+
+const CATALOGUE_ROOT = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/";
+
+async function readCatalogue(rel, fetchImpl) {
+  const res = await fetchImpl(CATALOGUE_ROOT + rel, { cf: { cacheTtl: 3600 } });
+  if (!res.ok) throw new Error(`${rel} ${res.status}`);
+  return res.json();
+}
+
+export async function loadPokemonBundle(fetchImpl = fetch) {
+  if (pokemonBundle) return pokemonBundle;
+  const [attrs, catalogue] = await Promise.all([
+    readCatalogue("card-attrs.json", fetchImpl),
+    readCatalogue("card-catalogue.json", fetchImpl),
+  ]);
+  pokemonBundle = buildPokemonPages(attrs?.cards || {}, catalogue?.cards || {});
+  return pokemonBundle;
 }

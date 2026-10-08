@@ -1,12 +1,13 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
+import { buildPokemonPages, productLink } from "../src/pokemon.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 
 let fail = 0;
@@ -146,7 +147,7 @@ t("a sealed id missing from the catalogue uses its tcgplayer id", cardPage.inclu
 t("a row with no id match is the branded tile", officialSrc({ id: "no-such", kind: "sealed", name: "Mystery Box" }, {}).src === "" && brandedTile("sealed", { kind: "sealed", name: "Elite Trainer Box" }).includes("ETB") && brandedTile("row", { kind: "single", name: "Mew" }).includes("Single"));
 }
 
-t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
+t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed" && pageKind("/pokemon/lickitung") === "pokemon");
 t("pulse is redirected, not the baked shorts", !isFeedPath("/pulse") && !isFeedPath("/feed"));
 t("app and try still go to the feed", redirectPath("/app/") === "/feed" && redirectPath("/try/index.html") === "/feed");
 const escaped = esc("A & B <x>");
@@ -328,6 +329,27 @@ t("one set with nothing picked does not repeat prices", buildFeedLoop([priced, f
 t("a pokemon fact says the English count and does not say catalogue", pokemonFactLine(fact) === "Duraludon has 19 English TCG cards." && !/catalog/i.test(pokemonFactLine(fact)));
 t("japanese stays off when that count is not on the row", !pokemonFactLine(fact).includes("Japanese"));
 t("a japanese count already on the row is said", pokemonFactLine({ ...fact, japaneseCount: 4 }) === "Duraludon has 19 English TCG cards and 4 Japanese TCG cards.");
+{
+  const attrs = { "sv5-180": { dex: 108 }, "base4-48": { dex: 108 }, "sv5-124": { dex: 108 }, "sm11-161": { dex: 108 } };
+  const catalogue = {
+    "sv5-180": { name: "Lickitung", artist: "A", setName: "Temporal Forces", number: "180", price: 30.28, priceUpdatedAt: "2026/08/22", priceFinish: "holofoil", priceSource: "tcgplayer via pokemontcg.io", releaseDate: "2024/03/22", tcgPlayerId: 542901 },
+    "base4-48": { name: "Lickitung", artist: "B", setName: "Base Set 2", number: "48", price: 2.02, priceUpdatedAt: "2026/08/22", priceFinish: "normal", priceSource: "tcgplayer via pokemontcg.io", releaseDate: "2000/02/24" },
+    "sv5-124": { name: "Lickitung", artist: "A", setName: "Temporal Forces", number: "124", price: 0.22, priceUpdatedAt: "2026/08/22", priceSource: "tcgplayer via pokemontcg.io", releaseDate: "2024/03/22" },
+    "sm11-161": { name: "Lickitung", artist: "C", setName: "Unified Minds", number: "161", releaseDate: "2019/08/02" },
+  };
+  const built = buildPokemonPages(attrs, catalogue);
+  const lick = built.bySlug.lickitung;
+  const withPics = { ...lick, cards: lick.cards.map((card) => ({ ...card, image: card.id === "sm11-161" ? "" : "/data/editor/tcg/" + card.id + ".png" })) };
+  const page = renderPokemon(withPics, "");
+  const words = page.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
+  const order = [...page.matchAll(/<span class="num">([^<]*)<\/span>/g)].map((m) => m[1]).join(",");
+  t("a Pokémon page is every catalog card for that dex, highest price first", lick.cardCount === 4 && lick.cards.length === 4 && order === "180,48,124,161");
+  t("the page names the card, the set, and the number, and hides ids", page.includes(">Lickitung<") && page.includes("Temporal Forces") && page.includes("Base Set 2") && page.includes("Unified Minds") && !words.includes("tcgcsv") && !words.includes("base4-48") && !words.includes("pokemon-lickitung") && !words.includes("The picture is missing.") && !words.includes("The cutout is missing."));
+  t("a stored price keeps its date, and a card with no price says so", page.includes("TCGplayer market") && page.includes("$30.28") && page.includes("Aug 22, 2026") && page.includes("No price yet") && (page.match(/No price yet/g) || []).length === 1);
+  t("a TCGplayer link is only the stored product id", page.includes('href="https://www.tcgplayer.com/product/542901"') && page.includes(">TCGplayer<") && (page.match(/tcgplayer\.com\/product\//g) || []).length === 1 && productLink({ name: "Lickitung" }) === "" && productLink({ id: "base4-48", name: "Lickitung" }) === "");
+  t("a missing catalogue picture is a branded tile", page.includes('class="tile tile-card"') && page.includes('src="/data/editor/tcg/sv5-180.png"') && page.includes("loading=\"lazy\"") && page.includes("mon-grid") && page.includes("repeat(2,minmax(0,1fr))") && page.includes("min-width:768px") && page.includes("min-width:1280px") && page.includes("Set order"));
+  t("the hero without a cutout is the branded tile", page.includes('class="poke-hero"') && !page.includes("The cutout is missing"));
+}
 t("priced cards stay highest first and a blank price stays off", pricedMonCards([
   ["a", "Duraludon", "Set A", "", "", "", 2],
   ["b", "Duraludon V", "Set B", "", "", "", 9],
@@ -518,9 +540,9 @@ const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
-t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
-t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && !factHtml.includes("The picture is missing.") && factHtml.includes("function newsTile") && factHtml.includes("news-tile") && !factHtml.includes("news-preview") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
-t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && factHtml.includes("The cutout is missing.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
+t("the fact card says the English count, keeps Cards on the Pokémon page, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes('className="mon-btn"') && monFn.includes('"/pokemon/"+') && monFn.includes("pokemonSlug(card&&card.name)") && !monFn.includes("fetch(") && !monFn.includes("tcgcsv") && !monFn.includes("The picture is missing.") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
+t("a missing cutout is a branded tile and the news filter says there is no news", !factHtml.includes("The cutout is missing.") && factHtml.includes("function factCutLine") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("brandedTile(") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("cutoutSrc(card)") && !factHtml.includes("The picture is missing.") && factHtml.includes("function newsTile") && factHtml.includes("news-tile") && !factHtml.includes("news-preview") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news."));
+t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && !factHtml.includes("The cutout is missing."));
 t("premium sees the hide control and the unranked loop walks the shuffled file", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
 t("the feed filter is a pinned chip row and each filter has a URL", factHtml.includes('id="f-loop"') && factHtml.includes('class="chip-row"') && factHtml.includes(">All<") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes('value="wave">Waves & reprints') && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && factHtml.includes('value="quiet">No sales') && factHtml.includes('value="still">Nothing moved') && factHtml.includes("position:sticky") && factHtml.includes("overflow-x:auto") && factHtml.includes("min-height:44px") && factHtml.includes("URLSearchParams(location.search)") && factHtml.includes('.get("f")') && factHtml.includes("history.pushState") && factHtml.includes('id="set-picker"') && factHtml.includes('aria-label="Find a set"') && factHtml.includes("Nothing in this filter.") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes("pill-menu") && factHtml.includes("function readUnderTitle") && factHtml.includes("function dropTitleName") && factHtml.includes("function cardIdentity") && factHtml.includes("card-meta") && factHtml.includes("isFact(card)?pokemonFactLine(card):moveLine(card)") && factHtml.includes("if(!path) return \"\";") && !factHtml.includes("__name") && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));

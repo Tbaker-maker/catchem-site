@@ -1,15 +1,15 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { loadJson, loadDive, loadDiveIndex, proxyPublic } from "./data.mjs";
+import { loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { officialSrc } from "./catalogue-image.mjs";
+import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -37,6 +37,7 @@ export function pageKind(pathname) {
   if (path.startsWith("/artists/")) return "artist";
   if (path.startsWith("/c/")) return "card";
   if (path.startsWith("/p/")) return "product";
+  if (path.startsWith("/pokemon/")) return "pokemon";
   if (path.startsWith("/dive/")) return "dive";
   if (path === "/board" || path === "/movers") return "movers";
   if (path === "/search") return "search";
@@ -205,6 +206,24 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return html(renderDive(null, stamp, pageOpts), 404);
     }
   }
+  if (kind === "pokemon") {
+    const slug = decodeURIComponent(path.slice("/pokemon/".length)).toLowerCase();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, 404);
+    }
+    try {
+      const bundle = await loadPokemonBundle(fetchImpl);
+      const page = bundle.bySlug[slug];
+      if (!page) {
+        return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, 404);
+      }
+      const images = await catalogueMap(fetchImpl);
+      const cards = page.cards.map((card) => ({ ...card, image: imageForId(images, card.id) }));
+      return html(renderPokemon({ ...page, cards }, stamp, pageOpts));
+    } catch {
+      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">The catalog did not load.</p><p><a href="/search">Search</a></p></main>`, 503);
+    }
+  }
   if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
     const cardId = decodeURIComponent(raw);
@@ -212,6 +231,25 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.products?.[cardId];
       if (dest) return go(dest);
+      try {
+        const bundle = await loadPokemonBundle(fetchImpl);
+        const hit = bundle.byId[cardId];
+        if (hit) {
+          const images = await catalogueMap(fetchImpl);
+          const row = {
+            id: hit.id,
+            name: hit.name,
+            set: hit.set,
+            num: hit.number,
+            artist: hit.artist,
+            price: hit.price,
+            asOf: hit.priceDate,
+            source: hit.source,
+            kind: "single",
+          };
+          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: imageForId(images, hit.id), catalogueCrop: !!imageForId(images, hit.id) }));
+        }
+      } catch { /* the catalogue file did not load */ }
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
