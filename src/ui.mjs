@@ -818,6 +818,17 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of kept) if (row && row.kind === "sealed") push(row);
     return out;
   }
+  if (filter === "signals") {
+    for (const row of kept) {
+      const days = Number(row?.windowDays);
+      const change = Number(row?.changePct);
+      const head = String(row?.headline || "");
+      const kind = String(row?.signal || row?.readKind || row?.kind || "");
+      const signal = kind === "mover" || kind === "set" || kind === "high" || kind === "streak" || kind === "lag" || kind === "group" || (days === 7 && Number.isFinite(change) && Math.abs(change) >= 8) || head.includes("6-month high");
+      if (signal) push(row);
+    }
+    return out;
+  }
   if (filter === "set" && !setName) return [];
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
@@ -2043,6 +2054,9 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .data-block{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
   .data-block h4{margin:0;font:600 16px/1.3 var(--sans)}
   .data-block p{margin:0}
+  .more-block{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+  .more-block h4{margin:0;font:600 16px/1.3 var(--sans)}
+  .more-block p{margin:0}
   .vote-q{margin:4px 0 0;font-weight:600}
   .set-ph{min-height:160px;display:flex;align-items:center;justify-content:center;background:#211e1a;border-radius:12px;padding:16px;text-align:center;font:600 16px/1.3 var(--sans);color:var(--gold)}
   .stats{display:flex;flex-direction:column;gap:4px}
@@ -2116,7 +2130,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
-  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Waves & reprints</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
+  <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="signals">Signals</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Waves & reprints</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
   <div class="chip-scroller">
   <div class="chip-row" role="toolbar" aria-label="Filter"></div>
   <button type="button" class="chip-more" aria-label="More filters" hidden>›</button>
@@ -2181,6 +2195,7 @@ function diveIdFor(card){
 const pageMode=${JSON.stringify(page)};
 const premium=${opts.premium === true ? "true" : "false"};
 let browse=null;
+let readLibrary=null;
 let flat=null;
 let hideFacts=false;
 let loopFilter="";
@@ -2535,6 +2550,45 @@ function waveEl(card){
   el.innerHTML=safeNewsHtml(card)+"<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
+function matterLines(card){
+  if(!card) return null;
+  const whyLine=card["whyItMatters"];
+  const wrongLine=card["whatWouldMakeThisWrong"];
+  if(whyLine && wrongLine) return {why:whyLine, wrong:wrongLine};
+  const sku=String(card.sku||"");
+  if(!/^tcgcsv-[0-9]+$/.test(sku)) return null;
+  const asOf=String(card.asOf||"");
+  const price=Number(card.price);
+  const priceText=price>0?"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
+  const days=Number(card.windowDays);
+  const change=Number(card.changePct);
+  const head=String(card.headline||"");
+  const hasChange=isFinite(change);
+  let why="", wrong="";
+  if(days===7 && hasChange && Math.abs(change)>=8 && priceText && asOf){
+    why="A 7-day TCGplayer market move of "+Math.abs(change)+"% "+(change<0?"down":"up")+" on "+sku+" is at least 8%. Latest price "+priceText+" on "+asOf+".";
+    wrong="Wrong if this is not "+sku+", if a day is missing inside those 7 days, or if the move is under 8%. A listing is not a sale.";
+  }else if(head.indexOf("6-month high")>=0){
+    why="The sentence on this card already calls the latest price a 6-month high"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
+    wrong="Wrong if the latest price on "+sku+" is not the highest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
+  }else if(head.indexOf("6-month low")>=0){
+    why="The sentence on this card already calls the latest price a 6-month low"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
+    wrong="Wrong if the latest price on "+sku+" is not the lowest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
+  }else if(days===7 && hasChange && Math.abs(change)<8 && priceText && asOf){
+    why="Latest price "+priceText+" on "+asOf+" for "+sku+". The 7-day move is "+Math.abs(change)+"% "+(change<0?"down":"up")+", under the 8% mover line.";
+    wrong="Wrong if this is not "+sku+", or if the 7-day move is 8% or more. A listing is not a sale.";
+  }else if(head || priceText){
+    why="This read is product id "+sku+(asOf?", as of "+asOf:"")+(priceText?", latest price "+priceText:"")+".";
+    wrong="Wrong if the sentence names a different product than "+sku+". A listing is not a sale.";
+  }
+  if(!why||!wrong) return null;
+  return {why:why, wrong:wrong};
+}
+function moreBlock(card){
+  const lines=matterLines(card);
+  if(!lines) return "";
+  return '<section class="more-block"><h4>More</h4><p><b>Why it matters.</b> '+html(lines.why)+'</p><p><b>What would make this wrong.</b> '+html(lines.wrong)+'</p></section>';
+}
 function mountMon(el, card){
   const slug=pokemonSlug(card&&card.name);
   if(!slug) return;
@@ -2640,7 +2694,7 @@ function cardEl(card, facts){
   const supplyFields=supply?'<input name="listingsBelow" inputmode="numeric" aria-label="Listings below" value="'+supply.low+'"><input name="listingsAbove" inputmode="numeric" aria-label="Listings above" value="'+supply.high+'">':"";
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
-  el.innerHTML=head+diveLink+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
+  el.innerHTML=head+diveLink+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section>'+moreBlock(card)+'<button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
   const readPhoto=photoEl(card);
   if(readPhoto) el.insertBefore(readPhoto, el.firstChild);
   const slot=el.querySelector(".slot");
@@ -3166,6 +3220,7 @@ function accepts(card){
   if(!card || card.skip) return false;
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
+  if(loopFilter==="signals") return card.signal==="mover" || card.signal==="set" || card.signal==="high" || card.signal==="streak";
   if(loopFilter==="sealed") return isSealedProductRow(card);
   if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
@@ -3288,6 +3343,19 @@ function buildFlat(){
       if(typeof id!=="string" || !id) return;
       const card=cards && cards[id];
       add(card || {id:id, pending:true});
+    });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="signals"){
+    const items=readLibrary && readLibrary.signals || [];
+    const cards=catalogue && catalogue.cards;
+    items.forEach(function(row){
+      if(!row || !row.id) return;
+      if(row.signal!=="mover" && row.signal!=="set" && row.signal!=="high" && row.signal!=="streak") return;
+      const full=cards && cards[row.id];
+      const card=full ? Object.assign({}, full, {signal:row.signal, whyItMatters:row.whyItMatters, whatWouldMakeThisWrong:row.whatWouldMakeThisWrong}) : row;
+      add(card);
     });
     flat=rows;
     return;
@@ -3501,6 +3569,7 @@ async function showFlat(index, dir){
     else if(!msg && loopFilter==="flagged") msg="No flagged prices.";
     else if(!msg && loopFilter==="dive") msg="No deep dives.";
     else if(!msg && loopFilter==="volume") msg="No TCGplayer sold counts on file.";
+    else if(!msg && loopFilter==="signals") msg="No signal reads tonight.";
     else if(!msg && loopFilter==="pokemon") msg="No Pokémon facts.";
     else if(!msg) msg="Nothing in this filter.";
     p.textContent=msg;
@@ -3608,6 +3677,7 @@ async function boot(){
   };
   if(pageMode==="read"){
     try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
+    try{ readLibrary=await (await fetch("/data/feed/read-library.json")).json(); }catch(e){ readLibrary=null; }
     await showRead();
     return;
   }
@@ -3624,6 +3694,7 @@ async function boot(){
   if(!only){
     try{ browse=await (await fetch("/data/feed/browse.json")).json(); }catch(e){ browse=null; }
     try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
+    try{ readLibrary=await (await fetch("/data/feed/read-library.json")).json(); }catch(e){ readLibrary=null; }
     try{
       const doc=await (await fetch("/data/sets.json")).json();
       const bySlug={};

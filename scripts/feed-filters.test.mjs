@@ -165,6 +165,7 @@ const chips = [
   ["prices", "Prices"],
   ["sealed", "Sealed"],
   ["set", "One set"],
+  ["signals", "Signals"],
   ["news", "News"],
   ["pokemon", "Pokémon facts"],
   ["wave", "Waves & reprints"],
