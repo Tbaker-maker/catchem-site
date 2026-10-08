@@ -1,6 +1,7 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
 import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
+import { imageForId, brandedTile } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
@@ -49,6 +50,7 @@ const files = {
   "movers.json": movers,
   "receipts.json": receipts,
   "redirects.json": { products: { "sv3pt5-etb": "/p/tcgcsv-504467" }, sets: { base1: "/sets/base-set" } },
+  "catalogue-images.json": { source: "Post Office catalogue. Match by id only.", images: { "tcgcsv-10": "/img/base1/1", "base1-4": "/cards/seed/base1-4.png" } },
 };
 
 const diveFiles = {
@@ -85,6 +87,7 @@ const fetchImpl = async (url) => {
   return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
 };
 
+t("catalogue image is the id hit only", imageForId({ "base1-1": "/img/base1/1" }, "base1-1") === "/data/editor/tcg/base1/1_hires.png" && imageForId({ a: "https://images.pokemontcg.io/base1/1.png" }, "a") === "" && imageForId({ "sv3pt5-200": "/cards/seed/sv3pt5-200.png" }, "sv3pt5-200").endsWith("/research/assets/cards/seed/sv3pt5-200.png") && imageForId({ "base1-1": "/img/base1/1" }, "tcgcsv-10") === "" && brandedTile("logo").includes("tile-logo") && brandedTile("card").includes("Catch'em"));
 t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
 t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pageKind("/dive/sv3pt5-etb.html") === "dive");
 
@@ -135,6 +138,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
 {
   const cardPage = await (await renderPath("/p/tcgcsv-503313", fetchImpl, { feed: true })).text();
   t("catalog sealed page links Deeper look when dive exists", cardPage.includes("Deeper look") && cardPage.includes("/dive/sv3pt5-etb") && cardPage.includes("See the chart"));
+t("a sealed id missing from the catalogue is the branded tile", cardPage.includes("tile-sealed") && cardPage.includes("Catch'em") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
 }
 
 t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
@@ -189,10 +193,11 @@ const known = await renderPath("/sets/base1", fetchImpl);
 t("a known old set slug is one hop", known.status === 301 && known.headers.get("location") === "/sets/base-set");
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
 t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori"));
+t("a card picture is the catalogue hit for that id", cardPage.includes("/data/editor/tcg/base1/1_hires.png") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
 t("a card page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(cardPage));
 const setHtml = await (await renderPath("/sets/base", fetchImpl)).text();
 t("a set page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(setHtml));
-t("a set page uses a picture only when the file already has one", setHtml.includes("function pictureSrc") && setHtml.includes("row.icon") && setHtml.includes("function cropStyle") && setHtml.includes("The picture is missing.") && setHtml.includes("Sealed line") && !setHtml.includes("tcgplayer-cdn.tcgplayer.com/product/"));
+t("a set page uses the catalogue id or the branded tile", setHtml.includes("function pictureSrc") && setHtml.includes("row.icon") && setHtml.includes("function cropStyle") && setHtml.includes("brandedTile") && setHtml.includes("catalogue-images.json") && setHtml.includes("Sealed line") && !setHtml.includes("tcgplayer-cdn.tcgplayer.com/product/") && !setHtml.includes("images.pokemontcg.io") && !setHtml.includes("String(data.logo)"));
 const board = await (await renderPath("/board", fetchImpl, { feed: true })).text();
 t("movers keep slabs off the list", board.includes("Slabs") && board.includes("graded feed") && board.includes("Alakazam"));
 const post = await (await renderPath("/post-office", fetchImpl)).text();
@@ -625,7 +630,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   if (deadFetch.length) console.error(deadFetch.join("\n"));
   t("a path the site cannot serve fails the check", deadLocals(["/no-such-page"], pageKind).join() === "/no-such-page" && deadLocals(["/sets", "/corrections"], pageKind).length === 0);
   t("a script template is not a path", localPaths(`<a href="/dive/'+encodeURIComponent(diveId)+'">x</a><a href="/sets">Sets</a>`).join() === "/sets" && scriptFetchPaths('<script>fetch("/data/feed/"+part+".json");fetch("/data/feed/meta.json")</script>').join() === "/data/feed/meta.json");
-  t("the chip row fades and the sealed chip follows dive", factHtml.includes("chip-more") && factHtml.includes("chip-scroller") && factHtml.includes("--chip-fade") && factHtml.includes("sealedAvailable") && factHtml.includes("function shownRead") && factHtml.includes("Asks on eBay for ") && factHtml.includes("if(!src) return null") && factHtml.includes('loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)'));
+  t("the chip row fades and the sealed chip follows dive", factHtml.includes("chip-more") && factHtml.includes("chip-scroller") && factHtml.includes("--chip-fade") && factHtml.includes("sealedAvailable") && factHtml.includes("function shownRead") && factHtml.includes("Asks on eBay for ") && factHtml.includes("function photoEl") && factHtml.includes("brandedTile") && !factHtml.includes("card.image") && factHtml.includes('loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)'));
   t("every page says it is made for collectors, rippers and flippers", factHtml.includes("Made for collectors, rippers and flippers.") && indexHtml.includes("Made for collectors, rippers and flippers.") && !indexHtml.includes("Made by one person who collects."));
 }
 

@@ -1,6 +1,7 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
+import { brandedTile, cataloguePath, catalogueUrl, imageTag } from "./catalogue-image.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -944,6 +945,18 @@ h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .counts b span{display:block;font:400 12px/1.3 var(--sans);color:var(--dim)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
 .ph{width:100%;aspect-ratio:1;border-radius:12px;background:#211e1a;display:grid;place-items:center;color:var(--dim);font-size:13px}
+.tile{display:grid;place-items:center;overflow:hidden;text-align:center;background:#12100e;border:1px solid #2f2b26;border-radius:12px;color:#efe9de}
+.tile span{font:600 22px/1.1 var(--serif);letter-spacing:-.03em}
+.tile .dot{color:var(--gold)}
+.tile-card{width:min(280px,100%);aspect-ratio:63/88}
+.tile-sealed{width:64px;aspect-ratio:1/1;flex:none}
+.tile-logo{width:min(220px,100%);aspect-ratio:5/2}
+.tile-row{width:56px;aspect-ratio:63/88;flex:none}
+.tile-row span,.tile-sealed span{font-size:9px}
+.tile-logo span{font-size:16px}
+.row .tile,.row .shot{flex:none}
+.shot{width:min(280px,100%);height:auto;border-radius:16px;background:#12100e;display:block}
+.row .shot{width:48px;height:auto;border-radius:8px;object-fit:contain}
 .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:44px;align-items:center;min-width:0;max-width:100%}
 .row a{color:var(--txt);text-decoration:none;min-width:0;flex:1;overflow-wrap:anywhere}
 .row b{overflow-wrap:anywhere}
@@ -1074,6 +1087,10 @@ function html(s){
   });
 }
 let rows=[], shown=48, setLogo="";
+let catImages={};
+${cataloguePath.toString()}
+${catalogueUrl.toString()}
+${brandedTile.toString()}
 function draw(){
   const kind=document.getElementById("kind").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
@@ -1085,8 +1102,7 @@ function draw(){
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
     const src=pictureSrc(r, setLogo);
-    const crop=cropStyle(r&&r.crop);
-    const img=src?'<img alt="" width="64" height="64" style="width:64px;height:64px;'+(crop?crop:"object-fit:contain")+';border-radius:8px;background:#211e1a" src="'+String(src).replace(/"/g,"")+'">':'<span class="muted">The picture is missing.</span>';
+    const img=src?'<img alt="" width="48" height="67" style="width:48px;height:auto;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'">':brandedTile(r&&r.kind==="sealed"?"sealed":"row");
     return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
   }).join("") || '<p class="muted">Nothing matches.</p>';
   document.getElementById("more").hidden=shown>=list.length;
@@ -1094,12 +1110,7 @@ function draw(){
 function pictureSrc(row, logo){
   if(!row || typeof row!=="object") return "";
   if(row.icon) return "";
-  const image=typeof row.image==="string"?row.image.trim():"";
-  const scan=typeof row.scan==="string"?row.scan.trim():"";
-  const src=image||scan;
-  if(!src) return "";
-  if(logo && src===String(logo)) return "";
-  return src;
+  return catalogueUrl(cataloguePath(catImages, row.id));
 }
 function cropStyle(crop){
   if(!crop || typeof crop!=="object") return "";
@@ -1110,12 +1121,18 @@ function cropStyle(crop){
   if(!Number.isFinite(x)||!Number.isFinite(y)||!(w>0)||!(h>0)) return "";
   return "object-fit:none;object-position:-"+x+"px -"+y+"px;width:"+w+"px;height:"+h+"px";
 }
-fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0; return r.json()}).then(data=>{
+fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0; return r.json()}).then(async function(data){
+  try{
+    var cres=await fetch("/data/catalogue-images.json");
+    var doc=cres.ok?await cres.json():{};
+    catImages=(doc&&doc.images)||{};
+  }catch(e){ catImages={}; }
   document.getElementById("title").textContent=data.name;
-  setLogo=typeof data.logo==="string"?data.logo:"";
+  setLogo="";
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
-  document.getElementById("lines").innerHTML=(data.logo?'<img alt="" width="120" height="48" src="'+String(data.logo).replace(/"/g,"")+'" style="height:48px;width:auto;background:#211e1a;border-radius:8px">':"")+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
+  var logoSrc=catalogueUrl(cataloguePath(catImages, slug));
+  document.getElementById("lines").innerHTML=(logoSrc?'<img alt="" width="160" height="64" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:64px;width:auto;background:#12100e;border-radius:8px">':brandedTile("logo"))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
   document.getElementById("charts").innerHTML='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div><div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
   document.getElementById("single-chart").setAttribute("data-chart", JSON.stringify(data.singleIndex||[]));
   document.getElementById("sealed-chart").setAttribute("data-chart", JSON.stringify(data.sealedIndex||[]));
@@ -1222,11 +1239,7 @@ export function renderCard(card, stamp, opts = {}) {
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
-  const img = card.pid
-    ? `<img alt="${esc(card.name)}" width="320" height="320" src="https://tcgplayer-cdn.tcgplayer.com/product/${Number(card.pid)}_in_400x400.jpg" style="width:min(320px,100%);height:auto;border-radius:16px;background:#211e1a" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'No stock image'}))">`
-    : (card.scan && String(card.scan).startsWith("https://images.pokemontcg.io/")
-      ? `<img alt="${esc(card.name)}" width="320" height="446" src="${esc(card.scan)}" style="width:min(280px,100%);height:auto;border-radius:16px;background:#211e1a" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'No stock image'}))">`
-      : `<div class="ph">No stock image</div>`);
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name);
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const body = `<main class="wrap">
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
@@ -1289,7 +1302,7 @@ export function renderArtist(doc, stamp, opts = {}) {
   if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp, "", feedNav(opts));
   const top = (doc.cards || []).slice(0, 12);
   const rest = (doc.cards || []).slice(12);
-  const row = (c) => `<div class="row">${c.pid ? `<img alt="" width="48" height="48" src="https://tcgplayer-cdn.tcgplayer.com/product/${Number(c.pid)}_in_200x200.jpg" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a" onerror="this.remove()">` : ""}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
+  const row = (c) => `<div class="row">${imageTag(c.catalogueSrc || "", c.kind === "sealed" ? "sealed" : "row", "")}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
   const body = `<main class="wrap"><h1>${esc(doc.name)}</h1>
 ${chartBox(doc.index || [], "Artist index, chain-linked")}
 <p class="muted">${esc(doc.source || "")}</p>
@@ -1310,9 +1323,9 @@ export function renderMovers(doc, stamp, opts = {}) {
   };
   const row = (r, withSpark) => {
     const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
-    const img = r.image ? `<img alt="" width="48" height="48" src="${esc(r.image)}" onerror="this.remove()">` : "";
+    const face = imageTag(r.catalogueSrc || "", r.kind === "sealed" ? "sealed" : "row", "");
     const line = withSpark ? spark(r.hist) : "";
-    return `<div class="row mover">${img}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
+    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
@@ -1649,7 +1662,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
-  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px;-webkit-user-drag:none;user-select:none}
+  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
+  .feed-card>.tile{width:min(200px,72%);margin:0 auto}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
@@ -2016,14 +2030,12 @@ function meansCopy(card){
   const line=moveLine(card);
   return line?[line]:[];
 }
+let catalogueImages=null;
+${cataloguePath.toString()}
+${catalogueUrl.toString()}
+${brandedTile.toString()}
 function logoFor(card){
-  if(card.logo) return String(card.logo);
-  const sets=(meta&&meta.sets)||[];
-  for(let i=0;i<sets.length;i++){
-    const s=sets[i];
-    if(s && (s.name===card.set || (card.setSlug && s.slug===card.setSlug)) && s.logo) return s.logo;
-  }
-  return "";
+  return catalogueUrl(cataloguePath(catalogueImages, card&&card.id))||"";
 }
 function placeholder(setName){
   const ph=document.createElement("div");
@@ -2032,13 +2044,22 @@ function placeholder(setName){
   return ph;
 }
 function photoEl(card){
-  const src=card&&card.image?String(card.image):"";
-  if(!src) return null;
+  const kind=card&&card.kind==="sealed"?"sealed":"card";
+  const url=catalogueUrl(cataloguePath(catalogueImages, card&&card.id));
+  if(!url){
+    const box=document.createElement("div");
+    box.innerHTML=brandedTile(kind);
+    return box.firstChild;
+  }
   const img=document.createElement("img");
   img.alt="";
-  img.src=src;
+  img.src=url;
   img.draggable=false;
-  img.onerror=function(){ img.remove(); };
+  img.onerror=function(){
+    const next=document.createElement("div");
+    next.innerHTML=brandedTile(kind);
+    img.replaceWith(next.firstChild);
+  };
   return img;
 }
 function monthDay(iso){
@@ -3046,6 +3067,10 @@ async function showFlat(index, dir){
   commitReadUrl(row);
 }
 async function boot(){
+  try{
+    const doc=await (await fetch("/data/catalogue-images.json")).json();
+    catalogueImages=doc&&doc.images||null;
+  }catch(e){ catalogueImages=null; }
   const back=document.getElementById("feed-back");
   if(back) back.onclick=function(ev){
     if(sessionStorage.getItem("feed-spot") && history.length>1){ ev.preventDefault(); history.back(); }

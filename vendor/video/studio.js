@@ -112,6 +112,33 @@ async function boot() {
   render();
 }
 
+async function loadCatalogueImages() {
+  try {
+    const res = await fetch("/data/catalogue-images.json");
+    if (!res.ok) return {};
+    const doc = await res.json();
+    return (doc && doc.images) || {};
+  } catch {
+    return {};
+  }
+}
+
+function catalogueImageUrl(map, id) {
+  const raw = map && map[id];
+  if (typeof raw !== "string") return "";
+  const path = raw.trim().split(/[?#]/)[0];
+  if (!/^(?:\/img\/|\/cards\/|\/thumb\/)/.test(path) || path.includes("..")) return "";
+  const m = path.match(/^\/(?:img|thumb)\/([A-Za-z0-9]+)\/([A-Za-z0-9._-]+)$/);
+  if (m) {
+    const file = /\.[A-Za-z0-9]+$/.test(m[2]) ? m[2] : m[2] + "_hires.png";
+    return "/data/editor/tcg/" + m[1] + "/" + file;
+  }
+  if (/^\/cards\/[A-Za-z0-9._/-]+$/.test(path)) {
+    return "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets" + path;
+  }
+  return "";
+}
+
 async function loadLive() {
   try {
     const [liteRes, countsRes] = await Promise.all([
@@ -122,6 +149,7 @@ async function loadLive() {
     const lite = await liteRes.json();
     const counts = countsRes.ok ? await countsRes.json() : {};
     const date = String(counts.asOf || "").slice(0, 10);
+    const map = await loadCatalogueImages();
     const rows = [];
     for (const row of lite) {
       if (!row || row[5] !== "single") continue;
@@ -134,7 +162,7 @@ async function loadLive() {
         rarity: row[8] || "",
         usd: typeof row[6] === "number" && row[6] > 0 ? row[6] : undefined,
         date,
-        image: "/api/card-img?pid=" + String(row[0]).replace(/\D/g, ""),
+        image: catalogueImageUrl(map, row[0]),
       }, null, date);
       if (card) rows.push(card);
     }
@@ -419,6 +447,24 @@ function drawAt(t) {
     ctx.drawImage(img, frame.x, frame.y, frame.iw, frame.ih);
   } else if (img && state.layout === "split") {
     ctx.drawImage(img, w * 0.46, frame.y, frame.iw * 0.7, frame.ih * 0.7);
+  } else {
+    const x = state.layout === "split" ? w * 0.46 : frame.x;
+    const iw = state.layout === "split" ? frame.iw * 0.7 : frame.iw;
+    const ih = state.layout === "split" ? frame.ih * 0.7 : frame.ih;
+    ctx.fillStyle = "#12100e";
+    ctx.fillRect(x, frame.y, iw, ih);
+    ctx.strokeStyle = "#2f2b26";
+    ctx.strokeRect(x + 0.5, frame.y + 0.5, iw - 1, ih - 1);
+    const label = "Catch'em";
+    ctx.font = "600 28px Georgia, serif";
+    ctx.textAlign = "left";
+    const tw = ctx.measureText(label).width;
+    const start = x + Math.max(8, (iw - tw - 10) / 2);
+    ctx.fillStyle = "#efe9de";
+    ctx.fillText(label, start, frame.y + ih / 2);
+    ctx.fillStyle = "#d9b779";
+    ctx.fillText(".", start + tw, frame.y + ih / 2);
+    ctx.textAlign = "center";
   }
   drawFace(ctx, w, h);
   const lines = String(sc.onScreen || "").split("\n").filter(Boolean);
