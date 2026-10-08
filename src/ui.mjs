@@ -1096,6 +1096,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 img,svg{max-width:100%}
 .filters input,.filters select{max-width:100%;min-width:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:12px}
+.set-date{white-space:nowrap}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .filters input,.filters select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 10px;font:15px var(--sans)}
 button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);cursor:pointer}
@@ -1225,7 +1226,9 @@ ${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => 
     const face = /^https:\/\//.test(String(s.logo || ""))
       ? `<img class="shot" alt="" width="160" height="64" loading="lazy" decoding="async" src="${esc(s.logo)}">`
       : brandedTile("logo", { kind: "set", name: s.name });
-    return `<a class="card" href="/sets/${esc(s.slug)}">${face}<b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${s.release ? ` · ${esc(s.release)}` : ""}</p></a>`;
+    const when = priceDay(s.release);
+    const date = when ? ` · <span class="set-date">${esc(when)}</span>` : "";
+    return `<a class="card" href="/sets/${esc(s.slug)}">${face}<b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${date}</p></a>`;
   }).join("")}</div>`).join("")}
 </main>`;
   return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
@@ -1237,7 +1240,7 @@ export function renderSetShell(slug, stamp, opts = {}) {
 <div class="filters"><select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><div id="list"></div><button id="more" type="button">Show more</button></main>
+</div><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
@@ -1267,6 +1270,12 @@ function miss(img){
   d.innerHTML=brandedTile(kind,{kind:img.getAttribute("data-kind"),name:img.alt,logo:typeof setLogo==="string"?setLogo:""});
   if(d.firstChild) img.replaceWith(d.firstChild);
 }
+function rowHtml(r){
+  const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
+  const src=pictureSrc(r, setLogo);
+  const img=src?'<img alt="'+html(r.name)+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
+  return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
+}
 function draw(){
   const kind=document.getElementById("kind").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
@@ -1274,14 +1283,26 @@ function draw(){
   let list=rows.filter(r=>!kind||r.kind===kind);
   if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
-  const view=list.slice(0, shown);
-  document.getElementById("list").innerHTML=view.map(r=>{
-    const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
-    const src=pictureSrc(r, setLogo);
-    const img=src?'<img alt="'+html(r.name)+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
-    return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
-  }).join("") || '<p class="muted">Nothing matches.</p>';
-  document.getElementById("more").hidden=shown>=list.length;
+  const main=list.filter(r=>!r.section);
+  const order=[];
+  const grouped={};
+  list.forEach(function(r){
+    if(!r.section) return;
+    if(!grouped[r.section]){ grouped[r.section]=[]; order.push(r.section); }
+    grouped[r.section].push(r);
+  });
+  const view=main.slice(0, shown);
+  document.getElementById("list").innerHTML=view.map(rowHtml).join("") || (order.length?"":'<p class="muted">Nothing matches.</p>');
+  document.getElementById("sections").innerHTML=order.map(function(name){
+    const id=String(name).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+    const cards=grouped[name];
+    return '<h2 id="'+id+'" class="set-section">'+html(name)+'</h2><p class="muted">'+cards.length+' cards</p>'+cards.map(rowHtml).join("");
+  }).join("");
+  document.getElementById("more").hidden=shown>=main.length;
+  if(location.hash.length>1){
+    var el=document.getElementById(location.hash.slice(1));
+    if(el) el.scrollIntoView({block:"start"});
+  }
 }
 function pictureSrc(row, logo){
   if(!row || typeof row!=="object") return "";
