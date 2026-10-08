@@ -62,6 +62,7 @@ export function productTypeLabel(row) {
   const kind = String(row && row.kind || "").toLowerCase();
   const blob = (String(row && row.subtype || "") + " " + String(row && row.name || "")).toLowerCase();
   if (kind === "logo" || kind === "set") return "Set";
+  if (/\bcase\b/.test(blob)) return "Case";
   if (/\bupc\b|ultra-premium|ultra premium/.test(blob)) return "UPC";
   if (/\betb\b|elite trainer/.test(blob)) return "ETB";
   if (/mini tin/.test(blob)) return "Mini Tin";
