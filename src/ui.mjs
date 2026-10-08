@@ -98,6 +98,42 @@ export function isShapeRow(row) {
   return false;
 }
 
+// A sealed product already filed under Dive, or a row whose kind is sealed.
+// The Sealed chip uses these rows. It does not invent a sealed price.
+export function isSealedProductRow(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.kind === "sealed") return true;
+  if (row.readKind !== "dive" && row.kind !== "dive") return false;
+  const name = String(row.name || "");
+  return /booster box|booster pack|booster bundle|elite trainer box|ultra[- ]premium|build & battle|premium collection/i.test(name);
+}
+
+// The line under the title keeps the product name. A spread already on the row
+// is said as an asking range. No price is rounded except that spread, and the
+// dollars come from the receipt. The first word is a capital.
+export function shownRead(card) {
+  if (!card || typeof card !== "object") return "";
+  const name = String(card.name || "").trim();
+  const raw = String(card.path || card.headline || "").trim();
+  const path = isVolumeRow(card) || isShapeRow(card) ? raw : withoutSoldClaim(raw);
+  if (!path) return "";
+  let line = path;
+  if ((card.readKind === "spread" || card.kind === "spread") && isShapeRow(card)) {
+    const low = Number(card.receipt && card.receipt.low);
+    const high = Number(card.receipt && card.receipt.high);
+    if (low > 0 && high > 0) {
+      const dollars = (n) => "$" + Math.round(n).toLocaleString("en-US");
+      line = name
+        ? "Asks on eBay for " + name + " range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales)."
+        : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales).";
+    }
+  }
+  line = line.replace(/^[,.\s]+/, "").trim();
+  if (name && line && !line.includes(name)) line = name + ": " + line;
+  if (!line) return "";
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
 export function soldSafeText(row, text) {
   return isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
 }
@@ -382,11 +418,6 @@ function newsPlace(item, name) {
   return "";
 }
 
-function isNewReveal(item) {
-  const title = String(item.title || "") + " " + String(item.titleEn || "");
-  return /\breveal(?:ed|s|ing)?\b/i.test(title);
-}
-
 function releaseInNextTwoWeeks(item, asOf) {
   const year = Number(String(asOf).slice(0, 4));
   const text = [item.title, item.titleEn, item.sentence, item.setDate, item.statedDate].filter(Boolean).join(" ");
@@ -424,7 +455,7 @@ export function newsSlice(doc) {
     const name = newsEnglishName(item);
     if (!name) continue;
     const older = date < cut;
-    if (older && !isNewReveal(item) && !releaseInNextTwoWeeks(item, asOf)) continue;
+    if (older && !releaseInNextTwoWeeks(item, asOf)) continue;
     seen.add(href);
     const row = {
       id: href,
@@ -656,7 +687,6 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     if (hideFacts && isFactRow(row)) return;
     if (filter === "pokemon" && !isFactRow(row)) return;
     if (filter === "prices" && (isFactRow(row) || isOutlierRow(row) || isDiveRow(row) || row.readKind === "news" || row.readKind === "wave" || !(Number(row.price) > 0))) return;
-    if (filter === "sealed" && row.kind !== "sealed") return;
     if (filter === "set" && setName && row.set !== setName) return;
     if (filter === "news" && row.readKind !== "news" && row.kind !== "news") return;
     if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
@@ -695,6 +725,12 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     for (const row of shapeReads(browse, kept, filter)) push(row);
     return out;
   }
+  if (filter === "sealed") {
+    for (const row of diveReads(browse, kept)) if (isSealedProductRow(row)) push(row);
+    for (const row of kept) if (row && row.kind === "sealed") push(row);
+    return out;
+  }
+  if (filter === "set" && !setName) return [];
   // The short front is the reads already on this bundle. It is not the whole
   // file. Unranked ids follow in the shuffled order the file already stored.
   // News, wave, flagged, dive, and volume rows already in the files are mixed in.
@@ -1587,9 +1623,13 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
   #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px}
-  .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 0;margin:0}
+  .chip-scroller{position:relative}
+  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:0;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
+  .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 48px 8px 0;margin:0;scrollbar-width:none}
   .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
+  .chip-more{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:5;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--gold);font:600 28px/1 var(--sans)}
+  .chip-more[hidden]{display:none}
   .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .set-picker{display:flex;flex-direction:column;gap:8px}
   .set-picker[hidden]{display:none}
@@ -1659,7 +1699,10 @@ ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/
 <p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Waves & reprints</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
+  <div class="chip-scroller">
   <div class="chip-row" role="toolbar" aria-label="Filter"></div>
+  <button type="button" class="chip-more" aria-label="More filters" hidden>›</button>
+  </div>
   <div id="set-picker" class="set-picker" hidden>
     <input id="set-q" aria-label="Find a set" placeholder="Find a set" autocomplete="off">
     <div id="set-hits" class="set-hits" role="listbox"></div>
@@ -1919,11 +1962,13 @@ ${isVolumeRow.toString()}
 ${shapeCash.toString()}
 const SHAPE_KINDS=${JSON.stringify(SHAPE_KINDS)};
 ${isShapeRow.toString()}
+${isSealedProductRow.toString()}
+${shownRead.toString()}
 ${cardIdentity.toString()}
 function moveLine(card){
-  const path=isVolumeRow(card)||isShapeRow(card)?String(card.path||"").trim():withoutSoldClaim(String(card.path||"").trim());
+  const path=String(card&&(card.path||card.headline)||"").trim();
   if(!path) return "";
-  return readUnderTitle(card.name, path);
+  return shownRead(card);
 }
 function watchDay(iso){
   const t=Date.parse(String(iso||"").slice(0,10)+"T00:00:00Z");
@@ -1952,21 +1997,12 @@ function placeholder(setName){
   return ph;
 }
 function photoEl(card){
-  const logo=logoFor(card);
-  const setName=card.set||"Pokémon";
-  const src=card.image?String(card.image):"";
-  if(!src && !logo) return placeholder(setName);
+  const src=card&&card.image?String(card.image):"";
+  if(!src) return null;
   const img=document.createElement("img");
   img.alt="";
-  img.src=src||logo;
-  img.onerror=function(){
-    if(logo && img.getAttribute("data-logo")!=="1"){
-      img.setAttribute("data-logo","1");
-      img.src=logo;
-      return;
-    }
-    img.replaceWith(placeholder(setName));
-  };
+  img.src=src;
+  img.onerror=function(){ img.remove(); };
   return img;
 }
 function monthDay(iso){
@@ -2012,7 +2048,7 @@ function waveEl(card){
   const el=document.createElement("article");
   el.className="feed-card";
   el.id="r-"+card.id;
-  const line=readUnderTitle(card.name, card.path||card.headline||"");
+  const line=shownRead(card);
   const ident=cardIdentity(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
   el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
@@ -2104,7 +2140,10 @@ function cardEl(card, facts){
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
-    else el.insertBefore(photoEl(card), el.firstChild);
+    else {
+      const photo=photoEl(card);
+      if(photo) el.insertBefore(photo, el.firstChild);
+    }
     el.addEventListener("click", function(ev){
     if(el.dataset.swipe==="1"){ el.dataset.swipe=""; return; }
       const node=ev["tar"+"get"];
@@ -2141,7 +2180,8 @@ function cardEl(card, facts){
   const voteLabel="Where's it heading?";
   const dmLine="We'll DM you on Discord.";
   el.innerHTML=head+diveLink+'<section class="data-block"><h4>The data</h4><div class="slot"></div>'+bits.join("")+(extra?"<p>"+extra+"</p>":"")+'</section><button type="button" data-act="track">Track</button><div class="vote-block"><p class="vote-q">'+voteLabel+'</p><div class="feed-acts"><button type="button" data-vote="up">Up</button><button type="button" data-vote="sideways">Sideways</button><button type="button" data-vote="down">Down</button></div><p class="vote muted"></p></div><form class="track-sheet"><p>'+dmLine+'</p><label><input type="checkbox" data-opt="price" checked> Price moves 10% either way</label>'+supplyBox+'<button type="button" data-act="custom">Customize</button><div class="custom" hidden><input name="pct" inputmode="decimal" aria-label="Percent" placeholder="Percent" value="10"><input name="price" inputmode="decimal" aria-label="Price" placeholder="Price"><select name="direction" aria-label="Which way"><option value="either">Either way</option><option value="up">Up</option><option value="down">Down</option></select>'+supplyFields+'</div><button type="submit">Save</button><p class="sheet-note muted"></p></form>';
-  el.insertBefore(photoEl(card), el.firstChild);
+  const readPhoto=photoEl(card);
+  if(readPhoto) el.insertBefore(readPhoto, el.firstChild);
   const slot=el.querySelector(".slot");
   if(card.hist && slot) slot.appendChild(chart(card.hist, src));
   const sheet=el.querySelector(".track-sheet");
@@ -2584,12 +2624,11 @@ function accepts(card){
   if(!card || card.skip) return false;
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
-  if(loopFilter==="sealed") return card.kind==="sealed" && Number(card.price)>0;
+  if(loopFilter==="sealed") return isSealedProductRow(card);
   if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
-    const name=wantedSet;
-    if(!name) return Number(card.price)>0;
-    return card.set===name && Number(card.price)>0;
+    if(!wantedSet) return false;
+    return card.set===wantedSet && Number(card.price)>0;
   }
   if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
   if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
@@ -2636,6 +2675,17 @@ function buildFlat(){
   }
   if(loopFilter==="pokemon"){
     leadRows().forEach(function(r){ if(isFact(r)) add(r); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="sealed"){
+    const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+    (items||[]).forEach(function(row){ if(isSealedProductRow(row)) add(row); });
+    leadRows().forEach(function(r){ if(r && r.kind==="sealed") add(r); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="set" && !wantedSet){
     flat=rows;
     return;
   }
@@ -2768,6 +2818,7 @@ async function showFlat(index){
     stage.appendChild(row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row)));
   }
   else {
+    if(loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)) return;
     const p=document.createElement("p");
     p.className="muted";
     const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
@@ -2858,14 +2909,42 @@ async function boot(){
     const picker=document.getElementById("set-picker");
     const setQ=document.getElementById("set-q");
     const chipRow=document.querySelector("#feed-loop-form .chip-row");
+    const chipMore=document.querySelector("#feed-loop-form .chip-more");
     function knownFilter(f){
       if(!loop) return "";
       return Array.prototype.some.call(loop.options, function(o){ return o.value===f; }) ? f : "";
+    }
+    function sealedAvailable(){
+      const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
+      if((items||[]).some(function(row){ return isSealedProductRow(row); })) return true;
+      return leadRows().some(function(r){ return r && r.kind==="sealed"; });
+    }
+    function fitChips(){
+      if(!chipRow) return;
+      const buttons=chipRow.querySelectorAll("button");
+      const left=chipRow.scrollLeft;
+      const right=left+chipRow.clientWidth;
+      let partial=null;
+      for(let i=0;i<buttons.length;i++){
+        const b=buttons[i];
+        const bLeft=b.offsetLeft;
+        const bRight=bLeft+b.offsetWidth;
+        if(bLeft>=left-1 && bLeft<right-8 && bRight>right+1){ partial=b; break; }
+      }
+      const overflow=chipRow.scrollWidth>chipRow.clientWidth+8;
+      const scroller=chipRow.parentElement;
+      if(scroller){
+        scroller.classList.toggle("can-scroll", overflow);
+        const cover=partial ? Math.min(chipRow.clientWidth-44, Math.ceil(right-partial.offsetLeft)+6) : 48;
+        scroller.style.setProperty("--chip-fade", (overflow ? cover : 0)+"px");
+      }
+      if(chipMore) chipMore.hidden=!overflow;
     }
     function paintChips(){
       if(!chipRow||!loop) return;
       chipRow.textContent="";
       Array.prototype.forEach.call(loop.options, function(opt){
+        if(opt.value==="sealed" && !sealedAvailable()) return;
         const b=document.createElement("button");
         b.type="button";
         b.dataset.value=opt.value;
@@ -2874,7 +2953,22 @@ async function boot(){
         b.onclick=function(){ applyFilter(opt.value, setSel ? setSel.value : "", true); };
         chipRow.appendChild(b);
       });
+      fitChips();
+      requestAnimationFrame(function(){ fitChips(); });
     }
+    if(chipMore) chipMore.onclick=function(){
+      if(!chipRow) return;
+      const buttons=chipRow.querySelectorAll("button");
+      const right=chipRow.scrollLeft+chipRow.clientWidth;
+      for(let i=0;i<buttons.length;i++){
+        if(buttons[i].offsetLeft+buttons[i].offsetWidth>right-4){
+          chipRow.scrollTo({left:Math.max(0, buttons[i].offsetLeft), behavior:"smooth"});
+          return;
+        }
+      }
+    };
+    if(chipRow) chipRow.addEventListener("scroll", function(){ fitChips(); });
+    window.addEventListener("resize", function(){ fitChips(); });
     function fillSetHits(q){
       const box=document.getElementById("set-hits");
       if(!box||!setSel) return;

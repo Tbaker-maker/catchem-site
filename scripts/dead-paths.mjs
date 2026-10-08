@@ -1,7 +1,8 @@
 // A linked path this worker cannot serve fails the check.
 // `node scripts/dead-paths.mjs https://host` exits 1 if any fetched path is dead.
-// It follows same-origin HTML links and every set slug in sets.json. It does not
-// walk the whole card catalog.
+// It follows same-origin HTML links, literal fetch() URLs inside scripts, and
+// every set slug in sets.json. It does not walk the whole card catalog.
+// A fetch built with + or ${} is a template, not a path.
 
 const STATIC = new Set([
   "/",
@@ -28,14 +29,66 @@ export function localPaths(html) {
   return [...out];
 }
 
+// Literal fetch("…") / fetch('…') / fetch(`…`) and assetUrl("…") calls.
+// A string closed and then concatenated is a template and is skipped.
+export function scriptFetchPaths(html) {
+  const text = String(html || "");
+  const out = new Set();
+  const re = /fetch\(\s*(["'`])([^"'`]+)\1/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const after = text.slice(m.index + m[0].length, m.index + m[0].length + 12);
+    if (/^\s*\+/.test(after)) continue;
+    let href = m[2].trim();
+    if (!href || href.includes("${") || href.includes("+")) continue;
+    if (/^https?:\/\//i.test(href)) {
+      out.add(href.split("#")[0]);
+      continue;
+    }
+    if (!href.startsWith("/") || href.startsWith("//")) continue;
+    const path = href.split("#")[0].split("?")[0];
+    if (!path || !/^\/[A-Za-z0-9._~%-]+(?:\/[A-Za-z0-9._~%-]+)*$/.test(path)) continue;
+    out.add(path);
+  }
+  const assetRe = /assetUrl\(\s*(["'])([^"']+)\1\s*\)/g;
+  while ((m = assetRe.exec(text))) {
+    const rel = m[2].trim();
+    if (!rel || rel.includes("+") || rel.includes("${")) continue;
+    out.add("asset:" + rel.split("#")[0]);
+  }
+  return [...out];
+}
+
 export function deadLocals(paths, pageKind) {
   const dead = [];
   for (const path of paths || []) {
+    if (typeof path !== "string") continue;
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("asset:")) continue;
     if (STATIC.has(path)) continue;
+    if (path.startsWith("/api/") || path.startsWith("/auth/") || path.startsWith("/data/")) continue;
     if (typeof pageKind === "function" && pageKind(path)) continue;
     dead.push(path);
   }
   return dead;
+}
+
+function scriptTargets(html, origin) {
+  const next = [];
+  const raw = String(html || "").match(/https:\/\/raw\.githubusercontent\.com\/[^"'\\\s]+/);
+  for (const item of scriptFetchPaths(html)) {
+    if (item.startsWith("asset:")) {
+      const rel = item.slice("asset:".length).replace(/^\//, "");
+      if (raw) next.push(raw[0] + rel);
+      else next.push(new URL("/" + rel, origin).href);
+      continue;
+    }
+    if (item.startsWith("http://") || item.startsWith("https://")) {
+      next.push(item);
+      continue;
+    }
+    next.push(new URL(item, origin).href);
+  }
+  return next;
 }
 
 async function crawl(base) {
@@ -73,10 +126,13 @@ async function crawl(base) {
       continue;
     }
     const type = res.headers.get("content-type") || "";
-    if (!type.includes("text/html")) continue;
+    if (!type.includes("text/html") && !type.includes("javascript")) continue;
     const html = await res.text();
     for (const path of localPaths(html)) {
       const next = new URL(path, origin).href;
+      if (!seen.has(next)) queue.push(next);
+    }
+    for (const next of scriptTargets(html, origin)) {
       if (!seen.has(next)) queue.push(next);
     }
   }
