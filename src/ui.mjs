@@ -432,6 +432,89 @@ function releaseInNextTwoWeeks(item, asOf) {
   return false;
 }
 
+function newsText(item) {
+  return [item && item.title, item && item.titleEn, item && item.sentence, item && item.source, item && item.url].filter(Boolean).join(" ");
+}
+
+// The Feed only carries Pokémon TCG: sets, products, reprints, events, and organized play.
+// Pokémon GO, video games, and anime stay out unless the same item also has a TCG angle.
+function isTcgNews(item) {
+  const text = newsText(item);
+  const source = String(item && item.source || "");
+  const tcg = /pok[eé]mon\s+tcg|\btcg\b|trading card|ポケカ|ポケモンカード|tcg pocket|elite trainer|boosters?|build & battle|build and battle|illustration rare|prerelease|pre-release|promo card|card game|deluxe pack|delta reign|pok[eé]mon card|カードゲーム|チャンピオンズリーグ|champions league|cards?\s+revealed|\breprints?\b/i;
+  if (tcg.test(text)) return true;
+  if (/^Pokémon Card \((Japan|Asia)\)$/.test(source.trim())) return true;
+  const other = /pok[eé]mon go|\bgo pass\b|masters ex|pok[eé]mon masters|pok[eé]mon unite|\bunite license\b|pok[eé]mon sleep|tera raid|pok[eé]mon legends|pok[eé]mon horizons|\banime\b|\bepisode\b|pok[eé]mon champions|caf[eé] remix|pokopia|\bwordle\b|starbucks|sponge cake|terrarium|\bmerch\b|merchandise|\bplush\b|lego pok[eé]mon|\bvgc\b|video game championships|scarlet & violet/i;
+  if (other.test(text)) return false;
+  if (source.trim() === "Play! Pokémon") return true;
+  return false;
+}
+
+const NEWS_DAY_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function newsPrettyDay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const months = NEWS_DAY_MONTHS;
+  const build = (y, m, d) => {
+    const dt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    if (dt.getUTCFullYear() !== Number(y) || dt.getUTCMonth() !== Number(m) - 1 || dt.getUTCDate() !== Number(d)) return "";
+    return months[Number(m) - 1] + " " + Number(d) + ", " + y;
+  };
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (m) return build(m[1], m[2], m[3]);
+  m = /^(\d{4})\.(\d{1,2})\.(\d{1,2})/.exec(raw);
+  if (m) return build(m[1], m[2], m[3]);
+  m = /^(\d{1,2})-(\d{1,2})-(\d{4})/.exec(raw);
+  if (m) return build(m[3], m[2], m[1]);
+  return raw;
+}
+
+function newsTwoSentences(text) {
+  const src = String(text || "").replace(/\s+/g, " ").trim();
+  if (!src) return "";
+  const parts = [];
+  let buf = "";
+  for (let i = 0; i < src.length; i++) {
+    const c = src.charAt(i);
+    buf += c;
+    if ((c === "." || c === "!" || c === "?") && (i + 1 === src.length || src.charAt(i + 1) === " ")) {
+      parts.push(buf.trim());
+      buf = "";
+      if (src.charAt(i + 1) === " ") i++;
+      if (parts.length === 2) return parts.join(" ");
+    }
+  }
+  if (buf.trim()) parts.push(buf.trim());
+  return parts.join(" ");
+}
+
+function newsSummary(name, sentence) {
+  const text = newsTwoSentences(sentence);
+  if (!text) return "";
+  const bare = (s) => String(s || "").replace(/[.!?]+$/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  if (bare(text) === bare(name)) return "";
+  return text;
+}
+
+function newsDetails(item, asOf) {
+  const out = [];
+  const push = (label, value) => {
+    const v = newsPrettyDay(value);
+    if (!v) return;
+    if (out.some((row) => row.label === label && row.value === v)) return;
+    out.push({ label, value: v });
+  };
+  if (item.product) push("Product", item.product);
+  if (item.set) push("Set", item.set);
+  if (item.wave) push("Wave", item.wave);
+  if (item.setDate) push("Set date", item.setDate);
+  const article = newsPrettyDay(asOf);
+  const stated = newsPrettyDay(item.statedDate);
+  if (stated && stated !== article && !out.some((row) => row.value === stated)) push("Date", item.statedDate);
+  return out;
+}
+
 // A short slice of an item already in the news file. No headline, date, or link is added.
 export function newsSlice(doc) {
   const root = Array.isArray(doc) ? { items: doc } : (doc && typeof doc === "object" ? doc : null);
@@ -456,6 +539,7 @@ export function newsSlice(doc) {
     if (translationUncertain(item)) continue;
     const name = newsEnglishName(item);
     if (!name) continue;
+    if (!isTcgNews(item)) continue;
     const older = date < cut;
     if (older && !releaseInNextTwoWeeks(item, asOf)) continue;
     seen.add(href);
@@ -473,6 +557,12 @@ export function newsSlice(doc) {
     else if (nonEnglishTitle(item.title)) row.originalTitle = String(item.title || "").trim();
     const place = newsPlace(item, name);
     if (place) row.place = place;
+    const dayLabel = newsPrettyDay(date);
+    if (dayLabel) row.dayLabel = dayLabel;
+    const summary = newsSummary(name, item.sentence);
+    if (summary) row.summary = summary;
+    const details = newsDetails(item, date);
+    if (details.length) row.details = details;
     out.push(row);
   }
   out.sort((a, b) => (a.asOf < b.asOf ? 1 : a.asOf > b.asOf ? -1 : (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)));
@@ -1864,6 +1954,20 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
   .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
   .feed-card>.news-tile{width:100%;height:220px;margin:0}
+  .feed-card.news-card{flex:0 0 auto;gap:10px;margin:0}
+  .feed-card.news-card>.news-tile{height:112px;padding:12px 14px}
+  .feed-card.news-card>.news-tile .mark{font-size:18px}
+  .feed-card.news-card>.news-tile .src{font-size:20px}
+  .news-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+  .news-kicker .k{font:600 12px/1 var(--sans);letter-spacing:.08em;color:var(--gold)}
+  .news-kicker .tag{font:600 12px/1 var(--sans);color:#1a1407;background:var(--gold);border-radius:999px;padding:4px 8px}
+  .news-card h3{font:600 20px/1.3 var(--serif)}
+  .news-sum{margin:0;font:400 15px/1.45 var(--sans)}
+  .news-meta{list-style:none;margin:0;padding:10px 12px;background:#211e1a;border-radius:12px;display:flex;flex-direction:column;gap:4px}
+  .news-meta li{margin:0;font:500 14px/1.35 var(--sans);color:var(--dim)}
+  .news-meta b{color:var(--gold);font-weight:600}
+  .news-by{margin:0;color:var(--dim);font:500 14px/1.3 var(--sans)}
+  .news-go{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
@@ -1917,8 +2021,15 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   }
   .pile{overflow:hidden}
   .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
+  .feed-stage.is-news{min-height:0;max-height:calc(100dvh - 348px)}
+  .feed-stage.is-news .read-pos,.feed-stage.is-news .news-bar{flex:0 0 auto}
+  .feed-stage.is-news .feed-slide{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto}
   .feed-stage .feed-card{flex:1 1 auto}
-  .feed-stage .feed-card.fact-card{flex:0 0 auto;width:100%}
+  .feed-stage .feed-card.fact-card,.feed-stage.is-news .feed-card{flex:0 0 auto;width:100%}
+  .news-bar{position:static;z-index:4;background:var(--bg);padding:8px 0 0}
+  .news-bar .read-nav{position:static;pointer-events:auto;gap:8px}
+  .news-bar .read-nav button,.news-bar .read-nav.hint button{width:auto;flex:1 1 0;min-height:44px;padding:0 12px;background:#1a1815;border:1px solid var(--gold);color:var(--gold);border-radius:12px;font:600 16px/1 var(--sans);opacity:1}
+  .swipe-hint{margin:0 0 6px;text-align:center;color:var(--dim);font:500 13px/1.3 var(--sans)}
   .mon-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;background:#12100e;color:#d9b779;border:1px solid #d9b779;border-radius:10px;min-height:48px;padding:0 16px;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif;text-decoration:none}
   .mon-list{display:flex;flex-direction:column;gap:6px;margin:0}
   .mon-list[hidden]{display:none}
@@ -2338,15 +2449,30 @@ function mountMon(el, card){
   link.textContent="Cards";
   el.appendChild(link);
 }
+function newsDetailHtml(card){
+  const rows=Array.isArray(card.details)?card.details:[];
+  const bits=[];
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];
+    if(!row || !row.value) continue;
+    bits.push("<li><b>"+html(row.label||"")+"</b> "+html(row.value)+"</li>");
+  }
+  if(!bits.length) return "";
+  return '<ul class="news-meta">'+bits.join("")+"</ul>";
+}
 function newsEl(card){
   const el=document.createElement("article");
-  el.className="feed-card";
+  el.className="feed-card news-card";
   el.id="r-"+card.id;
-  const place=card.place?'<p>'+html(card.place)+"</p>":"";
-  const when=card.asOf?'<p>'+html(card.asOf)+"</p>":"";
-  const label=card.source||card.href||"";
-  const link=card.href?'<p><a href="'+html(card.href)+'">'+html(label)+"</a></p>":"";
-  el.innerHTML=newsTile(card)+"<h3>"+html(card.name||"")+"</h3>"+place+when+link;
+  const place=String(card.place||"").trim();
+  const kicker='<p class="news-kicker"><span class="k">NEWS</span>'+(place?'<span class="tag">'+html(place)+"</span>":"")+"</p>";
+  const sum=String(card.summary||"").trim();
+  const blurb=sum?'<p class="news-sum">'+html(sum)+"</p>":"";
+  const when=String(card.dayLabel||"").trim();
+  const source=String(card.source||"").trim();
+  const by='<p class="news-by">'+html(source||"Source")+(when?" · "+html(when):"")+"</p>";
+  const link=card.href?'<a class="news-go" href="'+html(card.href)+'">Read at '+html(source||"the source")+"</a>":"";
+  el.innerHTML=newsTile(card)+kicker+"<h3>"+html(card.name||"")+"</h3>"+blurb+newsDetailHtml(card)+by+link;
   return el;
 }
 function factCutLine(card){
@@ -3185,7 +3311,8 @@ async function showFlat(index, dir){
     return;
   }
   const row=found.row;
-  const card=row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row));
+  const news=row.readKind==="news" || row.kind==="news";
+  const card=row.waveItem ? waveEl(row) : (news ? newsEl(row) : cardEl(row));
   let stage=host.querySelector(".feed-stage");
   if(!stage){
     host.innerHTML="";
@@ -3193,6 +3320,7 @@ async function showFlat(index, dir){
     stage.className="feed-stage";
     host.appendChild(stage);
   }
+  stage.classList.toggle("is-news", news);
   let pos=stage.querySelector(".read-pos");
   if(!pos){
     pos=document.createElement("p");
@@ -3226,11 +3354,10 @@ async function showFlat(index, dir){
     else slide.appendChild(card);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
-  let nav=slide.querySelector(".read-nav");
+  let nav=stage.querySelector(".read-nav");
   if(!nav){
     nav=document.createElement("div");
     nav.className="read-nav";
-    if(wantHint()) nav.classList.add("hint");
     const prev=document.createElement("button");
     prev.type="button";
     prev.setAttribute("aria-label","Previous");
@@ -3243,7 +3370,31 @@ async function showFlat(index, dir){
     next.onclick=function(){ stepRead(1); };
     nav.appendChild(prev);
     nav.appendChild(next);
-    slide.appendChild(nav);
+  }
+  const buttons=nav.querySelectorAll("button");
+  if(buttons[0]) buttons[0].textContent=news?"Previous":"‹";
+  if(buttons[1]) buttons[1].textContent=news?"Next":"›";
+  nav.classList.toggle("hint", !news && wantHint());
+  let bar=stage.querySelector(".news-bar");
+  if(news){
+    if(!bar){
+      bar=document.createElement("div");
+      bar.className="news-bar";
+      stage.appendChild(bar);
+    }
+    let hint=bar.querySelector(".swipe-hint");
+    if(wantHint()){
+      if(!hint){
+        hint=document.createElement("p");
+        hint.className="swipe-hint";
+        hint.textContent="Swipe sideways for the next read.";
+        bar.insertBefore(hint, bar.firstChild);
+      }
+    }else if(hint) hint.remove();
+    bar.appendChild(nav);
+  }else{
+    if(nav.parentElement!==slide) slide.appendChild(nav);
+    if(bar) bar.remove();
   }
   bindSwipe(card);
   commitReadUrl(row);
