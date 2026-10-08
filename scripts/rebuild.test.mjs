@@ -1,9 +1,9 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
-import { localPaths, deadLocals } from "./dead-paths.mjs";
+import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
 import { feedNews } from "../data/feed-news.mjs";
@@ -309,6 +309,7 @@ t("the short front stays first and the shuffled reads already in the file follow
 t("a later file id is not an invented price", loop[2] && loop[2].id === "move-tcgcsv-99-7" && loop[2].pending === true && loop[2].price == null);
 const setLoop = buildFeedLoop([priced, fact], browseDoc, { filter: "set", set: "Base Set" });
 t("one set still shows the catalogue id", setLoop.some((r) => r.id === "move-tcgcsv-99-7") && setLoop.some((r) => r.id === "move-tcgcsv-10-7"));
+t("one set with nothing picked does not repeat prices", buildFeedLoop([priced, fact], browseDoc, { filter: "set" }).length === 0);
 t("a pokemon fact says the English count and does not say catalogue", pokemonFactLine(fact) === "Duraludon has 19 English TCG cards." && !/catalog/i.test(pokemonFactLine(fact)));
 t("japanese stays off when that count is not on the row", !pokemonFactLine(fact).includes("Japanese"));
 t("a japanese count already on the row is said", pokemonFactLine({ ...fact, japaneseCount: 4 }) === "Duraludon has 19 English TCG cards and 4 Japanese TCG cards.");
@@ -336,7 +337,7 @@ const newsDoc = { asOf: "2026-10-02", items: [
 const newsRows = newsSlice(newsDoc);
 t("a news slice keeps the English title, the date, and the source link", newsRows.find((row) => row.href === "https://example.com/a").name === "New merch collection starring Dedenne." && newsRows.find((row) => row.href === "https://example.com/a").asOf === "2026-10-02" && newsRows.find((row) => row.href === "https://example.com/a").source === "Bulbagarden");
 t("an uncertain translation stays off", !newsRows.some((row) => row.href === "https://example.com/c"));
-t("an old item stays off unless it is a new reveal or the source states a release inside two weeks", !newsRows.some((row) => row.href === "https://example.com/b") && newsRows.some((row) => row.href === "https://example.com/e") && newsRows.some((row) => row.href === "https://example.com/f"));
+t("an old item stays off unless the source states a release inside two weeks", !newsRows.some((row) => row.href === "https://example.com/b") && !newsRows.some((row) => row.href === "https://example.com/e") && newsRows.some((row) => row.href === "https://example.com/f"));
 const japan = newsRows.find((row) => row.href === "https://example.com/d");
 t("Japan news says it is Japan news and the file keeps the original title", japan && japan.place === "Japan news" && japan.name === "Japan: A first event is being held" && japan.originalTitle === "「ここから」開催！" && japan.href === "https://example.com/d");
 t("the news filter does not walk price rows", buildFeedLoop([priced, fact], browseDoc, { filter: "news" }).length === 0);
@@ -389,6 +390,8 @@ const flagBrowse = {
 };
 t("flagged filter returns outlier rows by id", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "flagged" }).map((r) => r.id).includes("outlier-sv5-pc-etb"));
 t("dive filter returns dive rows by id", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "dive" }).map((r) => r.id).includes("dive-sv5-pc-etb"));
+t("sealed filter uses the sealed products already under dive", buildFeedLoop([priced], flagBrowse, { filter: "sealed" }).map((r) => r.id).join() === "dive-sv5-pc-etb" && isSealedProductRow(dive));
+t("sealed filter is empty when dive has no sealed product", buildFeedLoop([priced], { filters: { dive: { items: [] } } }, { filter: "sealed" }).length === 0);
 t("prices filter leaves outlier and dive out", buildFeedLoop([priced, outlier, dive], flagBrowse, { filter: "prices" }).every((r) => r.readKind !== "outlier" && r.readKind !== "dive"));
 t("default mix includes non-price types when present", buildFeedLoop([priced, fact, outlier, dive], flagBrowse, { news: newsDoc }).some((r) => r.readKind === "news") && buildFeedLoop([priced, fact, outlier, dive], flagBrowse, {}).some((r) => r.readKind === "outlier" || r.readKind === "dive"));
 t("flagged and dive empty shelves stay honest", flaggedReads({ filters: { flagged: { items: [] } } }, []).length === 0 && diveReads({ filters: { dive: { items: [] } } }, []).length === 0);
@@ -443,6 +446,44 @@ t("the quiet filter returns the verified row only", buildFeedLoop([priced], shap
 t("prices filter leaves a shape row out", buildFeedLoop([priced, quiet], shapeBrowse, { filter: "prices" }).every((r) => r.readKind !== "quiet"));
 t("default mix includes the shape read", buildFeedLoop([priced], shapeBrowse, {}).some((r) => r.id === "quiet-tcgcsv-1"));
 t("the feed lists the new filters", renderFeed({ asOf: "2026-10-06", reads: [priced] }, "").includes('value="quiet">No sales') && renderFeed({ asOf: "2026-10-06", reads: [priced] }, "").includes('value="still">Nothing moved'));
+
+const conditionCard = {
+  id: "conditions-tcgcsv-211451",
+  name: "Carracosta GX",
+  readKind: "conditions",
+  kind: "conditions",
+  path: "Near Mint $1.45 and Lightly Played $1.10 for Carracosta GX on Oct 5. Two condition prices. Not a grade result.",
+  receipt: { date: "2026-10-05", nearMint: 1.45, played: 1.1, playedCondition: "Lightly Played" },
+};
+const marketCard = {
+  id: "mktmove-me5-pack",
+  name: "Pitch Black Booster Pack",
+  readKind: "mktmove",
+  kind: "mktmove",
+  path: "The TCGplayer market price for Pitch Black Booster Pack went from $5.73 to $5.89 over Oct 6–Oct 7. The eBay ask stayed $10.25. The market price changed. The ask did not. Asks are not sales.",
+  receipt: { from: "2026-10-06", to: "2026-10-07", marketFrom: 5.73, marketTo: 5.89, ask: 10.25 },
+};
+const mixCard = {
+  id: "mix-tcgcsv-138598",
+  name: "Persian",
+  readKind: "mix",
+  kind: "mix",
+  path: "Persian, Sep 29–Oct 5: 7 Near Mint, 2 Lightly Played, 0 Moderately Played, 1 Heavily Played. This is the mix of copies that sold, not the copy in your hand.",
+  receipt: { from: "2026-09-29", to: "2026-10-05", conditions: [{ condition: "Near Mint", sold: 7 }, { condition: "Lightly Played", sold: 2 }, { condition: "Moderately Played", sold: 0 }, { condition: "Heavily Played", sold: 1 }] },
+};
+const spreadCard = {
+  id: "spread-sm11-booster-box",
+  name: "Unified Minds Booster Box",
+  readKind: "spread",
+  kind: "spread",
+  path: "The search for Unified Minds Booster Box asks from $3,250.00 to $6,933.97. Asking prices from the search. Not sold prices.",
+  receipt: { low: 3250, high: 6933.97 },
+};
+const shownLines = [conditionCard, marketCard, mixCard, spreadCard].map(shownRead);
+t("a shown read keeps the name and does not say for on or for went", shownLines.every((line) => line && !line.includes("for on") && !line.includes("for went") && !line.startsWith(",") && !line.startsWith(" ")) && shownRead(conditionCard).includes("Carracosta GX") && shownRead(marketCard).includes("Pitch Black Booster Pack") && shownRead(mixCard).startsWith("Persian") && shownRead(spreadCard).includes("Unified Minds Booster Box"));
+t("an ask spread is a plain asking range from the receipt", shownRead(spreadCard) === "Asks on eBay for Unified Minds Booster Box range from $3,250 to $6,934 (listings, not sales).");
+t("every shown read starts with a capital", shownLines.every((line) => /^[A-Z]/.test(line)) && shownRead({ name: "Abra", path: "abra latest price rose from $1.00 on Sep 3 to $1.10 on Oct 3.", kind: "single", readKind: "price" }).startsWith("Abra"));
+t("a missing name is put back and a leading comma is not a sentence", shownRead({ name: "Persian", path: ", Sep 29–Oct 5: 7 Near Mint.", readKind: "price", kind: "single" }).startsWith("Persian") && !shownRead({ name: "Persian", path: ", Sep 29–Oct 5: 7 Near Mint.", readKind: "price", kind: "single" }).startsWith(","));
 
 const liveNews = newsSlice(feedNews);
 const dedenne = liveNews.find((row) => row.href === "https://bulbagarden.net/threads/new-merch-collection-starring-dedenne-joltik-and-more-electric-types-coming-soon-to-pokemon-centers-in-japan.311717/");
@@ -573,8 +614,14 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   const dead = deadLocals(localPaths(linked), pageKind);
   t("rendered pages link no dead path", dead.length === 0);
   if (dead.length) console.error(dead.join("\n"));
+  const fetched = scriptFetchPaths(linked).filter((path) => path.startsWith("/"));
+  const deadFetch = deadLocals(fetched, pageKind);
+  t("a script fetch the site cannot serve fails the check", deadFetch.length === 0 && deadLocals(scriptFetchPaths('<script>fetch("/no-such-page")</script>'), pageKind).join() === "/no-such-page");
+  if (deadFetch.length) console.error(deadFetch.join("\n"));
   t("a path the site cannot serve fails the check", deadLocals(["/no-such-page"], pageKind).join() === "/no-such-page" && deadLocals(["/sets", "/corrections"], pageKind).length === 0);
-  t("a script template is not a path", localPaths(`<a href="/dive/'+encodeURIComponent(diveId)+'">x</a><a href="/sets">Sets</a>`).join() === "/sets");
+  t("a script template is not a path", localPaths(`<a href="/dive/'+encodeURIComponent(diveId)+'">x</a><a href="/sets">Sets</a>`).join() === "/sets" && scriptFetchPaths('<script>fetch("/data/feed/"+part+".json");fetch("/data/feed/meta.json")</script>').join() === "/data/feed/meta.json");
+  t("the chip row fades and the sealed chip follows dive", factHtml.includes("chip-more") && factHtml.includes("chip-scroller") && factHtml.includes("--chip-fade") && factHtml.includes("sealedAvailable") && factHtml.includes("function shownRead") && factHtml.includes("Asks on eBay for ") && factHtml.includes("if(!src) return null") && factHtml.includes('loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)'));
+  t("every page says it is made for collectors, rippers and flippers", factHtml.includes("Made for collectors, rippers and flippers.") && indexHtml.includes("Made for collectors, rippers and flippers.") && !indexHtml.includes("Made by one person who collects."));
 }
 
 if (fail) process.exit(1);
