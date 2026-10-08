@@ -1236,8 +1236,10 @@ ${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => 
 
 export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main class="wrap"><h1 id="title">Set</h1>
+<p class="muted" id="completion"></p>
 <div id="lines"></div><div id="charts"></div>
-<div class="filters"><select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
+<div class="filters"><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="base">Base set only</option></select>
+<select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
 </div><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
@@ -1274,14 +1276,51 @@ function rowHtml(r){
   const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
   const src=pictureSrc(r, setLogo);
   const img=src?'<img alt="'+html(r.name)+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
-  return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
+  const bits=[];
+  if(r.num) bits.push(html(r.num));
+  if(r.rarity) bits.push(html(r.rarity));
+  if(r.printing) bits.push(html(r.printing));
+  if(r.kind==="sealed" && r.subtype==="case") bits.push("Case");
+  if(r.artist) bits.push(html(r.artist));
+  return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span></a><b>'+money(r.price)+'</b></div>';
+}
+function expand(list, scope){
+  const out=[];
+  list.forEach(function(r){
+    if(r.kind==="sealed"){
+      if(scope==="master" || scope==="base") return;
+      out.push(r);
+      return;
+    }
+    const prints=(Array.isArray(r.printings)?r.printings:[]).filter(function(p){return p&&p.name});
+    if(scope==="base" || !prints.length){
+      out.push(r);
+      return;
+    }
+    prints.forEach(function(p){
+      out.push(Object.assign({}, r, {printing:p.name, price:p.price>0?p.price:null, id:p.id||r.id, pid:p.pid||r.pid}));
+    });
+  });
+  return out;
+}
+function completionLine(data){
+  const items=Array.isArray(data.items)?data.items:[];
+  const cards=Number.isInteger(data.cards)?data.cards:(Number.isInteger(data.single)?data.single:items.filter(function(r){return r&&r.kind!=="sealed"}).length);
+  const sealed=Number.isInteger(data.sealed)?data.sealed:items.filter(function(r){return r&&r.kind==="sealed"}).length;
+  const printings=Number.isInteger(data.printings)?data.printings:items.filter(function(r){return r&&r.kind!=="sealed"}).reduce(function(n,r){
+    const list=(r.printings||[]).filter(function(p){return p&&p.name});
+    return n+(list.length||1);
+  },0);
+  return cards+" cards · "+printings+" printings · "+sealed+" sealed";
 }
 function draw(){
   const kind=document.getElementById("kind").value;
+  const scope=document.getElementById("scope").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
   const sort=document.getElementById("sort").value;
-  let list=rows.filter(r=>!kind||r.kind===kind);
-  if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")).toLowerCase().includes(q));
+  let list=expand(rows, scope);
+  list=list.filter(r=>!kind||r.kind===kind);
+  if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
   const main=list.filter(r=>!r.section);
   const order=[];
@@ -1327,6 +1366,8 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
     catImages=(doc&&doc.images)||{};
   }catch(e){ catImages={}; }
   document.getElementById("title").textContent=data.name;
+  const completion=document.getElementById("completion");
+  if(completion) completion.textContent=completionLine(data);
   setLogo="";
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
@@ -1346,7 +1387,7 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   var title=document.getElementById("title");
   if(title && title.textContent==="Set") title.textContent="This set did not load.";
 });
-["kind","q","sort"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
+["kind","q","sort","scope"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 </script>`;
   return chrome("Sets", body, "Set", stamp, "", feedNav(opts));

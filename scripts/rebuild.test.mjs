@@ -654,6 +654,9 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   const shell = renderSetShell("me-30th-celebration", "Updated");
   t("a set page draws the list without wiping a loaded title", shell.includes('let rows=[], shown=48, setLogo=""') && shell.includes("pictureSrc(r, setLogo)") && !shell.includes("pictureSrc(r, data.logo)") && shell.includes('title.textContent==="Set"') && shell.includes("This set did not load."));
   t("a set page keeps a labelled section and does not mix it into the first page", shell.includes('r=>!r.section') && shell.includes('class="set-section"') && shell.includes('id="sections"') && shell.includes("location.hash") && shell.includes("scrollIntoView"));
+  t("a set page offers All, Master set, and Base set only", shell.includes('id="scope"') && shell.includes(">All</option>") && shell.includes("Master set") && shell.includes("Base set only"));
+  t("a set page writes the completion line from the file", shell.includes('id="completion"') && shell.includes(" cards · ") && shell.includes(" printings · ") && shell.includes(" sealed") && shell.includes("Number.isInteger(data.cards)") && shell.includes("Number.isInteger(data.printings)") && shell.includes("Number.isInteger(data.sealed)"));
+  t("a set row names the printing", shell.includes("r.printing") && shell.includes('bits.push("Case")'));
   const dated = renderSets({ sets: [{ slug: "me-30th-celebration", name: "ME: 30th Celebration", era: "Mega Evolution", single: 191, sealed: 38, priced: 227, release: "2026-09-16" }] }, "");
   t("a set tile writes Sep 16, 2026 and does not wrap the date", dated.includes("Sep 16, 2026") && dated.includes('class="set-date"') && !dated.includes(">2026-09-16<") && dated.includes("191 singles"));
   t("an index chart is a level and a price chart keeps $", shell.includes("indexLevel=/index/i.test") && shell.includes("maximumFractionDigits:1") && shell.includes('"$"+Number(n)'));
