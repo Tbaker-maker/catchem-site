@@ -272,7 +272,7 @@ const AI_JS = `<script id="ai-boot">
       a.href = href;
       a.textContent = "Sign in with Discord";
       p.appendChild(a);
-      p.appendChild(document.createTextNode(" to use Ideas. A free seat is 3 a day. Premium is 50 a day."));
+      p.appendChild(document.createTextNode(" to use Ideas. A free seat is 3 a day."));
     } else {
       p.textContent = text;
     }
@@ -386,7 +386,7 @@ const AI_JS = `<script id="ai-boot">
     }).then(function(pack){
       var data = pack.data;
       if (pack.status === 401) {
-        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.", data.ready ? signInHref : "");
+        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", data.ready ? signInHref : "");
         return;
       }
       if (data.card && !data.ideas && !data.variations) {
@@ -413,7 +413,7 @@ const AI_JS = `<script id="ai-boot">
   function load(panel){
     fetch("/api/session").then(function(r){ return r.json(); }).then(function(view){
       if (!view || !view.signedIn) {
-        showLine(panel, (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.", view && view.ready ? signInHref : "");
+        showLine(panel, (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", view && view.ready ? signInHref : "");
       } else {
         controls(panel, view);
       }

@@ -53,7 +53,7 @@ export function signInDocument(env) {
   const ready = discordReady(env);
   const line = ideasSignInLine(ready);
   const link = ready
-    ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a> to use Ideas. A free seat is 3 a day. Premium is 50 a day.</p>`
+    ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a> to use Ideas. A free seat is 3 a day.</p>`
     : `<p>${line}</p>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Sign in · Catch'em</title></head><body style="margin:24px;font:16px/1.5 sans-serif;background:#12100e;color:#efe9de">${link}<p><a href="/post-office">Back to Post Office</a></p><footer><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers.</p></footer></body></html>`;
 }
