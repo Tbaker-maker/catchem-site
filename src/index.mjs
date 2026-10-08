@@ -5,7 +5,7 @@ import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { imageForId } from "./catalogue-image.mjs";
+import { officialSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
@@ -102,7 +102,11 @@ async function catalogueMap(fetchImpl) {
 }
 
 function withCatalogue(list, images) {
-  return (list || []).map((row) => (row && typeof row === "object" ? { ...row, catalogueSrc: imageForId(images, row.id) } : row));
+  return (list || []).map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const hit = officialSrc(row, images);
+    return { ...row, catalogueSrc: hit.src, catalogueCrop: hit.crop };
+  });
 }
 
 async function omitStalePriceReads(reads, fetchImpl) {
@@ -219,8 +223,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
     const diveHref = sealedId ? `/dive/${sealedId}` : "";
     const images = await catalogueMap(fetchImpl);
-    const catalogueSrc = card ? imageForId(images, card.id) : "";
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc }), card ? 200 : 404);
+    const hit = card ? officialSrc(card, images) : { src: "", crop: false };
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -302,7 +306,14 @@ export default {
       });
     }
     if (request.method === "GET" && url.pathname === "/api/card-img") {
-      return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      const pid = Math.trunc(Number(url.searchParams.get("pid")));
+      if (!(pid > 0)) return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
+      const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
+      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      return new Response(img.body, {
+        status: 200,
+        headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" },
+      });
     }
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);

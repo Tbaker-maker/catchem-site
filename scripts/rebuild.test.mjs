@@ -1,7 +1,7 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
 import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost } from "../src/ui.mjs";
-import { imageForId, brandedTile } from "../src/catalogue-image.mjs";
+import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
@@ -88,6 +88,10 @@ const fetchImpl = async (url) => {
 };
 
 t("catalogue image is the id hit only", imageForId({ "base1-1": "/img/base1/1" }, "base1-1") === "/data/editor/tcg/base1/1_hires.png" && imageForId({ a: "https://images.pokemontcg.io/base1/1.png" }, "a") === "" && imageForId({ "sv3pt5-200": "/cards/seed/sv3pt5-200.png" }, "sv3pt5-200").endsWith("/research/assets/cards/seed/sv3pt5-200.png") && imageForId({ "base1-1": "/img/base1/1" }, "tcgcsv-10") === "" && brandedTile("logo").includes("tile-logo") && brandedTile("card").includes("Catch'em"));
+const japanNews = newsTile({ id: "jp-news", source: "Pokémon Card (Japan)", place: "Japan news", asOf: "2026-10-02" });
+const enNews = newsTile({ id: "en-news", source: "Bulbagarden", place: "", asOf: "2026-10-01" });
+const newsLooks = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => (newsTile({ id, source: "S", asOf: "2026-10-02" }).match(/news-tile v(\d)/) || [])[1]));
+t("news is a Catch'em tile, never a source preview", japanNews.includes("news-tile") && japanNews.includes("Japan news") && japanNews.includes("Oct 2, 2026") && japanNews.includes("Pokémon Card (Japan)") && enNews.includes("Bulbagarden") && enNews.includes("Oct 1, 2026") && !enNews.includes("Japan news") && !japanNews.includes("og:image") && newsLooks.size >= 2);
 t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
 t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pageKind("/dive/sv3pt5-etb.html") === "dive");
 
@@ -138,7 +142,8 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
 {
   const cardPage = await (await renderPath("/p/tcgcsv-503313", fetchImpl, { feed: true })).text();
   t("catalog sealed page links Deeper look when dive exists", cardPage.includes("Deeper look") && cardPage.includes("/dive/sv3pt5-etb") && cardPage.includes("See the chart"));
-t("a sealed id missing from the catalogue is the branded tile", cardPage.includes("tile-sealed") && cardPage.includes("Catch'em") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
+t("a sealed id missing from the catalogue uses its tcgplayer id", cardPage.includes("/api/card-img?pid=503313") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
+t("a row with no id match is the branded tile", officialSrc({ id: "no-such", kind: "sealed", name: "Mystery Box" }, {}).src === "" && brandedTile("sealed", { kind: "sealed", name: "Elite Trainer Box" }).includes("ETB") && brandedTile("row", { kind: "single", name: "Mew" }).includes("Single"));
 }
 
 t("catalog cards and shorts have kinds", pageKind("/c/tcgcsv-10") === "card" && pageKind("/p/tcgcsv-10") === "product" && pageKind("/feed") === "feed" && pageKind("/feed/r/heating-tcgcsv-10") === "feed");
@@ -197,7 +202,8 @@ t("a card picture is the catalogue hit for that id", cardPage.includes("/data/ed
 t("a card page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(cardPage));
 const setHtml = await (await renderPath("/sets/base", fetchImpl)).text();
 t("a set page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(setHtml));
-t("a set page uses the catalogue id or the branded tile", setHtml.includes("function pictureSrc") && setHtml.includes("row.icon") && setHtml.includes("function cropStyle") && setHtml.includes("brandedTile") && setHtml.includes("catalogue-images.json") && setHtml.includes("Sealed line") && !setHtml.includes("tcgplayer-cdn.tcgplayer.com/product/") && !setHtml.includes("images.pokemontcg.io") && !setHtml.includes("String(data.logo)"));
+t("a set page uses the catalogue id or the branded tile", setHtml.includes("function pictureSrc") && setHtml.includes("row.icon") && setHtml.includes("function cropStyle") && setHtml.includes("brandedTile") && setHtml.includes("catalogue-images.json") && setHtml.includes("/api/card-img?pid=") && setHtml.includes("Sealed line") && !setHtml.includes("tcgplayer-cdn.tcgplayer.com/product/") && !setHtml.includes("images.pokemontcg.io") && !setHtml.includes("String(data.logo)") && !setHtml.includes("The picture is missing."));
+t("a visible row has a picture or a branded tile", visualGaps(cardPage).length === 0 && visualGaps(setHtml).length === 0 && visualGaps(renderSearch()).length === 0 && visualGaps((await (await renderPath("/artists/ken-sugimori", fetchImpl)).text())).length === 0 && visualGaps((await (await renderPath("/board", fetchImpl, { feed: true })).text())).length === 0);
 const board = await (await renderPath("/board", fetchImpl, { feed: true })).text();
 t("movers keep slabs off the list", board.includes("Slabs") && board.includes("graded feed") && board.includes("Alakazam"));
 const post = await (await renderPath("/post-office", fetchImpl)).text();
@@ -513,7 +519,7 @@ const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
 t("the fact card says the English count, keeps the pull-down closed, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes("pricedMonCards(Array.isArray(lead)?lead:[]") && monFn.includes('className="mon-btn"') && monFn.includes('aria-expanded","false"') && monFn.includes("No priced cards are in the file.") && !monFn.includes("paper-rows") && !monFn.includes("fetch(") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
-t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && factHtml.includes("The picture is missing.") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
+t("a missing cutout stays on the fact and the news filter says there is no news", factHtml.includes("The cutout is missing.") && factHtml.includes("card && card.name") && !factHtml.includes("The picture is missing.") && factHtml.includes("function newsTile") && factHtml.includes("news-tile") && !factHtml.includes("news-preview") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && factHtml.includes("The cutout is missing.") && !factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("<img"));
 t("premium sees the hide control and the unranked loop walks the shuffled file", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
