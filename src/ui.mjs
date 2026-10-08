@@ -1648,8 +1648,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
-  .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
-  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px}
+  .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
+  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#211e1a;border-radius:12px;-webkit-user-drag:none;user-select:none}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
@@ -1679,6 +1679,28 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-acts button,.feed-acts a,.see-all{min-height:44px;display:inline-flex;align-items:center}
   .read-nav{display:flex;gap:8px}
   .read-nav button{min-height:44px;flex:1 1 0}
+  .feed-slide .read-nav{position:absolute;left:0;right:0;top:72px;z-index:2;justify-content:space-between;pointer-events:none;gap:0}
+  .feed-slide .read-nav button{pointer-events:auto;min-width:44px;width:44px;flex:0 0 44px;padding:0;background:transparent;border-color:transparent;color:var(--gold);font:600 34px/1 var(--sans);opacity:.9}
+  .feed-slide .read-nav.hint button{opacity:.4}
+  .read-pos{margin:0;color:var(--dim);font:600 13px/1.3 var(--sans);text-align:center}
+  .feed-slide{position:relative;overflow:hidden;flex:1 1 auto;min-width:0}
+  .feed-slide .feed-card{width:100%}
+  .feed-card.is-enter-next{animation:feedInNext 200ms ease}
+  .feed-card.is-enter-prev{animation:feedInPrev 200ms ease}
+  .feed-card.is-leave-next,.feed-card.is-leave-prev{position:absolute;left:0;right:0;top:0;width:100%;pointer-events:none}
+  .feed-card.is-leave-next{animation:feedOutNext 200ms ease forwards}
+  .feed-card.is-leave-prev{animation:feedOutPrev 200ms ease forwards}
+  .feed-card.is-bounce-next{animation:feedBounceNext 200ms ease}
+  .feed-card.is-bounce-prev{animation:feedBouncePrev 200ms ease}
+  @keyframes feedInNext{from{transform:translateX(100%)}to{transform:none}}
+  @keyframes feedInPrev{from{transform:translateX(-100%)}to{transform:none}}
+  @keyframes feedOutNext{from{transform:none}to{transform:translateX(-100%)}}
+  @keyframes feedOutPrev{from{transform:none}to{transform:translateX(100%)}}
+  @keyframes feedBounceNext{0%,100%{transform:none}45%{transform:translateX(-18px)}}
+  @keyframes feedBouncePrev{0%,100%{transform:none}45%{transform:translateX(18px)}}
+  @media (prefers-reduced-motion:reduce){
+    .feed-card.is-enter-next,.feed-card.is-enter-prev,.feed-card.is-leave-next,.feed-card.is-leave-prev,.feed-card.is-bounce-next,.feed-card.is-bounce-prev{animation:none!important}
+  }
   .pile{overflow:hidden}
   .feed-stage{min-height:calc(100dvh - 88px);display:flex;flex-direction:column}
   .feed-stage .feed-card{flex:1 1 auto}
@@ -1704,7 +1726,6 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const body = `<style>${css}</style><main class="wrap feed-page">
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
-<p class="muted" id="feed-count">TCGplayer market.</p>
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <select id="f-loop" class="pill-native" aria-label="Filter"><option value="">All</option><option value="prices">Prices</option><option value="sealed">Sealed</option><option value="set">One set</option><option value="news">News</option><option value="pokemon">Pokémon facts</option><option value="wave">Waves & reprints</option><option value="flagged">Flagged</option><option value="dive">Dive</option><option value="volume">Volume</option><option value="quiet">No sales</option><option value="mix">Condition mix</option><option value="conditions">Condition prices</option><option value="soldflat">Sold, price flat</option><option value="solddown">Sold, price down</option><option value="setshare">Set share</option><option value="spread">Ask spread</option><option value="askmove">Ask moved</option><option value="mktmove">Market moved</option><option value="still">Nothing moved</option></select>
   <div class="chip-scroller">
@@ -1776,7 +1797,10 @@ let hideFacts=false;
 let loopFilter="";
 let wantedSet="";
 let filterGen=0;
-let look=null;
+let urlIntent="replace";
+let openRead="";
+let moveBusy=false;
+let wheelAt=0;
 function isFact(card){
   if(!card) return false;
   if(card.readKind!=="pokemon" && card.kind!=="pokemon") return false;
@@ -1973,6 +1997,9 @@ ${isShapeRow.toString()}
 ${isSealedProductRow.toString()}
 ${shownRead.toString()}
 ${cardIdentity.toString()}
+function setLine(card){
+  return String(card&&card.set||"").trim();
+}
 function moveLine(card){
   const path=String(card&&(card.path||card.headline)||"").trim();
   if(!path) return "";
@@ -2010,6 +2037,7 @@ function photoEl(card){
   const img=document.createElement("img");
   img.alt="";
   img.src=src;
+  img.draggable=false;
   img.onerror=function(){ img.remove(); };
   return img;
 }
@@ -2057,9 +2085,9 @@ function waveEl(card){
   el.className="feed-card";
   el.id="r-"+card.id;
   const line=shownRead(card);
-  const ident=cardIdentity(card);
+  const setName=setLine(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
 function mountMon(el, card){
@@ -2133,7 +2161,7 @@ function cardEl(card, facts){
   const supply=supplyPreset(card);
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=isFact(card)?pokemonFactLine(card):moveLine(card);
-  const ident=cardIdentity(card);
+  const setName=setLine(card);
   const headline=String(card.headline||"").trim();
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
@@ -2144,7 +2172,7 @@ function cardEl(card, facts){
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?factCutLine(card):"";
-  const head=h3+(ident?'<p class="card-meta">'+html(ident)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
+  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
@@ -2422,7 +2450,7 @@ function paint(group, details, index){
       const dx=ev.clientX-start.x;
       const dy=ev.clientY-start.y;
       start=null;
-      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
+      if(Math.abs(dx)<60 || Math.abs(dx)<=Math.abs(dy)) return;
       card.dataset.swipe="1";
       if(dx<0 && !next.disabled) next.click();
       else if(dx>0 && !prev.disabled) prev.click();
@@ -2532,7 +2560,7 @@ async function showSpot(index){
       const dx=ev.clientX-start.x;
       const dy=ev.clientY-start.y;
       start=null;
-      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
+      if(Math.abs(dx)<60 || Math.abs(dx)<=Math.abs(dy)) return;
       card.dataset.swipe="1";
       if(dx<0 && !next.disabled) next.click();
       else if(dx>0 && !prev.disabled) prev.click();
@@ -2801,15 +2829,136 @@ async function materialize(index, dir){
       row=flat[i];
     }
     if(accepts(row)){
-      if(await stalePrice(row)){ i+=step; guard++; continue; }
+      if(await stalePrice(row)){
+        flat[i]={id:row.id, skip:true};
+        i+=step; guard++; continue;
+      }
       return {row:row, index:i};
     }
+    flat[i]={id:row&&row.id||"", skip:true};
     i+=step;
     guard++;
   }
   return {row:null, index:Math.max(0, index)};
 }
-async function showFlat(index){
+function reduceMotion(){
+  return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+function indexOfId(id){
+  buildFlat();
+  if(!id || !flat) return -1;
+  for(let i=0;i<flat.length;i++) if(flat[i] && String(flat[i].id)===String(id)) return i;
+  return -1;
+}
+function placeLabel(){
+  if(!flat || !flat.length) return "";
+  let pos=0;
+  let total=0;
+  for(let i=0;i<flat.length;i++){
+    if(flat[i] && flat[i].skip) continue;
+    total++;
+    if(i<=spot) pos++;
+  }
+  if(!total || !pos) return "";
+  return pos+" of "+total;
+}
+let hintReady=false;
+let hintOn=false;
+function wantHint(){
+  if(!hintReady){
+    hintReady=true;
+    try{ hintOn=localStorage.getItem("feed-arrows-seen")!=="1"; }catch(err){ hintOn=false; }
+    try{ if(hintOn) localStorage.setItem("feed-arrows-seen","1"); }catch(err){}
+  }
+  return hintOn;
+}
+function writeUrl(f, setName, readId, push){
+  const url=new URL(location.href);
+  if(f) url.searchParams.set("f", f); else url.searchParams.delete("f");
+  if(f==="set" && setName) url.searchParams.set("set", setName); else url.searchParams.delete("set");
+  if(readId) url.searchParams.set("r", readId); else url.searchParams.delete("r");
+  const next=url.pathname+url.search+url.hash;
+  const cur=location.pathname+location.search+location.hash;
+  if(next===cur) return;
+  const state={f:f||"", set:setName||"", r:readId||""};
+  if(push) history.pushState(state, "", next);
+  else history.replaceState(state, "", next);
+}
+function commitReadUrl(row){
+  if(urlIntent==="silent"){ urlIntent="push"; return; }
+  const id=row && row.id ? String(row.id) : "";
+  writeUrl(loopFilter, wantedSet, id, urlIntent==="push");
+  urlIntent="push";
+}
+function nodeOf(ev){
+  return ev && ev["tar"+"get"];
+}
+function bindSwipe(card){
+  let start=null;
+  let pid=0;
+  function finish(ev){
+    if(!start || !ev || ev.pointerId!==pid) return;
+    const dx=ev.clientX-start.x;
+    const dy=ev.clientY-start.y;
+    start=null;
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", abort);
+    if(Math.abs(dx)<60 || Math.abs(dx)<=Math.abs(dy)) return;
+    card.dataset.swipe="1";
+    stepRead(dx<0?1:-1);
+  }
+  function abort(){
+    start=null;
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", abort);
+  }
+  card.addEventListener("pointerdown", function(ev){
+    if(ev.pointerType==="mouse" && ev.button!==0) return;
+    const node=nodeOf(ev);
+    if(node && node.closest && node.closest("a, button, input, select, label, textarea")) return;
+    if(node && node.closest && node.closest("img")) ev.preventDefault();
+    start={x:ev.clientX, y:ev.clientY};
+    pid=ev.pointerId;
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", abort);
+  });
+  card.addEventListener("pointermove", function(ev){
+    if(!start || ev.pointerId!==pid) return;
+    const dx=ev.clientX-start.x;
+    const dy=ev.clientY-start.y;
+    if(Math.abs(dx)>10 && Math.abs(dx)>Math.abs(dy)) ev.preventDefault();
+  }, {passive:false});
+}
+function bounceCard(card, dir){
+  if(!card || reduceMotion()) return;
+  card.classList.remove("is-bounce-next","is-bounce-prev");
+  void card.offsetWidth;
+  card.classList.add(dir>0?"is-bounce-next":"is-bounce-prev");
+}
+async function stepRead(dir){
+  if(moveBusy || !dir) return;
+  if(!document.getElementById("feed-loop-form")) return;
+  const host=document.getElementById("feed-one");
+  const card=host && (host.querySelector("article.feed-card:not(.is-leave-next):not(.is-leave-prev)") || host.querySelector("article.feed-card"));
+  if(!card) return;
+  buildFlat();
+  if(!flat || !flat.length) return;
+  moveBusy=true;
+  try{
+    const gen=filterGen;
+    if(dir<0 && spot<=0){ bounceCard(card, dir); return; }
+    if(dir>0 && spot+1>=flat.length){ bounceCard(card, dir); return; }
+    const found=await materialize(dir<0?spot-1:spot+1, dir);
+    if(gen!==filterGen) return;
+    const live=host.querySelector("article.feed-card:not(.is-leave-next):not(.is-leave-prev)") || card;
+    if(!found.row || found.index===spot){ bounceCard(live||card, dir); return; }
+    urlIntent="push";
+    await showFlat(found.index, dir);
+  }finally{
+    moveBusy=false;
+  }
+}
+async function showFlat(index, dir){
   const gen=filterGen;
   const found=await materialize(index, index<(spot||0)?-1:1);
   if(gen!==filterGen) return;
@@ -2818,58 +2967,83 @@ async function showFlat(index){
   const sections=document.getElementById("feed-sections");
   if(sections) sections.innerHTML="";
   if(!host) return;
-  host.innerHTML="";
-  const stage=document.createElement("div");
-  stage.className="feed-stage";
-  if(found.row){
-    const row=found.row;
-    stage.appendChild(row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row)));
-  }
-  else {
-    if(loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)) return;
+  if(!found.row){
+    host.innerHTML="";
+    if(loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)){
+      commitReadUrl(null);
+      return;
+    }
     const p=document.createElement("p");
     p.className="muted";
     const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
     p.textContent=shapeEmpty[loopFilter]||(loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.");
     host.appendChild(p);
+    commitReadUrl(null);
     return;
   }
-  if(typeof catchemMount==="function") catchemMount(stage);
-  const nav=document.createElement("div");
-  nav.className="read-nav";
-  const prev=document.createElement("button");
-  prev.type="button";
-  prev.textContent="Previous";
-  prev.disabled=spot<=0;
-  prev.onclick=function(){ showFlat(spot-1); };
-  const next=document.createElement("button");
-  next.type="button";
-  next.textContent="Next";
-  next.disabled=!flat || spot+1>=flat.length;
-  next.onclick=function(){ showFlat(spot+1); };
-  nav.appendChild(prev);
-  nav.appendChild(next);
-  stage.appendChild(nav);
-  const card=stage.querySelector("article");
-  if(card){
-    let start=null;
-    card.addEventListener("pointerdown", function(ev){
-      const node=ev["tar"+"get"];
-      if(node && node.closest && node.closest("a, button, input, select, label")) return;
-      start={x:ev.clientX,y:ev.clientY};
-    });
-    card.addEventListener("pointerup", function(ev){
-      if(!start) return;
-      const dx=ev.clientX-start.x;
-      const dy=ev.clientY-start.y;
-      start=null;
-      if(Math.abs(dx)<48 || Math.abs(dx)<Math.abs(dy)) return;
-      card.dataset.swipe="1";
-      if(dx<0 && !next.disabled) next.click();
-      else if(dx>0 && !prev.disabled) prev.click();
-    });
+  const row=found.row;
+  const card=row.waveItem ? waveEl(row) : ((row.readKind==="news" || row.kind==="news") ? newsEl(row) : cardEl(row));
+  let stage=host.querySelector(".feed-stage");
+  if(!stage){
+    host.innerHTML="";
+    stage=document.createElement("div");
+    stage.className="feed-stage";
+    host.appendChild(stage);
   }
-  host.appendChild(stage);
+  let pos=stage.querySelector(".read-pos");
+  if(!pos){
+    pos=document.createElement("p");
+    pos.className="read-pos";
+    stage.appendChild(pos);
+  }
+  pos.textContent=placeLabel();
+  let slide=stage.querySelector(".feed-slide");
+  if(!slide){
+    slide=document.createElement("div");
+    slide.className="feed-slide";
+    const navNow=stage.querySelector(".read-nav");
+    if(navNow) stage.insertBefore(slide, navNow);
+    else stage.appendChild(slide);
+  }
+  slide.querySelectorAll("article.is-leave-next, article.is-leave-prev").forEach(function(node){ node.remove(); });
+  const old=slide.querySelector("article.feed-card");
+  const animate=!!dir && !reduceMotion() && !!old;
+  if(animate){
+    card.classList.add(dir>0?"is-enter-next":"is-enter-prev");
+    old.classList.add(dir>0?"is-leave-next":"is-leave-prev");
+    const navNow=slide.querySelector(".read-nav");
+    if(navNow) slide.insertBefore(card, navNow);
+    else slide.appendChild(card);
+    old.addEventListener("animationend", function(){ old.remove(); }, {once:true});
+    setTimeout(function(){ if(old.isConnected) old.remove(); }, 260);
+  }else{
+    if(old) old.remove();
+    const navNow=slide.querySelector(".read-nav");
+    if(navNow) slide.insertBefore(card, navNow);
+    else slide.appendChild(card);
+  }
+  if(typeof catchemMount==="function") catchemMount(stage);
+  let nav=slide.querySelector(".read-nav");
+  if(!nav){
+    nav=document.createElement("div");
+    nav.className="read-nav";
+    if(wantHint()) nav.classList.add("hint");
+    const prev=document.createElement("button");
+    prev.type="button";
+    prev.setAttribute("aria-label","Previous");
+    prev.textContent="‹";
+    prev.onclick=function(){ stepRead(-1); };
+    const next=document.createElement("button");
+    next.type="button";
+    next.setAttribute("aria-label","Next");
+    next.textContent="›";
+    next.onclick=function(){ stepRead(1); };
+    nav.appendChild(prev);
+    nav.appendChild(next);
+    slide.appendChild(nav);
+  }
+  bindSwipe(card);
+  commitReadUrl(row);
 }
 async function boot(){
   const back=document.getElementById("feed-back");
@@ -2890,7 +3064,6 @@ async function boot(){
       sel.appendChild(o);
     });
   }
-  if(meta && meta.source && document.getElementById("feed-count")) document.getElementById("feed-count").textContent=meta.source+".";
   const only=focusGroup();
   if(!only){
     try{ browse=await (await fetch("/data/feed/browse.json")).json(); }catch(e){ browse=null; }
@@ -2910,7 +3083,8 @@ async function boot(){
         hideFacts=!!hideBox.checked;
         try{ sessionStorage.setItem("hide-facts", hideFacts?"1":"0"); }catch(e){}
         flat=null;
-        showFlat(0);
+        urlIntent="replace";
+        showFlat(0, 0);
       };
     }
     const loop=document.getElementById("f-loop");
@@ -3002,16 +3176,6 @@ async function boot(){
         box.appendChild(p);
       }
     }
-    function writeUrl(f, setName, push){
-      const url=new URL(location.href);
-      if(f) url.searchParams.set("f", f); else url.searchParams.delete("f");
-      if(f==="set" && setName) url.searchParams.set("set", setName); else url.searchParams.delete("set");
-      const next=url.pathname+url.search+url.hash;
-      const cur=location.pathname+location.search+location.hash;
-      if(next===cur) return;
-      if(push) history.pushState({f:f}, "", next);
-      else history.replaceState({f:f}, "", next);
-    }
     async function applyFilter(f, setName, push){
       filterGen++;
       const next=knownFilter(f);
@@ -3022,16 +3186,59 @@ async function boot(){
       if(picker) picker.hidden=loopFilter!=="set";
       paintChips();
       if(loopFilter==="set") fillSetHits(setQ ? setQ.value : "");
-      writeUrl(loopFilter, wantedSet, push);
       flat=null;
-      await showFlat(0);
+      const startId=openRead;
+      openRead="";
+      if(urlIntent!=="silent") urlIntent=push?"push":"replace";
+      let index=0;
+      buildFlat();
+      if(startId){
+        const at=indexOfId(startId);
+        if(at>=0) index=at;
+      }
+      await showFlat(index, 0);
     }
     if(setQ) setQ.addEventListener("input", function(){ fillSetHits(setQ.value); });
     window.addEventListener("popstate", function(){
       const q=new URLSearchParams(location.search);
-      applyFilter(q.get("f")||"", q.get("set")||"", false);
+      const f=q.get("f")||"";
+      const setName=q.get("set")||"";
+      const rid=q.get("r")||"";
+      const same=f===loopFilter && (f!=="set" || setName===wantedSet);
+      if(same && flat){
+        urlIntent="silent";
+        const at=indexOfId(rid);
+        const dir=at<0?0:(at<spot?-1:(at>spot?1:0));
+        showFlat(at<0?spot:at, dir);
+        return;
+      }
+      openRead=rid;
+      urlIntent="silent";
+      applyFilter(f, setName, false);
     });
+    document.addEventListener("keydown", function(ev){
+      if(ev.altKey||ev.ctrlKey||ev.metaKey) return;
+      if(ev.key!=="ArrowLeft" && ev.key!=="ArrowRight") return;
+      const box=nodeOf(ev);
+      if(box && box.closest && box.closest("input, textarea, select")) return;
+      if(!document.querySelector("#feed-one article.feed-card")) return;
+      ev.preventDefault();
+      stepRead(ev.key==="ArrowRight"?1:-1);
+    });
+    document.addEventListener("wheel", function(ev){
+      const box=nodeOf(ev);
+      const card=box && box.closest && box.closest("#feed-one article.feed-card");
+      if(!card) return;
+      ev.preventDefault();
+      const now=Date.now();
+      if(now<wheelAt) return;
+      if(!ev.deltaY) return;
+      wheelAt=now+300;
+      stepRead(ev.deltaY>0?1:-1);
+    }, {passive:false});
     const startQ=new URLSearchParams(location.search);
+    openRead=startQ.get("r")||"";
+    urlIntent="replace";
     await applyFilter(startQ.get("f")||"", startQ.get("set")||"", false);
     await restoreSpot();
     return;
