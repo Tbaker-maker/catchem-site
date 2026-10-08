@@ -5,6 +5,7 @@ import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
+import { imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
@@ -90,6 +91,20 @@ export function addFeedEntry(html) {
 }
 
 
+async function catalogueMap(fetchImpl) {
+  try {
+    const doc = await loadJson("catalogue-images.json", fetchImpl);
+    const images = doc && doc.images && typeof doc.images === "object" ? doc.images : null;
+    return images && !Array.isArray(images) ? images : {};
+  } catch {
+    return {};
+  }
+}
+
+function withCatalogue(list, images) {
+  return (list || []).map((row) => (row && typeof row === "object" ? { ...row, catalogueSrc: imageForId(images, row.id) } : row));
+}
+
 async function omitStalePriceReads(reads, fetchImpl) {
   const list = Array.isArray(reads) ? reads : [];
   const buckets = new Map();
@@ -170,7 +185,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp, pageOpts));
   if (kind === "artist") {
     const slug = decodeURIComponent(path.slice("/artists/".length));
-    try { return html(renderArtist(await loadJson(`artists/${slug}.json`, fetchImpl), stamp, pageOpts)); }
+    try {
+      const doc = await loadJson(`artists/${slug}.json`, fetchImpl);
+      const images = await catalogueMap(fetchImpl);
+      return html(renderArtist({ ...doc, cards: withCatalogue(doc.cards, images) }, stamp, pageOpts));
+    }
     catch { return html(renderArtist(null, stamp, pageOpts), 404); }
   }
   if (kind === "dive") {
@@ -199,9 +218,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
     const diveHref = sealedId ? `/dive/${sealedId}` : "";
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref }), card ? 200 : 404);
+    const images = await catalogueMap(fetchImpl);
+    const catalogueSrc = card ? imageForId(images, card.id) : "";
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc }), card ? 200 : 404);
   }
-  if (kind === "movers") return html(renderMovers(await loadJson("movers.json", fetchImpl), stamp, pageOpts));
+  if (kind === "movers") {
+    const doc = await loadJson("movers.json", fetchImpl);
+    const images = await catalogueMap(fetchImpl);
+    const painted = { ...doc };
+    for (const key of ["singles", "sealed", "singlesRising", "singlesFalling", "sealedRising", "sealedFalling"]) {
+      if (Array.isArray(doc[key])) painted[key] = withCatalogue(doc[key], images);
+    }
+    return html(renderMovers(painted, stamp, pageOpts));
+  }
   if (kind === "search") return html(renderSearch(pageOpts));
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
@@ -273,14 +302,7 @@ export default {
       });
     }
     if (request.method === "GET" && url.pathname === "/api/card-img") {
-      const pid = Number(url.searchParams.get("pid"));
-      if (!Number.isFinite(pid) || pid <= 0) return new Response("Bad", { status: 400 });
-      const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
-      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-      return new Response(img.body, {
-        status: 200,
-        headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" },
-      });
+      return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
     }
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
