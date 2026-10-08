@@ -1,7 +1,7 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
-import { brandedTile, cataloguePath, catalogueUrl, imageTag } from "./catalogue-image.mjs";
+import { brandedTile, cataloguePath, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -945,16 +945,32 @@ h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .counts b span{display:block;font:400 12px/1.3 var(--sans);color:var(--dim)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
 .ph{width:100%;aspect-ratio:1;border-radius:12px;background:#211e1a;display:grid;place-items:center;color:var(--dim);font-size:13px}
-.tile{display:grid;place-items:center;overflow:hidden;text-align:center;background:#12100e;border:1px solid #2f2b26;border-radius:12px;color:#efe9de}
-.tile span{font:600 22px/1.1 var(--serif);letter-spacing:-.03em}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;overflow:hidden;text-align:center;background:#1a1815;border:1px solid #2f2b26;border-radius:12px;color:#efe9de;box-sizing:border-box;padding:6px}
+.tile .mark{font:600 13px/1 var(--serif);letter-spacing:-.03em;color:#efe9de}
 .tile .dot{color:var(--gold)}
+.tile .ptype{font:600 10px/1.15 var(--sans);letter-spacing:.04em;text-transform:uppercase;color:#d9b779}
+.tile img{width:44px;height:22px;object-fit:contain;background:transparent}
 .tile-card{width:min(280px,100%);aspect-ratio:63/88}
-.tile-sealed{width:64px;aspect-ratio:1/1;flex:none}
-.tile-logo{width:min(220px,100%);aspect-ratio:5/2}
-.tile-row{width:56px;aspect-ratio:63/88;flex:none}
-.tile-row span,.tile-sealed span{font-size:9px}
-.tile-logo span{font-size:16px}
-.row .tile,.row .shot{flex:none}
+.tile-card .mark{font-size:22px}
+.tile-card .ptype{font-size:13px}
+.tile-sealed,.tile-row{width:64px;height:88px;flex:none;aspect-ratio:auto}
+.tile-logo{width:min(220px,100%);height:72px;aspect-ratio:auto}
+.tile-logo .mark{font-size:18px}
+.row .tile,.row .shot{flex:none;width:64px;height:88px}
+img.shot{object-fit:contain;background:#12100e;border-radius:8px;display:block}
+img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
+.news-tile{box-sizing:border-box;width:100%;height:220px;border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;background:#1a1815;border:1px solid #2f2b26;color:#efe9de}
+.news-tile .mark{margin:0;font:600 22px/1 var(--serif);letter-spacing:-.03em}
+.news-tile .dot{color:#d9b779}
+.news-tile .src{margin:0;font:600 26px/1.15 var(--serif);letter-spacing:-.02em}
+.news-tile .tag{margin:0;align-self:flex-start;font:600 12px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1a1407;background:#d9b779;border-radius:999px;padding:6px 10px}
+.news-tile .when{margin:0;font:500 14px/1.2 var(--sans);color:#c4baab}
+.news-tile.v1{background:linear-gradient(160deg,#2a2418 0%,#12100e 58%);border-color:#d9b779}
+.news-tile.v1 .src{color:#d9b779}
+.news-tile.v2{background:#12100e;border-top:8px solid #d9b779}
+.news-tile.v2 .mark{color:#d9b779}
+.news-tile.v3{background:#211e1a;position:relative}
+.news-tile.v3::after{content:"";position:absolute;right:0;top:0;width:72px;height:72px;background:#d9b779;clip-path:polygon(100% 0,0 0,100% 100%)}
 .shot{width:min(280px,100%);height:auto;border-radius:16px;background:#12100e;display:block}
 .row .shot{width:48px;height:auto;border-radius:8px;object-fit:contain}
 .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:44px;align-items:center;min-width:0;max-width:100%}
@@ -1035,8 +1051,43 @@ ${body}
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
 <footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from the public TCGCSV feed.</p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
-<script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);</script>
-</body></html>`;
+<script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
+window.cropCardEdge=function(img){
+  if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
+  img.setAttribute("data-cropped","1");
+  try{
+    var w=img.naturalWidth,h=img.naturalHeight;
+    if(!w||!h||w<16||h<16) return;
+    var c=document.createElement("canvas");
+    c.width=w;c.height=h;
+    var x=c.getContext("2d",{willReadFrequently:true});
+    x.drawImage(img,0,0);
+    var d=x.getImageData(0,0,w,h).data;
+    function matte(px,py){
+      var i=(py*w+px)*4,r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
+      if(a<18) return true;
+      var C=Math.max(r,g,b)-Math.min(r,g,b),L=(r+g+b)/3;
+      if(C<=22&&L>=242) return true;
+      if(C<=18&&L<=14) return true;
+      return false;
+    }
+    if(!(matte(1,1)&&matte(w-2,1)&&matte(1,h-2)&&matte(w-2,h-2))) return;
+    function rowMatte(y){for(var xx=0;xx<w;xx+=4) if(!matte(xx,y)) return false; return true;}
+    function colMatte(xx){for(var yy=0;yy<h;yy+=4) if(!matte(xx,yy)) return false; return true;}
+    var top=0,bot=h-1,left=0,right=w-1;
+    while(top<bot&&rowMatte(top)) top++;
+    while(bot>top&&rowMatte(bot)) bot--;
+    while(left<right&&colMatte(left)) left++;
+    while(right>left&&colMatte(right)) right--;
+    var cw=right-left+1,ch=bot-top+1;
+    if(cw<8||ch<8||(top<2&&left<2&&h-1-bot<2&&w-1-right<2)) return;
+    var out=document.createElement("canvas");
+    out.width=cw;out.height=ch;
+    out.getContext("2d").drawImage(c,left,top,cw,ch,0,0,cw,ch);
+    img.src=out.toDataURL("image/jpeg",0.86);
+  }catch(e){}
+};
+</script></body></html>`;
 }
 
 function spark(values) {
@@ -1061,7 +1112,12 @@ export function renderSets(index, stamp, opts = {}) {
 ${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}
 ${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
 ${chartBox(index?.singlesIndex || [], "Singles index, chain-linked")}
-${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s) => `<a class="card" href="/sets/${esc(s.slug)}"><b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${s.release ? ` · ${esc(s.release)}` : ""}</p></a>`).join("")}</div>`).join("")}
+${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s) => {
+    const face = /^https:\/\//.test(String(s.logo || ""))
+      ? `<img class="shot" alt="" width="160" height="64" loading="lazy" decoding="async" src="${esc(s.logo)}">`
+      : brandedTile("logo", { kind: "set", name: s.name });
+    return `<a class="card" href="/sets/${esc(s.slug)}">${face}<b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${s.release ? ` · ${esc(s.release)}` : ""}</p></a>`;
+  }).join("")}</div>`).join("")}
 </main>`;
   return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
 }
@@ -1090,7 +1146,18 @@ let rows=[], shown=48, setLogo="";
 let catImages={};
 ${cataloguePath.toString()}
 ${catalogueUrl.toString()}
+${imageForId.toString()}
+${tcgPid.toString()}
+${ptcgFile.toString()}
+${productTypeLabel.toString()}
+${officialSrc.toString()}
 ${brandedTile.toString()}
+function miss(img){
+  var d=document.createElement("div");
+  var kind=img.getAttribute("data-kind")==="sealed"?"sealed":"row";
+  d.innerHTML=brandedTile(kind,{kind:img.getAttribute("data-kind"),name:img.alt,logo:typeof setLogo==="string"?setLogo:""});
+  if(d.firstChild) img.replaceWith(d.firstChild);
+}
 function draw(){
   const kind=document.getElementById("kind").value;
   const q=document.getElementById("q").value.trim().toLowerCase();
@@ -1102,15 +1169,17 @@ function draw(){
   document.getElementById("list").innerHTML=view.map(r=>{
     const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
     const src=pictureSrc(r, setLogo);
-    const img=src?'<img alt="" width="48" height="67" style="width:48px;height:auto;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'">':brandedTile(r&&r.kind==="sealed"?"sealed":"row");
+    const img=src?'<img alt="'+html(r.name)+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
     return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+html(r.num||"")+' '+html(r.rarity||"")+(r.artist?" · "+html(r.artist):"")+'</span></a><b>'+money(r.price)+'</b></div>';
   }).join("") || '<p class="muted">Nothing matches.</p>';
   document.getElementById("more").hidden=shown>=list.length;
 }
 function pictureSrc(row, logo){
   if(!row || typeof row!=="object") return "";
+  const hit=officialSrc(row, catImages);
+  if(hit&&hit.src) return hit.src;
   if(row.icon) return "";
-  return catalogueUrl(cataloguePath(catImages, row.id));
+  return "";
 }
 function cropStyle(crop){
   if(!crop || typeof crop!=="object") return "";
@@ -1132,7 +1201,9 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
   var logoSrc=catalogueUrl(cataloguePath(catImages, slug));
-  document.getElementById("lines").innerHTML=(logoSrc?'<img alt="" width="160" height="64" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:64px;width:auto;background:#12100e;border-radius:8px">':brandedTile("logo"))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
+  if(!logoSrc && typeof data.logo==="string" && data.logo.indexOf("https://")===0) logoSrc=data.logo;
+  setLogo=logoSrc||"";
+  document.getElementById("lines").innerHTML=(logoSrc?'<img alt="" width="160" height="64" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:64px;width:auto;background:#12100e;border-radius:8px">':brandedTile("logo",{kind:"set",name:data.name}))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
   document.getElementById("charts").innerHTML='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div><div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
   document.getElementById("single-chart").setAttribute("data-chart", JSON.stringify(data.singleIndex||[]));
   document.getElementById("sealed-chart").setAttribute("data-chart", JSON.stringify(data.sealedIndex||[]));
@@ -1239,7 +1310,7 @@ export function renderCard(card, stamp, opts = {}) {
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name);
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "" });
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const body = `<main class="wrap">
 <p class="muted"><a href="/sets/${esc(card.setSlug || "")}">${esc(card.set || "")}</a> · ${esc(hrefKind)}</p>
@@ -1302,7 +1373,7 @@ export function renderArtist(doc, stamp, opts = {}) {
   if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp, "", feedNav(opts));
   const top = (doc.cards || []).slice(0, 12);
   const rest = (doc.cards || []).slice(12);
-  const row = (c) => `<div class="row">${imageTag(c.catalogueSrc || "", c.kind === "sealed" ? "sealed" : "row", "")}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
+  const row = (c) => `<div class="row">${imageTag(c.catalogueSrc || "", c.kind === "sealed" ? "sealed" : "row", c.name || "", c)}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
   const body = `<main class="wrap"><h1>${esc(doc.name)}</h1>
 ${chartBox(doc.index || [], "Artist index, chain-linked")}
 <p class="muted">${esc(doc.source || "")}</p>
@@ -1323,7 +1394,7 @@ export function renderMovers(doc, stamp, opts = {}) {
   };
   const row = (r, withSpark) => {
     const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
-    const face = imageTag(r.catalogueSrc || "", r.kind === "sealed" ? "sealed" : "row", "");
+    const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
     return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
   };
@@ -1373,6 +1444,20 @@ const rankCatalog=search.rankCatalog;
 const searchCatalog=search.searchCatalog;
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
+let catImages={};
+${cataloguePath.toString()}
+${catalogueUrl.toString()}
+${imageForId.toString()}
+${tcgPid.toString()}
+${ptcgFile.toString()}
+${productTypeLabel.toString()}
+${officialSrc.toString()}
+${brandedTile.toString()}
+function miss(img){
+  var d=document.createElement("div");
+  d.innerHTML=brandedTile("row",{kind:img.getAttribute("data-kind"),name:img.alt});
+  if(d.firstChild) img.replaceWith(d.firstChild);
+}
 function stored(r){
   const n=Number(r&&r[6]);
   return Number.isFinite(n)&&n>0?n:null;
@@ -1389,7 +1474,10 @@ function take(list){
 }
 function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
-  return '<div class="row"><a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
+  const row={id:r[0],name:r[1],kind:r[5]};
+  const hit=officialSrc(row, catImages);
+  const face=hit.src?'<img alt="'+html(r[1])+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+html(r[5])+'" '+((r[5]!=="sealed")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+hit.src+'" onerror="miss(this)">':brandedTile("row",row);
+  return '<div class="row">'+face+'<a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
 }
 function draw(){
   const q=document.getElementById("q").value.trim();
@@ -1405,7 +1493,10 @@ function draw(){
   document.getElementById("meta").textContent=shown.length+" shown";
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("");
 }
-fetch("/data/search-lite.json").then(r=>r.json()).then(data=>{rows=data;document.getElementById("meta").textContent=rows.length+" names loaded.";draw()}).catch(()=>{document.getElementById("meta").textContent="Search did not load."});
+fetch("/data/search-lite.json").then(r=>r.json()).then(async function(data){
+  try{ var doc=await (await fetch("/data/catalogue-images.json")).json(); catImages=(doc&&doc.images)||{}; }catch(e){ catImages={}; }
+  rows=data;document.getElementById("meta").textContent=rows.length+" names loaded.";draw();
+}).catch(()=>{document.getElementById("meta").textContent="Search did not load."});
 document.getElementById("q").addEventListener("input",draw);
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));
@@ -1595,6 +1686,7 @@ export function renderDive(doc, stamp, opts = {}) {
   const body = `<main class="wrap">
 <p class="muted"><a href="/feed">Feed</a> · <a href="/board">Board</a> · Deep dive</p>
 <h1>${esc(doc.name || doc.id)}</h1>
+${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
 <p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
@@ -1663,7 +1755,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
   .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
-  .feed-card>.tile{width:min(200px,72%);margin:0 auto}
+  .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
+  .feed-card>.news-tile{width:100%;height:220px;margin:0}
   .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
   .one-line{margin:0}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
@@ -2033,7 +2126,14 @@ function meansCopy(card){
 let catalogueImages=null;
 ${cataloguePath.toString()}
 ${catalogueUrl.toString()}
+${imageForId.toString()}
+${tcgPid.toString()}
+${ptcgFile.toString()}
+${productTypeLabel.toString()}
+${officialSrc.toString()}
 ${brandedTile.toString()}
+${newsVariant.toString()}
+${newsTile.toString()}
 function logoFor(card){
   return catalogueUrl(cataloguePath(catalogueImages, card&&card.id))||"";
 }
@@ -2045,19 +2145,27 @@ function placeholder(setName){
 }
 function photoEl(card){
   const kind=card&&card.kind==="sealed"?"sealed":"card";
-  const url=catalogueUrl(cataloguePath(catalogueImages, card&&card.id));
-  if(!url){
+  const hit=officialSrc(card, catalogueImages);
+  if(!hit.src){
     const box=document.createElement("div");
-    box.innerHTML=brandedTile(kind);
+    box.innerHTML=brandedTile(kind, card);
     return box.firstChild;
   }
   const img=document.createElement("img");
-  img.alt="";
-  img.src=url;
+  img.alt=card&&card.name?String(card.name):"";
+  img.width=280;
+  img.height=392;
+  img.loading="lazy";
+  img.decoding="async";
   img.draggable=false;
+  img.src=hit.src;
+  if(hit.crop){
+    img.setAttribute("data-crop-card","1");
+    img.onload=function(){ if(window.cropCardEdge) cropCardEdge(img); };
+  }
   img.onerror=function(){
     const next=document.createElement("div");
-    next.innerHTML=brandedTile(kind);
+    next.innerHTML=brandedTile(kind, card);
     img.replaceWith(next.firstChild);
   };
   return img;
@@ -2108,7 +2216,7 @@ function waveEl(card){
   const line=shownRead(card);
   const setName=setLine(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML="<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML=newsTile(card)+"<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
 function mountMon(el, card){
@@ -2141,8 +2249,8 @@ function mountMon(el, card){
     priced.forEach(function(row){
       const p=document.createElement("p");
       const parts=[];
-      if(row.cutout) parts.push('<img class="cutout" alt="" src="'+html(row.cutout)+'">');
-      else parts.push("The picture is missing.");
+      if(row.cutout) parts.push('<img class="cutout" alt="" width="46" height="64" loading="lazy" decoding="async" src="'+html(row.cutout)+'">');
+      else parts.push(brandedTile("row",{kind:"single",name:row.name}));
       parts.push(money(row.price));
       if(row.name) parts.push(html(row.name));
       if(row.set) parts.push(html(row.set));
@@ -2165,7 +2273,7 @@ function newsEl(card){
   const when=card.asOf?'<p>'+html(card.asOf)+"</p>":"";
   const label=card.source||card.href||"";
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(label)+"</a></p>":"";
-  el.innerHTML="<h3>"+html(card.name||"")+"</h3>"+place+when+link;
+  el.innerHTML=newsTile(card)+"<h3>"+html(card.name||"")+"</h3>"+place+when+link;
   return el;
 }
 function factCutLine(card){
@@ -2193,7 +2301,7 @@ function cardEl(card, facts){
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?factCutLine(card):"";
-  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
+  const head=(isFact(card)?brandedTile("card",{kind:"single",name:card&&card.name}):"")+h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
@@ -3322,6 +3430,8 @@ export function renderMine(stamp, opts = {}) {
 <ul id="mine-list"></ul>
 </main>
 <script>
+${productTypeLabel.toString()}
+${brandedTile.toString()}
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
@@ -3346,7 +3456,7 @@ function draw(){
     li.className="mine-row";
     li.draggable=true;
     const listed=Number(row.listings)>=20 && row.listingsAsOf ? "Active listings: "+row.listings+" (as of "+row.listingsAsOf+")" : "";
-    li.innerHTML='<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
+    li.innerHTML=brandedTile("row",{kind:row.kind||"single",name:row.name||row.headline,id:row.id,sku:row.sku})+'<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
     li.ondragstart=function(){ dragId=row.id; };
     li.ondragover=function(ev){ ev.preventDefault(); };
     li.ondrop=function(ev){
@@ -3407,7 +3517,7 @@ export function renderAll(bundle, stamp, opts = {}) {
 ${reads.map((r) => {
     const line = soldSafeText(r, r.headline);
     if (!line) return "";
-    return `<div class="row"><a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
+    return `<div class="row">${imageTag(officialSrc(r, null).src, "row", line, r)}<a href="/feed/r/${esc(r.id)}"><b>${esc(line)}</b></a><b>${money(r.price) || ""}</b></div>`;
   }).join("")}
 </main>`;
   return chrome("Feed", body, "All reads", stamp, "", feedNav(opts));
