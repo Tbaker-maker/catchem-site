@@ -100,14 +100,11 @@ export function isShapeRow(row) {
   return false;
 }
 
-// A sealed product already filed under Dive, or a row whose kind is sealed.
-// The Sealed chip uses these rows. It does not invent a sealed price.
+// A sealed read is a row whose kind is sealed. Match that kind and its id.
+// A product name does not make a dive row sealed, and no sealed price is invented.
 export function isSealedProductRow(row) {
   if (!row || typeof row !== "object") return false;
-  if (row.kind === "sealed") return true;
-  if (row.readKind !== "dive" && row.kind !== "dive") return false;
-  const name = String(row.name || "");
-  return /booster box|booster pack|booster bundle|elite trainer box|ultra[- ]premium|build & battle|premium collection/i.test(name);
+  return row.kind === "sealed" && String(row.id || "").length > 0;
 }
 
 // The line under the title keeps the product name. A spread already on the row
@@ -779,7 +776,7 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     if (hideFacts && isFactRow(row)) return;
     if (filter === "pokemon" && !isFactRow(row)) return;
     if (filter === "prices" && (isFactRow(row) || isOutlierRow(row) || isDiveRow(row) || row.readKind === "news" || row.readKind === "wave" || !(Number(row.price) > 0))) return;
-    if (filter === "set" && setName && row.set !== setName) return;
+    if (filter === "set" && setName && row.set !== setName && row.setSlug !== setName) return;
     if (filter === "news" && row.readKind !== "news" && row.kind !== "news") return;
     if (filter === "wave" && row.readKind !== "wave" && row.kind !== "wave" && !row.reprint && !row.waveItem) return;
     if (filter === "flagged" && !isOutlierRow(row) && !(row.flagged && row.flagged.on)) return;
@@ -818,7 +815,6 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
     return out;
   }
   if (filter === "sealed") {
-    for (const row of diveReads(browse, kept)) if (isSealedProductRow(row)) push(row);
     for (const row of kept) if (row && row.kind === "sealed") push(row);
     return out;
   }
@@ -1151,7 +1147,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <title>${esc(title)} · Catch'em</title>
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}</style><script>${CHART_JS}</script></head><body>
+<style>${CSS}</style><script>function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}</script></head><body>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
@@ -1994,8 +1990,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const css = `
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
-  #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px}
-  .chip-scroller{position:relative}
+  #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;width:100%}
+  .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%}
   .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:0;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
   .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 48px 8px 0;margin:0;scrollbar-width:none}
   .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
@@ -2003,11 +1999,17 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .chip-more{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:5;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--gold);font:600 28px/1 var(--sans)}
   .chip-more[hidden]{display:none}
   .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .set-picker{display:flex;flex-direction:column;gap:8px}
+  .set-picker{display:flex;flex-direction:column;gap:8px;width:100%;max-width:100%;min-width:0;position:relative;z-index:6}
   .set-picker[hidden]{display:none}
   .set-picker input{min-height:44px;width:100%;max-width:100%}
-  .set-hits{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
-  .set-hits button{min-height:44px;text-align:left;width:100%}
+  .set-hits{display:flex;flex-direction:column;gap:4px;max-height:min(280px,50dvh);overflow:auto;background:#1a1815;border:1px solid var(--line);border-radius:12px;padding:4px}
+  .set-hits[hidden]{display:none}
+  .set-hits button{min-height:44px;text-align:left;width:100%;display:flex;align-items:center;gap:8px}
+  .set-hits img{width:44px;height:22px;object-fit:contain;flex:0 0 auto;background:#12100e;border-radius:4px}
+  @media (max-width:767px){
+    .set-picker.is-open:not([hidden]){position:fixed;z-index:40;left:0;right:0;bottom:0;max-height:min(70dvh,560px);overflow:auto;background:#1a1815;border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 12px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.45)}
+    .set-picker.is-open .set-hits{max-height:none;border:0;background:transparent;padding:0}
+  }
   .feed-filters select,.feed-filters input{min-height:44px;max-width:100%}
   .feed-sec{border-top:1px solid var(--line);padding:8px 0}
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
@@ -2253,11 +2255,15 @@ const GROUPS=[
 ];
 const SAID={up:"Up",sideways:"Sideways",down:"Down"};
 const pages={};
+let look=null;
 const HOME_CAP=6;
 const PAGE=24;
 const cursor={};
 let meta=null;
 let catalogue=null;
+let setBook=null;
+let setIndex=null;
+let rankAt=null;
 let drawing=false;
 function focusGroup(){
   const key=String(focus||"");
@@ -2426,32 +2432,59 @@ function placeholder(setName){
   ph.textContent=setName||"Pokémon";
   return ph;
 }
+function staticTile(kind){
+  const el=document.createElement("div");
+  const k=kind==="sealed"?"sealed":"card";
+  el.className="tile tile-"+k;
+  el.setAttribute("role","img");
+  el.setAttribute("aria-label","Catch'em");
+  el.innerHTML='<span class="mark">Catch'+"'"+'em<span class="dot">.</span></span>';
+  return el;
+}
+function safeTile(kind, card){
+  try{
+    const html=brandedTile(kind, card);
+    const box=document.createElement("div");
+    box.innerHTML=html;
+    if(box.firstChild) return box.firstChild;
+  }catch(e){}
+  return staticTile(kind);
+}
+function safeNewsHtml(card){
+  try{ return newsTile(card); }catch(e){}
+  return '<div class="news-tile" role="img" aria-label="Catch'+"'"+'em news"><p class="mark">Catch'+"'"+'em<span class="dot">.</span></p></div>';
+}
+function safeBrandHtml(kind, row){
+  try{ return brandedTile(kind, row); }catch(e){}
+  return '<div class="tile tile-card" role="img" aria-label="Catch'+"'"+'em"><span class="mark">Catch'+"'"+'em<span class="dot">.</span></span></div>';
+}
 function photoEl(card){
   const kind=card&&card.kind==="sealed"?"sealed":"card";
-  const hit=officialSrc(card, catalogueImages);
-  if(!hit.src){
-    const box=document.createElement("div");
-    box.innerHTML=brandedTile(kind, card);
-    return box.firstChild;
+  try{
+    const hit=officialSrc(card, catalogueImages);
+    if(!hit || !hit.src) return safeTile(kind, card);
+    const img=document.createElement("img");
+    img.alt=card&&card.name?String(card.name):"";
+    img.width=280;
+    img.height=392;
+    img.loading="lazy";
+    img.decoding="async";
+    img.draggable=false;
+    img.src=hit.src;
+    if(hit.crop){
+      img.setAttribute("data-crop-card","1");
+      img.onload=function(){ if(window.cropCardEdge) cropCardEdge(img); };
+    }
+    img.onerror=function(){
+      try{
+        const next=safeTile(kind, card);
+        if(img.replaceWith) img.replaceWith(next);
+      }catch(e){}
+    };
+    return img;
+  }catch(e){
+    return staticTile(kind);
   }
-  const img=document.createElement("img");
-  img.alt=card&&card.name?String(card.name):"";
-  img.width=280;
-  img.height=392;
-  img.loading="lazy";
-  img.decoding="async";
-  img.draggable=false;
-  img.src=hit.src;
-  if(hit.crop){
-    img.setAttribute("data-crop-card","1");
-    img.onload=function(){ if(window.cropCardEdge) cropCardEdge(img); };
-  }
-  img.onerror=function(){
-    const next=document.createElement("div");
-    next.innerHTML=brandedTile(kind, card);
-    img.replaceWith(next.firstChild);
-  };
-  return img;
 }
 function monthDay(iso){
   const s=String(iso||"").slice(0,10);
@@ -2499,7 +2532,7 @@ function waveEl(card){
   const line=shownRead(card);
   const setName=setLine(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML=newsTile(card)+"<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML=safeNewsHtml(card)+"<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
 function mountMon(el, card){
@@ -2534,13 +2567,14 @@ function newsEl(card){
   const source=String(card.source||"").trim();
   const by='<p class="news-by">'+html(source||"Source")+(when?" · "+html(when):"")+"</p>";
   const link=card.href?'<a class="news-go" href="'+html(card.href)+'">Read at '+html(source||"the source")+"</a>":"";
-  el.innerHTML=newsTile(card)+kicker+"<h3>"+html(card.name||"")+"</h3>"+blurb+newsDetailHtml(card)+by+link;
+  el.innerHTML=safeNewsHtml(card)+kicker+"<h3>"+html(card.name||"")+"</h3>"+blurb+newsDetailHtml(card)+by+link;
   return el;
 }
 function factCutLine(card){
   const src=cutoutSrc(card);
   if(src) return '<img class="cutout" alt="'+html(String(card&&card.name||""))+'" width="220" height="220" loading="lazy" decoding="async" src="'+html(src)+'">';
-  return brandedTile("card",{kind:"single",name:card&&card.name});
+  try{ return brandedTile("card",{kind:"single",name:card&&card.name}); }
+  catch(e){ return safeBrandHtml("card",{kind:"single",name:card&&card.name}); }
 }
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
@@ -3036,6 +3070,87 @@ async function showRead(){
   if(typeof catchemMount==="function") catchemMount(host);
 }
 function revealStart(){}
+function readSlug(row){
+  if(!row || !setBook) return "";
+  const slug=String(row.setSlug||"");
+  if(slug && setBook.bySlug[slug]) return slug;
+  const name=String(row.set||"").trim();
+  if(name && setBook.byName[name]) return setBook.byName[name];
+  return "";
+}
+function resolveSet(raw){
+  const s=String(raw||"").trim();
+  if(!s || !setBook || !setIndex) return "";
+  if(setBook.bySlug[s] && setIndex[s] && setIndex[s].length) return s;
+  const slug=setBook.byName[s];
+  if(slug && setIndex[slug] && setIndex[slug].length) return slug;
+  return "";
+}
+function catalogueRows(){
+  const cards=catalogue && catalogue.cards;
+  if(!cards || typeof cards!=="object") return [];
+  if(Array.isArray(cards)) return cards;
+  return Object.keys(cards).map(function(k){ return cards[k]; });
+}
+function buildReadIndex(){
+  setIndex={};
+  rankAt={};
+  const order=browse && Array.isArray(browse.ranked) ? browse.ranked : [];
+  for(let i=0;i<order.length;i++){
+    if(typeof order[i]==="string" && rankAt[order[i]]==null) rankAt[order[i]]=i;
+  }
+  const seen={};
+  function add(row){
+    if(!row || !row.id) return;
+    const id=String(row.id);
+    if(seen[id]) return;
+    const slug=readSlug(row);
+    if(!slug) return;
+    seen[id]=1;
+    if(!setIndex[slug]) setIndex[slug]=[];
+    setIndex[slug].push(row);
+  }
+  catalogueRows().forEach(add);
+  const filters=browse && browse.filters || {};
+  Object.keys(filters).forEach(function(kind){
+    const items=filters[kind] && filters[kind].items;
+    (items||[]).forEach(add);
+  });
+  leadRows().forEach(add);
+  Object.keys(setIndex).forEach(function(slug){
+    setIndex[slug].sort(function(a,b){
+      const aa=rankAt[a.id]==null?1e15:rankAt[a.id];
+      const bb=rankAt[b.id]==null?1e15:rankAt[b.id];
+      if(aa!==bb) return aa-bb;
+      return String(a.id)<String(b.id)?-1:1;
+    });
+  });
+}
+function sealedList(){
+  const out=[];
+  const seen={};
+  function add(row){
+    if(!isSealedProductRow(row)) return;
+    const id=String(row.id);
+    if(seen[id]) return;
+    seen[id]=1;
+    out.push(row);
+  }
+  catalogueRows().forEach(add);
+  const filters=browse && browse.filters || {};
+  Object.keys(filters).forEach(function(kind){
+    const items=filters[kind] && filters[kind].items;
+    (items||[]).forEach(add);
+  });
+  leadRows().forEach(add);
+  out.sort(function(a,b){
+    const aa=rankAt && rankAt[a.id]!=null ? rankAt[a.id] : 1e15;
+    const bb=rankAt && rankAt[b.id]!=null ? rankAt[b.id] : 1e15;
+    if(aa!==bb) return aa-bb;
+    return String(a.id)<String(b.id)?-1:1;
+  });
+  return out;
+}
 function leadRows(){
   return lead.filter(function(r){
     if(!r || !(r.headline || r.path)) return false;
@@ -3055,7 +3170,9 @@ function accepts(card){
   if(loopFilter==="prices") return Number(card.price)>0 && !isFact(card) && !isShapeRow(card) && card.readKind!=="outlier" && card.kind!=="outlier" && card.readKind!=="dive" && card.kind!=="dive" && card.readKind!=="news" && card.readKind!=="wave";
   if(loopFilter==="set"){
     if(!wantedSet) return false;
-    return card.set===wantedSet && Number(card.price)>0;
+    const slug=readSlug(card);
+    if(slug && slug===wantedSet) return true;
+    return card.set===wantedSet || card.setSlug===wantedSet;
   }
   if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
   if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
@@ -3106,13 +3223,14 @@ function buildFlat(){
     return;
   }
   if(loopFilter==="sealed"){
-    const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
-    (items||[]).forEach(function(row){ if(isSealedProductRow(row)) add(row); });
-    leadRows().forEach(function(r){ if(r && r.kind==="sealed") add(r); });
+    sealedList().forEach(add);
     flat=rows;
     return;
   }
-  if(loopFilter==="set" && !wantedSet){
+  if(loopFilter==="set"){
+    if(!wantedSet){ flat=rows; return; }
+    const slug=resolveSet(wantedSet);
+    ((slug && setIndex && setIndex[slug]) || []).forEach(add);
     flat=rows;
     return;
   }
@@ -3160,6 +3278,17 @@ function buildFlat(){
     const items=block && block.items;
     (items||[]).forEach(function(row){ if(isShapeRow(row)) add(row); });
     leadRows().forEach(function(r){ if(isShapeRow(r) && (r.readKind===loopFilter || r.kind===loopFilter)) add(r); });
+    flat=rows;
+    return;
+  }
+  if(loopFilter==="prices"){
+    const cards=catalogue && catalogue.cards;
+    const order=browse && browse.ranked || [];
+    (order||[]).forEach(function(id){
+      if(typeof id!=="string" || !id) return;
+      const card=cards && cards[id];
+      add(card || {id:id, pending:true});
+    });
     flat=rows;
     return;
   }
@@ -3212,7 +3341,7 @@ async function materialize(index, dir){
   if(i<0) i=0;
   if(i>=flat.length) i=flat.length-1;
   let guard=0;
-  while(i>=0 && i<flat.length && guard<400){
+  while(i>=0 && i<flat.length && guard<flat.length){
     let row=flat[i];
     if(row && row.pending){
       const full=await cardById(row.id);
@@ -3360,14 +3489,21 @@ async function showFlat(index, dir){
   if(!host) return;
   if(!found.row){
     host.innerHTML="";
-    if(loopFilter==="sealed" || (loopFilter==="set" && !wantedSet)){
-      commitReadUrl(null);
-      return;
-    }
     const p=document.createElement("p");
     p.className="muted";
     const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
-    p.textContent=shapeEmpty[loopFilter]||(loopFilter==="news"?"There is no news.":loopFilter==="wave"?"No wave or reprint news.":loopFilter==="flagged"?"No flagged prices.":loopFilter==="dive"?"No deep dives.":loopFilter==="volume"?"No TCGplayer sold counts on file.":loopFilter==="pokemon"?"No Pokémon facts.":"Nothing in this filter.");
+    let msg=shapeEmpty[loopFilter]||"";
+    if(!msg && loopFilter==="sealed") msg="No sealed reads tonight.";
+    else if(!msg && loopFilter==="set" && !wantedSet) msg="Choose a set to see its reads.";
+    else if(!msg && loopFilter==="set") msg="No reads for this set.";
+    else if(!msg && loopFilter==="news") msg="There is no news.";
+    else if(!msg && loopFilter==="wave") msg="No wave or reprint news.";
+    else if(!msg && loopFilter==="flagged") msg="No flagged prices.";
+    else if(!msg && loopFilter==="dive") msg="No deep dives.";
+    else if(!msg && loopFilter==="volume") msg="No TCGplayer sold counts on file.";
+    else if(!msg && loopFilter==="pokemon") msg="No Pokémon facts.";
+    else if(!msg) msg="Nothing in this filter.";
+    p.textContent=msg;
     host.appendChild(p);
     commitReadUrl(null);
     return;
@@ -3487,14 +3623,47 @@ async function boot(){
   const only=focusGroup();
   if(!only){
     try{ browse=await (await fetch("/data/feed/browse.json")).json(); }catch(e){ browse=null; }
+    try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
+    try{
+      const doc=await (await fetch("/data/sets.json")).json();
+      const bySlug={};
+      const byName={};
+      (doc && Array.isArray(doc.sets) ? doc.sets : []).forEach(function(tile){
+        if(!tile || !tile.slug || !tile.name) return;
+        bySlug[tile.slug]=tile;
+        if(!byName[tile.name]) byName[tile.name]=tile.slug;
+      });
+      setBook={bySlug:bySlug, byName:byName};
+    }catch(e){ setBook={bySlug:{}, byName:{}}; }
+    buildReadIndex();
     const setSel=document.getElementById("f-loop-set");
-    if(setSel){
-      (meta&&meta.sets||[]).forEach(function(set){
+    function fillSetOptions(){
+      if(!setSel) return;
+      while(setSel.options.length>1) setSel.remove(1);
+      const rows=[];
+      Object.keys(setIndex||{}).forEach(function(slug){
+        const tile=setBook && setBook.bySlug[slug];
+        if(!tile || !setIndex[slug] || !setIndex[slug].length) return;
+        rows.push(tile);
+      });
+      rows.sort(function(a,b){
+        const ar=String(a.release||"");
+        const br=String(b.release||"");
+        const aOk=/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(ar);
+        const bOk=/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(br);
+        if(aOk && bOk && ar!==br) return ar<br?1:-1;
+        if(aOk!==bOk) return aOk?-1:1;
+        return String(a.name||"").localeCompare(String(b.name||""));
+      });
+      rows.forEach(function(tile){
         const o=document.createElement("option");
-        o.value=set.name; o.textContent=set.name;
+        o.value=tile.slug;
+        o.textContent=tile.name;
+        if(String(tile.logo||"").indexOf("https://")===0) o.dataset.logo=tile.logo;
         setSel.appendChild(o);
       });
     }
+    fillSetOptions();
     const hideBox=document.getElementById("f-hide-facts");
     if(premium && hideBox){
       try{ hideFacts=sessionStorage.getItem("hide-facts")==="1"; }catch(e){ hideFacts=false; }
@@ -3517,9 +3686,7 @@ async function boot(){
       return Array.prototype.some.call(loop.options, function(o){ return o.value===f; }) ? f : "";
     }
     function sealedAvailable(){
-      const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
-      if((items||[]).some(function(row){ return isSealedProductRow(row); })) return true;
-      return leadRows().some(function(r){ return r && r.kind==="sealed"; });
+      return sealedList().length>0;
     }
     function fitChips(){
       if(!chipRow) return;
@@ -3571,11 +3738,14 @@ async function boot(){
     };
     if(chipRow) chipRow.addEventListener("scroll", function(){ fitChips(); });
     window.addEventListener("resize", function(){ fitChips(); });
+    let setHitsOpen=false;
     function fillSetHits(q){
       const box=document.getElementById("set-hits");
       if(!box||!setSel) return;
       const query=String(q||"").trim().toLowerCase();
       box.textContent="";
+      box.hidden=!setHitsOpen;
+      if(!setHitsOpen) return;
       let n=0;
       Array.prototype.forEach.call(setSel.options, function(opt){
         if(!opt.value) return;
@@ -3583,9 +3753,25 @@ async function boot(){
         const b=document.createElement("button");
         b.type="button";
         b.setAttribute("role","option");
-        b.textContent=opt.textContent;
+        const logo=String(opt.dataset.logo||"");
+        if(logo.indexOf("https://")===0){
+          const img=document.createElement("img");
+          img.alt="";
+          img.width=44;
+          img.height=22;
+          img.src=logo;
+          b.appendChild(img);
+        }
+        const label=document.createElement("span");
+        label.textContent=opt.textContent;
+        b.appendChild(label);
         b.setAttribute("aria-selected", opt.value===setSel.value ? "true" : "false");
-        b.onclick=function(){ applyFilter("set", opt.value, true); };
+        b.onclick=function(){
+          setHitsOpen=false;
+          if(setQ) setQ.value=opt.textContent;
+          if(picker) picker.classList.remove("is-open");
+          applyFilter("set", opt.value, true);
+        };
         box.appendChild(b);
         n++;
       });
@@ -3601,9 +3787,27 @@ async function boot(){
       const next=knownFilter(f);
       if(loop) loop.value=next;
       loopFilter=next;
-      wantedSet=loopFilter==="set" ? String(setName||"") : "";
-      if(setSel && wantedSet && Array.prototype.some.call(setSel.options, function(o){ return o.value===wantedSet; })) setSel.value=wantedSet;
-      if(picker) picker.hidden=loopFilter!=="set";
+      if(loopFilter==="set"){
+        wantedSet=resolveSet(setName);
+        setHitsOpen=wantedSet ? false : true;
+      }else{
+        wantedSet="";
+        setHitsOpen=false;
+      }
+      if(setSel){
+        const match=!!(wantedSet && Array.prototype.some.call(setSel.options, function(o){ return o.value===wantedSet; }));
+        setSel.value=match ? wantedSet : "";
+        if(setQ && document.activeElement!==setQ){
+          if(match){
+            const opt=Array.prototype.find.call(setSel.options, function(o){ return o.value===wantedSet; });
+            setQ.value=opt ? opt.textContent : "";
+          }else setQ.value="";
+        }
+      }
+      if(picker){
+        picker.hidden=loopFilter!=="set";
+        picker.classList.toggle("is-open", loopFilter==="set" && setHitsOpen);
+      }
       paintChips();
       if(loopFilter==="set") fillSetHits(setQ ? setQ.value : "");
       flat=null;
@@ -3618,7 +3822,18 @@ async function boot(){
       }
       await showFlat(index, 0);
     }
-    if(setQ) setQ.addEventListener("input", function(){ fillSetHits(setQ.value); });
+    if(setQ){
+      setQ.addEventListener("input", function(){
+        setHitsOpen=true;
+        if(picker) picker.classList.add("is-open");
+        fillSetHits(setQ.value);
+      });
+      setQ.addEventListener("focus", function(){
+        setHitsOpen=true;
+        if(picker) picker.classList.add("is-open");
+        fillSetHits(setQ.value);
+      });
+    }
     window.addEventListener("popstate", function(){
       const q=new URLSearchParams(location.search);
       const f=q.get("f")||"";
