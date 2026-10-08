@@ -8,7 +8,7 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPost, renderPremium, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -308,6 +308,11 @@ export default {
       }
     }
     if (readPage) {
+      const back = url.searchParams.get("premium");
+      const here = norm(url.pathname);
+      if ((here === "/" || here === "/premium") && (back === "success" || back === "cancel")) {
+        return html(renderPremiumResult(back));
+      }
       if (!feed && gatedFeedPath(url.pathname)) return home302();
       const dest = redirectPath(url.pathname);
       if (dest) {

@@ -1,8 +1,8 @@
 // Sign-in caps. A browser cookie that is not a signed session does not count.
 
 export function ideasSignInLine(ready) {
-  if (ready) return "Sign in with Discord to use Ideas. A free seat is 3 a day. Premium is 50 a day.";
-  return "Ideas need a signed-in seat. Free is 3 a day. Premium is 50 a day. Discord sign-in is not turned on yet.";
+  if (ready) return "Sign in with Discord to use Ideas. A free seat is 3 a day.";
+  return "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.";
 }
 
 export const LIMITS = {
@@ -93,18 +93,18 @@ export function signInCard(feature) {
   if (feature === "video") {
     return {
       title: "Sign in to export",
-      body: "Export is tied to the signed-in seat. A browser cookie is not a pass. Free is 1 a day and 2 a week. Premium is 5 a day and 35 a week.",
+      body: "Export is tied to the signed-in seat. A browser cookie is not a pass. Free is 1 a day and 2 a week.",
     };
   }
   if (feature === "ideas") {
     return {
       title: "Sign in for Ideas",
-      body: "A free seat is 3 Ideas a day. Premium is 50 a day. A browser cookie is not a pass.",
+      body: "A free seat is 3 Ideas a day. A browser cookie is not a pass.",
     };
   }
   return {
     title: "Sign in for post text",
-    body: "Post text is 3 a day on a free seat and 100 a day on Premium. A browser cookie is not a pass.",
+    body: "Post text is 3 a day on a free seat. A browser cookie is not a pass.",
   };
 }
 

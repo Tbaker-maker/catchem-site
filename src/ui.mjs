@@ -1505,15 +1505,13 @@ export function renderPremium(stamp, opts = {}) {
 <h1>Join the club.<br>Claim your First 222 number.</h1>
 <p class="prem-lede">Hang out with serious collectors, rippers and flippers.</p>
 <p class="prem-price">$14.99 a month. Cancel anytime.</p>
+<p>Cancelling stops the next renewal. 7-day refund on the first charge.</p>
 <a class="prem-join" href="${DISCORD}">Join Premium</a>
 <p class="prem-fine">One number per person. Never reused. Card payments only. Checkout starts in Discord.</p>
 </section>
 <h2>What you're joining</h2>
 <div class="prem-grid">
 ${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Your First 222 number + Premium role", "Premium members get a number and the Premium role. One person, one number. Never reused.")}
-${card('<path d="M4 16V7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5V12H7.2L4 14.6z"/><path d="M9 11.5h8.5A1.5 1.5 0 0 1 19 13V18l-2.4-2H10.5A1.5 1.5 0 0 1 9 14.5z"/>', "Private member channels", "The rooms that open with the seat.")}
-${card('<path d="M12 3l1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3z"/>', "Early beta access", "Try new Feed features, bots and tools before anyone else, and help shape them. Beta channel, feedback votes, a first look at new reads, alerts, and Post Office tools.")}
-${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ideas a day, not 3. Post text is 100 a day, not 3. Video export is 5 a day and 35 a week, not 1 a day and 2 a week.")}
 </div>
 <h2>Your price stays locked</h2>
 <div class="prem-lock">
@@ -1535,6 +1533,16 @@ ${card('<path d="M5 19V11M12 19V5M19 19v-6"/>', "Bigger tool limits", "50 AI Ide
 <div class="prem-acts"><a href="${DISCORD}">Pause</a><a href="${DISCORD}">Cancel</a></div>
 </main>`;
   return chrome("", body, "Discord Premium", "", "", feedNav(opts));
+}
+
+export function renderPremiumResult(kind) {
+  const success = kind === "success";
+  const title = success ? "Payment sent." : "No charge.";
+  const rest = success
+    ? "Discord Premium turns on when the payment lands. You get the Premium role and a First 222 number in Discord. Then run /pull week."
+    : "Checkout was canceled. Nothing was charged. Run /premium in Discord when you want to try again.";
+  const body = `<main class="wrap"><h1>${title}</h1><p>${rest}</p></main>`;
+  return chrome("", body, success ? "Payment sent" : "No charge", "", "");
 }
 
 export function renderDive(doc, stamp, opts = {}) {

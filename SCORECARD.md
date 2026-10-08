@@ -59,9 +59,9 @@ Anonymous POST `{}`:
 
 | Route | Status | Card |
 |---|---|---|
-| /api/ideas | 401 | Sign in for Ideas. Free 3 a day, Premium 50. |
-| /api/post-text | 401 | Sign in for post text. Free 3 a day, Premium 100. |
-| /api/video/quota | 401 | Sign in to export. Free 1 a day and 2 a week. Premium 5 a day and 35 a week. |
+| /api/ideas | 401 | Sign in for Ideas. Free 3 a day. |
+| /api/post-text | 401 | Sign in for post text. Free 3 a day. |
+| /api/video/quota | 401 | Sign in to export. Free 1 a day and 2 a week. |
 
 None of those returned 405. A signed session is required. There is no sign-in form yet, so the buttons show the limit card and do not call a model from the browser. No API key is in the page. With a server key, post text uses `grok-4.20-0309-non-reasoning` and a catalog fact pack; without the key the response is the fact pack.
 
