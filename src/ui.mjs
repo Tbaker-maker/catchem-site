@@ -1117,6 +1117,14 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 }
 @media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
 @media (min-width:1280px){.site-bar nav{display:flex}}
+/* One card face, the Post Office formula (its .card img rule):
+   aspect-ratio 63/88, object-fit contain, centered, Post Office sheet behind, rounded to the card corner.
+   Every single-card picture on the site uses this class. */
+img.card-face{display:block;aspect-ratio:63/88;object-fit:contain;object-position:center;background:#141416;border-radius:14px;height:auto}
+img.card-face[data-tile="card"]{width:min(280px,100%);height:auto}
+.row img.card-face,img.card-face.thumb{flex:none;width:64px;height:auto;border-radius:8px}
+.row.mover img.card-face{width:48px;height:auto}
+.mon-tile img.card-face{width:100%;max-width:none;height:auto;border-radius:14px}
 `;
 
 function feedNav(opts) {
@@ -1282,7 +1290,7 @@ function miss(img){
 function rowHtml(r){
   const href=r.kind==="sealed"?"/p/"+encodeURIComponent(r.id):"/c/"+encodeURIComponent(r.id);
   const src=pictureSrc(r, setLogo);
-  const img=src?'<img alt="'+html(r.name)+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
+  const img=src?'<img alt="'+html(r.name)+'" width="64" height="89" loading="lazy" decoding="async" '+((r.kind==="single")?'':'class="shot" ')+'data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+((r.kind==="single")?'class="shot card-face thumb" ':'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" ')+'src="'+String(src).replace(/"/g,"")+'" onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
   const bits=[];
   if(r.num) bits.push(html(r.num));
   if(r.rarity) bits.push(html(r.rarity));
@@ -1742,7 +1750,7 @@ function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
   const row={id:r[0],name:r[1],kind:r[5]};
   const hit=officialSrc(row, catImages);
-  const face=hit.src?'<img alt="'+html(r[1])+'" width="64" height="88" loading="lazy" decoding="async" class="shot" data-kind="'+html(r[5])+'" '+((r[5]!=="sealed")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" src="'+hit.src+'" onerror="miss(this)">':brandedTile("row",row);
+  const face=hit.src?'<img alt="'+html(r[1])+'" width="64" height="89" loading="lazy" decoding="async" class="'+((r[5]!=="sealed")?'shot card-face thumb':'shot')+'" data-kind="'+html(r[5])+'" '+((r[5]!=="sealed")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" ')+'src="'+hit.src+'" onerror="miss(this)">':brandedTile("row",row);
   return '<div class="row">'+face+'<a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
 }
 function draw(){
@@ -2026,7 +2034,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-sec summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font:600 18px/1.3 var(--serif)}
   .feed-sec summary span{color:var(--gold);font:600 14px var(--sans)}
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
-  .feed-card img{width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
+  .feed-card img:not(.card-face){width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
+  .feed-card img.card-face{width:auto;height:220px;max-width:100%;margin:0 auto;-webkit-user-drag:none;user-select:none}
   .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
   .feed-card>.news-tile{width:100%;height:220px;margin:0}
   .feed-card.news-card{flex:0 0 auto;gap:10px;margin:0}
@@ -2487,6 +2496,7 @@ function photoEl(card){
     img.draggable=false;
     img.src=hit.src;
     if(hit.crop){
+      img.className="card-face";
       img.setAttribute("data-crop-card","1");
       img.onload=function(){ if(window.cropCardEdge) cropCardEdge(img); };
     }

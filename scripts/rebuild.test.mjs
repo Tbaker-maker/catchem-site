@@ -695,5 +695,16 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("every page says it is made for collectors, rippers and flippers", factHtml.includes("Made for collectors, rippers and flippers.") && indexHtml.includes("Made for collectors, rippers and flippers.") && !indexHtml.includes("Made by one person who collects."));
 }
 
+{
+  const { imageTag } = await import("../src/catalogue-image.mjs");
+  const ui = await readFile(new URL("../src/ui.mjs", import.meta.url), "utf8");
+  const single = imageTag("/api/card-img?pid=610435", "card", "Dudunsparce", { kind: "single", crop: true });
+  const sealed = imageTag("/api/card-img?pid=654136", "sealed", "ETB", { kind: "sealed", crop: false });
+  t("a single card picture uses the Post Office card face", /class="shot card-face"/.test(single) && single.includes('data-crop-card="1"'));
+  t("a sealed picture is not a card face", !sealed.includes("card-face") && !sealed.includes("data-crop-card"));
+  t("the card face is the Post Office formula", /img\.card-face\{display:block;aspect-ratio:63\/88;object-fit:contain;object-position:center;background:#141416;border-radius:14px/.test(ui));
+  t("feed, set and search card pictures use the card face", ui.includes('img.className="card-face"') && ui.includes("shot card-face thumb") && ui.includes(".feed-card img.card-face{"));
+}
+
 if (fail) process.exit(1);
 console.log("rebuild routes ok");

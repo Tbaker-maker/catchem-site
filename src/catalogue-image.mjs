@@ -150,8 +150,9 @@ export function imageTag(src, kind, alt, row) {
   const big = k === "card";
   const w = k === "logo" ? 160 : big ? 280 : 64;
   const h = k === "logo" ? 64 : big ? 392 : 88;
-  const crop = info.catalogueCrop || info.crop ? ' data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)"' : "";
-  return '<img alt="' + escapeAttr(alt || "") + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" src="' + escapeAttr(src) + '" class="shot" data-tile="' + k + '" data-fallback="' + escapeAttr(brandedTile(kind, info)) + '"' + crop + ' onerror="this.outerHTML=this.getAttribute(\'data-fallback\')">';
+  const face = !!(info.catalogueCrop || info.crop) && info.kind !== "sealed" && k !== "logo";
+  const crop = face ? ' data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)"' : "";
+  return '<img alt="' + escapeAttr(alt || "") + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" src="' + escapeAttr(src) + '" class="' + (face ? "shot card-face" : "shot") + '" data-tile="' + k + '" data-fallback="' + escapeAttr(brandedTile(kind, info)) + '"' + crop + ' onerror="this.outerHTML=this.getAttribute(\'data-fallback\')">';
 }
 
 export function visualGaps(html) {
