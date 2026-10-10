@@ -1330,9 +1330,10 @@ export function renderSets(index, stamp, opts = {}) {
 ${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}
 ${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
 ${chartBox(index?.singlesIndex || [], "Singles index, chain-linked")}
-${eras.map((era) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s) => {
+${eras.map((era, eraIdx) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
+    const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
     const face = /^https:\/\//.test(String(s.logo || ""))
-      ? `<img class="shot" alt="" width="160" height="64" loading="lazy" decoding="async" src="${esc(s.logo)}">`
+      ? `<img class="shot" alt="" width="160" height="64" loading="${load}" decoding="async" src="${esc(s.logo)}">`
       : brandedTile("logo", { kind: "set", name: s.name });
     const when = priceDay(s.release);
     const date = when ? ` · <span class="set-date">${esc(when)}</span>` : "";
@@ -2425,6 +2426,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
   .feed-card img:not(.card-face){width:100%;max-height:220px;object-fit:contain;background:#12100e;border-radius:12px;-webkit-user-drag:none;user-select:none}
   .feed-card img.card-face{width:auto;height:220px;max-width:100%;margin:0 auto;-webkit-user-drag:none;user-select:none}
+  .skel-card{height:280px;border-radius:18px;background:#1c1915}
+  .feed-card img.is-skel{background:#1c1915}
   .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
   .feed-card>.news-tile{width:100%;height:220px;margin:0}
   .feed-card.news-card{flex:0 0 auto;gap:10px;margin:0}
@@ -2548,7 +2551,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
-<div id="feed-one"></div>
+<div id="feed-one"><div class="skel-card" aria-hidden="true"></div></div>
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
@@ -2886,15 +2889,18 @@ function photoEl(card){
     img.alt=card&&card.name?String(card.name):"";
     img.width=280;
     img.height=392;
-    img.loading="lazy";
+    img.loading="eager";
     img.decoding="async";
     img.draggable=false;
+    img.className="card-face";
+    if(hit.crop) img.classList.add("is-skel");
+    else img.className="is-skel";
     img.src=hit.src;
-    if(hit.crop){
-      img.className="card-face";
-      img.setAttribute("data-crop-card","1");
-      img.onload=function(){ if(window.cropCardEdge) cropCardEdge(img); };
-    }
+    if(hit.crop) img.setAttribute("data-crop-card","1");
+    img.onload=function(){
+      img.classList.remove("is-skel");
+      if(hit.crop && window.cropCardEdge) cropCardEdge(img);
+    };
     img.onerror=function(){
       try{
         const next=safeTile(kind, card);
@@ -4059,6 +4065,15 @@ async function showFlat(index, dir){
     else slide.appendChild(card);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
+  try{
+    const ahead=flat && flat[spot+1];
+    const aheadHit=ahead?officialSrc(ahead, catalogueImages):null;
+    if(aheadHit && aheadHit.src){
+      const warm=new Image();
+      warm.decoding="async";
+      warm.src=aheadHit.src;
+    }
+  }catch(e){}
   let nav=stage.querySelector(".read-nav");
   if(!nav){
     nav=document.createElement("div");
