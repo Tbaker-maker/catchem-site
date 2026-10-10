@@ -1,7 +1,7 @@
-import worker, { pageKind, renderPath } from "../src/index.mjs";
+import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -34,6 +34,22 @@ const setDoc = { ...sets.sets[0], items: [{ id: "tcgcsv-10", name: "Alakazam", n
 const artists = { note: "Partial.", artists: [{ slug: "ken-sugimori", name: "Ken Sugimori", count: 1 }] };
 const artist = { name: "Ken Sugimori", source: "partial", cards: [{ id: "tcgcsv-10", name: "Alakazam", set: "Base Set", num: "1", price: 12.5 }] };
 const card = { id: "tcgcsv-10", name: "Alakazam", set: "Base Set", setSlug: "base", kind: "single", price: 12.5, pct: 4.2, num: "1", rarity: "Holo Rare", artist: "Ken Sugimori", pid: 10, source: "TCGplayer market", asOf: "2026-09-27" };
+const quickCard = {
+  id: "tcgcsv-110",
+  name: "Test Card",
+  set: "Base Set",
+  setSlug: "base",
+  kind: "single",
+  price: 8,
+  num: "2",
+  printing: "Holofoil",
+  rarity: "Rare",
+  artist: "Ken Sugimori",
+  pid: 110,
+  source: "TCGplayer market",
+  asOf: "2026-10-09",
+  hist: [["2026-07-11", 10], ["2026-09-09", 10], ["2026-10-02", 8], ["2026-10-09", 8]],
+};
 const reads = { asOf: "2026-09-27", reads: [
   { id: "heating-tcgcsv-10", type: "heating", headline: "Alakazam is heating up, up 4.2% since yesterday.", price: 12.5, changePct: 4.2, source: "TCGplayer market", asOf: "2026-09-27", confidence: "Early", history: [12, 12.5], why: "One day is not a trend.", href: "/c/tcgcsv-10", set: "Base Set", image: "" },
   { id: "box-etb", type: "box", headline: "Elite Trainer Box works out to $3.50 a pack on the eBay ask.", price: 31.5, changePct: null, source: "eBay ask", asOf: "2026-09-27", confidence: "Tracked", history: [30, 31.5], why: "Median eBay ask divided by 9 packs.", href: "/p/sv3pt5-etb.html", set: "151" },
@@ -46,8 +62,8 @@ const files = {
   "sets/base.json": setDoc,
   "artists.json": artists,
   "artists/ken-sugimori.json": artist,
-  "buckets/10.json": [card],
-  "buckets/13.json": [{ id: "tcgcsv-503313", name: "151 Elite Trainer Box", set: "151", setSlug: "sv-scarlet-violet-151", kind: "sealed", price: 87.5, pid: 503313, source: "TCGplayer market", asOf: "2026-10-06", hist: [["2026-08-20", 90], ["2026-08-21", 88]] }],
+  "buckets/10.json": [card, quickCard],
+  "buckets/13.json": [{ id: "tcgcsv-503313", name: "151 Elite Trainer Box", set: "151", setSlug: "sv-scarlet-violet-151", kind: "sealed", price: 87.5, pid: 503313, source: "TCGplayer market", asOf: "2026-08-21", hist: [["2026-08-20", 90], ["2026-08-21", 88]] }],
   "reads.json": reads,
   "movers.json": movers,
   "receipts.json": receipts,
@@ -826,6 +842,33 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("artist page: cards render in the sorted order", page.indexOf("/c/c\"") < page.indexOf("/c/d\"") && page.indexOf("/c/d\"") < page.indexOf("/c/a\""));
   const ui = await readFile(new URL("../src/ui.mjs", import.meta.url), "utf8");
   t("chart: a missing day lifts the line", ui.includes('(i&&!cut(i)?"L":"M")'));
+}
+
+{
+  const spark = sparkSvg(decodeSpark("2:4,0:5", "2026-10-09"));
+  const moves = spark.match(/[ML]/g) || [];
+  t("a 30-day spark leaves the missing day open", decodeSpark("2:4,0:5", "2026-10-09").join("|") === "2026-10-07,4|2026-10-09,5" && moves.filter((c) => c === "M").length === 2);
+  const view = quickView(quickCard, {});
+  const raw = JSON.stringify(view);
+  t("the sheet uses the exact day or a dash", view.windows[0].pct === 0 && view.windows[1].pct === -20 && view.windows[2].pct === -20 && view.windows[1].from === "2026-09-09" && view.windows[1].to === "2026-10-09");
+  t("the sheet does not print an internal id", !raw.includes("tcgcsv") && !("id" in view) && view.printing === "Holofoil" && view.tcgUrl === "https://www.tcgplayer.com/product/110");
+  const sheet = renderSearch();
+  t("search rows open the sheet and can draw a 30-day spark", sheet.includes('data-quick') && sheet.includes("catchemSpark") && sheet.includes("/data/sparks/") && sheet.includes('id="qsheet"') && sheet.includes("Escape") && sheet.includes("Full page"));
+  const setShell = renderSetShell("base");
+  const artist = renderArtist({ name: "Ken Sugimori", slug: "ken-sugimori", cards: [{ id: "tcgcsv-10", name: "Alakazam", set: "Base Set", num: "1", price: 12.5 }] }, "");
+  const mon = renderPokemon({ name: "Abra", slug: "abra", cards: [{ id: "tcgcsv-10", name: "Abra", set: "Base Set", number: "43", price: 1 }] }, "");
+  const feed = renderFeed({ asOf: "2026-09-27", reads: [{ id: "heating-tcgcsv-10", sku: "tcgcsv-10", name: "Alakazam", headline: "Alakazam is heating up.", price: 12.5, source: "TCGplayer market", asOf: "2026-09-27", href: "/c/tcgcsv-10" }] }, "", "", { feed: true });
+  t("set, artist, pokemon, and feed rows open the sheet", setShell.includes("data-quick") && artist.includes('data-quick="tcgcsv-10"') && mon.includes('data-quick="tcgcsv-10"') && feed.includes("data-quick") && feed.includes("productIdOf"));
+  const mine = renderMine("");
+  t("a saved row opens the sheet", mine.includes("data-quick"));
+  resetJsonCache();
+  const doc = await quickFor("tcgcsv-110", fetchImpl, { feed: false });
+  t("one product history is the stored series", doc && doc.price === 8 && doc.hist.length === 4 && doc.hist[3][0] === "2026-10-09" && doc.photo.crop === true && doc.photo.src.includes("pid=110"));
+  resetJsonCache();
+  const sealed = await quickFor("tcgcsv-503313", fetchImpl, { feed: false });
+  t("sealed listings stay listings", sealed && sealed.kind === "sealed" && sealed.listings.text.startsWith("eBay listings") && sealed.listings.text.includes("7D —") && !sealed.listings.text.toLowerCase().includes("sale") && !JSON.stringify(sealed).includes("tcgcsv"));
+  const missing = await worker.fetch(new Request("https://catchemtcg.com/api/quick?id=tcgcsv-999"), env);
+  t("an unknown product is not invented", missing.status === 404);
 }
 
 if (fail) process.exit(1);
