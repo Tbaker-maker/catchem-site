@@ -1,6 +1,6 @@
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
-import { editorDocument, patchedPaper, pocketDocument, PAPER_PATH, POCKET_PATH } from "./full-editor.mjs";
+import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
@@ -360,6 +360,23 @@ export default {
       } catch {
         return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
+    }
+    if (request.method === "GET" && url.pathname.startsWith(POCKET_IMG_PREFIX)) {
+      const id = decodeURIComponent(url.pathname.slice(POCKET_IMG_PREFIX.length));
+      if (!/^tcgp-[A-Za-z0-9-]+$/.test(id)) return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
+      let src = "";
+      try { src = await pocketImageUrl(id, fetchImpl); } catch {}
+      if (!src) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      const img = await fetch(src, { headers: { "User-Agent": "CatchEm-post-office/1.0" } });
+      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      return new Response(img.body, {
+        status: 200,
+        headers: {
+          "content-type": img.headers.get("content-type") || "image/webp",
+          "cache-control": "public, max-age=86400",
+          "access-control-allow-origin": "*",
+        },
+      });
     }
     if (request.method === "GET" && url.pathname.startsWith("/data/editor/tcg/")) {
       const rest = decodeURIComponent(url.pathname.slice("/data/editor/tcg/".length));
