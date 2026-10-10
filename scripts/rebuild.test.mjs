@@ -1,4 +1,5 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
+import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
 import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
@@ -704,6 +705,34 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("a sealed picture is not a card face", !sealed.includes("card-face") && !sealed.includes("data-crop-card"));
   t("the card face is the Post Office formula", /img\.card-face\{display:block;aspect-ratio:63\/88;object-fit:contain;object-position:center;background:#141416;border-radius:14px/.test(ui));
   t("feed, set and search card pictures use the card face", ui.includes('img.className="card-face"') && ui.includes("shot card-face thumb") && ui.includes(".feed-card img.card-face{"));
+}
+
+{
+  // Artist page sort chips.
+  const cards = [
+    { id: "a", name: "Charmander", price: 5, setSlug: "base-set", num: "46/102" },
+    { id: "b", name: "alakazam", price: null, setSlug: "sv-151", num: "65/165" },
+    { id: "c", name: "Blastoise", price: 200, setSlug: "base-set", num: "2/102" },
+    { id: "d", name: "Zapdos", price: 12, setSlug: "sv-151", num: "145/165" },
+    { id: "e", name: "Mew", price: 0, setSlug: "unknown", num: "1" },
+  ];
+  const rel = { "base-set": "1999-01-09", "sv-151": "2023-09-22" };
+  const ids = (sort) => sortArtistCards(cards, sort, rel).map((c) => c.id).join("");
+  t("artist sort: default keeps the published order", ids("") === "abcde" && ids("nonsense") === "abcde");
+  t("artist sort: name A–Z ignores case", ids("name-asc") === "bcaed");
+  t("artist sort: name Z–A", ids("name-desc") === "deacb");
+  t("artist sort: price high–low, unpriced last", ids("price-desc") === "cdabe");
+  t("artist sort: price low–high, unpriced last", ids("price-asc") === "adcbe");
+  t("artist sort: newest set first, then card number", ids("release-desc") === "bdcae");
+  t("artist sort: oldest set first, then card number", ids("release-asc") === "cabde");
+  const page = renderArtist({ name: "Ken Sugimori", slug: "ken-sugimori", cards, index: [], indexCards: 3, indexNote: "Median day-over-day move of 3 of 5 cards." }, "", { sort: "price-desc", releaseBySlug: rel });
+  t("artist page: one chip per sort, the chosen one pressed", (page.match(/class="sort-chip"/g) || []).length === ARTIST_SORTS.length && /href="\/artists\/ken-sugimori\?sort=price-desc" data-sort="price-desc" aria-pressed="true"/.test(page));
+  t("artist page: Default chip links to the bare URL", /href="\/artists\/ken-sugimori" data-sort="" aria-pressed="false"/.test(page));
+  t("artist page: price sort says unpriced cards go last", page.includes("2 cards with no market price are listed last."));
+  t("artist page: index states the card count", page.includes("Artist index, chain-linked. 3 of 5 cards") && page.includes("Median day-over-day move of 3 of 5 cards."));
+  t("artist page: cards render in the sorted order", page.indexOf("/c/c\"") < page.indexOf("/c/d\"") && page.indexOf("/c/d\"") < page.indexOf("/c/a\""));
+  const ui = await readFile(new URL("../src/ui.mjs", import.meta.url), "utf8");
+  t("chart: a missing day lifts the line", ui.includes('(i&&!cut(i)?"L":"M")'));
 }
 
 if (fail) process.exit(1);
