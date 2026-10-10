@@ -1845,6 +1845,23 @@ fetch("/data/indexes.json").then(r=>r.json()).then(idx=>{
   return chrome("Movers", body, "Movers", stamp, "", feedNav(opts));
 }
 
+export function renderTrackRecord(doc, stamp, opts = {}) {
+  const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${row.scored7 ? `${row.hit7}/${row.scored7}` : "—"}</td><td>${row.scored30 ? `${row.hit30}/${row.scored30}` : "—"}</td></tr>`).join("");
+  const rows = (doc?.rows || []).map((row) => {
+    const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "No score.");
+    return `<li><span class="muted">${esc(row.shipped || "")}</span> ${esc(note)} ${esc(row.headline || "")}</li>`;
+  }).join("");
+  const body = `<main class="wrap">
+<h1>Track record</h1>
+<p class="muted">Scored through ${esc(doc?.asOf || "")}. Oldest read ${esc(doc?.oldest || "—")}.</p>
+<p>A read needs 7 days and a later price on that exact day. Under 7 days is too early to score. No later price is not a miss.</p>
+<p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. Scored at 7 days: ${Number(doc?.scored7) || 0}. Scored at 30 days: ${Number(doc?.scored30) || 0}.</p>
+<table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>7-day</th><th>30-day</th></tr></thead><tbody>${types}</tbody></table>
+<ul>${rows}</ul>
+</main>`;
+  return chrome("", body, "Track record", stamp, "", feedNav(opts));
+}
+
 export function renderReceipts(doc, stamp, opts = {}) {
   const rows = doc?.rows || [];
 const mark = (r) => {

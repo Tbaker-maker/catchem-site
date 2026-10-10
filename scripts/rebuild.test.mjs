@@ -1,6 +1,6 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -239,6 +239,23 @@ t("a card page has the market price", cardPage.includes("$12.50") && cardPage.in
 t("a missing exact day is a dash, not the nearest night", exactWindowPct([["2026-10-01", 10], ["2026-10-09", 8]], 7, "2026-10-09") === null && exactWindowPct([["2026-10-02", 10], ["2026-10-09", 8]], 7, "2026-10-09") === -20);
 t("sealed listings use the exact night or a dash", listingTrend([{ date: "2026-08-20", listingCount: 40 }, { date: "2026-10-06", listingCount: 35 }], "2026-10-06") === "eBay listings 7D — · 30D —");
 t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text.startsWith("6-month high —"));
+{
+  const page = renderTrackRecord({
+    asOf: "2026-10-09",
+    oldest: "2026-10-09",
+    count: 2,
+    tooEarly: 1,
+    noLaterPrice: 1,
+    scored7: 0,
+    scored30: 0,
+    types: [{ type: "price", reads: 1, tooEarly: 1, noLaterPrice: 0, scored7: 0, hit7: 0, scored30: 0, hit30: 0 }],
+    rows: [
+      { status: "too-early", shipped: "2026-10-09", headline: "Pidgey is up 74.2% this month: $1.51 → $2.63." },
+      { status: "no-score", shipped: "2026-10-09", headline: "Pidgey (#16): 17 cards, 14 artists.", note: "The read has no date, product id, or price." },
+    ],
+  }, "stamp");
+  t("track record shows too early and does not invent a hit rate", page.includes("Too early to score") && page.includes("Scored at 7 days: 0") && page.includes("17 cards, 14 artists") && !page.includes("tcgcsv-"));
+}
 t("a card picture is the catalogue hit for that id", cardPage.includes("/data/editor/tcg/base1/1_hires.png") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
 t("a card page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(cardPage));
 const setHtml = await (await renderPath("/sets/base", fetchImpl)).text();
