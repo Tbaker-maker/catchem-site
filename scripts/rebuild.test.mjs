@@ -1,6 +1,6 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -155,6 +155,43 @@ t("esc keeps markup out of a name", escaped.includes("amp;") && escaped.includes
 
 const hidden = await renderPath("/feed", fetchImpl);
 t("feed is hidden without the flag", hidden.status === 302 && hidden.headers.get("location") === "/");
+
+{
+  const off = renderSupply({
+    enabled: false,
+    asOf: "2026-10-09",
+    nightCount: 19,
+    products: 183,
+    productsOnLatest: 177,
+    wouldQualify: 0,
+    windows: { "7": { qualify: 0, exactStart: "2026-10-02", exactStartOnFile: false, productsWithBothDays: 1 }, "30": { qualify: 0, exactStart: "2026-09-09", exactStartOnFile: false, productsWithBothDays: 0 } },
+    belowGate: [{ name: "Unbroken Bonds Booster Box", pct: -5.6, from: 18, to: 17, fromDate: "2026-08-19", toDate: "2026-08-26" }],
+    reads: [{ sentence: "Fewer copies listed: should not show" }],
+  }, "stamp");
+  t("supply page stays off and does not publish a read", off.includes("This read is off") && off.includes("0 would qualify") && off.includes("Unbroken Bonds Booster Box") && off.includes("not sales") && !off.includes("should not show") && !/\bholds?\b/i.test(off));
+  const segs = splitDated([
+    { date: "2026-10-05", listings: 140 },
+    { date: "2026-10-07", listings: 109 },
+  ], "listings");
+  const chart = gapChartSvg(segs);
+  t("a missing night is a gap in the chart", segs.length === 2 && chart.split("<path").length === 3);
+  const on = renderSupply({
+    enabled: true,
+    asOf: "2026-10-09",
+    wouldQualify: 1,
+    windows: { "7": { qualify: 1, exactStart: "2026-10-02", exactStartOnFile: true, productsWithBothDays: 1 }, "30": { qualify: 0, exactStart: "2026-09-09", exactStartOnFile: false, productsWithBothDays: 0 } },
+    reads: [{
+      sentence: "Fewer copies listed: Surging Sparks ETB eBay listings fell 22.1% in 7 days (140 → 109).",
+      wrong: "What would make this wrong: either exact night is missing, the listing change is under 15%, or a listing was treated as a sale.",
+      series: [
+        { date: "2026-10-05", ask: 16.98, listings: 140 },
+        { date: "2026-10-07", ask: 16.98, listings: 109 },
+      ],
+    }],
+  }, "stamp");
+  t("a kept supply read draws both lines and the wrong-check", on.includes("The read is on") && on.includes("140 → 109") && on.includes("What would make this wrong") && on.includes("eBay listings") && on.split("<path").length >= 3);
+}
+
 t("board, receipts, and accuracy are hidden without the flag",
   (await renderPath("/board", fetchImpl)).status === 302
   && (await renderPath("/receipts", fetchImpl)).headers.get("location") === "/"
