@@ -2088,6 +2088,8 @@ const searchCatalog=search.searchCatalog;
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
 let catImages={};
+let logos={};
+let codes={};
 ${cataloguePath.toString()}
 ${catalogueUrl.toString()}
 ${imageForId.toString()}
@@ -2120,12 +2122,21 @@ function rowHtml(r){
   const row={id:r[0],name:r[1],kind:r[5]};
   const hit=officialSrc(row, catImages);
   const face=hit.src?'<img alt="'+html(r[1])+'" width="64" height="89" loading="lazy" decoding="async" class="'+((r[5]!=="sealed")?'shot card-face thumb':'shot')+'" data-kind="'+html(r[5])+'" '+((r[5]!=="sealed")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" ')+'src="'+hit.src+'" onerror="miss(this)">':brandedTile("row",row);
-  return '<div class="row">'+face+'<a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[5])+' · '+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span></a></div>';
+  var mark=logos[r[7]||""];
+  var logoSrc=mark && typeof mark.src==="string"?catalogueUrl(mark.src):"";
+  var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto" onerror="this.remove()">':"";
+  var chips="";
+  if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
+  if(r[9]) chips+='<span class="win">'+html(r[9])+'</span>';
+  var price=stored(r);
+  var cash=price==null?"No market price":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  return '<div class="row">'+face+logo+'<a href="'+href+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span> '+chips+'</a><b>'+cash+'</b></div>';
 }
 function draw(){
   const q=document.getElementById("q").value.trim();
   if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent=rows.length+" names loaded. Type at least 2 letters.";return}
-  const found=typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]};
+  var hits=rankCatalog(q, rows, 40, codes);
+  var found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]});
   const shown=take(found.hits);
   const near=take(found.nearest);
   if(!shown.length){
@@ -2138,6 +2149,15 @@ function draw(){
 }
 fetch("/data/search-lite.json").then(r=>r.json()).then(async function(data){
   try{ var doc=await (await fetch("/data/catalogue-images.json")).json(); catImages=(doc&&doc.images)||{}; }catch(e){ catImages={}; }
+  try{
+    var marks=await (await fetch("/data/set-logos.json")).json();
+    logos=(marks&&marks.logos)||{};
+    codes={};
+    Object.keys(logos).forEach(function(key){
+      var row=logos[key];
+      if(row && row.setId && row.slug) codes[String(row.setId).toLowerCase()]=row.slug;
+    });
+  }catch(e){ logos={}; codes={}; }
   rows=data;document.getElementById("meta").textContent=rows.length+" names loaded.";draw();
 }).catch(()=>{document.getElementById("meta").textContent="Search did not load."});
 document.getElementById("q").addEventListener("input",draw);
