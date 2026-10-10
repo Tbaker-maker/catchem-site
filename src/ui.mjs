@@ -2914,14 +2914,29 @@ function cardEl(card, facts){
       market:card.price,
       listings:card.listings,
       listingsAsOf:card.listingsAsOf||"",
-      changePct:card.changePct
+      changePct:card.changePct,
+      change7:card.change7,
+      kind:card.kind||"",
+      href:card.href||""
     }, extraBody||{});
   }
   function saveAlert(body){
+    try {
+      var key="catchem-watch";
+      var cur=JSON.parse(localStorage.getItem(key)||"[]");
+      if(!Array.isArray(cur)) cur=[];
+      var id=body.sku||body.id;
+      cur=cur.filter(function(row){return (row.sku||row.id)!==id && row.id!==body.id});
+      cur.unshift(body);
+      localStorage.setItem(key, JSON.stringify(cur.slice(0,100)));
+      note.textContent="Saved on this device.";
+    } catch (err) {
+      note.textContent="This browser did not store the save.";
+    }
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
       .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
       .then(function(res){
-        if(!res.ok){ note.textContent=res.j.error||"Sign in with Discord to track this."; return; }
+        if(!res.ok) return;
         sheet.classList.remove("open");
         trackBtn.textContent="Tracking";
         let done=el.querySelector(".track-done");
@@ -2933,7 +2948,7 @@ function cardEl(card, facts){
         done.textContent="Tracking. We'll DM you.";
         note.textContent="";
       })
-      .catch(function(){ note.textContent="Sign in with Discord to track this."; });
+      .catch(function(){});
   }
   trackBtn.onclick=function(){
     const opened=sheet.classList.contains("open");
@@ -4195,7 +4210,7 @@ export function renderMine(stamp, opts = {}) {
   const body = `<style>${css}</style><main class="wrap">
 <p><a href="/feed">Back</a></p>
 <h1>Tracked</h1>
-<p class="muted" id="mine-note">Your tracked reads.</p>
+<p class="muted" id="mine-note">Nothing saved on this device yet.</p>
 <label class="mine-sort">Sort
   <select id="mine-sort" aria-label="Sort tracked reads">
     <option value="custom">Your order</option>
@@ -4222,7 +4237,13 @@ function status(row){
   return bits.length ? "Alert: "+bits.join(". ") : "Alert saved";
 }
 function saveOrder(){
-  fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({order:rows.map(function(row){return row.id})})}).catch(function(){});
+  try { localStorage.setItem("catchem-watch", JSON.stringify(rows)); } catch(err) {}
+}
+function readLocal(){
+  try {
+    var cur=JSON.parse(localStorage.getItem("catchem-watch")||"[]");
+    return Array.isArray(cur)?cur:[];
+  } catch(err) { return []; }
 }
 function pidOf(row){
   const sku=String(row&&row.sku||"");
@@ -4249,8 +4270,10 @@ function draw(){
     const li=document.createElement("li");
     li.className="mine-row";
     li.draggable=true;
-    const listed=Number(row.listings)>=20 && row.listingsAsOf ? "Active listings: "+row.listings+" (as of "+row.listingsAsOf+")" : "";
-    li.innerHTML=faceHtml(row)+'<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
+    const seven=Number.isFinite(Number(row.change7)) ? "7D "+(Number(row.change7)>0?"+":"")+row.change7+"%" : "7D —";
+    const listed=Number(row.listings)>=0 && row.listingsAsOf ? "eBay listings "+row.listings+" as of "+row.listingsAsOf : "eBay listings —";
+    const href=row.href||("/feed/r/"+encodeURIComponent(row.id));
+    li.innerHTML=faceHtml(row)+'<a href="'+href+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market||row.price)+'</b><p>'+html(seven)+'</p><p class="muted">'+html(listed)+'</p><p>'+html(row.headline||"")+'</p><button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
     li.ondragstart=function(){ dragId=row.id; };
     li.ondragover=function(ev){ ev.preventDefault(); };
     li.ondrop=function(ev){
@@ -4266,14 +4289,13 @@ function draw(){
     li.querySelector("[data-act=up]").onclick=function(){ move(index,-1); };
     li.querySelector("[data-act=down]").onclick=function(){ move(index,1); };
     li.querySelector("[data-act=remove]").onclick=function(){
-      fetch("/api/alerts",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:row.id})})
-        .then(function(res){return res.json()})
-        .then(function(data){ rows=(data&&data.rows)||rows.filter(function(item){return item.id!==row.id}); draw(); })
-        .catch(function(){});
+      rows=rows.filter(function(item){return item.id!==row.id});
+      saveOrder();
+      draw();
     };
     list.appendChild(li);
   });
-  document.getElementById("mine-note").textContent=rows.length ? rows.length+" tracked." : "Nothing tracked yet.";
+  document.getElementById("mine-note").textContent=rows.length ? rows.length+" saved on this device." : "Nothing saved on this device yet.";
 }
 function move(index, dir){
   const next=index+dir;
@@ -4290,17 +4312,8 @@ document.getElementById("mine-sort").onchange=function(ev){
   if(mode!=="custom") saveOrder();
   draw();
 };
-fetch("/api/alerts").then(function(res){return res.json().then(function(data){return {ok:res.ok, data:data}})}).then(function(res){
-  if(!res.ok){
-    document.getElementById("mine-note").textContent="Sign in with Discord to see your tracked reads.";
-    document.getElementById("mine-sort").parentElement.hidden=true;
-    return;
-  }
-  rows=res.data.rows||[];
-  draw();
-}).catch(function(){
-  document.getElementById("mine-note").textContent="Sign in with Discord to see your tracked reads.";
-});
+rows=readLocal();
+draw();
 </script>`;
   return chrome("Tracked", body, "Tracked", stamp, "", feedNav(opts));
 }
