@@ -880,6 +880,76 @@ export function chartBox(hist, caption = "TCGplayer market, daily", release = ""
   return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>`;
 }
 
+export function splitDated(points, key) {
+  const rows = (points || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point[key])));
+  const segments = [];
+  let run = [];
+  let prev = "";
+  for (const point of rows) {
+    const next = String(point.date);
+    const expected = prev ? new Date(Date.parse(`${prev}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : "";
+    if (prev && next !== expected && run.length) {
+      segments.push(run);
+      run = [];
+    }
+    run.push([next, Number(point[key])]);
+    prev = next;
+  }
+  if (run.length) segments.push(run);
+  return segments;
+}
+
+export function gapChartSvg(segments, color = "#d9b779") {
+  const flat = (segments || []).flat().filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(point[0]) && Number.isFinite(Number(point[1])));
+  if (!flat.length) return "";
+  const vals = flat.map((point) => Number(point[1]));
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || 1;
+  const t0 = Date.parse(`${flat[0][0]}T00:00:00Z`);
+  const t1 = Date.parse(`${flat[flat.length - 1][0]}T00:00:00Z`);
+  const w = 320;
+  const h = 140;
+  const x = (day) => {
+    const t = Date.parse(`${day}T00:00:00Z`);
+    if (t1 === t0) return 16;
+    return 16 + ((t - t0) / (t1 - t0)) * (w - 32);
+  };
+  const y = (v) => h - 16 - ((v - min) / span) * (h - 32);
+  const paths = (segments || []).map((seg) => {
+    const pts = (seg || []).filter((point) => Array.isArray(point));
+    if (!pts.length) return "";
+    const d = pts.map((point, i) => `${i ? "L" : "M"}${x(point[0]).toFixed(1)},${y(Number(point[1])).toFixed(1)}`).join(" ");
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  }).join("");
+  return `<svg class="gap-chart" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Line with gaps left open">${paths}</svg>`;
+}
+
+export function renderSupply(doc, stamp, opts = {}) {
+  const on = doc?.enabled === true;
+  const reads = on ? (doc?.reads || []) : [];
+  const w7 = doc?.windows?.["7"] || {};
+  const w30 = doc?.windows?.["30"] || {};
+  const below = (doc?.belowGate || []).map((row) => `<li>${esc(row.name)} eBay listings ${row.pct > 0 ? "+" : ""}${esc(row.pct)}% (${esc(row.from)} → ${esc(row.to)}) from ${esc(row.fromDate)} to ${esc(row.toDate)}. Under 15%, so it is not a read.</li>`).join("");
+  const cards = reads.map((read) => {
+    const askSeg = splitDated((read.series || []).map((point) => ({ date: point.date, ask: point.ask })), "ask");
+    const listSeg = splitDated((read.series || []).map((point) => ({ date: point.date, listings: point.listings })), "listings");
+    return `<article class="card" style="margin:12px 0"><h2>${esc(read.sentence)}</h2><p class="muted">${esc(read.wrong || "")}</p><p class="muted">eBay ask</p>${gapChartSvg(askSeg, "#d9b779")}<p class="muted">eBay listings</p>${gapChartSvg(listSeg, "#7fc79a")}</article>`;
+  }).join("");
+  const body = `<main class="wrap">
+<h1>Listing supply</h1>
+<p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
+<p>Counts are active eBay listings, not sales. Both exact nights have to be on file, and the change has to be at least 15%.</p>
+<p>Nights on file: ${Number(doc?.nightCount) || 0}. Products: ${Number(doc?.products) || 0}. Products on ${esc(doc?.asOf || "the latest night")}: ${Number(doc?.productsOnLatest) || 0}.</p>
+<p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${esc(w7.exactStart || "—")} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
+<p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${esc(w30.exactStart || "—")} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
+<p>Flag off or on, published reads: ${reads.length}. Counted before the flag: ${Number(doc?.wouldQualify) || 0}.</p>
+${below ? `<h2>Checked, not shipped</h2><ul>${below}</ul>` : ""}
+${cards}
+</main>`;
+  return chrome("", body, "Listing supply", stamp, "", feedNav(opts));
+}
+
 const CHART_JS = `
 function catchemPoints(raw){
   var rows=Array.isArray(raw)?raw:[];

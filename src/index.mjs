@@ -9,7 +9,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSupply,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -49,6 +49,7 @@ export function pageKind(pathname) {
   if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
   if (path === "/premium") return "premium";
+  if (path === "/supply") return "supply";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -282,6 +283,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
+  if (kind === "supply") {
+    const doc = await loadJson("feed/supply-lead.json", fetchImpl).catch(() => ({ enabled: false, reads: [], wouldQualify: 0 }));
+    return html(renderSupply(doc, stamp, pageOpts));
+  }
   return null;
 }
 
