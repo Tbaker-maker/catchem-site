@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { neutralizeCopy, writePublicRoutes } from "./public-routes.mjs";
-import { AFFILIATION, ensureAffiliation } from "../src/affiliation.mjs";
+import { AFFILIATION, TCGPLAYER_ATTRIBUTION, ensureAffiliation } from "../src/affiliation.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -14,6 +14,7 @@ t("Demand replaces Buy Pressure", neutralizeCopy("Buy Pressure est.") === "Deman
 t("HEAT replaces BULLISH", neutralizeCopy("BULLISH·long") === "HEAT·long");
 t("HEAT replaces bullish", neutralizeCopy("not bullish") == "not HEAT");
 t("a page with no footer gets one", ensureAffiliation("<h1>Pulse</h1>").includes(AFFILIATION));
+t("every page carries the TCGplayer attribution once", ensureAffiliation("<h1>Pulse</h1>").includes(TCGPLAYER_ATTRIBUTION) && ensureAffiliation(`<footer><p>${AFFILIATION}</p><p>${TCGPLAYER_ATTRIBUTION}</p></footer>`).split(TCGPLAYER_ATTRIBUTION).length === 2);
 t("a page that already says it is not duplicated", ensureAffiliation(`<footer><p>${AFFILIATION}</p></footer>`).split(AFFILIATION).length === 2);
 
 const dir = await mkdtemp(join(tmpdir(), "routes-"));
