@@ -49,6 +49,10 @@ export function tcgPid(row) {
   if (embedded) return Number(embedded[1]);
   const pid = obj ? Number(obj.pid) : 0;
   if (pid > 0) return Math.trunc(pid);
+  const tcgId = obj ? String(obj.tcgcsvId || "").match(/^tcgcsv-(\d+)$/) : null;
+  if (tcgId) return Number(tcgId[1]);
+  const reviewed = obj ? String(obj.tcgPlayerId == null ? "" : obj.tcgPlayerId) : "";
+  if (/^\d+$/.test(reviewed) && Number(reviewed) > 0) return Number(reviewed);
   return 0;
 }
 
