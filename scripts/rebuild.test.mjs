@@ -653,7 +653,7 @@ const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-
 const hiddenNotes = hidePublishedNotes(shippingCard);
 t("a public page drops the correction log and the shipping card", !hiddenNotes.includes("Correction log") && !hiddenNotes.includes("AFFECTED A PUBLISHED NUMBER") && !/auto-fix/i.test(hiddenNotes) && hiddenNotes.includes("Kept"));
 const searchHtml = renderSearch();
-t("search stays capped at 40, highest stored value first, with no price on the hit", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("money(r[6])") && !searchHtml.includes("No market price"));
+t("search stays capped at 40, highest stored value first, with the stored price and rarity", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40, codes)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && searchHtml.includes("No market price") && searchHtml.includes("set-logos.json") && searchHtml.includes("r[8]") && searchHtml.includes("r[9]"));
 
 const lagLine = "SV: Prismatic Evolutions: Prismatic Evolutions Booster Pack latest price rose from $8.00 on Sep 3 to $9.00 on Oct 3, up 12.5%. The booster box is $134.46 on Oct 3, the same price as $134.46 on Sep 3. Singles in the set with a price on both days: 4 up, 0 down, 1 unchanged.";
 const lag = {
