@@ -301,3 +301,16 @@ t("fact pack uses the live row", looked.cards[0].price === "TCGplayer market: $2
 
 if (fail) process.exit(1);
 console.log("post office ok");
+
+{
+  const { patchPocketRows, pocketImageMap } = await import("../src/full-editor.mjs");
+  const rows = [
+    ["tcgp-A1-001", "Bulbasaur", "Genetic Apex", "2024", 0, "One Diamond", 0, "P", 70, 0, 0, "Basic", "001", "A1", "https://assets.tcgdex.net/en/tcgp/A1/001/high.webp"],
+    ["tcgp-B2a-010", "X", "S", "2026", 0, 0, 0, "P", 0, 0, 0, 0, "010", "B2a", "https://evil.example/x.webp"],
+    ["tcgp-A1-002", "Ivysaur", "Genetic Apex", "2024", 0, 0, 0, "P", 0, 0, 0, 0, "002", "A1", 0],
+  ];
+  const out = patchPocketRows(rows);
+  const okPocket = out[0][14] === "/data/editor/pocket/tcgp-A1-001" && out[1][14] === 0 && out[2][14] === 0 && pocketImageMap(rows).get("tcgp-A1-001") === rows[0][14] && pocketImageMap(rows).size === 1;
+  if (!okPocket) { console.error("FAIL a Pocket picture is the checked URL for that id, served same-origin"); process.exitCode = 1; }
+  else console.log("ok a Pocket picture is the checked URL for that id, served same-origin");
+}

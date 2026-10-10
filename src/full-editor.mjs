@@ -813,6 +813,43 @@ export async function patchedPaper(fetchImpl = fetch) {
   return body;
 }
 
+export const POCKET_IMG_PREFIX = "/data/editor/pocket/";
+const POCKET_HOSTS = /^https:\/\/(assets\.tcgdex\.net\/en\/tcgp\/|limitlesstcg\.nyc3\.cdn\.digitaloceanspaces\.com\/pocket\/|www\.serebii\.net\/tcgpocket\/)/;
+
+// Pocket pictures are the checked URL Catchem-data stores for each id (column 14).
+// They are proxied same-origin, like the paper scans, so the picture canvas can read them.
+export function pocketImageMap(rows) {
+  const map = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || !/^tcgp-[A-Za-z0-9-]+$/.test(String(r[0] || ""))) continue;
+    if (POCKET_HOSTS.test(String(r[14] || ""))) map.set(String(r[0]), String(r[14]));
+  }
+  return map;
+}
+
+export function patchPocketRows(rows) {
+  const map = pocketImageMap(rows);
+  return (Array.isArray(rows) ? rows : []).map((r) => {
+    if (!Array.isArray(r)) return r;
+    const out = r.slice();
+    if (out.length > 14) out[14] = map.has(String(r[0])) ? POCKET_IMG_PREFIX + r[0] : 0;
+    return out;
+  });
+}
+
+async function pocketRowsRaw(fetchImpl) {
+  return JSON.parse(await textOf(POCKET_URL, fetchImpl));
+}
+
 export async function pocketDocument(fetchImpl = fetch) {
-  return textOf(POCKET_URL, fetchImpl);
+  const key = "patched-pocket";
+  if (htmlCache.has(key)) return htmlCache.get(key);
+  const body = JSON.stringify(patchPocketRows(await pocketRowsRaw(fetchImpl)));
+  htmlCache.set(key, body);
+  return body;
+}
+
+export async function pocketImageUrl(id, fetchImpl = fetch) {
+  const map = pocketImageMap(await pocketRowsRaw(fetchImpl));
+  return map.get(String(id || "")) || "";
 }
