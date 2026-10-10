@@ -1618,6 +1618,62 @@ ${line ? `<p>${esc(line)}</p>` : ""}
   return chrome("", body, page.name, stamp, "", feedNav(opts));
 }
 
+export function exactWindowPct(hist, days, endDate) {
+  const endDay = String(endDate || "").slice(0, 10);
+  const pts = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) && Number(point[1]) > 0);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDay) || (days !== 7 && days !== 30 && days !== 90)) return null;
+  const end = pts.find((point) => point[0] === endDay) || null;
+  const startDay = new Date(Date.parse(`${endDay}T00:00:00Z`) - days * 86400000).toISOString().slice(0, 10);
+  const start = pts.find((point) => point[0] === startDay) || null;
+  if (!end || !start) return null;
+  const pct = Math.round(((Number(end[1]) - Number(start[1])) / Number(start[1])) * 1000) / 10;
+  return Number.isFinite(pct) ? pct : null;
+}
+
+export function rangeMarker(hist, endDate) {
+  const endDay = String(endDate || "").slice(0, 10);
+  const pts = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) && Number(point[1]) > 0 && point[0] <= endDay);
+  if (!pts.length || !/^\d{4}-\d{2}-\d{2}$/.test(endDay)) return { text: "6-month high —. 6-month low —." };
+  const startDay = new Date(Date.parse(`${endDay}T00:00:00Z`) - 183 * 86400000).toISOString().slice(0, 10);
+  const covers = pts.some((point) => point[0] <= startDay);
+  const use = covers ? pts.filter((point) => point[0] >= startDay) : pts;
+  let hi = use[0];
+  let lo = use[0];
+  for (const point of use) {
+    if (point[1] > hi[1] || (point[1] === hi[1] && point[0] > hi[0])) hi = point;
+    if (point[1] < lo[1] || (point[1] === lo[1] && point[0] > lo[0])) lo = point;
+  }
+  if (!covers) return { text: `6-month high —. 6-month low —. High on file ${money(hi[1])} on ${hi[0]}. Low on file ${money(lo[1])} on ${lo[0]}.` };
+  const end = pts.find((point) => point[0] === endDay);
+  const freshHigh = end && Number(end[1]) === Number(hi[1]) && hi[0] === endDay;
+  const freshLow = end && Number(end[1]) === Number(lo[1]) && lo[0] === endDay;
+  const highBit = freshHigh ? `New 6-month high ${money(hi[1])} on ${hi[0]}.` : `6-month high ${money(hi[1])} on ${hi[0]}.`;
+  const lowBit = freshLow ? `New 6-month low ${money(lo[1])} on ${lo[0]}.` : `6-month low ${money(lo[1])} on ${lo[0]}.`;
+  return { text: `${highBit} ${lowBit}` };
+}
+
+function exactChip(label, n) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return `<span class="win">${label} —</span>`;
+  const cls = n > 0 ? "up" : n < 0 ? "down" : "";
+  const sign = n > 0 ? "+" : "";
+  return `<span class="win ${cls}">${label} ${sign}${n}%</span>`;
+}
+
+export function listingTrend(series, endDate) {
+  const endDay = String(endDate || "").slice(0, 10);
+  const pts = (series || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isInteger(Number(point.listingCount)));
+  const end = pts.find((point) => point.date === endDay) || null;
+  if (!end) return "eBay listings —";
+  const bits = [7, 30].map((days) => {
+    const startDay = new Date(Date.parse(`${endDay}T00:00:00Z`) - days * 86400000).toISOString().slice(0, 10);
+    const start = pts.find((point) => point.date === startDay) || null;
+    if (!start || !(Number(start.listingCount) > 0)) return `${days}D —`;
+    const pct = Math.round(((Number(end.listingCount) - Number(start.listingCount)) / Number(start.listingCount)) * 1000) / 10;
+    return `${days}D ${pct > 0 ? "+" : ""}${pct}% (${start.listingCount} → ${end.listingCount})`;
+  });
+  return `eBay listings ${bits.join(" · ")}`;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
@@ -1625,20 +1681,29 @@ export function renderCard(card, stamp, opts = {}) {
   const price = money(shown);
   const asOf = fact?.asOf || card.asOf;
   const hist = histWithFact(card.hist || [], fact);
-  const computed = seriesFacts(hist, asOf);
+  const endDay = String(asOf || "").slice(0, 10);
   const chips = [
-    winChip("7D", fact?.change7 ?? computed?.change7),
-    winChip("30D", fact?.change30 ?? computed?.change30),
-    winChip("90D", fact?.change90 ?? computed?.change90),
+    exactChip("7D", exactWindowPct(hist, 7, endDay)),
+    exactChip("30D", exactWindowPct(hist, 30, endDay)),
+    exactChip("90D", exactWindowPct(hist, 90, endDay)),
   ].join("");
-  const high = fact?.high ?? computed?.high;
-  const highOn = fact?.highOn || computed?.highOn || "";
-  const low = fact?.low ?? computed?.low;
-  const lowOn = fact?.lowOn || computed?.lowOn || "";
-  const since = fact?.daysSinceHigh ?? computed?.daysSinceHigh;
+  const marker = rangeMarker(hist, endDay);
+  const sealed = card.kind === "sealed";
+  const listingsLine = sealed ? listingTrend(opts.listingSeries || [], endDay) : "";
+  const reads = (opts.productReads || []).filter((read) => read && (read.headline || read.path)).slice(0, 3);
+  const readHtml = reads.length
+    ? `<ul class="glance-reads">${reads.map((read) => {
+      const when = esc(String(read.asOf || "").slice(0, 10));
+      const line = esc(read.headline || read.path || "");
+      const href = opts.feed && read.id ? `/feed/r/${encodeURIComponent(read.id)}` : "";
+      return `<li>${href ? `<a href="${esc(href)}">${when} ${line}</a>` : `${when} ${line}`}</li>`;
+    }).join("")}</ul>`
+    : `<p class="muted">No reads on file for this product.</p>`;
+  const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
+  const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
+  const priceChart = pricePts.length >= 2 ? `<p class="muted">TCGplayer market. A missing day is a gap.</p>${gapChartSvg(splitDated(pricePts, "ask"))}` : "";
+  const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
   const breakBits = [];
-  if (high && highOn && low && lowOn) breakBits.push(`<p>▲ high ${money(high)} on ${esc(highOn)}. ▼ low ${money(low)} on ${esc(lowOn)}.</p>`);
-  if (Number.isFinite(Number(since))) breakBits.push(`<p>${Number(since)} days since the high.</p>`);
   const listings = Number(fact?.listings);
   if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
   const flagged = flagHtml(fact?.flagged);
@@ -1648,20 +1713,43 @@ export function renderCard(card, stamp, opts = {}) {
   const setBit = card.setSlug
     ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || "");
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "" });
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "" }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
-  const body = `<main class="wrap">
+  const body = `<main class="wrap product-glance">
+<style>
+.glance{display:block}
+.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:112px;height:auto}
+.win{display:inline-block;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
+.glance-reads{margin:8px 0;padding-left:18px}
+@media (min-width:768px){
+  .glance{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:start}
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:168px}
+}
+@media (min-width:1100px){
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:200px}
+}
+</style>
+<div class="glance">
+<div class="glance-photo">${img}</div>
+<div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
-<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span>${chips}</p>
+<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span></p>
+<p>${chips}</p>
+<p>${esc(marker.text)}</p>
+${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
+<h2>Reads</h2>
+${readHtml}
+</div>
+</div>
 <p class="muted">${esc(card.source || "TCGplayer market")}${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}${checked ? `. ${esc(checked)}` : ""}</p>
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
 <p class="muted">${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")})` : "No sold data yet"}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
-${img}
-${(hist || []).length >= 2 ? chartBox(hist, "TCGplayer market, daily", card.release || "") : ""}
+${priceChart}
+${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
