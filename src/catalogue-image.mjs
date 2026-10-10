@@ -81,7 +81,7 @@ export function officialSrc(row, map) {
   const sealed = obj.kind === "sealed";
   if (pid && stored.includes("/product/" + pid)) return { src: "/api/card-img?pid=" + pid, crop: !sealed };
   if (pid) return { src: "/api/card-img?pid=" + pid, crop: !sealed };
-  const file = ptcgFile(obj.id);
+  const file = ptcgFile(obj.cardId) || ptcgFile(obj.sku) || ptcgFile(obj.id);
   if (file) return { src: "/data/editor/tcg/" + file, crop: true };
   return { src: "", crop: false };
 }

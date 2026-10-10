@@ -77,11 +77,13 @@ export function isShapeRow(row) {
   const kind = String(row.readKind || "");
   if (kind !== row.kind || !SHAPE_KINDS.includes(kind)) return false;
   const path = String(row.path || row.headline || "");
+  const why = String(row.why || "");
   const rec = row.receipt;
   if (!path || !rec || typeof rec !== "object") return false;
-  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && path.includes("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
+  const has = (clause) => why.includes(clause) || path.includes(clause);
+  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && has("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
   if (kind === "mix") {
-    if (!path.includes("This is the mix of copies that sold, not the copy in your hand.")) return false;
+    if (!has("This is the mix of copies that sold, not the copy in your hand.")) return false;
     if (!Array.isArray(rec.conditions) || rec.conditions.length < 2) return false;
     for (let i = 0; i < rec.conditions.length; i += 1) {
       const bit = rec.conditions[i];
@@ -89,14 +91,13 @@ export function isShapeRow(row) {
     }
     return true;
   }
-  if (kind === "conditions") return path.includes("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
-  if (kind === "soldflat") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.price));
-  if (kind === "solddown") return path.includes("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
-  if (kind === "setshare") return path.includes("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
-  if (kind === "spread") return path.includes("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
-  if (kind === "askmove") return path.includes("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
-  if (kind === "mktmove") return path.includes("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
-  if (kind === "still") return path.includes("Asks and listing count. Not sales.") && path.includes(shapeCash(rec.price)) && path.includes(String(rec.listingCount));
+  if (kind === "conditions") return has("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
+  if (kind === "soldflat" || kind === "still") return false;
+  if (kind === "solddown") return has("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
+  if (kind === "setshare") return has("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
+  if (kind === "spread") return has("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
+  if (kind === "askmove") return has("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
+  if (kind === "mktmove") return has("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
   return false;
 }
 
@@ -230,19 +231,12 @@ export function isFactRow(row) {
 export function pokemonFactLine(row) {
   if (!row || typeof row !== "object") return "";
   const name = String(row.name || "").trim();
-  if (!name) return "";
-  let english = Number.isInteger(row.englishCount) && row.englishCount >= 0 ? row.englishCount : null;
-  if (english == null && Number.isInteger(row.enCount) && row.enCount >= 0) english = row.enCount;
-  let japanese = Number.isInteger(row.japaneseCount) && row.japaneseCount >= 0 ? row.japaneseCount : null;
-  if (japanese == null && Number.isInteger(row.jaCount) && row.jaCount >= 0) japanese = row.jaCount;
-  if (japanese == null && Number.isInteger(row.jpCount) && row.jpCount >= 0) japanese = row.jpCount;
-  if (english == null && Number.isInteger(row.cardCount) && row.cardCount >= 0) english = row.cardCount;
-  const parts = [];
-  if (english != null) parts.push(`${english} English TCG card${english === 1 ? "" : "s"}`);
-  if (japanese != null) parts.push(`${japanese} Japanese TCG card${japanese === 1 ? "" : "s"}`);
-  if (!parts.length) return "";
-  if (parts.length === 1) return `${name} has ${parts[0]}.`;
-  return `${name} has ${parts[0]} and ${parts[1]}.`;
+  const cardCount = Number.isInteger(row.cardCount) ? row.cardCount : null;
+  const artistCount = Number.isInteger(row.artistCount) ? row.artistCount : null;
+  const dex = Number.isInteger(row.dex) ? row.dex : null;
+  if (!name || cardCount == null || artistCount == null || dex == null) return "";
+  if (cardCount < 1 || artistCount < 1 || dex < 1) return "";
+  return name + " (#" + dex + "): " + cardCount + " cards, " + artistCount + " artists.";
 }
 
 // A cutout only when that field is already on the row. A product image is not a cutout.
@@ -2421,6 +2415,12 @@ function setLine(card){
   return set;
 }
 function moveLine(card){
+  if(!card) return "";
+  if(!(isShapeRow(card) || isVolumeRow(card))){
+    const head=String(card.headline||"").trim();
+    const path=String(card.path||"").trim();
+    if(head && head!==path && (head.indexOf("$")>=0 || head.indexOf("%")>=0)) return shownRead(Object.assign({}, card, {path: head}));
+  }
   const path=String(card&&(card.path||card.headline)||"").trim();
   if(!path) return "";
   return shownRead(card);
@@ -2596,8 +2596,13 @@ function matterLines(card){
 }
 function moreBlock(card){
   const lines=matterLines(card);
-  if(!lines) return "";
-  return '<section class="more-block"><h4>More</h4><p><b>Why it matters.</b> '+html(lines.why)+'</p><p><b>What would make this wrong.</b> '+html(lines.wrong)+'</p></section>';
+  const note=String(card&&card["why"]||"").trim();
+  const path=String(card&&(card.path||"")||"").trim();
+  const extra=note && note!==path ? "<p>"+html(note)+"</p>" : "";
+  if(!lines && !extra) return "";
+  const why=lines?"<p><b>Why it matters.</b> "+html(lines.why)+"</p>":"";
+  const wrong=lines?"<p><b>What would make this wrong.</b> "+html(lines.wrong)+"</p>":"";
+  return '<section class="more-block"><h4>More</h4>'+why+wrong+extra+"</section>";
 }
 function mountMon(el, card){
   const slug=pokemonSlug(card&&card.name);
@@ -2640,6 +2645,13 @@ function factCutLine(card){
   try{ return brandedTile("card",{kind:"single",name:card&&card.name}); }
   catch(e){ return safeBrandHtml("card",{kind:"single",name:card&&card.name}); }
 }
+function factPhoto(card){
+  try{
+    const hit=officialSrc(card, catalogueImages);
+    if(!hit || !hit.src) return null;
+    return photoEl(card);
+  }catch(e){ return null; }
+}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
   if(card && (card.readKind==="news" || card.kind==="news")) return newsEl(card);
@@ -2651,6 +2663,7 @@ function cardEl(card, facts){
   const readHref="/feed/r/"+encodeURIComponent(card.id);
   const line=isFact(card)?pokemonFactLine(card):moveLine(card);
   const setName=setLine(card);
+  const face=isFact(card)?factPhoto(card):null;
   const headline=String(card.headline||"").trim();
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
@@ -2660,11 +2673,15 @@ function cardEl(card, facts){
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
-  const cut=isFact(card)?factCutLine(card):"";
+  const cut=isFact(card)?(face?"":factCutLine(card)):"";
   const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
-    if(isFact(card)){ el.classList.add("fact-card"); mountMon(el, card); }
+    if(isFact(card)){
+      el.classList.add("fact-card");
+      if(face) el.insertBefore(face, el.firstChild);
+      mountMon(el, card);
+    }
     else {
       const photo=photoEl(card);
       if(photo) el.insertBefore(photo, el.firstChild);
@@ -2683,6 +2700,7 @@ function cardEl(card, facts){
   if(isFact(card)){
     el.classList.add("fact-card");
     el.innerHTML=head;
+    if(face) el.insertBefore(face, el.firstChild);
     mountMon(el, card);
     return el;
   }
@@ -4031,6 +4049,24 @@ function status(row){
 function saveOrder(){
   fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({order:rows.map(function(row){return row.id})})}).catch(function(){});
 }
+function pidOf(row){
+  const sku=String(row&&row.sku||"");
+  const skuHit=sku.match(/^tcgcsv-([0-9]+)$/);
+  if(skuHit) return skuHit[1];
+  const id=String(row&&row.id||"");
+  const hit=id.match(/tcgcsv-([0-9]+)/);
+  return hit?hit[1]:"";
+}
+function missMine(img){
+  const box=document.createElement("div");
+  box.innerHTML=brandedTile("row",{kind:img.getAttribute("data-kind")||"single",name:img.alt||""});
+  if(box.firstChild) img.replaceWith(box.firstChild);
+}
+function faceHtml(row){
+  const pid=pidOf(row);
+  if(!pid) return brandedTile("row",{kind:row.kind||"single",name:row.name||row.headline,id:row.id,sku:row.sku});
+  return '<img alt="'+html(row.name||"")+'" width="64" height="89" loading="lazy" decoding="async" data-kind="'+(row.kind||"single")+'" src="/api/card-img?pid='+pid+'" onerror="missMine(this)">';
+}
 function draw(){
   const list=document.getElementById("mine-list");
   list.innerHTML="";
@@ -4039,7 +4075,7 @@ function draw(){
     li.className="mine-row";
     li.draggable=true;
     const listed=Number(row.listings)>=20 && row.listingsAsOf ? "Active listings: "+row.listings+" (as of "+row.listingsAsOf+")" : "";
-    li.innerHTML=brandedTile("row",{kind:row.kind||"single",name:row.name||row.headline,id:row.id,sku:row.sku})+'<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
+    li.innerHTML=faceHtml(row)+'<a href="/feed/r/'+encodeURIComponent(row.id)+'">'+html(row.name||row.headline||"Read")+'</a><b>'+money(row.market)+'</b><p>'+html(status(row))+'</p>'+(listed?'<p class="muted">'+html(listed)+'</p>':"")+'<button type="button" data-act="up">Up</button><button type="button" data-act="down">Down</button><button type="button" data-act="remove">Remove</button>';
     li.ondragstart=function(){ dragId=row.id; };
     li.ondragover=function(ev){ ev.preventDefault(); };
     li.ondrop=function(ev){

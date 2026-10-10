@@ -348,7 +348,11 @@ export default {
       if (!(pid > 0)) return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
       const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
       if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-      return new Response(img.body, {
+      const bytes = new Uint8Array(await img.arrayBuffer());
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (hex.startsWith("23c8d781")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      return new Response(bytes, {
         status: 200,
         headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" },
       });
