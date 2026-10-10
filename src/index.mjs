@@ -9,7 +9,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -149,6 +149,64 @@ async function readsFor(cardId, fetchImpl) {
   } catch {
     return [];
   }
+}
+
+export async function quickFor(cardId, fetchImpl, opts = {}) {
+  const id = String(cardId || "").trim();
+  if (!id || id.length > 80 || /[^A-Za-z0-9._-]/.test(id)) return null;
+  let card = null;
+  if (/^tcgcsv-\d+$/.test(id)) {
+    const bucket = String((Number((id.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
+    const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
+    card = (Array.isArray(rows) ? rows : []).find((row) => row && row.id === id) || null;
+  }
+  if (!card) {
+    try {
+      const bundle = await loadPokemonBundle(fetchImpl);
+      const hit = bundle.byId[id];
+      if (hit) {
+        card = {
+          id: hit.id,
+          name: hit.name,
+          set: hit.set,
+          num: hit.number,
+          artist: hit.artist,
+          price: hit.price,
+          asOf: hit.priceDate,
+          source: hit.source,
+          printing: hit.finish || "",
+          kind: "single",
+          hist: [],
+        };
+        if (hit.link) card.tcgplayer = hit.link;
+      }
+    } catch { /* the catalogue file did not load */ }
+  }
+  if (!card) return null;
+  const images = await catalogueMap(fetchImpl);
+  const pic = officialSrc(card, images);
+  const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
+  const fact = facts && facts[id] ? facts[id] : null;
+  let listingSeries = [];
+  if (card.kind === "sealed") {
+    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
+    const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[id]) || ((diveMap.ids || []).includes(id) ? id : "");
+    if (sealedId) {
+      try {
+        const dive = await loadDive(sealedId, fetchImpl);
+        listingSeries = Array.isArray(dive?.series) ? dive.series : [];
+      } catch { listingSeries = []; }
+    }
+  }
+  const productReads = await readsFor(id, fetchImpl);
+  return quickView(card, {
+    fact,
+    listingSeries,
+    productReads,
+    photo: pic.src,
+    crop: pic.crop,
+    feed: opts.feed === true,
+  });
 }
 
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
@@ -414,6 +472,18 @@ export default {
           "access-control-allow-origin": "*",
         },
       });
+    }
+    if (request.method === "GET" && url.pathname === "/api/quick") {
+      const id = url.searchParams.get("id") || "";
+      const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+      try {
+        const doc = await quickFor(id, fetchImpl, { feed });
+        if (!doc) return new Response(JSON.stringify({ error: "Not in the catalog" }), { status: 404, headers });
+        headers["cache-control"] = "public, max-age=300";
+        return new Response(JSON.stringify(doc), { status: 200, headers });
+      } catch {
+        return new Response(JSON.stringify({ error: "Not in the catalog" }), { status: 404, headers });
+      }
     }
     if (request.method === "GET" && url.pathname === "/api/card-img") {
       const pid = Math.trunc(Number(url.searchParams.get("pid")));
