@@ -3038,6 +3038,7 @@ function newsEl(card){
   const by='<p class="news-by">'+html(source||"Source")+(when?" · "+html(when):"")+"</p>";
   const link=card.href?'<a class="news-go" href="'+html(card.href)+'">Read at '+html(source||"the source")+"</a>":"";
   el.innerHTML=safeNewsHtml(card)+kicker+"<h3>"+html(card.name||"")+"</h3>"+blurb+newsDetailHtml(card)+by+link;
+  bindShare(el, card);
   return el;
 }
 function factCutLine(card){
@@ -3052,6 +3053,53 @@ function factPhoto(card){
     if(!hit || !hit.src) return null;
     return photoEl(card);
   }catch(e){ return null; }
+}
+function bindShare(el, card){
+  var btn=document.createElement("button");
+  btn.type="button";
+  btn.textContent="Share";
+  btn.addEventListener("click", function(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+    var canvas=document.createElement("canvas");
+    canvas.width=1080;
+    canvas.height=1350;
+    var pen=canvas.getContext("2d");
+    pen.fillStyle="#12100e";
+    pen.fillRect(0,0,1080,1350);
+    pen.fillStyle="#d9b779";
+    pen.font="700 64px Georgia, serif";
+    pen.fillText("Catch'em", 72, 100);
+    var img=el.querySelector("img");
+    var y=170;
+    var src=img?String(img.currentSrc||img.src||""):"";
+    var same=src.indexOf(location.origin)===0;
+    if(img && same && img.complete && img.naturalWidth){
+      try { pen.drawImage(img, 390, 150, 300, 420); y=620; } catch(err) {}
+    }
+    pen.fillStyle="#efe9de";
+    pen.font="36px Georgia, serif";
+    var sentence=el.querySelector(".one-line") || el.querySelector("h3");
+    var text=sentence?sentence.textContent:String(card.headline||"");
+    var words=String(text||"").split(" ");
+    var cur="";
+    words.forEach(function(word){
+      if(!cur){ cur=word; return; }
+      if((cur+" "+word).length<=40) cur=cur+" "+word;
+      else { if(y<1160) pen.fillText(cur, 72, y); y+=48; cur=word; }
+    });
+    if(cur && y<1160){ pen.fillText(cur, 72, y); y+=56; }
+    pen.fillStyle="#c4baab";
+    pen.font="28px Georgia, serif";
+    pen.fillText(String(card.asOf||""), 72, 1220);
+    pen.fillText(String(card.source||"TCGplayer market"), 72, 1260);
+    pen.fillText("catchemtcg.com/feed", 72, 1300);
+    var link=document.createElement("a");
+    link.href=canvas.toDataURL("image/png");
+    link.download="catchem-read.png";
+    link.click();
+  });
+  el.appendChild(btn);
 }
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
@@ -3096,6 +3144,7 @@ function cardEl(card, facts){
     });
     const nameLink=el.querySelector("h3 a");
     if(nameLink) nameLink.addEventListener("click", remember);
+    bindShare(el, card);
     return el;
   }
   if(isFact(card)){
@@ -3103,6 +3152,7 @@ function cardEl(card, facts){
     el.innerHTML=head;
     if(face) el.insertBefore(face, el.firstChild);
     mountMon(el, card);
+    bindShare(el, card);
     return el;
   }
   const info=dataFacts(card, facts);
@@ -3226,6 +3276,7 @@ function cardEl(card, facts){
       listingsAbove:above
     }));
   };
+  bindShare(el, card);
   return el;
 }
 function trackedEl(row){
