@@ -132,6 +132,22 @@ async function omitStalePriceReads(reads, fetchImpl) {
   return out;
 }
 
+async function readsFor(cardId, fetchImpl) {
+  try {
+    const bundle = await loadJson("reads.json", fetchImpl);
+    const rows = (bundle?.reads || []).filter((read) => {
+      if (!read) return false;
+      const sku = String(read.sku || "");
+      const href = String(read.href || "");
+      return sku === cardId || href === `/c/${cardId}` || href === `/p/${cardId}`;
+    });
+    rows.sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")));
+    return rows.slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
   if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
@@ -248,7 +264,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             source: hit.source,
             kind: "single",
           };
-          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: imageForId(images, hit.id), catalogueCrop: !!imageForId(images, hit.id) }));
+          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: imageForId(images, hit.id), catalogueCrop: !!imageForId(images, hit.id), productReads: await readsFor(hit.id, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
@@ -263,7 +279,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const diveHref = sealedId ? `/dive/${sealedId}` : "";
     const images = await catalogueMap(fetchImpl);
     const hit = card ? officialSrc(card, images) : { src: "", crop: false };
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop }), card ? 200 : 404);
+    let listingSeries = [];
+    if (sealedId) {
+      try {
+        const dive = await loadDive(sealedId, fetchImpl);
+        listingSeries = Array.isArray(dive?.series) ? dive.series : [];
+      } catch { listingSeries = []; }
+    }
+    const productReads = card ? await readsFor(cardId, fetchImpl) : [];
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, listingSeries, productReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
