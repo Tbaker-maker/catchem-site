@@ -1157,6 +1157,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .row a{color:var(--txt);text-decoration:none;min-width:0;flex:1;overflow-wrap:anywhere}
 .row b{overflow-wrap:anywhere}
 .row > b{flex:none;white-space:nowrap}
+.own{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
 .row svg{flex:none}
 .row.mover{align-items:center;gap:10px}
 .row.mover img{flex:none;width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a}
@@ -1317,11 +1318,11 @@ export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main class="wrap"><h1 id="title">Set</h1>
 <p class="muted" id="completion"></p>
 <div id="lines"></div><div id="charts"></div>
-<div class="filters"><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="base">Base set only</option></select>
+<div class="filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
+</div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
@@ -1361,13 +1362,53 @@ function rowHtml(r){
   if(r.printing) bits.push(html(r.printing));
   if(r.kind==="sealed" && r.subtype==="case") bits.push("Case");
   if(r.artist) bits.push(html(r.artist));
-  return '<div class="row">'+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span></a><b>'+money(r.price)+'</b></div>';
+  var tick="";
+  if(mineOn() && r.kind!=="sealed"){
+    var key=ownKey(r);
+    var owned=readOwned();
+    tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
+  }
+  return '<div class="row">'+tick+img+'<a href="'+href+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span></a><b>'+money(r.price)+'</b></div>';
+}
+function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
+function readOwned(){
+  try { return JSON.parse(localStorage.getItem("catchem-set:"+slug)||"{}"); }
+  catch(e) { return {}; }
+}
+function mineOn(){
+  var btn=document.getElementById("mine-toggle");
+  return !!(btn && btn.getAttribute("aria-pressed")==="true");
+}
+function cash(n){
+  return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function paintMine(){
+  var el=document.getElementById("mine-line");
+  if(!el) return;
+  if(!mineOn()){ el.textContent=""; return; }
+  var scope=document.getElementById("scope").value;
+  var list=expand(rows, scope).filter(function(r){ return r && r.kind!=="sealed"; });
+  var owned=readOwned();
+  var total=list.length, have=0, cost=0, unpriced=0, leftPriced=0;
+  list.forEach(function(r){
+    var key=ownKey(r);
+    var got=owned[key]===1;
+    if(got) have++;
+    var price=Number(r.price);
+    if(!(price>0)){ unpriced++; return; }
+    if(!got){ cost+=price; leftPriced++; }
+  });
+  var pct=total?Math.round((have/total)*1000)/10:0;
+  var costText=leftPriced?cash(cost):"—";
+  var mode=scope==="grand"?"Grand master. ":scope==="master"?"Master set. ":scope==="base"?"Base set. ":"";
+  var noun=unpriced===1?"card unpriced.":"cards unpriced.";
+  el.textContent=mode+"Owned "+have+" of "+total+" ("+pct+"%). Cost to complete "+costText+". "+unpriced+" "+noun;
 }
 function expand(list, scope){
   const out=[];
   list.forEach(function(r){
     if(r.kind==="sealed"){
-      if(scope==="master" || scope==="base") return;
+      if(scope==="master" || scope==="base" || scope==="grand") return;
       out.push(r);
       return;
     }
@@ -1417,6 +1458,7 @@ function draw(){
     return '<h2 id="'+id+'" class="set-section">'+html(name)+'</h2><p class="muted">'+cards.length+' cards</p>'+cards.map(rowHtml).join("");
   }).join("");
   document.getElementById("more").hidden=shown>=main.length;
+  paintMine();
   if(location.hash.length>1){
     var el=document.getElementById(location.hash.slice(1));
     if(el) el.scrollIntoView({block:"start"});
@@ -1468,6 +1510,21 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
 });
 ["kind","q","sort","scope"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
+document.getElementById("mine-toggle").addEventListener("click", function(){
+  var on=this.getAttribute("aria-pressed")==="true";
+  this.setAttribute("aria-pressed", on?"false":"true");
+  draw();
+});
+document.addEventListener("change", function(ev){
+  var box=ev.target;
+  if(!box || !box.getAttribute || box.getAttribute("data-own")==null) return;
+  var owned=readOwned();
+  var key=box.getAttribute("data-own");
+  if(box.checked) owned[key]=1;
+  else delete owned[key];
+  try { localStorage.setItem("catchem-set:"+slug, JSON.stringify(owned)); } catch(e) {}
+  paintMine();
+});
 </script>`;
   return chrome("Sets", body, "Set", stamp, "", feedNav(opts));
 }
