@@ -166,7 +166,7 @@ export function visualGaps(html) {
   const parts = src.split('<div class="row');
   for (let i = 1; i < parts.length; i++) {
     const chunk = parts[i].slice(0, 1500);
-    if (!chunk.includes("<img") && !chunk.includes('class="tile') && !chunk.includes("news-tile") && !chunk.includes("brandedTile(") && !chunk.includes("imageTag(") && !chunk.includes("'+img+") && !chunk.includes("'+face+")) {
+    if (!chunk.includes("<img") && !chunk.includes('class="tile') && !chunk.includes("news-tile") && !chunk.includes("brandedTile(") && !chunk.includes("imageTag(") && !chunk.includes("'+img+") && !chunk.includes("'+tick+img+") && !chunk.includes("'+face+")) {
       gaps.push("row-" + i);
     }
   }
