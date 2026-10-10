@@ -9,7 +9,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSupply, renderTrackRecord,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSupply, renderToday, renderTrackRecord,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -51,6 +51,7 @@ export function pageKind(pathname) {
   if (path === "/premium") return "premium";
   if (path === "/supply") return "supply";
   if (path === "/track-record") return "track";
+  if (path === "/today") return "today";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -315,6 +316,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "track") {
     const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored7: 0, scored30: 0 }));
     return html(renderTrackRecord(doc, stamp, pageOpts));
+  }
+  if (kind === "today") {
+    const doc = await loadJson("today.json", fetchImpl).catch(() => ({ asOf: "", supply: "off", lines: [] }));
+    return html(renderToday(doc, stamp, pageOpts));
   }
   return null;
 }

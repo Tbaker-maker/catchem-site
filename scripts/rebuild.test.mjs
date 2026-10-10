@@ -1,6 +1,6 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -52,6 +52,16 @@ const files = {
   "receipts.json": receipts,
   "redirects.json": { products: { "sv3pt5-etb": "/p/tcgcsv-504467" }, sets: { base1: "/sets/base-set" } },
   "catalogue-images.json": { source: "Post Office catalogue. Match by id only.", images: { "tcgcsv-10": "/img/base1/1", "base1-4": "/cards/seed/base1-4.png" } },
+  "today.json": {
+    asOf: "2026-10-09",
+    supply: "off",
+    lines: [
+      { slot: "mover", text: "Pidgey (Base Set, 1999, #57) is up 74.2% this month: $1.51 → $2.63.", href: "/c/tcgcsv-42401" },
+      { slot: "high", text: "Rebel Clash Booster Pack (Rebel Clash, 2020) hit a 6-month high: $12.55, up 33.5% in 90 days.", href: "/p/tcgcsv-210562" },
+      { slot: "fact", text: "Pidgey (#16): 17 cards, 14 artists.", note: "Species fact on the short list. No set move was shipped." },
+      { slot: "news", text: "Mega Evolution - Delta Reign (PokeGuardian, 2026-11-06).", href: "https://www.pokeguardian.com/3231721_pokemon-tcg-mega-evolution-delta-reign-teased-november-release" },
+    ],
+  },
 };
 
 const diveFiles = {
@@ -255,6 +265,13 @@ t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["
     ],
   }, "stamp");
   t("track record shows too early and does not invent a hit rate", page.includes("Too early to score") && page.includes("Scored at 7 days: 0") && page.includes("17 cards, 14 artists") && !page.includes("tcgcsv-"));
+}
+{
+  const today = await (await renderPath("/today", fetchImpl)).text();
+  const visible = today.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+  t("today lists the morning lines and keeps the listings line off", pageKind("/today") === "today" && today.includes("<h1>Today</h1>") && today.includes("Biggest move") && today.includes("74.2%") && today.includes("$12.55") && today.includes("The listings line is off.") && today.includes("Delta Reign") && today.includes("No set move was shipped.") && today.includes("Share card") && today.includes("catchem-today.png") && !visible.includes("tcgcsv"));
+  const drawn = renderToday({ asOf: "2026-10-09", supply: "on", lines: [{ slot: "supply", text: "Fewer copies listed: Unbroken Bonds Booster Box eBay listings fell 5.6% in 7 days (18 → 17)." }] }, "");
+  t("a kept listings line is the only supply sentence", drawn.includes("Fewer copies listed") && !drawn.includes("The listings line is off."));
 }
 t("a card picture is the catalogue hit for that id", cardPage.includes("/data/editor/tcg/base1/1_hires.png") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
 t("a card page does not link the hidden pages", !/href="\/(feed|board|receipts|accuracy|movers)/.test(cardPage));
