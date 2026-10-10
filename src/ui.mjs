@@ -1845,6 +1845,66 @@ fetch("/data/indexes.json").then(r=>r.json()).then(idx=>{
   return chrome("Movers", body, "Movers", stamp, "", feedNav(opts));
 }
 
+export function renderToday(doc, stamp, opts = {}) {
+  const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
+  const lines = (doc?.lines || []).map((line) => {
+    const label = labels[line.slot] || line.slot;
+    const body = line.href ? `<a href="${esc(line.href)}">${esc(line.text)}</a>` : esc(line.text);
+    const note = line.note ? `<p class="muted">${esc(line.note)}</p>` : "";
+    return `<li><b>${esc(label)}</b><p>${body}</p>${note}</li>`;
+  }).join("");
+  const supply = doc?.supply === "on" ? "" : `<p>The listings line is off.</p>`;
+  const payload = JSON.stringify((doc?.lines || []).map((line) => ({ text: line.text }))).replace(/</g, "\\u003c");
+  const body = `<main class="wrap">
+<h1>Today</h1>
+<p class="muted">${esc(doc?.asOf || "")}</p>
+${supply}
+<ol class="today-lines">${lines}</ol>
+<p><button type="button" id="share-card">Share card</button></p>
+<p class="muted" id="share-note"></p>
+<script type="application/json" id="today-lines">${payload}</script>
+<script type="application/json" id="today-date">${esc(doc?.asOf || "")}</script>
+<script>
+document.getElementById("share-card").addEventListener("click", function(){
+  var lines=JSON.parse(document.getElementById("today-lines").textContent);
+  var canvas=document.createElement("canvas");
+  canvas.width=1080; canvas.height=1350;
+  var pen=canvas.getContext("2d");
+  pen.fillStyle="#12100e"; pen.fillRect(0,0,1080,1350);
+  pen.fillStyle="#d9b779"; pen.font="700 72px Georgia, serif"; pen.fillText("Catch'em", 72, 150);
+  pen.fillStyle="#efe9de"; pen.font="36px Georgia, serif";
+  var y=280;
+  function wrap(text, max){
+    var words=String(text||"").split(" ");
+    var out=[];
+    var cur="";
+    words.forEach(function(word){
+      if(!cur){ cur=word; return; }
+      if((cur+" "+word).length<=max) cur=cur+" "+word;
+      else { out.push(cur); cur=word; }
+    });
+    if(cur) out.push(cur);
+    return out;
+  }
+  lines.forEach(function(line){
+    wrap(line.text, 42).forEach(function(row){
+      if(y<1180){ pen.fillText(row, 72, y); y+=52; }
+    });
+    y+=28;
+  });
+  pen.fillStyle="#c4baab"; pen.font="28px Georgia, serif";
+  pen.fillText(document.getElementById("today-date").textContent, 72, 1260);
+  var link=document.createElement("a");
+  link.href=canvas.toDataURL("image/png");
+  link.download="catchem-today.png";
+  link.click();
+  document.getElementById("share-note").textContent="Card saved on this device.";
+});
+</script>
+</main>`;
+  return chrome("", body, "Today", stamp, "", feedNav(opts));
+}
+
 export function renderTrackRecord(doc, stamp, opts = {}) {
   const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${row.scored7 ? `${row.hit7}/${row.scored7}` : "—"}</td><td>${row.scored30 ? `${row.hit30}/${row.scored30}` : "—"}</td></tr>`).join("");
   const rows = (doc?.rows || []).map((row) => {
