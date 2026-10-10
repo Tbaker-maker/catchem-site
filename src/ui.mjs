@@ -1002,13 +1002,20 @@ function catchemDraw(host,pts,release,caption){
   host.style.minHeight=h+"px";
   var span=max-min||Math.max(max*0.04,0.01);
   var lo=min-span*0.08, hi=max+span*0.08, plot=hi-lo;
+  function dayN(d){return Math.round(Date.parse(String(d)+"T00:00:00Z")/86400000);}
+  var d0=dayN(pts[0].d), dSpan=Math.max(1,dayN(pts[pts.length-1].d)-d0);
   var step=(w-112)/Math.max(1,pts.length-1);
+  function xAt(i){return 96+((dayN(pts[i].d)-d0)/dSpan)*(w-112);}
   function y(v){return (22+((hi-v)/plot)*(h-52));}
-  var d=pts.map(function(p,i){return (i?"L":"M")+(96+i*step).toFixed(1)+","+y(p.v).toFixed(1)}).join(" ");
+  // A missing calendar day is a gap: the line lifts and restarts, nothing is drawn across it.
+  function cut(i){return i>0&&dayN(pts[i].d)-dayN(pts[i-1].d)>1;}
+  var d=pts.map(function(p,i){return (i&&!cut(i)?"L":"M")+xAt(i).toFixed(1)+","+y(p.v).toFixed(1)}).join(" ");
+  var dots="";
+  for(var di=0;di<pts.length;di++){ if((di===0||cut(di))&&(di===pts.length-1||cut(di+1))) dots+='<circle cx="'+xAt(di).toFixed(1)+'" cy="'+y(pts[di].v).toFixed(1)+'" r="2.5" fill="#d9b779"></circle>'; }
   var rel="";
   if(release){
     for(var i=0;i<pts.length;i++){
-      if(pts[i].d>=release){ rel='<line x1="'+(96+i*step).toFixed(1)+'" y1="18" x2="'+(96+i*step).toFixed(1)+'" y2="'+(h-30)+'" stroke="#6f9be8" stroke-dasharray="3 3"/>'; break; }
+      if(pts[i].d>=release){ rel='<line x1="'+xAt(i).toFixed(1)+'" y1="18" x2="'+xAt(i).toFixed(1)+'" y2="'+(h-30)+'" stroke="#6f9be8" stroke-dasharray="3 3"/>'; break; }
     }
   }
   var indexLevel=/index/i.test(String(caption||""));
@@ -1017,7 +1024,7 @@ function catchemDraw(host,pts,release,caption){
     : function(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
   function when(d){var parts=String(d).split("-"); var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return months[(Number(parts[1])||1)-1]+" "+Number(parts[2])+", "+parts[0];}
   var label=(caption||"TCGplayer market, daily").replace(/"/g,"");
-  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="6" y="20" fill="#efe9de" font-size="14">'+money(max)+'</text><text x="6" y="'+(h-32)+'" fill="#efe9de" font-size="14">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"></path><text x="96" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[0].d.slice(5)+'</text><text x="'+(w-72)+'" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
+  host.innerHTML='<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+" "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+'" style="display:block;width:100%;height:'+h+'px;min-height:'+h+'px;flex:none;touch-action:pan-y"><text x="6" y="20" fill="#efe9de" font-size="14">'+money(max)+'</text><text x="6" y="'+(h-32)+'" fill="#efe9de" font-size="14">'+money(min)+'</text>'+rel+'<path d="'+d+'" fill="none" stroke="#d9b779" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"></path>'+dots+'<text x="96" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[0].d.slice(5)+'</text><text x="'+(w-72)+'" y="'+(h-8)+'" fill="#efe9de" font-size="14">'+pts[pts.length-1].d.slice(5)+'</text></svg>';
   if(note) note.textContent=(caption||"TCGplayer market, daily")+". "+when(pts[0].d)+" "+money(pts[0].v)+" to "+when(pts[pts.length-1].d)+" "+money(pts[pts.length-1].v)+".";
   if(hover) hover.textContent=when(pts[pts.length-1].d)+" · "+money(pts[pts.length-1].v);
   var svg=host.querySelector("svg");
@@ -1026,8 +1033,8 @@ function catchemDraw(host,pts,release,caption){
     var rect=svg.getBoundingClientRect();
     if(!rect.width) return;
     var x=(ev.clientX-rect.left)/rect.width*w;
-    var i=Math.round((x-96)/step);
-    if(i<0) i=0; if(i>=pts.length) i=pts.length-1;
+    var i=0,best=Infinity;
+    for(var k=0;k<pts.length;k++){var dx=Math.abs(xAt(k)-x); if(dx<best){best=dx;i=k;}}
     hover.textContent=when(pts[i].d)+" · "+money(pts[i].v);
   }
   var active=false;
@@ -1170,6 +1177,9 @@ img,svg{max-width:100%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:12px}
 .set-date{white-space:nowrap}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.sort-chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);text-decoration:none;white-space:nowrap}
+.sort-chip[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
+@media (max-width:600px){.sort-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}}
 .filters input,.filters select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 10px;font:15px var(--sans)}
 button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);cursor:pointer}
 button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
@@ -1852,16 +1862,71 @@ export function renderArtists(index, stamp, opts = {}) {
   return chrome("Artists", body, "Artists", stamp, "", feedNav(opts));
 }
 
+export const ARTIST_SORTS = [
+  ["", "Default"],
+  ["name-asc", "Name A–Z"],
+  ["name-desc", "Name Z–A"],
+  ["price-desc", "Price high–low"],
+  ["price-asc", "Price low–high"],
+  ["release-desc", "Newest set"],
+  ["release-asc", "Oldest set"],
+];
+
+function cardNumParts(num) {
+  const m = String(num || "").match(/^([A-Za-z]*)(\d+)/);
+  return m ? [m[1].toLowerCase(), Number(m[2]), String(num)] : ["~", Infinity, String(num || "")];
+}
+
+function byCardNum(a, b) {
+  const x = cardNumParts(a.num), y = cardNumParts(b.num);
+  return x[0].localeCompare(y[0]) || x[1] - y[1] || x[2].localeCompare(y[2]);
+}
+
+// Sorts an artist's cards. Unknown or empty sort keeps the published order.
+// Price is TCGplayer market; unpriced cards always go last. Release is the
+// set release date, then card number; cards with no release date go last.
+export function sortArtistCards(cards, sort = "", releaseBySlug = {}) {
+  const list = (cards || []).map((c, i) => ({ c, i }));
+  const priced = (c) => Number(c.price) > 0;
+  const rel = (c) => (releaseBySlug.__strict ? releaseBySlug[c.setSlug] : c.release || releaseBySlug[c.setSlug]) || "";
+  const name = (a, b) => String(a.c.name || "").localeCompare(String(b.c.name || ""), "en", { sensitivity: "base" }) || a.i - b.i;
+  const cmp = {
+    "name-asc": name,
+    "name-desc": (a, b) => -name(a, b) || a.i - b.i,
+    "price-desc": (a, b) => (priced(b.c) - priced(a.c)) || (priced(a.c) ? Number(b.c.price) - Number(a.c.price) : 0) || a.i - b.i,
+    "price-asc": (a, b) => (priced(b.c) - priced(a.c)) || (priced(a.c) ? Number(a.c.price) - Number(b.c.price) : 0) || a.i - b.i,
+    "release-desc": (a, b) => (!!rel(b.c) - !!rel(a.c)) || rel(b.c).localeCompare(rel(a.c)) || String(a.c.setSlug || "").localeCompare(String(b.c.setSlug || "")) || byCardNum(a.c, b.c) || a.i - b.i,
+    "release-asc": (a, b) => (!!rel(b.c) - !!rel(a.c)) || rel(a.c).localeCompare(rel(b.c)) || String(a.c.setSlug || "").localeCompare(String(b.c.setSlug || "")) || byCardNum(a.c, b.c) || a.i - b.i,
+  }[sort];
+  if (!cmp) return list.map((x) => x.c);
+  return list.sort(cmp).map((x) => x.c);
+}
+
 export function renderArtist(doc, stamp, opts = {}) {
   if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp, "", feedNav(opts));
-  const top = (doc.cards || []).slice(0, 12);
-  const rest = (doc.cards || []).slice(12);
+  const sort = ARTIST_SORTS.some(([k]) => k && k === opts.sort) ? opts.sort : "";
+  const cards = sortArtistCards(doc.cards || [], sort, opts.releaseBySlug || {});
+  const top = cards.slice(0, 12);
+  const rest = cards.slice(12);
   const row = (c) => `<div class="row">${imageTag(c.catalogueSrc || "", c.kind === "sealed" ? "sealed" : "row", c.name || "", c)}<a href="/c/${esc(c.id)}"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.set)} ${esc(c.num || "")}</span></a><b>${money(c.price) || "No market price"}</b></div>`;
+  const base = `/artists/${encodeURIComponent(doc.slug || "")}`;
+  const chips = ARTIST_SORTS.map(([k, label]) => `<a class="sort-chip" href="${esc(k ? `${base}?sort=${k}` : base)}" data-sort="${esc(k)}" aria-pressed="${k === sort ? "true" : "false"}"${k === sort ? ` aria-current="true"` : ""}>${esc(label)}</a>`).join("");
+  const unpriced = cards.filter((c) => !(Number(c.price) > 0)).length;
+  const relMap = opts.releaseBySlug || {};
+  const undated = cards.filter((c) => !(relMap.__strict ? relMap[c.setSlug] : c.release || relMap[c.setSlug])).length;
+  const caption = `Artist index, chain-linked${Number(doc.indexCards) > 0 ? `. ${Number(doc.indexCards)} of ${cards.length} cards` : ""}`;
   const body = `<main class="wrap"><h1>${esc(doc.name)}</h1>
-${chartBox(doc.index || [], "Artist index, chain-linked")}
+${chartBox(doc.index || [], caption)}
+${doc.indexNote ? `<p class="muted">${esc(doc.indexNote)}</p>` : ""}
 <p class="muted">${esc(doc.source || "")}</p>
+<nav class="filters sort-chips" aria-label="Sort cards">${chips}</nav>
+<script>(function(){var n=document.querySelector(".sort-chips"),a=n&&n.querySelector('[aria-pressed="true"]');if(n&&a&&n.scrollWidth>n.clientWidth)n.scrollLeft=Math.max(0,a.offsetLeft-n.offsetLeft-16);})();</script>
+${sort.startsWith("price") && unpriced ? `<p class="muted">${unpriced} cards with no market price are listed last.</p>` : ""}
+${sort.startsWith("release") && undated ? `<p class="muted">${undated} cards from sets with no release date on file are listed last.</p>` : ""}
+<div id="artist-cards">
 ${top.map(row).join("")}
-${rest.length ? `<details><summary>Show all ${doc.cards.length}</summary>${rest.map(row).join("")}</details>` : ""}
+${rest.length ? `<details><summary>Show all ${cards.length}</summary>${rest.map(row).join("")}</details>` : ""}
+</div>
 </main>`;
   return chrome("Artists", body, doc.name, stamp, "", feedNav(opts));
 }

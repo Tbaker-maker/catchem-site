@@ -212,7 +212,18 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     try {
       const doc = await loadJson(`artists/${slug}.json`, fetchImpl);
       const images = await catalogueMap(fetchImpl);
-      return html(renderArtist({ ...doc, cards: withCatalogue(doc.cards, images) }, stamp, pageOpts));
+      const sort = String(opts.sort || "");
+      let releaseBySlug = {};
+      if (sort.startsWith("release")) {
+        const setsDoc = await loadJson("sets.json", fetchImpl).catch(() => null);
+        // A date stamped on 10+ sets at once is a catalogue placeholder, not a
+        // release (19 promo and POP sets read 2026-09-27). Those sort as undated.
+        const seen = {};
+        for (const set of setsDoc?.sets || []) if (set.release) seen[set.release] = (seen[set.release] || 0) + 1;
+        for (const set of setsDoc?.sets || []) if (set.slug && set.release && seen[set.release] < 10) releaseBySlug[set.slug] = set.release;
+        releaseBySlug.__strict = true;
+      }
+      return html(renderArtist({ ...doc, cards: withCatalogue(doc.cards, images) }, stamp, { ...pageOpts, sort, releaseBySlug }));
     }
     catch { return html(renderArtist(null, stamp, pageOpts), 404); }
   }
@@ -464,7 +475,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "" });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
