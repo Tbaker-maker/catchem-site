@@ -950,6 +950,24 @@ ${cards}
   return chrome("", body, "Listing supply", stamp, "", feedNav(opts));
 }
 
+export function renderSetValue(doc, stamp, opts = {}) {
+  const on = doc?.enabled === true;
+  const reads = on ? (doc?.reads || []) : [];
+  const days = (doc?.priceDaysOnFile || []).join(", ");
+  const cards = reads.map((read) => `<article class="card" style="margin:12px 0"><h2>${esc(read.sentence)}</h2><p>${esc(read.count)} cards priced on both days. ${money(read.from)} on ${esc(read.fromDate)} and ${money(read.to)} on ${esc(read.toDate)}. Days between are not filled in.</p></article>`).join("");
+  const body = `<main class="wrap">
+<h1>Set value</h1>
+<p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
+<p>The sum is TCGplayer market for singles priced on both exact days. A missing day drops the set. The card count is how many singles had a price on both days.</p>
+<p>Sets on file: ${Number(doc?.sets) || 0}. Window: ${Number(doc?.windowDays) || 30} days. A set is a read only at ${Number(doc?.minPct) || 8}% or more.</p>
+<p>Exact start ${esc(doc?.exactStart || "—")} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
+<p>Would qualify: ${Number(doc?.wouldQualify) || 0}. Published reads: ${reads.length}.</p>
+${days ? `<p class="muted">Price days on file: ${esc(days)}.</p>` : ""}
+${cards}
+</main>`;
+  return chrome("", body, "Set value", stamp, "", feedNav(opts));
+}
+
 const CHART_JS = `
 function catchemPoints(raw){
   var rows=Array.isArray(raw)?raw:[];

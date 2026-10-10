@@ -1,7 +1,7 @@
 import worker, { pageKind, renderPath } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -62,6 +62,18 @@ const files = {
       { slot: "fact", text: "Pidgey (#16): 17 cards, 14 artists.", note: "Species fact on the short list. No set move was shipped." },
       { slot: "news", text: "Mega Evolution - Delta Reign (PokeGuardian, 2026-11-06).", href: "https://www.pokeguardian.com/3231721_pokemon-tcg-mega-evolution-delta-reign-teased-november-release" },
     ],
+  },
+  "feed/set-value.json": {
+    enabled: false,
+    asOf: "2026-10-09",
+    windowDays: 30,
+    minPct: 8,
+    exactStart: "2026-09-09",
+    exactStartOnFile: false,
+    sets: 205,
+    wouldQualify: 0,
+    reads: [{ sentence: "should not show a set sum" }],
+    priceDaysOnFile: ["2026-09-26", "2026-09-27", "2026-09-29", "2026-10-03", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"],
   },
 };
 
@@ -180,6 +192,10 @@ t("feed is hidden without the flag", hidden.status === 302 && hidden.headers.get
     reads: [{ sentence: "Fewer copies listed: should not show" }],
   }, "stamp");
   t("supply page stays off and does not publish a read", off.includes("This read is off") && off.includes("0 would qualify") && off.includes("Unbroken Bonds Booster Box") && off.includes("not sales") && !off.includes("should not show") && !/\bholds?\b/i.test(off));
+  const setValue = await (await renderPath("/set-value", fetchImpl)).text();
+  t("set value stays off when the exact day is missing", pageKind("/set-value") === "set-value" && setValue.includes("This read is off") && setValue.includes("Sets on file: 205") && setValue.includes("2026-09-09") && setValue.includes("not a price day on file") && setValue.includes("Would qualify: 0") && setValue.includes("Published reads: 0") && setValue.includes("2026-10-09") && !setValue.includes("should not show") && !setValue.includes("gap-chart"));
+  const keptSet = renderSetValue({ enabled: true, asOf: "2026-10-09", sets: 1, wouldQualify: 1, exactStart: "2026-09-09", exactStartOnFile: true, reads: [{ sentence: "Base Set singles priced on both days are up 8.2% in 30 days (100 cards, $10.00 → $10.82).", count: 100, from: 10, to: 10.82, fromDate: "2026-09-09", toDate: "2026-10-09" }] }, "");
+  t("a kept set read names the card count and leaves the gap", keptSet.includes("100 cards") && keptSet.includes("Days between are not filled in") && keptSet.includes("$10.00") && keptSet.includes("$10.82"));
   const segs = splitDated([
     { date: "2026-10-05", listings: 140 },
     { date: "2026-10-07", listings: 109 },
