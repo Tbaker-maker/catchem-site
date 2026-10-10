@@ -227,7 +227,7 @@ t("the live read drops the sold sentence and keeps the price path", soldLead.len
 const soldAll = renderAll({ asOf: "2026-10-03", reads: [{ id: "only-sold", headline: "Sales volume is 40 copies sold.", price: 10 }] }, "");
 t("all reads leaves out a sentence that is only a sold claim", !soldAll.includes("copies sold") && !soldAll.includes("Sales volume") && !soldAll.includes(">40<"));
 
-t("tracked reads are a signed-in list", (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("My tracked") === false && (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("Sign in with Discord to see your tracked reads."));
+t("tracked reads stay on this device", (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("Nothing saved on this device yet.") && (await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("catchem-watch") && !(await (await renderPath("/feed/mine", fetchImpl, { feed: true })).text()).includes("Sign in with Discord to see your tracked reads."));
 const all = await (await renderPath("/feed/all", fetchImpl, { feed: true })).text();
 t("all reads is a list", all.includes("All reads") && all.includes("Alakazam"));
 const setPage = await renderPath("/sets/missing", fetchImpl);
