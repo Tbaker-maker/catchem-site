@@ -86,6 +86,7 @@ export function catalogCard(id, card) {
     finish: price > 0 ? finish : "",
     source: price > 0 ? source : "",
     link: productLink(row),
+    tcgPlayerId: productId(row) || null,
     cutout: typeof row.cutout === "string" ? row.cutout.trim() : "",
   };
 }
