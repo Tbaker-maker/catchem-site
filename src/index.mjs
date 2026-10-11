@@ -547,6 +547,9 @@ export default {
         },
       });
     }
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/img/")) {
+      return handleSetLogo(request, url.pathname, fetchImpl);
+    }
     if (request.method === "GET" && url.pathname.startsWith("/data/editor/tcg/")) {
       const rest = decodeURIComponent(url.pathname.slice("/data/editor/tcg/".length));
       if (!/^[a-z0-9]+\/[A-Za-z0-9._-]+$/.test(rest)) {
@@ -690,3 +693,19 @@ export default {
   },
 };
 
+
+// /img/{setId}/logo.png: Post Office catalogue file in Catchem-data first,
+// then the same id on images.pokemontcg.io (already in IMAGE_HOSTS). Else 404.
+const LOGO_RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/img/";
+export async function handleSetLogo(request, pathname, fetchImpl = fetch) {
+  const m = pathname.match(/^\/img\/([a-z0-9]+)\/logo\.png$/);
+  const miss = () => new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
+  if (!m) return miss();
+  for (const src of [LOGO_RAW + m[1] + "/logo.png", "https://images.pokemontcg.io/" + m[1] + "/logo.png"]) {
+    const res = await fetchImpl(src, { cf: { cacheTtl: 3600 } });
+    if (!res.ok) continue;
+    const headers = { "content-type": "image/png", "cache-control": "public, max-age=86400" };
+    return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
+  }
+  return miss();
+}

@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { handleSetLogo } from "../src/index.mjs";
+const png = new Uint8Array([137, 80, 78, 71]);
+const seen = [];
+const fake = async (u) => { seen.push(u); return u.includes("Catchem-data") && u.includes("/me55/") || u.includes("pokemontcg.io/base1/") ? new Response(png, { status: 200 }) : new Response("", { status: 404 }); };
+const get = (p, m = "GET") => handleSetLogo(new Request("https://x" + p, { method: m }), p, fake);
+let r = await get("/img/me55/logo.png");
+assert.equal(r.status, 200); assert.equal(r.headers.get("content-type"), "image/png");
+assert.equal(seen.length, 1, "catalogue file first");
+r = await get("/img/base1/logo.png"); assert.equal(r.status, 200);
+r = await get("/img/base1/logo.png", "HEAD"); assert.equal(r.status, 200); assert.equal(r.body, null);
+assert.equal((await get("/img/nope9/logo.png")).status, 404);
+seen.length = 0;
+assert.equal((await get("/img/../x/logo.png")).status, 404);
+assert.equal((await get("/img/me1/other.png")).status, 404);
+assert.equal(seen.length, 0, "bad paths never fetch");
+console.log("set-logo ok");
