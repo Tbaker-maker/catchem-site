@@ -30,9 +30,14 @@ t("printing preference keeps the crown ahead of a flat tie", preferPrinting([
 ])[0][0] === "c");
 
 const home = await readFile(join(root, "index.html"), "utf8");
-t("homepage h1", home.includes("<h1>A home for collectors, rippers and flippers.</h1>"));
+t("homepage h1 says the free tools and the club price", home.includes("<h1>The catalog, the Feed, and the Post Office are free, and the Discord club is $14.99.</h1>"));
 t("homepage title dropped the old line", !home.includes("Know what to rip"));
-t("homepage says catalog", !/catalog/i.test(home));
+t("homepage drops rippers and Request access", !/rippers and flippers/i.test(home) && !home.includes("Request access") && !home.includes("Opening soon"));
+const title = (home.match(/<title>([^<]*)<\/title>/) || [,""])[1];
+const desc = (home.match(/<meta name="description" content="([^"]*)"/) || [,""])[1];
+t("homepage title is under 60 and description under 160", title.length > 0 && title.length < 60 && desc.length > 0 && desc.length < 160);
+const seo = await readFile(join(root, "src/seo.mjs"), "utf8");
+t("seo drops rippers and Request access", !/rippers and flippers/i.test(seo) && !seo.includes("Request access"));
 t("nav close wins on small screens", home.lastIndexOf(".site-bar nav{display:none") > home.indexOf(".site-bar nav{display:none"));
 t("dock hide is the last dock display", home.lastIndexOf(".dock{display:none") > home.lastIndexOf(".dock{display:flex"));
 t("homepage does not link the hidden pages", !/href="\/(board|receipts|accuracy|movers)/.test(home) && home.includes('href="/feed">Open the Feed'));
