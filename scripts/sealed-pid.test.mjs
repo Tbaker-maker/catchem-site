@@ -7,7 +7,7 @@ assert.equal(tcgPid({ id: "tcgcsv-5", tcgPlayerId: "9" }), 5);
 console.log("sealed pid ok");
 
 // Store links (TCGplayer by id, eBay search by exact product) + disclosure.
-import { ebayQuery, ebaySearchUrl, productLink, storeLinksHtml } from "../src/pokemon.mjs";
+import { affEbay, affTcg, ebayQuery, ebaySearchUrl, productLink, setAffiliateConfig, storeLinksHtml, tcgStoreUrl } from "../src/pokemon.mjs";
 import { quickView, renderCard, renderSearch, esc } from "../src/ui.mjs";
 assert.equal(productLink({ id: "tcgcsv-229277" }), "https://www.tcgplayer.com/product/229277");
 assert.equal(productLink({ id: "sv1-pc-etb", tcgPlayerId: null }), "", "no id, no TCG link");
@@ -23,13 +23,31 @@ assert.equal(ebaySearchUrl({}), "", "no name, no eBay link");
 assert.ok(ebaySearchUrl({ name: "Lost Origin Booster Bundle", set: "SWSH11: Lost Origin", kind: "sealed" }).startsWith("https://www.ebay.com/sch/i.html?_nkw=Pokemon%20Lost%20Origin%20Booster%20Bundle"));
 assert.equal(storeLinksHtml({}, esc), "", "both missing: the line is hidden");
 const both = storeLinksHtml({ id: "tcgcsv-1", name: "A", kind: "sealed" }, esc);
-assert.ok(both.includes("TCGplayer") && both.includes("eBay") && both.includes("Affiliate link"));
+assert.ok(both.includes("TCGplayer") && both.includes("eBay") && both.includes("Paid link"));
 const onlyEbay = storeLinksHtml({ id: "sv1-pc-etb", name: "A", kind: "sealed" }, esc);
-assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("eBay") && onlyEbay.includes("Affiliate link"));
+assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("eBay") && onlyEbay.includes("Paid link"));
 const qv = quickView({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", hist: [] });
 assert.ok(qv.tcgUrl.endsWith("/229277") && qv.ebayUrl.includes("ebay.com/sch"));
 const page = renderCard({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", price: 283.93, hist: [] }, {}, {});
-assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes("Affiliate link"));
+assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes("Paid link"));
 const sr = renderSearch({});
-assert.ok(sr.includes("function storeLinks(r)") && sr.includes("Affiliate link"));
+assert.ok(sr.includes("function storeLinks(r)") && sr.includes("Paid link"));
 console.log("store links ok");
+
+// Paid-link disclosure + affiliate ids from config.
+assert.ok(!page.includes("Affiliate link") && !sr.includes("Affiliate link"));
+assert.ok(page.includes('<small class="paid-note">Paid link</small>'));
+assert.ok(page.includes("Paid link. We may earn a commission if you buy, at no extra cost to you."));
+assert.equal(affTcg("https://www.tcgplayer.com/product/1", ""), "https://www.tcgplayer.com/product/1", "empty: plain");
+assert.equal(affTcg("https://www.tcgplayer.com/product/1", "https://tcgplayer.pxf.io/c/1/2/3"), "https://tcgplayer.pxf.io/c/1/2/3?u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F1");
+assert.equal(affTcg("u", "javascript:alert(1)"), "u", "bad base: plain");
+assert.equal(affEbay("https://www.ebay.com/sch/i.html?_nkw=x", ""), "https://www.ebay.com/sch/i.html?_nkw=x");
+assert.ok(affEbay("https://www.ebay.com/sch/i.html?_nkw=x", "5339000000").endsWith("&campid=5339000000&toolid=10001&mkevt=1"));
+assert.equal(affEbay("https://www.ebay.com/sch/i.html?_nkw=x", "abc"), "https://www.ebay.com/sch/i.html?_nkw=x");
+setAffiliateConfig({ TCGPLAYER_AFFILIATE_URL: "https://tcgplayer.pxf.io/c/1/2/3", EPN_CAMPAIGN_ID: "5339000000" });
+assert.ok(tcgStoreUrl({ id: "tcgcsv-9" }).startsWith("https://tcgplayer.pxf.io/c/1/2/3?u=") && ebaySearchUrl({ name: "A", kind: "sealed" }).includes("campid=5339000000"));
+assert.ok(renderSearch({}).includes('"epn":"5339000000"'));
+assert.equal(productLink({ id: "tcgcsv-9" }), "https://www.tcgplayer.com/product/9", "plain productLink untouched");
+setAffiliateConfig({});
+assert.ok(!ebaySearchUrl({ name: "A", kind: "sealed" }).includes("campid") && tcgStoreUrl({ id: "tcgcsv-9" }) === "https://www.tcgplayer.com/product/9");
+console.log("paid link ok");

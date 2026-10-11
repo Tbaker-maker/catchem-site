@@ -190,10 +190,26 @@ export function buildPokemonPages(attrs, catalogue, cutouts) {
   return { bySlug, byId };
 }
 
+// Affiliate config comes from the worker env (TCGPLAYER_AFFILIATE_URL,
+// EPN_CAMPAIGN_ID). Empty or malformed means plain links.
+let AFF = { tcg: "", epn: "" };
+export function setAffiliateConfig(env) {
+  AFF = { tcg: String(env?.TCGPLAYER_AFFILIATE_URL || "").trim(), epn: String(env?.EPN_CAMPAIGN_ID || "").trim() };
+}
+export function getAffiliateConfig() { return { ...AFF }; }
+export function affTcg(url, base) {
+  if (!url || !base || !/^https:\/\/[^\s"'<>]+$/.test(base)) return url;
+  return base + (base.includes("?") ? "&" : "?") + "u=" + encodeURIComponent(url);
+}
+export function affEbay(url, campid) {
+  if (!url || !/^[0-9]{6,12}$/.test(String(campid || ""))) return url;
+  return url + "&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=" + campid + "&toolid=10001&mkevt=1";
+}
+export const PAID_NOTE = "Paid link";
+export const PAID_FOOTER = "Paid link. We may earn a commission if you buy, at no extra cost to you.";
+
 // eBay search link for this exact product: name + set (+ card number for a
 // single), minus obvious noise. A search, not a listing and not a sale.
-// No affiliate id is configured in this repo, so the URL carries none.
-export const AFFILIATE_NOTE = "Affiliate link";
 export function ebayQuery(card) {
   if (!card || typeof card !== "object") return "";
   const clean = (s) => String(s || "").replace(/tcgcsv-\d+/gi, "").replace(/[[\](){}"]/g, " ").replace(/\s+/g, " ").trim();
@@ -209,17 +225,20 @@ export function ebayQuery(card) {
   if (sealed && !/\bcase\b/i.test(name)) noise.push("-case");
   return [...words, ...noise].join(" ");
 }
-export function ebaySearchUrl(card) {
+export function ebaySearchUrl(card, cfg = AFF) {
   const q = ebayQuery(card);
-  return q ? "https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(q) : "";
+  return q ? affEbay("https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(q), cfg.epn) : "";
+}
+export function tcgStoreUrl(card, cfg = AFF) {
+  return affTcg(productLink(card), cfg.tcg);
 }
 // Both store links with the disclosure next to them. Hidden when neither exists.
 export function storeLinksHtml(card, esc) {
-  const tcg = productLink(card);
+  const tcg = tcgStoreUrl(card);
   const ebay = ebaySearchUrl(card);
   if (!tcg && !ebay) return "";
   const bits = [];
   if (tcg) bits.push(`<a href="${esc(tcg)}" rel="sponsored noopener">TCGplayer</a>`);
   if (ebay) bits.push(`<a href="${esc(ebay)}" rel="sponsored noopener">eBay</a>`);
-  return `<p class="store-links">${bits.join(" · ")} <span class="muted affiliate-note">${AFFILIATE_NOTE}</span></p>`;
+  return `<p class="store-links">${bits.join(" · ")} <small class="paid-note">${PAID_NOTE}</small></p>`;
 }
