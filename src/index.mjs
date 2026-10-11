@@ -1,3 +1,4 @@
+import { withShareMeta } from "./seo.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
@@ -278,8 +279,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
-      await loadJson(`sets/${slug}.json`, fetchImpl);
-      return html(renderSetShell(slug, stamp, pageOpts));
+      const setDoc = await loadJson(`sets/${slug}.json`, fetchImpl);
+      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name }));
     } catch {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.sets?.[slug];
@@ -579,7 +580,7 @@ export default {
       if (kind && kind !== "data") {
         try {
           const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "" });
-          if (page) return page;
+          if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }

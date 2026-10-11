@@ -1582,7 +1582,7 @@ document.addEventListener("change", function(ev){
   paintMine();
 });
 </script>`;
-  return chrome("Sets", body, "Set", stamp, "", feedNav(opts));
+  return chrome("Sets", body, String(opts.title || "").trim() || "Set", stamp, "", feedNav(opts));
 }
 
 const CHECK_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
