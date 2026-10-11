@@ -77,17 +77,35 @@ export function productTypeLabel(row) {
 }
 
 export function officialSrc(row, map) {
+  // Ordered by id: catalogue image, then the TCGplayer photo by product id,
+  // then the pokemontcg.io scan for that same setId-number. Each later one is
+  // tried only when the earlier one fails to load. A tile only when all miss.
   const obj = row && typeof row === "object" ? row : { id: row };
-  const cat = imageForId(map, obj.id);
-  if (cat) return { src: cat, crop: obj.kind !== "sealed" };
-  const pid = tcgPid(obj);
-  const stored = String(obj.image || obj.scan || "");
   const sealed = obj.kind === "sealed";
-  if (pid && stored.includes("/product/" + pid)) return { src: "/api/card-img?pid=" + pid, crop: !sealed };
-  if (pid) return { src: "/api/card-img?pid=" + pid, crop: !sealed };
-  const file = ptcgFile(obj.cardId) || ptcgFile(obj.sku) || ptcgFile(obj.id);
-  if (file) return { src: "/data/editor/tcg/" + file, crop: true };
-  return { src: "", crop: false };
+  const list = [];
+  const cat = imageForId(map, obj.id);
+  if (cat) list.push(cat);
+  const pid = tcgPid(obj);
+  if (pid) list.push("/api/card-img?pid=" + pid);
+  const file = sealed ? "" : (ptcgFile(obj.cardId) || ptcgFile(obj.sku) || ptcgFile(obj.id));
+  if (file) list.push("/data/editor/tcg/" + file);
+  const uniq = list.filter((u, i) => u && list.indexOf(u) === i);
+  if (!uniq.length) return { src: "", crop: false, alts: [] };
+  return { src: uniq[0], crop: !sealed, alts: uniq.slice(1) };
+}
+
+export function altAttr(hit) {
+  const alts = hit && Array.isArray(hit.alts) ? hit.alts.filter((u) => /^[A-Za-z0-9:/._?=&-]+$/.test(String(u))) : [];
+  return alts.length ? ' data-alts="' + alts.join("|") + '"' : "";
+}
+
+export function nextImage(img) {
+  if (!img || !img.getAttribute) return false;
+  const rest = String(img.getAttribute("data-alts") || "").split("|").filter(Boolean);
+  if (!rest.length) return false;
+  img.setAttribute("data-alts", rest.slice(1).join("|"));
+  img.src = rest[0];
+  return true;
 }
 
 function tileKind(kind) {
@@ -155,8 +173,9 @@ export function imageTag(src, kind, alt, row) {
   const w = k === "logo" ? 160 : big ? 280 : 64;
   const h = k === "logo" ? 64 : big ? 392 : 88;
   const face = !!(info.catalogueCrop || info.crop) && info.kind !== "sealed" && k !== "logo";
+  const alts = altAttr({ alts: info.alts });
   const crop = face ? ' data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)"' : "";
-  return '<img alt="' + escapeAttr(alt || "") + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" src="' + escapeAttr(src) + '" class="' + (face ? "shot card-face" : "shot") + '" data-tile="' + k + '" data-fallback="' + escapeAttr(brandedTile(kind, info)) + '"' + crop + ' onerror="this.outerHTML=this.getAttribute(\'data-fallback\')">';
+  return '<img alt="' + escapeAttr(alt || "") + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" src="' + escapeAttr(src) + '" class="' + (face ? "shot card-face" : "shot") + '" data-tile="' + k + '" data-fallback="' + escapeAttr(brandedTile(kind, info)) + '"' + alts + crop + ' onerror="var a=(this.getAttribute(\'data-alts\')||\'\').split(\'|\').filter(Boolean);if(a.length){this.setAttribute(\'data-alts\',a.slice(1).join(\'|\'));this.src=a[0]}else{this.outerHTML=this.getAttribute(\'data-fallback\')}">';
 }
 
 export function visualGaps(html) {

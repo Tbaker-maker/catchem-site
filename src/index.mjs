@@ -110,7 +110,7 @@ function withCatalogue(list, images) {
   return (list || []).map((row) => {
     if (!row || typeof row !== "object") return row;
     const hit = officialSrc(row, images);
-    return { ...row, catalogueSrc: hit.src, catalogueCrop: hit.crop };
+    return { ...row, catalogueSrc: hit.src, catalogueCrop: hit.crop, alts: hit.alts || [] };
   });
 }
 
@@ -179,6 +179,7 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
           hist: [],
         };
         if (hit.link) card.tcgplayer = hit.link;
+        if (hit.tcgPlayerId) card.tcgPlayerId = hit.tcgPlayerId;
       }
     } catch { /* the catalogue file did not load */ }
   }
@@ -204,6 +205,7 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
     listingSeries,
     productReads,
     photo: pic.src,
+    photoAlts: pic.alts || [],
     crop: pic.crop,
     feed: opts.feed === true,
   });
@@ -307,7 +309,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, 404);
       }
       const images = await catalogueMap(fetchImpl);
-      const cards = page.cards.map((card) => ({ ...card, image: imageForId(images, card.id) }));
+      const cards = page.cards.map((card) => { const pic = officialSrc({ id: card.id, kind: "single", tcgPlayerId: card.tcgPlayerId || "" }, images); return { ...card, image: pic.src, imageAlts: pic.alts }; });
       return html(renderPokemon({ ...page, cards }, stamp, pageOpts));
     } catch {
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">The catalog did not load.</p><p><a href="/search">Search</a></p></main>`, 503);
@@ -336,7 +338,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             source: hit.source,
             kind: "single",
           };
-          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: imageForId(images, hit.id), catalogueCrop: !!imageForId(images, hit.id), productReads: await readsFor(hit.id, fetchImpl) }));
+          return html(renderCard(row, stamp, { ...pageOpts, ...(() => { const pic = officialSrc({ id: hit.id, kind: "single" }, images); return { catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts }; })(), productReads: await readsFor(hit.id, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
@@ -359,7 +361,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       } catch { listingSeries = []; }
     }
     const productReads = card ? await readsFor(cardId, fetchImpl) : [];
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, listingSeries, productReads }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);

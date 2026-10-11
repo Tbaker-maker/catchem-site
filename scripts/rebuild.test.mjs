@@ -2,7 +2,7 @@ import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
 import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg } from "../src/ui.mjs";
-import { imageForId, brandedTile, officialSrc, newsTile, visualGaps } from "../src/catalogue-image.mjs";
+import { imageForId, brandedTile, officialSrc, newsTile, visualGaps, imageTag as chainTag } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
@@ -127,6 +127,12 @@ const fetchImpl = async (url) => {
   return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
 };
 
+{
+  const a = officialSrc({ id: "bw6-120", kind: "single" }, { "bw6-120": "/cards/seed/bw6-120.png" });
+  const b = officialSrc({ id: "tcgcsv-42", kind: "single" }, {});
+  const c = officialSrc({ id: "sv-etb", kind: "sealed", tcgPlayerId: 654136 }, {});
+  t("a broken catalogue image falls back by id, then a tile", a.src.endsWith("/cards/seed/bw6-120.png") && a.alts.join() === "/data/editor/tcg/bw6/120_hires.png" && b.src === "/api/card-img?pid=42" && b.alts.length === 0 && c.src === "/api/card-img?pid=654136" && c.alts.length === 0 && chainTag(a.src, "card", "Mew-EX", { alts: a.alts }).includes('data-alts="/data/editor/tcg/bw6/120_hires.png"'));
+}
 t("catalogue image is the id hit only", imageForId({ "base1-1": "/img/base1/1" }, "base1-1") === "/data/editor/tcg/base1/1_hires.png" && imageForId({ a: "https://images.pokemontcg.io/base1/1.png" }, "a") === "" && imageForId({ "sv3pt5-200": "/cards/seed/sv3pt5-200.png" }, "sv3pt5-200").endsWith("/research/assets/cards/seed/sv3pt5-200.png") && imageForId({ "base1-1": "/img/base1/1" }, "tcgcsv-10") === "" && brandedTile("logo").includes("tile-logo") && brandedTile("card").includes("Catch'em"));
 const japanNews = newsTile({ id: "jp-news", source: "Pokémon Card (Japan)", place: "Japan news", asOf: "2026-10-02" });
 const enNews = newsTile({ id: "en-news", source: "Bulbagarden", place: "", asOf: "2026-10-01" });
@@ -280,10 +286,10 @@ t("a missing set is not a generic redirect", setPage.status === 404);
 const known = await renderPath("/sets/base1", fetchImpl);
 t("a known old set slug is one hop", known.status === 301 && known.headers.get("location") === "/sets/base-set");
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
-t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori") && cardPage.includes("7D —") && cardPage.includes("30D —") && cardPage.includes("90D —") && cardPage.includes("6-month high —") && cardPage.includes("No reads on file") === false && cardPage.includes("Alakazam is heating up"));
+t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori") && !cardPage.includes("7D —") && !cardPage.includes("30D —") && !cardPage.includes("90D —") && !cardPage.includes("6-month high —") && (cardPage.slice(cardPage.indexOf("product-glance"), cardPage.indexOf("<details", cardPage.indexOf("product-glance"))).match(/TCGplayer market/g)||[]).length === 1 && cardPage.includes("Missing days show as gaps.") && cardPage.includes("No reads on file") === false && cardPage.includes("Alakazam is heating up"));
 t("a missing exact day is a dash, not the nearest night", exactWindowPct([["2026-10-01", 10], ["2026-10-09", 8]], 7, "2026-10-09") === null && exactWindowPct([["2026-10-02", 10], ["2026-10-09", 8]], 7, "2026-10-09") === -20);
-t("sealed listings use the exact night or a dash", listingTrend([{ date: "2026-08-20", listingCount: 40 }, { date: "2026-10-06", listingCount: 35 }], "2026-10-06") === "eBay listings 7D — · 30D —");
-t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text.startsWith("6-month high —"));
+t("sealed listings hide a missing window and show the night count", listingTrend([{ date: "2026-08-20", listingCount: 40 }, { date: "2026-10-06", listingCount: 35 }], "2026-10-06") === "eBay listings 35 on 2026-10-06");
+t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text === "History since 2026-09-26. 6-month high and low show once we have 6 months.");
 {
   const page = renderTrackRecord({
     asOf: "2026-10-09",
@@ -774,7 +780,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
 
 {
   const shell = renderSetShell("me-30th-celebration", "Updated");
-  t("a set page draws the list without wiping a loaded title", shell.includes('let rows=[], shown=48, setLogo=""') && shell.includes("pictureSrc(r, setLogo)") && !shell.includes("pictureSrc(r, data.logo)") && shell.includes('title.textContent==="Set"') && shell.includes("This set did not load."));
+  t("a set page draws the list without wiping a loaded title", shell.includes('let rows=[], shown=48, setLogo=""') && shell.includes("officialSrc(r, catImages)") && shell.includes("altAttr(pic)") && !shell.includes("pictureSrc(r, data.logo)") && shell.includes('title.textContent==="Set"') && shell.includes("This set did not load."));
   t("a set page keeps a labelled section and does not mix it into the first page", shell.includes('r=>!r.section') && shell.includes('class="set-section"') && shell.includes('id="sections"') && shell.includes("location.hash") && shell.includes("scrollIntoView"));
   t("a set page offers All, Master set, and Base set only", shell.includes('id="scope"') && shell.includes(">All</option>") && shell.includes("Master set") && shell.includes("Base set only"));
   t("a set page can tick owned printings on this device", shell.includes("Grand master") && shell.includes("My set") && shell.includes("catchem-set:") && shell.includes("Cost to complete") && shell.includes("cards unpriced") && shell.includes('data-own'));
@@ -866,7 +872,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("one product history is the stored series", doc && doc.price === 8 && doc.hist.length === 4 && doc.hist[3][0] === "2026-10-09" && doc.photo.crop === true && doc.photo.src.includes("pid=110"));
   resetJsonCache();
   const sealed = await quickFor("tcgcsv-503313", fetchImpl, { feed: false });
-  t("sealed listings stay listings", sealed && sealed.kind === "sealed" && sealed.listings.text.startsWith("eBay listings") && sealed.listings.text.includes("7D —") && !sealed.listings.text.toLowerCase().includes("sale") && !JSON.stringify(sealed).includes("tcgcsv"));
+  t("sealed listings stay listings", sealed && sealed.kind === "sealed" && sealed.listings.text.startsWith("eBay listings") && !sealed.listings.text.includes("—") && !sealed.listings.text.toLowerCase().includes("sale") && !JSON.stringify(sealed).includes("tcgcsv"));
   const missing = await worker.fetch(new Request("https://catchemtcg.com/api/quick?id=tcgcsv-999"), env);
   t("an unknown product is not invented", missing.status === 404);
 }
