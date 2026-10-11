@@ -1,7 +1,7 @@
 import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps, imageTag as chainTag } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -167,11 +167,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     volume: null, volumeNote: "Sold counts need Insights scope.",
     listingChange: { label: "net change in active eBay listings (estimate)", net: 191, from: "2026-10-04", to: "2026-10-06", days: 3, startTotal: 3881, endTotal: 4072, readEligible: false },
   }, "stamp", { feed: true });
-  t("dive shows the listing-change estimate with its exact label and day count", withChange.includes("net change in active eBay listings (estimate): <b>+191</b> over 3 days of eBay Browse totals (2026-10-04 to 2026-10-06)"));
-  const changeBit = withChange.slice(withChange.indexOf("net change in active eBay listings"), withChange.indexOf("</p>", withChange.indexOf("net change in active eBay listings")));
-  t("the estimate never says sold or sell-through", !/\bsold\b|sell-through/i.test(changeBit));
-  const wrongLabel = renderDive({ id: "x", name: "X", series: [], latest: {}, listingChange: { label: "sold", net: 5, days: 3, from: "a", to: "b" } }, "stamp", { feed: true });
-  t("an estimate without the exact label is not shown", !wrongLabel.includes("over 3 days of eBay Browse totals"));
+  t("dive does not publish the listing-change estimate", !withChange.includes("net change in active eBay listings") && !withChange.includes("over 3 days of eBay Browse totals"));
   t("dive share card has og tags", flagged.includes('property="og:title"') && flagged.includes("Temporal Forces Pokemon Center Elite Trainer Box — Deep dive · Catch&#39;em") && flagged.includes('property="og:description"') && flagged.includes("eBay Browse ask median") && flagged.includes('property="og:image" content="https://catchemtcg.com/og.png"') && flagged.includes('name="twitter:card" content="summary_large_image"') && flagged.includes('rel="canonical" href="https://catchemtcg.com/dive/sv5-pc-etb"'));
 }
 {
@@ -292,20 +288,28 @@ t("sealed listings hide a missing window and show the night count", listingTrend
 t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text === "History since 2026-09-26. 6-month high and low show once we have 6 months.");
 {
   const page = renderTrackRecord({
-    asOf: "2026-10-09",
+    asOf: "2026-10-11",
     oldest: "2026-10-09",
     count: 2,
     tooEarly: 1,
     noLaterPrice: 1,
-    scored7: 0,
-    scored30: 0,
-    types: [{ type: "price", reads: 1, tooEarly: 1, noLaterPrice: 0, scored7: 0, hit7: 0, scored30: 0, hit30: 0 }],
+    scored14: 0,
+    scored28: 0,
+    scored56: 0,
+    types: [{ type: "price", reads: 1, tooEarly: 1, noLaterPrice: 0, scored14: 0, scored28: 0, scored56: 0, line14: "0 scored so far", line28: "0 scored so far", line56: "0 scored so far" }],
     rows: [
-      { status: "too-early", shipped: "2026-10-09", headline: "Pidgey is up 74.2% this month: $1.51 → $2.63." },
-      { status: "no-score", shipped: "2026-10-09", headline: "Pidgey (#16): 17 cards, 14 artists.", note: "The read has no date, product id, or price." },
+      { status: "too-early", shipped: "2026-10-09", name: "Pidgey", price: 2.63, direction: "up" },
+      { status: "no-score", shipped: "2026-10-10", name: "Example", note: "No ship price in the price file, so no score." },
     ],
   }, "stamp");
-  t("track record shows too early and does not invent a hit rate", page.includes("Too early to score") && page.includes("Scored at 7 days: 0") && page.includes("17 cards, 14 artists") && !page.includes("tcgcsv-"));
+  const main = page.slice(page.indexOf("<h1>Track record"), page.indexOf("</main>"));
+  const table = main.slice(main.lastIndexOf("<tbody>"));
+  t("track record is newest first and hides a percent under 20", main.includes("Too early to score") && main.includes("0 scored so far") && main.includes("Newest first") && table.includes("Example") && table.indexOf("2026-10-10") < table.indexOf("2026-10-09") && !main.includes("%") && !page.includes("tcgcsv-"));
+  const facts = renderFacts({ market: 12.5, low: 9, date: "2026-10-09", source: "TCGplayer market", listings: 40 });
+  t("facts panel is market, low, date, and source", facts.includes("Market:") && facts.includes("Low:") && facts.includes("Date:") && facts.includes("Source:") && !facts.includes("listings"));
+  const compared = compareRows({ market: 10, date: "2026-10-09", source: "TCGplayer market" }, { market: 12, low: 8, source: "TCGplayer market" });
+  t("compare leaves a missing row off", compared.map((row) => row.label).join() === "Market,Source" && !/winner|score|better|higher|lower/i.test(JSON.stringify(compared)));
+  t("compare page has the form", renderCompare(null, null, "stamp").includes("Compare two products") && renderCompare(null, null, "stamp").includes("A missing number is left off."));
 }
 {
   const today = await (await renderPath("/today", fetchImpl)).text();

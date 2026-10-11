@@ -1921,7 +1921,8 @@ export function renderCard(card, stamp, opts = {}) {
     : `<p class="muted">No reads on file for this product.</p>`;
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
-  const priceChart = pricePts.length >= 2 ? `<p class="muted">Daily price.</p>${gapChartSvg(splitDated(pricePts, "ask"))}` : "";
+  const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
+  const priceChart = `<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>${pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : ""}`;
   const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
   const breakBits = [];
   const listings = Number(fact?.listings);
@@ -1958,14 +1959,15 @@ export function renderCard(card, stamp, opts = {}) {
 ${chips ? `<p>${chips}</p>` : ""}
 ${marker.text ? `<p>${esc(marker.text)}</p>` : ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
+<h2>Facts</h2>
+${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
 <h2>Reads</h2>
 ${readHtml}
 </div>
 </div>
-<p class="muted">${esc(sourceLine(card))}${asOf ? `, ${esc(String(asOf).slice(0, 10))}` : ""}. Missing days show as gaps.${checked ? ` ${esc(checked)}` : ""}</p>
+${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
-<p class="muted">${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")})` : "No sold data yet"}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${priceChart}
@@ -2180,19 +2182,70 @@ document.getElementById("share-card").addEventListener("click", function(){
   return chrome("", body, "Today", stamp, "", feedNav(opts));
 }
 
+export function factsLines(row) {
+  const lines = [];
+  if (Number(row?.market) > 0) lines.push({ label: "Market", value: money(row.market) });
+  if (Number(row?.low) > 0) lines.push({ label: "Low", value: money(row.low) });
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(row?.date || ""))) lines.push({ label: "Date", value: String(row.date).slice(0, 10) });
+  if (typeof row?.source === "string" && row.source.trim()) lines.push({ label: "Source", value: row.source.trim() });
+  return lines;
+}
+
+export function renderFacts(row) {
+  return factsLines(row).map((line) => `<p>${esc(line.label)}: ${esc(line.value)}</p>`).join("");
+}
+
+export function compareRows(left, right) {
+  const fields = [
+    ["Market", "market", "number"],
+    ["Low", "low", "number"],
+    ["Date", "date", "date"],
+    ["Source", "source", "text"],
+  ];
+  const ok = (value, kind) => kind === "number" ? Number(value) > 0 : kind === "date" ? /^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) : typeof value === "string" && value.trim().length > 0;
+  const rows = [];
+  for (const [label, key, kind] of fields) {
+    if (!ok(left?.[key], kind) || !ok(right?.[key], kind)) continue;
+    const show = (value, kind) => kind === "number" ? (money(value) || "") : String(value);
+    rows.push({ label, left: show(left[key], kind), right: show(right[key], kind) });
+  }
+  return rows;
+}
+
+export function renderCompare(left, right, stamp, opts = {}) {
+  const rows = compareRows(left, right);
+  const body = `<main class="wrap">
+<h1>Compare two products</h1>
+<form method="get" action="/compare">
+<label>First <input name="a" value="${esc(opts.a || "")}" aria-label="First product"></label>
+<label>Second <input name="b" value="${esc(opts.b || "")}" aria-label="Second product"></label>
+<button type="submit">Show</button>
+</form>
+${left?.name || right?.name ? `<table><thead><tr><th></th><th>${esc(left?.name || "Not in the catalog")}</th><th>${esc(right?.name || "Not in the catalog")}</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.label)}</td><td>${esc(row.left)}</td><td>${esc(row.right)}</td></tr>`).join("") || `<tr><td colspan="3">No shared rows. A missing number is left off.</td></tr>`}</tbody></table>` : `<p class="muted">Add two product ids.</p>`}
+<p class="muted">A missing number is left off.</p>
+</main>`;
+  return chrome("", body, "Compare", stamp, "", feedNav(opts));
+}
+
 export function renderTrackRecord(doc, stamp, opts = {}) {
-  const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${row.scored7 ? `${row.hit7}/${row.scored7}` : "—"}</td><td>${row.scored30 ? `${row.hit30}/${row.scored30}` : "—"}</td></tr>`).join("");
-  const rows = (doc?.rows || []).map((row) => {
-    const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "No score.");
-    return `<li><span class="muted">${esc(row.shipped || "")}</span> ${esc(note)} ${esc(row.headline || "")}</li>`;
+  const horizonLine = (label, scored) => {
+    const n = Number(scored) || 0;
+    return `${label}: ${n} scored so far`;
+  };
+  const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${esc(row.line14 || horizonLine("14-day", row.scored14))}</td><td>${esc(row.line28 || horizonLine("28-day", row.scored28))}</td><td>${esc(row.line56 || horizonLine("56-day", row.scored56))}</td></tr>`).join("");
+  const rows = [...(doc?.rows || [])].sort((a, b) => String(b.shipped || "").localeCompare(String(a.shipped || ""))).map((row) => {
+    const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "");
+    const later = (n) => row.marks?.[n]?.price > 0 ? (money(row.marks[n].price) || "—") : "—";
+    const dir = row.direction === "up" || row.direction === "down" ? row.direction : "—";
+    return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : "—"}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
   }).join("");
   const body = `<main class="wrap">
 <h1>Track record</h1>
-<p class="muted">Scored through ${esc(doc?.asOf || "")}. Oldest read ${esc(doc?.oldest || "—")}.</p>
-<p>A read needs 7 days and a later price on that exact day. Under 7 days is too early to score. No later price is not a miss.</p>
-<p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. Scored at 7 days: ${Number(doc?.scored7) || 0}. Scored at 30 days: ${Number(doc?.scored30) || 0}.</p>
-<table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>7-day</th><th>30-day</th></tr></thead><tbody>${types}</tbody></table>
-<ul>${rows}</ul>
+<p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || "—")}.</p>
+<p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
+<p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. ${esc(horizonLine("14-day", doc?.scored14))}. ${esc(horizonLine("28-day", doc?.scored28))}. ${esc(horizonLine("56-day", doc?.scored56))}.</p>
+<table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>14-day</th><th>28-day</th><th>56-day</th></tr></thead><tbody>${types}</tbody></table>
+<table><thead><tr><th>Ship date</th><th>Name</th><th>Ship price</th><th>Direction</th><th>14-day</th><th>28-day</th><th>56-day</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>
 </main>`;
   return chrome("", body, "Track record", stamp, "", feedNav(opts));
 }
@@ -2501,10 +2554,6 @@ export function renderDive(doc, stamp, opts = {}) {
   const outlierLine = outlier
     ? `<p style="border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin:12px 0"><b>${esc(outlierNote || `Outlier: ${String(outlier.flag)}`)}</b>${outlier.asOf ? ` <span class="muted">(${esc(outlier.asOf)})</span>` : ""}${outlier.provisionalLabel ? `<br><span class="muted">${esc(String(outlier.provisionalLabel))}</span>` : ""}</p>`
     : `<p class="muted">Outlier flags: none yet.</p>`;
-  const change = doc.listingChange || null;
-  const changeLine = change && change.label === "net change in active eBay listings (estimate)" && Number.isInteger(change.net) && Number.isInteger(change.days) && change.days >= 2
-    ? `<p>${esc(change.label)}: <b>${change.net > 0 ? "+" : ""}${esc(String(change.net))}</b> over ${esc(String(change.days))} days of eBay Browse totals (${esc(change.from || "")} to ${esc(change.to || "")})</p>`
-    : "";
   const buyoutLine = browse
     ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
     : `<p class="muted">Browse total: not on file for this product.</p>`;
@@ -2516,7 +2565,6 @@ ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subty
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
 <p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
 ${buyoutLine}
-${changeLine}
 ${chartBox(hist, "eBay Browse ask median, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
 <thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
@@ -3160,6 +3208,11 @@ function matterLines(card){
   if(!why||!wrong) return null;
   return {why:why, wrong:wrong};
 }
+function shipReady(card){
+  const dir=card&&card.direction;
+  const price=Number(card&&card.shipPrice);
+  return (dir==="up"||dir==="down") && price>0;
+}
 function moreBlock(card){
   const lines=matterLines(card);
   const note=String(card&&card["why"]||"").trim();
@@ -3167,7 +3220,7 @@ function moreBlock(card){
   const extra=note && note!==path ? "<p>"+html(note)+"</p>" : "";
   if(!lines && !extra) return "";
   const why=lines?"<p><b>Why it matters.</b> "+html(lines.why)+"</p>":"";
-  const wrong=lines?"<p><b>What would make this wrong.</b> "+html(lines.wrong)+"</p>":"";
+  const wrong=lines && shipReady(card)?"<p><b>What would make this wrong.</b> "+html(lines.wrong)+"</p>":"";
   return '<section class="more-block"><h4>More</h4>'+why+wrong+extra+"</section>";
 }
 function productIdOf(card){

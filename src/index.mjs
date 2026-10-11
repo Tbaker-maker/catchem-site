@@ -9,7 +9,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -52,6 +52,7 @@ export function pageKind(pathname) {
   if (path === "/supply") return "supply";
   if (path === "/set-value") return "set-value";
   if (path === "/track-record") return "track";
+  if (path === "/compare") return "compare";
   if (path === "/today") return "today";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
@@ -209,6 +210,24 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
     crop: pic.crop,
     feed: opts.feed === true,
   });
+}
+
+async function marketRow(id, fetchImpl) {
+  const raw = String(id || "").trim();
+  if (!raw.startsWith("tcgcsv-")) return null;
+  const bucket = String((Number((raw.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
+  const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []);
+  const card = (rows || []).find((row) => row.id === raw);
+  if (!card) return null;
+  const low = Number(card.low);
+  const day = String(card.asOf || "").slice(0, 10);
+  return {
+    name: card.name || "",
+    market: Number(card.price) > 0 ? Number(card.price) : null,
+    low: low > 0 ? low : null,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "",
+    source: card.source || "",
+  };
 }
 
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
@@ -390,8 +409,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderSetValue(doc, stamp, pageOpts));
   }
   if (kind === "track") {
-    const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored7: 0, scored30: 0 }));
+    const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored14: 0, scored28: 0, scored56: 0 }));
     return html(renderTrackRecord(doc, stamp, pageOpts));
+  }
+  if (kind === "compare") {
+    const left = await marketRow(opts.a, fetchImpl);
+    const right = await marketRow(opts.b, fetchImpl);
+    return html(renderCompare(left, right, stamp, { ...pageOpts, a: opts.a || "", b: opts.b || "" }));
   }
   if (kind === "today") {
     const doc = await loadJson("today.json", fetchImpl).catch(() => ({ asOf: "", supply: "off", lines: [] }));
@@ -552,7 +576,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "" });
           if (page) return page;
         } catch {
           // Fall through to the baked asset if the catalog did not load.
