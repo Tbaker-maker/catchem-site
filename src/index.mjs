@@ -12,7 +12,7 @@ import { setAffiliateConfig } from "./pokemon.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -68,6 +68,7 @@ export function pageKind(pathname) {
   if (path === "/search") return "search";
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
+  if (path === "/rotation") return "rotation";
   if (path === "/accuracy") return "accuracy";
   if (path === "/faq") return "faq";
   if (path === "/build") return "build";
@@ -431,6 +432,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "search") return html(renderSearch(pageOpts));
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
+  if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {

@@ -4,6 +4,7 @@ import { feedNews } from "../data/feed-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
+import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -1142,6 +1143,8 @@ a{color:var(--gold)}
 .chart{height:180px;min-height:180px;flex:none;overflow:hidden}
 .chart-readout{min-height:1.4em;margin:0 0 6px;font-size:14px;line-height:1.4}
 .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 32px;overflow-x:hidden}
+.set-rot{margin:4px 0 8px;font:500 16px/1.45 var(--sans);max-width:40em}
+.print-run{margin:8px 0;color:var(--dim);font:400 15px/1.45 var(--sans);max-width:40em}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
@@ -1324,7 +1327,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
-<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
+<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -1401,9 +1404,22 @@ ${eras.map((era, eraIdx) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter
   return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
 }
 
+function setRotationBlock(slug) {
+  const row = setRotation(slug);
+  if (!row) return "";
+  const when = row.rotated
+    ? ` <a href="/rotation">Rotated ${esc(row.rotated)}</a>.`
+    : ` <a href="/rotation">Rotation and print runs</a>.`;
+  const supply = row.rotated
+    ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>`
+    : "";
+  return `<p class="set-rot">Regulation mark ${esc(row.mark)}.${when}</p>${supply}`;
+}
+
 export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main class="wrap"><h1 id="title">Set</h1>
 <p class="muted" id="completion"></p>
+${setRotationBlock(slug)}
 <div id="lines"></div><div id="charts"></div>
 <div class="filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
@@ -1957,6 +1973,9 @@ export function renderCard(card, stamp, opts = {}) {
       return `<li>${href ? `<a href="${esc(href)}">${when} ${line}</a>` : `${when} ${line}`}</li>`;
     }).join("")}</ul>`
     : `<p class="muted">No reads on file for this product.</p>`;
+  const supplyNote = isRotatedSet(card)
+    ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>`
+    : "";
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
@@ -2002,6 +2021,7 @@ ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
 ${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
 <h2>Reads</h2>
 ${readHtml}
+${supplyNote}
 </div>
 </div>
 ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
@@ -2513,6 +2533,35 @@ export function renderMethod(counts, stamp, opts = {}) {
 <p><a href="/corrections">Corrections</a></p>
 </main>`;
   return chrome("", body, "Methodology", stamp, "", feedNav(opts));
+}
+
+export function renderRotation(stamp, opts = {}) {
+  const paras = GUIDE_PARAS.map((p) => `<p class="copy">${esc(p)}</p>`).join("");
+  const sources = ROTATION_SOURCES.map((src) => `<li><a href="${esc(src.href)}">${esc(src.label)}</a></li>`).join("");
+  const body = `<main class="wrap rot"><style>
+.rot h1{font:500 clamp(32px,8vw,52px)/1.05 var(--serif);letter-spacing:-.03em;margin:0 0 12px;max-width:12em}
+.rot .kicker{margin:0 0 12px;letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)}
+.rot .marks{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.rot .marks span{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0 12px;border:1px solid var(--gold);border-radius:12px;color:var(--gold);font:600 18px/1 var(--serif)}
+.rot .copy{font-size:17px;line-height:1.5;max-width:40em;margin:0 0 14px}
+.rot h2{font:600 22px/1.3 var(--serif);margin:22px 0 8px}
+.rot .sources{list-style:none;padding:0;margin:0;max-width:40em}
+.rot .sources li{margin:0;border-top:1px solid var(--line)}
+.rot .sources a{display:flex;align-items:center;min-height:48px}
+.rot .note{color:var(--dim);font-size:14px;line-height:1.45;max-width:40em}
+</style>
+<p class="kicker">Standard</p>
+<h1>Rotation and print runs</h1>
+<div class="marks" aria-hidden="true"><span>F</span><span>G</span></div>
+${paras}
+<h2>Sources</h2>
+<ul class="sources">${sources}</ul>
+<p class="note">A set page shows a regulation mark when at least 80% of that set's cards in the card file share one letter. The card file is dated 2026-08-24. A rotated date is shown only for a letter these two announcements say left Standard: F on April 11, 2025, and G on April 10, 2026. This page does not say a set was printed again after it rotated.</p>
+</main>`;
+  return chrome("", body, "Rotation and print runs", stamp, "", feedNav(opts), {
+    description: GUIDE_PARAS[0],
+    url: "https://catchemtcg.com/rotation",
+  });
 }
 
 export function renderAccuracy(doc, stamp, opts = {}) {
@@ -3136,6 +3185,14 @@ function setLine(card){
   if(/^tcgcsv-\d+$/i.test(set) || /^pokemon-[a-z0-9-]+$/i.test(set)) return "";
   return set;
 }
+const ROTATED_SET=${JSON.stringify(rotatedSetKeys())};
+function printRunLine(card){
+  if(!card) return "";
+  const slug=String(card.setSlug||"").trim().toLowerCase();
+  const name=String(card.set||"").trim().toLowerCase();
+  if((slug && ROTATED_SET[slug]) || (name && ROTATED_SET[name])) return ${JSON.stringify(PRINT_RUN_LINE)};
+  return "";
+}
 function moveLine(card){
   if(!card) return "";
   if(!(isShapeRow(card) || isVolumeRow(card))){
@@ -3457,6 +3514,8 @@ function cardEl(card, facts){
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
   const shown=sameSentence||line;
+  const run=printRunLine(card);
+  const runHtml=run?'<p class="print-run">'+html(run)+' <a href="/rotation">Rotation and print runs</a>.</p>':"";
   const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const pid=productIdOf(card);
   const h3=pageMode==="read"?"<h3>"+title+"</h3>":(pid?'<h3><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>");
@@ -3464,7 +3523,7 @@ function cardEl(card, facts){
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
-  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+cut+(isFact(card)?"":priceRow(card));
+  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?"":priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){

@@ -885,5 +885,39 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("an unknown product is not invented", missing.status === 404);
 }
 
+{
+  const rot = await import("../src/rotation.mjs");
+  const { renderCard: paintCard } = await import("../src/ui.mjs");
+  const marks = Object.values(rot.SET_MARKS);
+  const rotatedN = marks.filter((mark) => rot.ROTATED_DATES[mark]).length;
+  const asHtml = (s) => String(s).replaceAll("&", "&" + "amp;").replaceAll("'", "&#" + "39;");
+  const line = asHtml(rot.PRINT_RUN_LINE);
+  t("28 sets have a letter and 11 of those letters have left", Object.keys(rot.SET_MARKS).length === 28 && rotatedN === 11 && Object.keys(rot.ROTATED_DATES).join() === "F,G");
+  t("only F and G have announcement dates", rot.ROTATED_DATES.F === "April 11, 2025" && rot.ROTATED_DATES.G === "April 10, 2026" && rot.setRotation("swsh01-sword-and-shield-base-set").rotated === "" && rot.setRotation("sv05-temporal-forces").rotated === "");
+  const guide = await (await renderPath("/rotation", fetchImpl)).text();
+  const visible = guide.replace(/<script[\s\S]*?<\/script>/g, "");
+  t("rotation is a page with the approved paragraphs and both sources", pageKind("/rotation") === "rotation" && guide.includes("<h1>Rotation and print runs</h1>") && visible.includes("In 2025 that was F (April 11).") && visible.includes(asHtml("In 2026 it was G (April 10), which covered 2023 sets like Scarlet & Violet, Paldea Evolved, Obsidian Flames and 151.")) && visible.includes("Historically, once a set rotates, it stops getting new print runs.") && visible.includes("The main exception is older packs turning up in tins and collections after rotation.") && visible.includes("https://www.pokemon.com/us/pokemon-news/2025-pokemon-tcg-standard-format-rotation-announcement") && visible.includes("https://www.pokemon.com/us/pokemon-news/2026-pokemon-tcg-standard-format-rotation-announcement"));
+  t("the guide does not use a third-party image or call a set reprinted", !visible.includes("images.pokemontcg.io") && !visible.includes("scrydex") && !/reprint/i.test(visible) && !visible.includes("Prismatic") && !BANNED.test(clean(visible)));
+  const g = renderSetShell("sv01-scarlet-and-violet-base-set");
+  t("a G set shows the mark, the April 10 date, and the supply line", g.includes("Regulation mark G.") && g.includes(">Rotated April 10, 2026<") && g.includes('href="/rotation"') && g.includes(line) && !/reprint/i.test(g));
+  const f = renderSetShell("swsh12-silver-tempest");
+  t("an F set uses the April 11 date", f.includes("Regulation mark F.") && f.includes(">Rotated April 11, 2025<") && f.includes(line));
+  const h = renderSetShell("sv05-temporal-forces");
+  t("an H set shows the letter and no rotated date", h.includes("Regulation mark H.") && !h.includes("Rotated") && !h.includes(line) && h.includes('href="/rotation"'));
+  const d = renderSetShell("swsh02-rebel-clash");
+  t("a D set is not given an invented date", d.includes("Regulation mark D.") && !d.includes("Rotated"));
+  const prismatic = renderSetShell("sv-prismatic-evolutions");
+  const journey = renderSetShell("sv09-journey-together");
+  const base = renderSetShell("base");
+  t("prismatic, journey together, and base get no letter", !prismatic.includes("Regulation mark") && !journey.includes("Regulation mark") && !base.includes("Regulation mark") && !prismatic.includes(line) && !prismatic.includes("Rotated"));
+  const one51 = renderSetShell("sv-scarlet-and-violet-151");
+  t("151 shows mark G and April 10 and does not say it was reprinted", one51.includes("Regulation mark G.") && one51.includes(">Rotated April 10, 2026<") && !/reprint/i.test(one51));
+  const feed = renderFeed({ reads: [{ id: "r-sv", headline: "Paldea Evolved box.", set: "SV02: Paldea Evolved", setSlug: "sv02-paldea-evolved", price: 9, source: "TCGplayer market", asOf: "2026-10-10", kind: "sealed" }] }, "", "", { feed: true });
+  t("a read on a rotated set can say the supply line", feed.includes("function printRunLine") && feed.includes("printRunLine(card)") && feed.includes(rot.PRINT_RUN_LINE) && feed.includes('"sv02-paldea-evolved":1') && feed.includes('"sv02: paldea evolved":1'));
+  const product = paintCard({ id: "tcgcsv-1", name: "Booster Box", set: "SV02: Paldea Evolved", setSlug: "sv02-paldea-evolved", kind: "sealed", price: 90, source: "TCGplayer market" }, "");
+  const other = paintCard({ id: "tcgcsv-2", name: "ETB", set: "SV: Prismatic Evolutions", setSlug: "sv-prismatic-evolutions", kind: "sealed", price: 80, source: "TCGplayer market" }, "");
+  t("a product on a rotated set gets the one-liner and prismatic does not", product.includes("<h2>Reads</h2>") && product.includes(line) && !product.includes("Regulation mark") && !other.includes(line) && !/reprint/i.test(product));
+}
+
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
