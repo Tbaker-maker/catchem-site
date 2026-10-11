@@ -76,19 +76,22 @@ export function productTypeLabel(row) {
   return "Single";
 }
 
-export function officialSrc(row, map) {
-  // Ordered by id: catalogue image, then the TCGplayer photo by product id,
-  // then the pokemontcg.io scan for that same setId-number. Each later one is
-  // tried only when the earlier one fails to load. A tile only when all miss.
+export function officialSrc(row, map, opts) {
+  // Ordered by id: Post Office catalogue, then the pokemontcg.io scan for that
+  // same setId-number, then the TCGplayer photo when images.tcgplayer is on.
+  // A tile only when all of those miss. Default is on until Tyler turns it off.
   const obj = row && typeof row === "object" ? row : { id: row };
   const sealed = obj.kind === "sealed";
+  const allowTcg = opts && typeof opts.tcgplayerImages === "boolean"
+    ? opts.tcgplayerImages
+    : !(typeof globalThis !== "undefined" && globalThis.CATCHEM_TCG_IMAGES === false);
   const list = [];
   const cat = imageForId(map, obj.id);
   if (cat) list.push(cat);
-  const pid = tcgPid(obj);
-  if (pid) list.push("/api/card-img?pid=" + pid);
   const file = sealed ? "" : (ptcgFile(obj.cardId) || ptcgFile(obj.sku) || ptcgFile(obj.id));
   if (file) list.push("/data/editor/tcg/" + file);
+  const pid = tcgPid(obj);
+  if (allowTcg && pid) list.push("/api/card-img?pid=" + pid);
   const uniq = list.filter((u, i) => u && list.indexOf(u) === i);
   if (!uniq.length) return { src: "", crop: false, alts: [] };
   return { src: uniq[0], crop: !sealed, alts: uniq.slice(1) };

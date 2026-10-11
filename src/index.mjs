@@ -9,9 +9,10 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
+import { addError, topErrors } from "./client-log.mjs";
 import {
-  clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, quickView,
+  clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -22,6 +23,28 @@ const html = (body, status = 200) => new Response(ensureAffiliation(body), {
     "cdn-cache-control": "no-store",
   },
 });
+
+let clientLog = { events: [] };
+const CLIENT_LOG_KEY = "https://catchem.internal/client-errors";
+
+export async function readClientLog() {
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      const hit = await caches.default.match(CLIENT_LOG_KEY);
+      if (hit) return await hit.json();
+    }
+  } catch { /* the cache is optional */ }
+  return clientLog;
+}
+
+async function writeClientLog(log) {
+  clientLog = log;
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      await caches.default.put(CLIENT_LOG_KEY, new Response(JSON.stringify(log), { headers: { "content-type": "application/json" } }));
+    }
+  } catch { /* memory copy remains */ }
+}
 
 function norm(pathname) {
   let path = String(pathname || "").split("?")[0];
@@ -56,6 +79,7 @@ export function pageKind(pathname) {
   if (path === "/track-record") return "track";
   if (path === "/compare") return "compare";
   if (path === "/today") return "today";
+  if (path === "/status") return "status";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -238,11 +262,22 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const kind = pageKind(path);
   let stamp = "";
   let asOf = "";
+  let countsDoc = null;
   try {
-    const counts = await loadJson("counts.json", fetchImpl);
-    stamp = clockLabel(counts.updatedAt);
-    asOf = counts.asOf || "";
-  } catch { stamp = ""; }
+    countsDoc = await loadJson("counts.json", fetchImpl);
+    stamp = clockLabel(countsDoc.updatedAt);
+    asOf = countsDoc.asOf || "";
+    setPriceBanner(priceBannerLine(countsDoc.updatedAt));
+  } catch {
+    stamp = "";
+    setPriceBanner("");
+  }
+  try {
+    const health = await loadJson("feed/status.json", fetchImpl);
+    globalThis.CATCHEM_TCG_IMAGES = !(health?.images && health.images.tcgplayer === false);
+  } catch {
+    globalThis.CATCHEM_TCG_IMAGES = true;
+  }
   const pageOpts = { ...opts, asOf };
   if (kind === "data") {
     const rel = path.slice("/data/".length);
@@ -423,6 +458,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const doc = await loadJson("today.json", fetchImpl).catch(() => ({ asOf: "", supply: "off", lines: [] }));
     return html(renderToday(doc, stamp, pageOpts));
   }
+  if (kind === "status") {
+    const status = await loadJson("feed/status.json", fetchImpl).catch(() => null);
+    const sources = await loadJson("feed/sources.json", fetchImpl).catch(() => null);
+    const gap = await loadJson("feed/image-gap.json", fetchImpl).catch(() => null);
+    return html(renderStatus({ status, sources, gap, errors: topErrors(await readClientLog()) }, stamp, pageOpts));
+  }
   return null;
 }
 
@@ -431,6 +472,17 @@ export default {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    if (url.pathname === "/api/client-log" && request.method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch { body = {}; }
+      await writeClientLog(addError(await readClientLog(), body));
+      return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+    }
+    if (url.pathname === "/api/client-errors" && request.method === "GET") {
+      return new Response(JSON.stringify({ errors: topErrors(await readClientLog()) }), {
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
     const urlVideo = url.searchParams.get("video");
     if (urlVideo != null) {
       // ?video=1 is not a gate. The flag is env.VIDEO_ENABLED, checked below.
