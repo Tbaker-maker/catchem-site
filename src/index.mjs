@@ -24,6 +24,13 @@ const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   },
 });
 
+// Temporary image proxy until the id has a Post Office catalogue hit.
+// No new host may be added. The allowlist is exactly these two hosts.
+export const IMAGE_HOSTS = [
+  "images.pokemontcg.io",
+  "tcgplayer-cdn.tcgplayer.com",
+];
+
 let clientLog = { events: [] };
 const CLIENT_LOG_KEY = "https://catchem.internal/client-errors";
 
@@ -545,6 +552,8 @@ export default {
       if (!/^[a-z0-9]+\/[A-Za-z0-9._-]+$/.test(rest)) {
         return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
       }
+      // Temporary proxy until the id has a Post Office catalogue hit. No new host may be added.
+      if (!IMAGE_HOSTS.includes("images.pokemontcg.io")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
       const img = await fetch("https://images.pokemontcg.io/" + rest);
       if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
       return new Response(img.body, {
@@ -568,19 +577,21 @@ export default {
         return new Response(JSON.stringify({ error: "Not in the catalog" }), { status: 404, headers });
       }
     }
-    if (request.method === "GET" && url.pathname === "/api/card-img") {
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/api/card-img") {
+      // Temporary proxy until the id has a Post Office catalogue hit. No new host may be added.
+      // Response is image bytes only. No eBay payload, no public JSON.
       const pid = Math.trunc(Number(url.searchParams.get("pid")));
-      if (!(pid > 0)) return new Response("Bad", { status: 400, headers: { "cache-control": "no-store" } });
+      if (!(pid > 0)) return new Response(request.method === "HEAD" ? null : "Bad", { status: 400, headers: { "cache-control": "no-store" } });
+      if (!IMAGE_HOSTS.includes("tcgplayer-cdn.tcgplayer.com")) return new Response(request.method === "HEAD" ? null : "Not found", { status: 404, headers: { "cache-control": "no-store" } });
       const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
-      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      if (!img.ok) return new Response(request.method === "HEAD" ? null : "Not found", { status: 404, headers: { "cache-control": "no-store" } });
       const bytes = new Uint8Array(await img.arrayBuffer());
       const digest = await crypto.subtle.digest("SHA-256", bytes);
       const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      if (hex.startsWith("23c8d781")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-      return new Response(bytes, {
-        status: 200,
-        headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" },
-      });
+      if (hex.startsWith("23c8d781")) return new Response(request.method === "HEAD" ? null : "Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      const headers = { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=86400" };
+      if (request.method === "HEAD") return new Response(null, { status: 200, headers });
+      return new Response(bytes, { status: 200, headers });
     }
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
@@ -678,3 +689,4 @@ export default {
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
   },
 };
+
