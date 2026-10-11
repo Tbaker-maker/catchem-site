@@ -20,8 +20,11 @@ const t = (name, cond) => {
 const BANNED = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|roi|invest(?:ing|ment|or)?s?|crypto|nfts?|web3|dsk|tickers?|tapes?)\b/i;
 const LOCKED = "The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.";
 
+// Legal's required disclosure, word for word (2026-10-10). The only other exception.
+const PAID = "Paid link. We may earn a commission if you buy, at no extra cost to you.";
+
 function clean(html) {
-  return String(html).replaceAll(LOCKED, "LOCKED");
+  return String(html).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID");
 }
 
 function stripNews(html) {
@@ -400,7 +403,7 @@ const lock = "The rate you check out at stays yours while you stay subscribed or
 t("premium is a worker page", pageKind("/premium") === "premium" && premium.status === 200);
 t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause</a><a href=") && premiumHtml.includes(">Cancel</a>"));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
-t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(premiumHtml) && !/pay to win|more entries/i.test(premiumHtml));
+t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
 t("premium sells the club", premiumHtml.includes("Join the club.") && premiumHtml.includes("Claim your First 222 number.") && premiumHtml.includes("Hang out with serious collectors, rippers and flippers.") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes("Join Premium") && premiumHtml.includes("$14.99 a month"));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));

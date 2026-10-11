@@ -7,6 +7,7 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
+import { setAffiliateConfig } from "./pokemon.mjs";
 import {
   clockLabel, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, quickView,
@@ -426,6 +427,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
 
 export default {
   async fetch(request, env) {
+    setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     const urlVideo = url.searchParams.get("video");
