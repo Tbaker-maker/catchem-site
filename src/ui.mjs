@@ -2,7 +2,8 @@ import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
-import { PAID_FOOTER, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
+import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
+import { queryShardIds } from "./search-shards.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -876,6 +877,13 @@ export function clockLabel(iso) {
 }
 
 export function chartBox(hist, caption = "TCGplayer market, daily", release = "") {
+  const rows = Array.isArray(hist) ? hist : [];
+  const hasPoint = rows.some((point) => {
+    if (Array.isArray(point)) return point.some((v) => typeof v === "number" && Number.isFinite(v));
+    if (!point || typeof point !== "object") return false;
+    return Object.values(point).some((v) => typeof v === "number" && Number.isFinite(v));
+  });
+  if (!hasPoint) return `<p class="muted">${esc(caption)}. No daily points in this file.</p>`;
   const payload = esc(JSON.stringify(hist || []));
   return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>`;
 }
@@ -1097,7 +1105,7 @@ function catchemMount(root){
 }
 `;
 
-const QUICK_JS = "function catchemSpark(packed, asOf){\n  var end=String(asOf||\"\").slice(0,10);\n  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(end) || !packed) return \"\";\n  var endMs=Date.parse(end+\"T00:00:00Z\");\n  var pts=[];\n  String(packed).split(\",\").forEach(function(bit){\n    var m=bit.match(/^([0-9]+):([0-9]+(?:[.][0-9]+)?)$/);\n    if(!m) return;\n    var off=Number(m[1]);\n    var v=Number(m[2]);\n    if(off<0 || off>29 || !(v>0)) return;\n    pts.push([new Date(endMs-off*86400000).toISOString().slice(0,10), v]);\n  });\n  pts.sort(function(a,b){ return a[0]<b[0]?-1:a[0]>b[0]?1:0; });\n  if(pts.length<2) return \"\";\n  var w=72,h=28,vals=pts.map(function(p){return p[1]}),min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=max-min||1;\n  var t0=Date.parse(pts[0][0]+\"T00:00:00Z\"), t1=Date.parse(pts[pts.length-1][0]+\"T00:00:00Z\");\n  function x(d){ var t=Date.parse(d+\"T00:00:00Z\"); if(t1===t0) return 2; return 2+((t-t0)/(t1-t0))*(w-4); }\n  function y(v){ return 2+((max-v)/span)*(h-4); }\n  var d=\"\", prev=\"\";\n  pts.forEach(function(p){\n    var expected=prev?new Date(Date.parse(prev+\"T00:00:00Z\")+86400000).toISOString().slice(0,10):\"\";\n    d+=(!prev || p[0]!==expected ? \"M\" : \"L\")+x(p[0]).toFixed(1)+\",\"+y(p[1]).toFixed(1);\n    prev=p[0];\n  });\n  return '<svg class=\"spark30\" width=\"72\" height=\"28\" viewBox=\"0 0 72 28\" aria-hidden=\"true\"><path d=\"'+d+'\" fill=\"none\" stroke=\"#d9b779\" stroke-width=\"1.5\"></path></svg>';\n}\nwindow.catchemSpark=catchemSpark;\nvar qCache={};\nvar qAnchor=null;\nfunction qEls(){\n  return {back:document.getElementById(\"qback\"), sheet:document.getElementById(\"qsheet\"), body:document.getElementById(\"q-body\")};\n}\nfunction qClose(){\n  var el=qEls();\n  if(!el.sheet) return;\n  el.sheet.hidden=true;\n  if(el.back) el.back.hidden=true;\n  document.body.classList.remove(\"q-open\");\n  el.sheet.style.transform=\"\";\n  el.sheet.classList.remove(\"tall\");\n}\nfunction qPlace(anchor){\n  var el=qEls();\n  var sheet=el.sheet;\n  if(!sheet) return;\n  var wide=window.matchMedia(\"(min-width:768px)\").matches;\n  sheet.classList.toggle(\"pop\", wide);\n  if(!wide){\n    sheet.style.left=\"\";\n    sheet.style.top=\"\";\n    sheet.style.width=\"\";\n    return;\n  }\n  var w=Math.min(440, window.innerWidth-32);\n  var r=anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;\n  var left=r ? Math.min(window.innerWidth-w-16, Math.max(16, r.left)) : (window.innerWidth-w)/2;\n  var top=r ? r.bottom+8 : 24;\n  if(top>window.innerHeight-180) top=r ? Math.max(16, r.top-16) : 24;\n  sheet.style.left=left+\"px\";\n  sheet.style.top=Math.max(16, top)+\"px\";\n  sheet.style.width=w+\"px\";\n}\nfunction qAttr(s){\n  return String(s==null?\"\":s).replace(/[&<>\"']/g, function(c){\n    if(c===\"&\") return \"&\"+\"amp;\";\n    if(c===\"<\") return \"&\"+\"lt;\";\n    if(c===\">\") return \"&\"+\"gt;\";\n    if(c==='\"') return \"&\"+\"quot;\";\n    return \"&\"+\"#39;\";\n  });\n}\nfunction qText(s){\n  return qAttr(s).replace(new RegExp(\"tcg\"+\"csv-\"+\"[0-9]+\",\"gi\"), \"\").replace(/\\s{2,}/g, \" \").trim();\n}\nfunction qMoney(n){\n  if(!(Number(n)>0)) return \"\";\n  return \"$\"+Number(n).toLocaleString(\"en-US\",{minimumFractionDigits:2,maximumFractionDigits:2});\n}\nfunction qSaved(id){\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    return Array.isArray(cur) && cur.some(function(row){ return row && (row.sku||row.id)===id; });\n  }catch(e){ return false; }\n}\nfunction qSave(id, doc){\n  var body={ id:id, sku:id, name:doc.name||\"\", market:doc.price, kind:doc.kind||\"\", headline:doc.name||\"\", href:\"/p/\"+encodeURIComponent(id) };\n  var wins=doc.windows||[];\n  for(var i=0;i<wins.length;i++){ if(wins[i].label===\"7D\" && typeof wins[i].pct===\"number\") body.change7=wins[i].pct; }\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    if(!Array.isArray(cur)) cur=[];\n    cur=cur.filter(function(row){ return row && (row.sku||row.id)!==id && row.id!==id; });\n    cur.unshift(body);\n    localStorage.setItem(\"catchem-watch\", JSON.stringify(cur.slice(0,100)));\n    return true;\n  }catch(e){ return false; }\n}\nfunction qPaint(id, doc){\n  var el=qEls();\n  var box=el.body;\n  if(!box) return;\n  var cash=qMoney(doc.price);\n  var price=cash?qText(cash):\"No market price\";\n  var when=(doc.asOf?qText(doc.source||\"TCGplayer market\")+\", \"+qText(doc.asOf):qText(doc.source||\"TCGplayer market\"))+\". Missing days show as gaps.\";\n  var wins=(doc.windows||[]).map(function(w){\n    if(typeof w.pct!==\"number\") return \"\";\n    var cls=w.pct>0?\" up\":w.pct<0?\" down\":\"\";\n    var sign=w.pct>0?\"+\":\"\";\n    var note=w.from&&w.to?'<span class=\"muted\"> '+qText(w.from)+\" to \"+qText(w.to)+\"</span>\":\"\";\n    return '<span class=\"win'+cls+'\">'+qText(w.label)+\" \"+sign+w.pct+\"%</span>\"+note;\n  }).filter(Boolean).join(\" \");\n  var photo=\"\";\n  if(doc.photo && doc.photo.src){\n    var crop=doc.kind!==\"sealed\" && doc.photo.crop;\n    photo='<img alt=\"'+qText(doc.name)+'\" width=\"168\" height=\"234\" class=\"'+(crop?\"card-face\":\"shot\")+'\" '+(crop?'data-crop-card=\"1\" onload=\"if(window.cropCardEdge)cropCardEdge(this)\" ':\"\")+(doc.photo.alts&&doc.photo.alts.length?'data-alts=\"'+qAttr(doc.photo.alts.join(\"|\"))+'\" ':\"\")+'onerror=\"var a=(this.getAttribute(\\'data-alts\\')||\\'\\').split(\\'|\\').filter(Boolean);if(a.length){this.setAttribute(\\'data-alts\\',a.slice(1).join(\\'|\\'));this.src=a[0]}else{this.remove()}\" src=\"'+qAttr(doc.photo.src)+'\">';\n  }\n  var list=\"\";\n  if(doc.listings && doc.listings.text){\n    list='<p>'+qText(doc.listings.text||\"eBay listings —\")+'</p><p class=\"muted\">'+qText(doc.listings.source||\"eBay listings\")+(doc.listings.asOf?\", \"+qText(doc.listings.asOf):\"\")+\". Listings are not sales.</p>\";\n    if((doc.listings.points||[]).length>=2){\n      list+='<p class=\"muted\">eBay listings. A missing night is a gap.</p><div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"140\" data-caption=\"eBay listings\" data-chart=\"'+qAttr(JSON.stringify(doc.listings.points))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>';\n    }\n  }\n  var reads=(doc.reads||[]).map(function(read){\n    var line=qText(read.date)+\" \"+qText(read.text);\n    var src=read.source?'<p class=\"muted\">'+qText(read.source)+(read.date?\", \"+qText(read.date):\"\")+\"</p>\":\"\";\n    var body=read.href?'<a href=\"'+qAttr(read.href)+'\">'+line+\"</a>\":line;\n    return \"<li>\"+body+src+\"</li>\";\n  }).join(\"\");\n  var tcgA=doc.tcgUrl?'<a href=\"'+qAttr(doc.tcgUrl)+'\" rel=\"sponsored noopener\">TCGplayer</a>':\"\";\n  var ebA=doc.ebayUrl?'<a href=\"'+qAttr(doc.ebayUrl)+'\" rel=\"sponsored noopener\">eBay</a>':\"\";\n  var tcg=(tcgA||ebA)?'<p class=\"store-links\">'+[tcgA,ebA].filter(Boolean).join(\" · \")+' <small class=\"paid-note\">Paid link</small></p>':\"\";\n  var page=\"/p/\"+encodeURIComponent(id);\n  box.innerHTML=photo\n    +\"<h2>\"+qText(doc.name)+\"</h2>\"\n    +'<p class=\"muted\">'+qText(doc.set||\"—\")+\" · \"+qText(doc.num||\"—\")+\" · \"+qText(doc.printing||\"—\")+\"</p>\"\n    +'<p class=\"px\"><span class=\"q-price\">'+price+\"</span></p>\"\n    +(when?'<p class=\"muted\">'+when+\"</p>\":\"\")\n    +(wins?\"<p>\"+wins+\"</p>\":\"\")\n    +(doc.range?\"<p>\"+qText(doc.range)+\"</p>\":\"\")\n    +list\n    +'<div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"160\" data-caption=\"TCGplayer market, daily\" data-chart=\"'+qAttr(JSON.stringify(doc.hist||[]))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>'\n    +\"<h3>Reads</h3>\"\n    +(reads?'<ul class=\"glance-reads\">'+reads+\"</ul>\":'<p class=\"muted\">'+\"No reads on \"+\"file for this product.</p>\")\n    +tcg\n    +'<p class=\"q-acts\"><button type=\"button\" id=\"q-save\">'+(qSaved(id)?\"Saved\":\"Save\")+'</button><a class=\"q-page\" href=\"'+qAttr(page)+'\">Full page</a></p>';\n  var save=document.getElementById(\"q-save\");\n  if(save) save.onclick=function(){ if(qSave(id, doc)) save.textContent=\"Saved\"; };\n  if(typeof catchemMount===\"function\") catchemMount(box);\n  qPlace(qAnchor);\n}\nfunction catchemQuick(id, anchor){\n  if(!id) return;\n  qAnchor=anchor||null;\n  var el=qEls();\n  if(!el.sheet || !el.body) return;\n  el.sheet.hidden=false;\n  if(el.back) el.back.hidden=false;\n  document.body.classList.add(\"q-open\");\n  el.sheet.style.transform=\"\";\n  qPlace(anchor);\n  if(qCache[id]){ qPaint(id, qCache[id]); return; }\n  el.body.innerHTML='<p class=\"muted\">'+\"Opening this product.\"+'</p>';\n  fetch(\"/api/quick?id=\"+encodeURIComponent(id)).then(function(r){\n    if(!r.ok) throw 0;\n    return r.json();\n  }).then(function(doc){\n    qCache[id]=doc;\n    if(!el.sheet.hidden) qPaint(id, doc);\n  }).catch(function(){\n    if(!el.sheet.hidden) el.body.innerHTML='<p>Not in the catalog.</p>';\n  });\n}\nwindow.catchemQuick=catchemQuick;\nfunction qInit(){\n  var el=qEls();\n  if(!el.sheet || el.sheet.dataset.ready) return;\n  el.sheet.dataset.ready=\"1\";\n  var closeBtn=document.getElementById(\"q-close\");\n  if(closeBtn) closeBtn.addEventListener(\"click\", qClose);\n  if(el.back) el.back.addEventListener(\"click\", qClose);\n  document.addEventListener(\"keydown\", function(ev){ if(ev.key===\"Escape\") qClose(); });\n  document.addEventListener(\"click\", function(ev){\n    if(ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;\n    var node=ev[\"tar\"+\"get\"];\n    if(!node || !node.closest) return;\n    if(node.closest(\"#qsheet\")) return;\n    if(node.closest(\"button, input, select, textarea, label\")) return;\n    var link=node.closest(\"a\");\n    if(link && !link.hasAttribute(\"data-quick\")) return;\n    var hit=node.closest(\"[data-quick]\");\n    if(!hit) return;\n    var qid=hit.getAttribute(\"data-quick\");\n    if(!qid) return;\n    ev.preventDefault();\n    catchemQuick(qid, hit);\n  });\n  var drag=null;\n  el.sheet.addEventListener(\"pointerdown\", function(ev){\n    if(el.sheet.classList.contains(\"pop\")) return;\n    var from=ev[\"tar\"+\"get\"];\n    var grab=from && from.closest && from.closest(\".q-grab, .q-head\");\n    if(!grab && el.sheet.scrollTop>0) return;\n    if(!grab && from && from.closest && from.closest(\"a, button, input, select, textarea\")) return;\n    drag={y:ev.clientY, dy:0, id:ev.pointerId};\n  });\n  el.sheet.addEventListener(\"pointermove\", function(ev){\n    if(!drag || drag.id!==ev.pointerId) return;\n    drag.dy=ev.clientY-drag.y;\n    if(drag.dy>0) el.sheet.style.transform=\"translateY(\"+drag.dy+\"px)\";\n  });\n  function endDrag(ev){\n    if(!drag || (ev && drag.id!==ev.pointerId)) return;\n    var dy=drag.dy;\n    drag=null;\n    el.sheet.style.transform=\"\";\n    if(dy>90) qClose();\n    else if(dy<-40) el.sheet.classList.add(\"tall\");\n  }\n  el.sheet.addEventListener(\"pointerup\", endDrag);\n  el.sheet.addEventListener(\"pointercancel\", endDrag);\n}\nif(document.readyState===\"loading\") document.addEventListener(\"DOMContentLoaded\", qInit);\nelse qInit();";
+const QUICK_JS = "function catchemSpark(packed, asOf){\n  var end=String(asOf||\"\").slice(0,10);\n  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(end) || !packed) return \"\";\n  var endMs=Date.parse(end+\"T00:00:00Z\");\n  var pts=[];\n  String(packed).split(\",\").forEach(function(bit){\n    var m=bit.match(/^([0-9]+):([0-9]+(?:[.][0-9]+)?)$/);\n    if(!m) return;\n    var off=Number(m[1]);\n    var v=Number(m[2]);\n    if(off<0 || off>29 || !(v>0)) return;\n    pts.push([new Date(endMs-off*86400000).toISOString().slice(0,10), v]);\n  });\n  pts.sort(function(a,b){ return a[0]<b[0]?-1:a[0]>b[0]?1:0; });\n  if(pts.length<2) return \"\";\n  var w=72,h=28,vals=pts.map(function(p){return p[1]}),min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=max-min||1;\n  var t0=Date.parse(pts[0][0]+\"T00:00:00Z\"), t1=Date.parse(pts[pts.length-1][0]+\"T00:00:00Z\");\n  function x(d){ var t=Date.parse(d+\"T00:00:00Z\"); if(t1===t0) return 2; return 2+((t-t0)/(t1-t0))*(w-4); }\n  function y(v){ return 2+((max-v)/span)*(h-4); }\n  var d=\"\", prev=\"\";\n  pts.forEach(function(p){\n    var expected=prev?new Date(Date.parse(prev+\"T00:00:00Z\")+86400000).toISOString().slice(0,10):\"\";\n    d+=(!prev || p[0]!==expected ? \"M\" : \"L\")+x(p[0]).toFixed(1)+\",\"+y(p[1]).toFixed(1);\n    prev=p[0];\n  });\n  return '<svg class=\"spark30\" width=\"72\" height=\"28\" viewBox=\"0 0 72 28\" aria-hidden=\"true\"><path d=\"'+d+'\" fill=\"none\" stroke=\"#d9b779\" stroke-width=\"1.5\"></path></svg>';\n}\nwindow.catchemSpark=catchemSpark;\nvar qCache={};\nvar qAnchor=null;\nfunction qEls(){\n  return {back:document.getElementById(\"qback\"), sheet:document.getElementById(\"qsheet\"), body:document.getElementById(\"q-body\")};\n}\nfunction qClose(){\n  var el=qEls();\n  if(!el.sheet) return;\n  el.sheet.hidden=true;\n  if(el.back) el.back.hidden=true;\n  document.body.classList.remove(\"q-open\");\n  el.sheet.style.transform=\"\";\n  el.sheet.classList.remove(\"tall\");\n}\nfunction qPlace(anchor){\n  var el=qEls();\n  var sheet=el.sheet;\n  if(!sheet) return;\n  var wide=window.matchMedia(\"(min-width:768px)\").matches;\n  sheet.classList.toggle(\"pop\", wide);\n  if(!wide){\n    sheet.style.left=\"\";\n    sheet.style.top=\"\";\n    sheet.style.width=\"\";\n    return;\n  }\n  var w=Math.min(440, window.innerWidth-32);\n  var r=anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;\n  var left=r ? Math.min(window.innerWidth-w-16, Math.max(16, r.left)) : (window.innerWidth-w)/2;\n  var top=r ? r.bottom+8 : 24;\n  if(top>window.innerHeight-180) top=r ? Math.max(16, r.top-16) : 24;\n  sheet.style.left=left+\"px\";\n  sheet.style.top=Math.max(16, top)+\"px\";\n  sheet.style.width=w+\"px\";\n}\nfunction qAttr(s){\n  return String(s==null?\"\":s).replace(/[&<>\"']/g, function(c){\n    if(c===\"&\") return \"&\"+\"amp;\";\n    if(c===\"<\") return \"&\"+\"lt;\";\n    if(c===\">\") return \"&\"+\"gt;\";\n    if(c==='\"') return \"&\"+\"quot;\";\n    return \"&\"+\"#39;\";\n  });\n}\nfunction qText(s){\n  return qAttr(s).replace(new RegExp(\"tcg\"+\"csv-\"+\"[0-9]+\",\"gi\"), \"\").replace(/\\s{2,}/g, \" \").trim();\n}\nfunction qMoney(n){\n  if(!(Number(n)>0)) return \"\";\n  return \"$\"+Number(n).toLocaleString(\"en-US\",{minimumFractionDigits:2,maximumFractionDigits:2});\n}\nfunction qSaved(id){\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    return Array.isArray(cur) && cur.some(function(row){ return row && (row.sku||row.id)===id; });\n  }catch(e){ return false; }\n}\nfunction qSave(id, doc){\n  var body={ id:id, sku:id, name:doc.name||\"\", market:doc.price, kind:doc.kind||\"\", headline:doc.name||\"\", href:\"/p/\"+encodeURIComponent(id) };\n  var wins=doc.windows||[];\n  for(var i=0;i<wins.length;i++){ if(wins[i].label===\"7D\" && typeof wins[i].pct===\"number\") body.change7=wins[i].pct; }\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    if(!Array.isArray(cur)) cur=[];\n    cur=cur.filter(function(row){ return row && (row.sku||row.id)!==id && row.id!==id; });\n    cur.unshift(body);\n    localStorage.setItem(\"catchem-watch\", JSON.stringify(cur.slice(0,100)));\n    return true;\n  }catch(e){ return false; }\n}\nfunction qPaint(id, doc){\n  var el=qEls();\n  var box=el.body;\n  if(!box) return;\n  var cash=qMoney(doc.price);\n  var price=cash?qText(cash):\"No market price\";\n  var when=(doc.asOf?qText(doc.source||\"TCGplayer market\")+\", \"+qText(doc.asOf):qText(doc.source||\"TCGplayer market\"))+\". Missing days show as gaps.\";\n  var wins=(doc.windows||[]).map(function(w){\n    if(typeof w.pct!==\"number\") return \"\";\n    var cls=w.pct>0?\" up\":w.pct<0?\" down\":\"\";\n    var sign=w.pct>0?\"+\":\"\";\n    var note=w.from&&w.to?'<span class=\"muted\"> '+qText(w.from)+\" to \"+qText(w.to)+\"</span>\":\"\";\n    return '<span class=\"win'+cls+'\">'+qText(w.label)+\" \"+sign+w.pct+\"%</span>\"+note;\n  }).filter(Boolean).join(\" \");\n  var photo=\"\";\n  if(doc.photo && doc.photo.src){\n    var crop=doc.kind!==\"sealed\" && doc.photo.crop;\n    photo='<img alt=\"'+qText(doc.name)+'\" width=\"168\" height=\"234\" class=\"'+(crop?\"card-face\":\"shot\")+'\" '+(crop?'data-crop-card=\"1\" onload=\"if(window.cropCardEdge)cropCardEdge(this)\" ':\"\")+(doc.photo.alts&&doc.photo.alts.length?'data-alts=\"'+qAttr(doc.photo.alts.join(\"|\"))+'\" ':\"\")+'onerror=\"var a=(this.getAttribute(\\'data-alts\\')||\\'\\').split(\\'|\\').filter(Boolean);if(a.length){this.setAttribute(\\'data-alts\\',a.slice(1).join(\\'|\\'));this.src=a[0]}else{this.remove()}\" src=\"'+qAttr(doc.photo.src)+'\">';\n  }\n  var list=\"\";\n  if(doc.listings && doc.listings.text){\n    list='<p>'+qText(doc.listings.text||\"eBay listings —\")+'</p><p class=\"muted\">'+qText(doc.listings.source||\"eBay listings\")+(doc.listings.asOf?\", \"+qText(doc.listings.asOf):\"\")+\". Listings are not sales.</p>\";\n    if((doc.listings.points||[]).length>=2){\n      list+='<p class=\"muted\">eBay listings. A missing night is a gap.</p><div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"140\" data-caption=\"eBay listings\" data-chart=\"'+qAttr(JSON.stringify(doc.listings.points))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>';\n    }\n  }\n  var reads=(doc.reads||[]).map(function(read){\n    var line=qText(read.date)+\" \"+qText(read.text);\n    var src=read.source?'<p class=\"muted\">'+qText(read.source)+(read.date?\", \"+qText(read.date):\"\")+\"</p>\":\"\";\n    var body=read.href?'<a href=\"'+qAttr(read.href)+'\">'+line+\"</a>\":line;\n    return \"<li>\"+body+src+\"</li>\";\n  }).join(\"\");\n  var tcgA=doc.tcgUrl?'<a href=\"'+qAttr(doc.tcgUrl)+'\" rel=\"sponsored noopener\">TCGplayer</a>':\"\";\n  var ebA=doc.ebayUrl?'<a href=\"'+qAttr(doc.ebayUrl)+'\" rel=\"sponsored noopener\">eBay</a>':\"\";\n  var tcg=(tcgA||ebA)?'<p class=\"store-links\">'+[tcgA,ebA].filter(Boolean).join(\" · \")+' <small class=\"paid-note\">Paid link</small></p>':\"\";\n  var page=\"/p/\"+encodeURIComponent(id);\n  box.innerHTML=photo\n    +\"<h2>\"+qText(doc.name)+\"</h2>\"\n    +'<p class=\"muted\">'+qText(doc.set||\"not in the file\")+\" · \"+qText(doc.num||\"not in the file\")+\" · \"+qText(doc.printing||\"not in the file\")+\"</p>\"\n    +'<p class=\"px\"><span class=\"q-price\">'+price+\"</span></p>\"\n    +(when?'<p class=\"muted\">'+when+\"</p>\":\"\")\n    +(wins?\"<p>\"+wins+\"</p>\":\"\")\n    +(doc.range?\"<p>\"+qText(doc.range)+\"</p>\":\"\")\n    +list\n    +'<div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"160\" data-caption=\"TCGplayer market, daily\" data-chart=\"'+qAttr(JSON.stringify(doc.hist||[]))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>'\n    +\"<h3>Reads</h3>\"\n    +(reads?'<ul class=\"glance-reads\">'+reads+\"</ul>\":'<p class=\"muted\">'+\"No reads on \"+\"file for this product.</p>\")\n    +tcg\n    +'<p class=\"q-acts\"><button type=\"button\" id=\"q-save\">'+(qSaved(id)?\"Saved\":\"Save\")+'</button><a class=\"q-page\" href=\"'+qAttr(page)+'\">Full page</a></p>';\n  var save=document.getElementById(\"q-save\");\n  if(save) save.onclick=function(){ if(qSave(id, doc)) save.textContent=\"Saved\"; };\n  if(typeof catchemMount===\"function\") catchemMount(box);\n  qPlace(qAnchor);\n}\nfunction catchemQuick(id, anchor){\n  if(!id) return;\n  qAnchor=anchor||null;\n  var el=qEls();\n  if(!el.sheet || !el.body) return;\n  el.sheet.hidden=false;\n  if(el.back) el.back.hidden=false;\n  document.body.classList.add(\"q-open\");\n  el.sheet.style.transform=\"\";\n  qPlace(anchor);\n  if(qCache[id]){ qPaint(id, qCache[id]); return; }\n  el.body.innerHTML='<p class=\"muted\">'+\"Opening this product.\"+'</p>';\n  fetch(\"/api/quick?id=\"+encodeURIComponent(id)).then(function(r){\n    if(!r.ok) throw 0;\n    return r.json();\n  }).then(function(doc){\n    qCache[id]=doc;\n    if(!el.sheet.hidden) qPaint(id, doc);\n  }).catch(function(){\n    if(!el.sheet.hidden) el.body.innerHTML='<p>Not in the catalog.</p>';\n  });\n}\nwindow.catchemQuick=catchemQuick;\nfunction qInit(){\n  var el=qEls();\n  if(!el.sheet || el.sheet.dataset.ready) return;\n  el.sheet.dataset.ready=\"1\";\n  var closeBtn=document.getElementById(\"q-close\");\n  if(closeBtn) closeBtn.addEventListener(\"click\", qClose);\n  if(el.back) el.back.addEventListener(\"click\", qClose);\n  document.addEventListener(\"keydown\", function(ev){ if(ev.key===\"Escape\") qClose(); });\n  document.addEventListener(\"click\", function(ev){\n    if(ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;\n    var node=ev[\"tar\"+\"get\"];\n    if(!node || !node.closest) return;\n    if(node.closest(\"#qsheet\")) return;\n    if(node.closest(\"button, input, select, textarea, label\")) return;\n    var link=node.closest(\"a\");\n    if(link && !link.hasAttribute(\"data-quick\")) return;\n    var hit=node.closest(\"[data-quick]\");\n    if(!hit) return;\n    var qid=hit.getAttribute(\"data-quick\");\n    if(!qid) return;\n    ev.preventDefault();\n    catchemQuick(qid, hit);\n  });\n  var drag=null;\n  el.sheet.addEventListener(\"pointerdown\", function(ev){\n    if(el.sheet.classList.contains(\"pop\")) return;\n    var from=ev[\"tar\"+\"get\"];\n    var grab=from && from.closest && from.closest(\".q-grab, .q-head\");\n    if(!grab && el.sheet.scrollTop>0) return;\n    if(!grab && from && from.closest && from.closest(\"a, button, input, select, textarea\")) return;\n    drag={y:ev.clientY, dy:0, id:ev.pointerId};\n  });\n  el.sheet.addEventListener(\"pointermove\", function(ev){\n    if(!drag || drag.id!==ev.pointerId) return;\n    drag.dy=ev.clientY-drag.y;\n    if(drag.dy>0) el.sheet.style.transform=\"translateY(\"+drag.dy+\"px)\";\n  });\n  function endDrag(ev){\n    if(!drag || (ev && drag.id!==ev.pointerId)) return;\n    var dy=drag.dy;\n    drag=null;\n    el.sheet.style.transform=\"\";\n    if(dy>90) qClose();\n    else if(dy<-40) el.sheet.classList.add(\"tall\");\n  }\n  el.sheet.addEventListener(\"pointerup\", endDrag);\n  el.sheet.addEventListener(\"pointercancel\", endDrag);\n}\nif(document.readyState===\"loading\") document.addEventListener(\"DOMContentLoaded\", qInit);\nelse qInit();";
 const CSS = `
 .paid-note,.paid-foot small{font:400 12px/1.4 var(--sans);color:#a39d93}
 .paid-note{margin-left:4px}
@@ -1113,6 +1121,9 @@ a{color:var(--gold)}
 .means p{margin:0 0 8px}
 .means p:last-child{margin:0}
 .site-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:0 16px;height:56px;min-height:56px;max-height:56px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:5}
+.stale-banner{margin:0;padding:10px 16px;background:#3a2a12;color:#f3e6c8;font:600 14px/1.4 var(--sans)}
+.status-list{list-style:none;padding:0;margin:0}
+.status-list li{padding:8px 0;border-bottom:1px solid var(--line)}
 .site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em}
 .site-bar .logo span{color:var(--gold)}
 .menu-btn{display:none;min-height:44px}
@@ -1272,26 +1283,48 @@ function shareMetaTags(title, share) {
 <link rel="canonical" href="${esc(url)}">`;
 }
 
+let priceBanner = "";
+export function setPriceBanner(line) {
+  priceBanner = String(line || "");
+}
+export function priceBannerLine(updatedAt, nowMs = Date.now()) {
+  const raw = String(updatedAt || "");
+  let t = Date.parse(raw);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) t = Date.parse(`${raw}T04:00:00Z`);
+  if (!Number.isFinite(t)) return "";
+  if (nowMs - t <= 36 * 3600 * 1000) return "";
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(t));
+  return `Prices last updated ${day}.`;
+}
+
 function chrome(active, body, title, stamp, extraFoot = "", feed = false, share = null) {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
   const feedLink = feed ? item("/feed", "Feed") : "";
   const fresh = stamp ? `<div class="wrap" style="padding-bottom:0"><p class="muted" id="fresh" style="margin:0">${esc(stamp)}</p></div>` : "";
   const foot = extraFoot ? `<p id="post-office-build">${esc(extraFoot)}</p>` : "";
   const shareTags = shareMetaTags(title, share);
+  const tcgOn = !(typeof globalThis !== "undefined" && globalThis.CATCHEM_TCG_IMAGES === false);
+  const banner = priceBanner ? `<p class="stale-banner" role="status">${esc(priceBanner)}</p>` : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}</style><script>function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
+${banner}
 ${fresh}
 ${body}
 <nav class="dock" aria-label="Primary">
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
-<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
+<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Made for collectors, rippers and flippers. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -1328,7 +1361,8 @@ window.cropCardEdge=function(img){
     img.src=out.toDataURL("image/jpeg",0.86);
   }catch(e){}
 };
-</script></body></html>`;
+</script>
+<script>window.addEventListener("error",function(e){var body=JSON.stringify({message:String(e.message||""),source:String(e.filename||""),line:e.lineno||0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});window.addEventListener("unhandledrejection",function(e){var reason=e.reason;var message=reason&&reason.message?String(reason.message):String(reason||"");var body=JSON.stringify({message:message,source:"",line:0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});</script></body></html>`;
 }
 
 function spark(values) {
@@ -1350,6 +1384,7 @@ export function renderSets(index, stamp, opts = {}) {
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || String(a).localeCompare(String(b));
   });
   const body = `<main class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart.</p>
+${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
 ${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}
 ${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
 ${chartBox(index?.singlesIndex || [], "Singles index, chain-linked")}
@@ -1682,7 +1717,7 @@ export function renderPokemon(page, stamp, opts = {}) {
     : brandedTile("card", { kind: "single", name: page.name });
   const tiles = cards.map((card) => {
     const open = `<a class="mon-open" data-quick="${esc(card.id)}" href="/c/${esc(card.id)}">${pokemonFace(card)}<b>${esc(card.name)}</b><span class="set">${esc(card.set)}</span><span class="num">${esc(card.number)}</span><span class="px">${pokemonPriceHtml(card)}</span></a>`;
-    const shop = card.link ? `<a class="shop" href="${esc(card.link)}">TCGplayer</a>` : "";
+    const shop = card.link ? `<span class="store-links"><a class="shop" href="${esc(affTcg(card.link))}" rel="sponsored noopener">TCGplayer</a> <small class="paid-note">${PAID_NOTE}</small></span>` : "";
     const release = /^\d{4}-\d{2}-\d{2}$/.test(String(card.release || "")) ? card.release : "9999-99-99";
     return `<article class="mon-tile" data-price="${card.price > 0 ? card.price : ""}" data-release="${esc(release)}" data-set="${esc(card.set)}" data-num="${esc(card.number)}" data-name="${esc(card.name)}">${open}${shop}</article>`;
   }).join("");
@@ -1925,7 +1960,7 @@ export function renderCard(card, stamp, opts = {}) {
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
-  const priceChart = `<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>${pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : ""}`;
+  const priceChart = `<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>${pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : `<p class="muted">No price points in that file.</p>`}`;
   const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
   const breakBits = [];
   const listings = Number(fact?.listings);
@@ -1971,14 +2006,14 @@ ${readHtml}
 </div>
 ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
-<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")}</p>
+<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${priceChart}
 ${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
-<p>Number ${esc(card.num || "—")} · Rarity ${esc(card.rarity || "—")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
+<p>Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
 <p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
@@ -2015,7 +2050,7 @@ export function renderArtists(index, stamp, opts = {}) {
   const rows = index?.artists || [];
   const body = `<main class="wrap"><p class="muted">${esc(index?.note || "")}</p><h1>Artists</h1>
 <div class="filters"><input id="q" aria-label="Find an artist" placeholder="Find an artist"></div>
-<div id="list" class="grid">${rows.map((a) => `<a class="card" data-name="${esc(a.name.toLowerCase())}" href="/artists/${esc(a.slug)}"><b>${esc(a.name)}</b><p class="muted">${a.count} matched cards</p></a>`).join("")}</div>
+<div id="list" class="grid">${rows.map((a) => `<a class="card" data-name="${esc(a.name.toLowerCase())}" href="/artists/${esc(a.slug)}"><b>${esc(a.name)}</b><p class="muted">${a.count} matched cards</p></a>`).join("") || `<p class="muted">No artists in the file.</p>`}</div>
 <script>document.getElementById("q").addEventListener("input",ev=>{const q=ev.currentTarget.value.toLowerCase();document.querySelectorAll("#list a").forEach(a=>{a.hidden=!a.dataset.name.includes(q)})})</script>
 </main>`;
   return chrome("Artists", body, "Artists", stamp, "", feedNav(opts));
@@ -2062,7 +2097,7 @@ export function sortArtistCards(cards, sort = "", releaseBySlug = {}) {
 }
 
 export function renderArtist(doc, stamp, opts = {}) {
-  if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1></main>`, "Artist", stamp, "", feedNav(opts));
+  if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1><p class="muted">That artist is not in the file.</p></main>`, "Artist", stamp, "", feedNav(opts));
   const sort = ARTIST_SORTS.some(([k]) => k && k === opts.sort) ? opts.sort : "";
   const cards = sortArtistCards(doc.cards || [], sort, opts.releaseBySlug || {});
   const top = cards.slice(0, 12);
@@ -2083,7 +2118,7 @@ ${doc.indexNote ? `<p class="muted">${esc(doc.indexNote)}</p>` : ""}
 ${sort.startsWith("price") && unpriced ? `<p class="muted">${unpriced} cards with no market price are listed last.</p>` : ""}
 ${sort.startsWith("release") && undated ? `<p class="muted">${undated} cards from sets with no release date on file are listed last.</p>` : ""}
 <div id="artist-cards">
-${top.map(row).join("")}
+${cards.length ? top.map(row).join("") : `<p class="muted">No cards matched to this artist.</p>`}
 ${rest.length ? `<details><summary>Show all ${cards.length}</summary>${rest.map(row).join("")}</details>` : ""}
 </div>
 </main>`;
@@ -2196,7 +2231,9 @@ export function factsLines(row) {
 }
 
 export function renderFacts(row) {
-  return factsLines(row).map((line) => `<p>${esc(line.label)}: ${esc(line.value)}</p>`).join("");
+  const lines = factsLines(row);
+  if (!lines.length) return `<p class="muted">No market line in the price file.</p>`;
+  return lines.map((line) => `<p>${esc(line.label)}: ${esc(line.value)}</p>`).join("");
 }
 
 export function compareRows(left, right) {
@@ -2249,7 +2286,7 @@ export function renderTrackRecord(doc, stamp, opts = {}) {
 <p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
 <p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. ${esc(horizonLine("14-day", doc?.scored14))}. ${esc(horizonLine("28-day", doc?.scored28))}. ${esc(horizonLine("56-day", doc?.scored56))}.</p>
 <table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>14-day</th><th>28-day</th><th>56-day</th></tr></thead><tbody>${types}</tbody></table>
-<table><thead><tr><th>Ship date</th><th>Name</th><th>Ship price</th><th>Direction</th><th>14-day</th><th>28-day</th><th>56-day</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>Ship date</th><th>Name</th><th>Ship price</th><th>Direction</th><th>14-day</th><th>28-day</th><th>56-day</th><th>Note</th></tr></thead><tbody>${rows || `<tr><td colspan="8">No reads in the track record file.</td></tr>`}</tbody></table>
 </main>`;
   return chrome("", body, "Track record", stamp, "", feedNav(opts));
 }
@@ -2269,10 +2306,52 @@ ${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">
   return chrome("", body, "Receipts", stamp, "", feedNav(opts));
 }
 
+export function renderStatus(doc, stamp, opts = {}) {
+  const status = doc?.status;
+  const sources = doc?.sources;
+  const gap = doc?.gap;
+  const errors = Array.isArray(doc?.errors) ? doc.errors : [];
+  if (!status) {
+    const body = `<main class="wrap"><h1>Status</h1><p class="muted">The status file is not in the public feed.</p></main>`;
+    return chrome("", body, "Status", stamp, "", feedNav(opts));
+  }
+  const steps = (status.steps || []).map((row) => `<li><b>${esc(row.name)}</b>: ${esc(row.result || "not in the files")}${row.detail ? ` (${esc(row.detail)})` : ""}. <span class="muted">${esc(row.file || "")}</span></li>`).join("");
+  const missing = (status.missingDays || []).map((day) => esc(day)).join(", ");
+  const counts = status.counts || {};
+  const countBits = ["items", "single", "sealed", "slab", "sets", "priced", "artists"].filter((key) => Number.isFinite(Number(counts[key]))).map((key) => `${key} ${Number(counts[key]).toLocaleString("en-US")}`).join(" · ");
+  const ebayAt = status.ebayUpdatedAt ? esc(status.ebayUpdatedAt) : "";
+  const ebayMs = Date.parse(status.ebayUpdatedAt || "");
+  const ebayAge = Number.isFinite(ebayMs) ? `${Math.round(((Date.now() - ebayMs) / 3600000) * 10) / 10} hours` : "";
+  const files = (sources?.files || []).map((row) => `<li><b>${esc(row.file)}</b> · ${esc((row.readers || []).join(", ") || "no reader")}${row.asOf ? ` · ${esc(row.asOf)}` : ""}${row.live ? "" : " · not a nightly price file"}${row.note ? ` · ${esc(row.note)}` : ""}</li>`).join("");
+  const types = (gap?.byType || []).map((row) => `${esc(row.type)} ${Number(row.lose).toLocaleString("en-US")}`).join(" · ");
+  const err = errors.length
+    ? `<ol>${errors.map((row) => `<li>${esc(row.message)} <span class="muted">${Number(row.count) || 0}</span></li>`).join("")}</ol>`
+    : `<p class="muted">No client errors stored on this server yet.</p>`;
+  const body = `<main class="wrap">
+<h1>Status</h1>
+<p>${esc(status.note || "")}</p>
+<p>Last time in the files: ${status.lastFileTimePt ? esc(status.lastFileTimePt) : "not in the files"}${status.lastFile ? ` (${esc(status.lastFile)})` : ""}.</p>
+<p>Newest price day: ${status.newestPriceDay ? esc(status.newestPriceDay) : "not in the files"}.</p>
+<p>eBay file time: ${ebayAt || "not in the files"}${ebayAge ? `. Age: ${esc(ebayAge)}.` : ""}.</p>
+<p>Product counts: ${countBits || "not in the files"}.</p>
+<h2>Missing price days</h2>
+<p>${missing || "No missing day between the first and last file."}</p>
+<h2>Steps</h2>
+<ul class="status-list">${steps || `<li>No step lines in the status file.</li>`}</ul>
+<h2>Pictures with the TCGplayer photo off</h2>
+${gap ? `<p>Search rows ${Number(gap.rows) || 0}. Catalogue hit ${Number(gap.catalogue) || 0}. pokemontcg.io id ${Number(gap.pokemontcg) || 0}. TCGplayer photo is the only picture ${Number(gap.tcgplayerOnly) || 0}. Already a tile ${Number(gap.tileOnly) || 0}.</p><p>Would lose a real picture: ${Number(gap.lose) || 0}. ${types}</p><p class="muted">${esc(gap.note || "")}</p>` : `<p class="muted">The image count file is not in the public feed.</p>`}
+<h2>Files the site, bot, and newsletter read</h2>
+<ul class="status-list">${files || `<li>The source list is not in the public feed.</li>`}</ul>
+<h2>Client errors</h2>
+${err}
+</main>`;
+  return chrome("", body, "Status", stamp, "", feedNav(opts));
+}
+
 export function renderSearch(opts = {}) {
   const body = `<main class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
 <div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus></div>
-<p class="muted" id="meta">Loading the index.</p><div id="list"></div>
+<p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
@@ -2280,6 +2359,7 @@ const ebayQuery=${ebayQuery.toString()};
 const AFF=${JSON.stringify(getAffiliateConfig()).replace(/</g, "\\u003c")};
 const affTcg=${affTcg.toString()};
 const affEbay=${affEbay.toString()};
+const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
 const searchCatalog=search.searchCatalog;
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
@@ -2353,10 +2433,49 @@ function rowHtml(r){
   return '<div class="row" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span> '+chips+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
 }
 let drawN=0;
+let manifest=null;
+let usedLite=false;
+const shardCache={};
+async function ensureBags(){
+  if(ensureBags.done) return;
+  try{ var doc=await (await fetch("/data/catalogue-images.json")).json(); catImages=(doc&&doc.images)||{}; }catch(e){ catImages={}; }
+  try{
+    var marks=await (await fetch("/data/set-logos.json")).json();
+    logos=(marks&&marks.logos)||{};
+    codes={};
+    Object.keys(logos).forEach(function(key){
+      var row=logos[key];
+      if(row && row.setId && row.slug) codes[String(row.setId).toLowerCase()]=row.slug;
+    });
+  }catch(e){ logos={}; codes={}; }
+  ensureBags.done=1;
+}
+async function ensureRows(q){
+  if(usedLite) return;
+  if(!manifest){
+    var res=await fetch("/data/feed/search/manifest.json");
+    if(!res.ok){
+      rows=await (await fetch("/data/search-lite.json")).json();
+      usedLite=true;
+      return;
+    }
+    manifest=await res.json();
+  }
+  var ids=queryShardIds(q).filter(function(id){ return manifest.shards && manifest.shards[id]; });
+  await Promise.all(ids.map(function(id){
+    if(shardCache[id]) return Promise.resolve();
+    return fetch("/data/feed/search/shards/"+id+".json").then(function(r){ return r.ok?r.json():[]; }).then(function(body){ shardCache[id]=body; }).catch(function(){ shardCache[id]=[]; });
+  }));
+  var seen={};
+  rows=[];
+  ids.forEach(function(id){ (shardCache[id]||[]).forEach(function(row){ if(row && !seen[row[0]]){ seen[row[0]]=1; rows.push(row); } }); });
+}
 async function draw(){
   const n=++drawN;
   const q=document.getElementById("q").value.trim();
-  if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent=rows.length+" names loaded. Type at least 2 letters.";return}
+  if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters.";return}
+  try{ await ensureBags(); await ensureRows(q); }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
+  if(n!==drawN) return;
   var hits=rankCatalog(q, rows, 40, codes);
   var found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]});
   const shown=take(found.hits);
@@ -2371,19 +2490,6 @@ async function draw(){
   document.getElementById("meta").textContent=shown.length+" shown";
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("");
 }
-fetch("/data/search-lite.json").then(r=>r.json()).then(async function(data){
-  try{ var doc=await (await fetch("/data/catalogue-images.json")).json(); catImages=(doc&&doc.images)||{}; }catch(e){ catImages={}; }
-  try{
-    var marks=await (await fetch("/data/set-logos.json")).json();
-    logos=(marks&&marks.logos)||{};
-    codes={};
-    Object.keys(logos).forEach(function(key){
-      var row=logos[key];
-      if(row && row.setId && row.slug) codes[String(row.setId).toLowerCase()]=row.slug;
-    });
-  }catch(e){ logos={}; codes={}; }
-  rows=data;document.getElementById("meta").textContent=rows.length+" names loaded.";draw();
-}).catch(()=>{document.getElementById("meta").textContent="Search did not load."});
 document.getElementById("q").addEventListener("input",draw);
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));
@@ -2414,7 +2520,7 @@ export function renderAccuracy(doc, stamp, opts = {}) {
 <p>${esc(doc?.note || "A hit rate is shown after 20 calls had a direction written down first.")}</p>
 <p class="muted">Scored ${Number(doc?.scored) || 0}. Hits ${Number(doc?.hits) || 0}. Misses ${Number(doc?.misses) || 0}. Crowd votes are not in this score until the server store is on.</p>
 <p>Baseline: a read that says the price stays the same. We do not print a rate from a handful of calls.</p>
-${(doc?.rows || []).map((r) => `<article class="card" style="margin:10px 0"><h2>${esc(r.name)}</h2><p>${esc(r.result || "open")} · ${esc(r.date || "")}</p></article>`).join("")}
+${(doc?.rows || []).map((r) => `<article class="card" style="margin:10px 0"><h2>${esc(r.name)}</h2><p>${esc(r.result || "open")} · ${esc(r.date || "")}</p></article>`).join("") || `<p class="muted">No scored calls in this file.</p>`}
 <h2>Privacy</h2>
 <p>A vote is a yes or a no on a read. A price report is the number you say you paid or received, the date, the condition, and where. We do not ask for your name. Reports stay private. A community median is shown only after five reports of the same product. You can email support@catchemtcg.com to ask for a report to be deleted.</p>
 </main>`;
