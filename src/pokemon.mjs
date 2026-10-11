@@ -189,3 +189,37 @@ export function buildPokemonPages(attrs, catalogue, cutouts) {
   }
   return { bySlug, byId };
 }
+
+// eBay search link for this exact product: name + set (+ card number for a
+// single), minus obvious noise. A search, not a listing and not a sale.
+// No affiliate id is configured in this repo, so the URL carries none.
+export const AFFILIATE_NOTE = "Affiliate link";
+export function ebayQuery(card) {
+  if (!card || typeof card !== "object") return "";
+  const clean = (s) => String(s || "").replace(/tcgcsv-\d+/gi, "").replace(/[[\](){}"]/g, " ").replace(/\s+/g, " ").trim();
+  const name = clean(card.name);
+  if (!name) return "";
+  const set = clean(card.set);
+  const sealed = card.kind === "sealed";
+  const num = sealed ? "" : clean(card.num).split("/")[0];
+  const words = ["Pokemon", name];
+  if (set && !name.toLowerCase().includes(set.toLowerCase())) words.push(set);
+  if (num && !name.includes(num)) words.push(num);
+  const noise = sealed ? ["-lot", "-proxy", "-custom", "-empty", "-code"] : ["-lot", "-proxy", "-custom", "-orica"];
+  if (sealed && !/\bcase\b/i.test(name)) noise.push("-case");
+  return [...words, ...noise].join(" ");
+}
+export function ebaySearchUrl(card) {
+  const q = ebayQuery(card);
+  return q ? "https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(q) : "";
+}
+// Both store links with the disclosure next to them. Hidden when neither exists.
+export function storeLinksHtml(card, esc) {
+  const tcg = productLink(card);
+  const ebay = ebaySearchUrl(card);
+  if (!tcg && !ebay) return "";
+  const bits = [];
+  if (tcg) bits.push(`<a href="${esc(tcg)}" rel="sponsored noopener">TCGplayer</a>`);
+  if (ebay) bits.push(`<a href="${esc(ebay)}" rel="sponsored noopener">eBay</a>`);
+  return `<p class="store-links">${bits.join(" · ")} <span class="muted affiliate-note">${AFFILIATE_NOTE}</span></p>`;
+}
