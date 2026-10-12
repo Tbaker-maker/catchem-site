@@ -37,14 +37,15 @@ export function rotationChipData(rot, slug, today) {
   return { mark: row.mark, official: false, past: true, text: `Regulation mark ${row.mark}`, sub: "" };
 }
 
-export const CHIP_CSS = `.rchips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.rchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));font:600 13px/1.25 var(--sans);color:inherit;text-decoration:none}.rchip .dot{width:8px;height:8px;border-radius:999px;background:var(--gold);flex:none}.rchip.past .dot{background:#8a8f98}.rchip.est{border-style:dashed}.rchip .sub{font-weight:500;opacity:.72}.rchip.kind{border-color:var(--gold);color:var(--gold)}
+export const CHIP_CSS = `.rchips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.rchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));font:600 13px/1.25 var(--sans);color:inherit;text-decoration:none}.rchip .dot{width:8px;height:8px;border-radius:999px;background:var(--gold);flex:none}.rchip.past .dot{background:#8a8f98}.rchip.est{border-style:dashed}.rchip .sub{font-weight:500;opacity:.72}.rchip.kind{border-color:var(--gold);color:var(--gold)}.rchip.lift{border-color:rgba(212,175,55,.45);background:rgba(212,175,55,.08)}
 .ircy{margin:14px 0;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}.ircy h2{margin:0 0 10px;font:600 18px/1.3 var(--serif)}.ircy dl{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr);gap:6px 14px;margin:0}.ircy dt{opacity:.7;font-size:13px}.ircy dd{margin:0;font-size:14px;overflow-wrap:anywhere}.ircy .fine{margin:10px 0 0;font-size:12px;opacity:.65}`;
 
 export function chipsHtml(card, rot, today) {
   const kind = artKind(card);
   if (!kind || !card?.setSlug) return "";
   const r = rotationChipData(rot, card.setSlug, today);
-  const kindChip = `<span class="rchip kind">${esc(kind)}</span>`;
+  // The kind itself is shown by the catalogue variant tag under the name.
+  const kindChip = "";
   if (!r) return `<div class="rchips">${kindChip}</div>`;
   const cls = r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est";
   const title = r.basis ? ` title="${esc(r.basis)}"` : "";
@@ -56,7 +57,7 @@ export function setChipHtml(slug, rot, today, irCount) {
   if (!r && !irCount) return "";
   const cls = r ? (r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est") : "";
   const chip = r ? `<a class="${cls}" href="/rotation"><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a>` : "";
-  const ir = irCount ? `<a class="rchip kind" href="/ir-watchlist?set=${encodeURIComponent(slug)}">${irCount} IRs and SIRs on the IR watchlist</a>` : "";
+  const ir = irCount ? `<a class="rchip kind" href="/ir-watchlist?set=${encodeURIComponent(slug)}">${irCount} cards on the IR watchlist</a>` : "";
   return `<style>${CHIP_CSS}</style><div class="rchips">${chip}${ir}</div>`;
 }
 
@@ -85,10 +86,17 @@ export function cycleRows(row) {
   ];
 }
 
+export function liftChips(r) {
+  const lifts = (r.lifts || []).map((l) => `<span class="rchip lift">${esc(l.text)}</span>`);
+  const pop = (r.popularity || []).map((t) => `<span class="rchip">${esc(TAG_LABEL[t] || t)}</span>`);
+  return [...lifts, ...pop].join("");
+}
+
 export function cyclePanel(row, asOf) {
   if (!row) return "";
+  const chips = liftChips(row);
   const dl = cycleRows(row).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
-  return `<section class="ircy" aria-label="IR cycle"><h2>IR cycle</h2><dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Curve from our IR study of TCGplayer market history.</p></section>`;
+  return `<section class="ircy" aria-label="IR cycle"><h2>IR cycle${row.kindLabel ? ` <span class="sub" style="font:500 13px/1 var(--sans);opacity:.7">· ${esc(row.kindLabel)}</span>` : ""}</h2>${chips ? `<div class="rchips">${chips}</div>` : ""}<dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Curve from our IR study of TCGplayer market history.</p></section>`;
 }
 
 export function cardArtHtml(card, rot, doc, today) {
@@ -108,19 +116,19 @@ export function watchlistBody(doc, opts = {}) {
   const pic = typeof opts.pic === "function" ? opts.pic : () => "";
   const items = shown.map((r) => {
     const facts = cycleRows(r).filter(([k]) => k !== "IR curve").map(([k, v]) => `<li><span>${esc(k)}</span> ${esc(v)}</li>`).join("");
-    const tags = (r.popularity || []).map((t) => `<span class="rchip">${esc(TAG_LABEL[t] || t)}</span>`).join("");
-    return `<li class="wl-row"><a class="wl-pic" href="/c/${esc(r.id)}">${pic(r)}</a><div class="wl-main"><p class="wl-set">${esc(r.set)} · ${esc(r.kind)} · ${esc(r.num || "")}</p><h2><a href="/c/${esc(r.id)}">${esc(r.name.replace(/\s+-\s+\S+$/, ""))}</a></h2><p class="wl-pos">${esc(r.position || "")}</p><ul class="wl-facts">${facts}</ul><p class="wl-curve">${esc(r.curve.text)}</p>${tags ? `<div class="rchips">${tags}</div>` : ""}</div></li>`;
+    const tags = liftChips(r);
+    return `<li class="wl-row"><a class="wl-pic" href="/c/${esc(r.id)}">${pic(r)}</a><div class="wl-main"><p class="wl-set">${esc(r.set)} · ${esc(r.kindLabel || r.kind)} · ${esc(r.num || "")}</p><h2><a href="/c/${esc(r.id)}">${esc(r.name.replace(/\s+-\s+\S+$/, ""))}</a></h2><p class="wl-pos">${esc(r.position || "")}</p><ul class="wl-facts">${facts}</ul><p class="wl-curve">${esc(r.curve.text)}</p>${tags ? `<div class="rchips">${tags}</div>` : ""}</div></li>`;
   }).join("");
-  const gate = premium ? "" : `<div class="wl-gate"><p><b>${all.length} IRs and SIRs</b> are on the full watchlist, with every fact dated.</p><a class="wl-btn" href="/premium">See it with Premium</a></div>`;
+  const gate = premium ? "" : `<div class="wl-gate"><p><b>${all.length} cards</b> are on the full watchlist, with every fact dated.</p><a class="wl-btn" href="/premium">See it with Premium</a></div>`;
   const filter = set ? `<p class="muted">One set. <a href="/ir-watchlist">Show every set</a></p>` : "";
   return `<main id="main" tabindex="-1" class="wrap wl"><style>${CHIP_CSS}
 .wl h1{font:500 clamp(30px,7vw,46px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 8px}.wl .lede{max-width:40em;font-size:16px;line-height:1.5;opacity:.85}.wl-list{list-style:none;margin:16px 0;padding:0;display:grid;gap:14px}.wl-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:16px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01))}.wl-pic img,.wl-pic .tile{width:96px;max-width:96px;height:auto;border-radius:10px}.wl-set{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}.wl h2{margin:4px 0;font:600 20px/1.25 var(--serif)}.wl h2 a{color:inherit;text-decoration:none}.wl-pos{margin:0 0 8px;color:var(--gold);font-weight:600}.wl-facts{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}.wl-facts span{opacity:.6;margin-right:6px}.wl-curve{margin:8px 0 0;font-size:13px;opacity:.7}.wl-gate{margin:18px 0;padding:20px;border-radius:20px;border:1px solid var(--gold);text-align:center}.wl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;background:var(--gold);color:#111;font-weight:700;text-decoration:none}.wl .fine{font-size:12px;opacity:.6;max-width:44em}
 @media (min-width:768px){.wl-row{grid-template-columns:120px minmax(0,1fr)}.wl-pic img,.wl-pic .tile{width:120px;max-width:120px}}</style>
 <p class="kicker" style="letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)">Premium</p>
 <h1>IR watchlist</h1>
-<p class="lede">Illustration Rares and Special Illustration Rares from sets still in Standard. Each one shows its age, where its price sits against its own low and high on file, its 30 and 90 day trend, and the sealed listings we counted for its set.</p>
+<p class="lede">Illustration Rares, Special Illustration Rares, Trainer Gallery and Galarian Gallery cards, and Sword &amp; Shield alt arts. Each one shows its age, where its price sits against its own low and high on file, its 30 and 90 day trend, and the sealed listings we counted for its set.</p>
 ${filter}<ul class="wl-list">${items}</ul>${gate}
-<p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. Listings are eBay listings we counted for one sealed product of the set, not for the card. Cards with popular Pokémon (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others) are listed first. This is a factual signal, not advice.</p></main>`;
+<p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. Listings are eBay listings we counted for one sealed product of the set, not for the card. The order weighs several facts together: time since release, where the price sits in its range on file, the Pokémon's popularity (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others), how its 90 days compare with set and era peers, its trend, and the sealed listings counted. The chips on each card name the facts that weigh most for it. This is a factual signal, not advice.</p></main>`;
 }
 
 const TAG_LABEL = { headliner: "Fan favourite", eeveelution: "Eeveelution", gen1: "Gen 1", starter: "Starter", popular: "Popular Pokémon" };

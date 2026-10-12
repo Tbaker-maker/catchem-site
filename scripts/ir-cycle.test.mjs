@@ -15,7 +15,7 @@ t("old mark with no date never claims Standard", rotationChipData(rot, "e", "202
 t("Standard only when the file says so", /In Standard/.test(rotationChipData(rot, "s", "2026-10-12").text));
 t("no mark no chip", rotationChipData(rot, "n", "2026-10-12") === null);
 t("chips only on art cards", chipsHtml({ rarity: "Common", setSlug: "h" }, rot, "2026-10-12") === "");
-const row = { id: "tcgcsv-1", name: "Pikachu ex - 1/2", set: "S", setSlug: "h", kind: "SIR", num: "1/2", release: "2026-01-30", daysSinceRelease: 255, price: { price: 3, date: "2026-10-12" }, low: { price: 2, date: "2026-10-01" }, high: { price: 9, date: "2026-04-01" }, onFileSince: "2026-02-05", position: "Near its lowest on file", trend30: null, trend90: { pct: -30, from: { date: "2026-07-14", price: 4 }, to: { date: "2026-10-12", price: 3 } }, setListings: { name: "S Booster Box", n: 12, date: "2026-10-12" }, curve: { stage: "6 to 12 months", text: "c" }, popularity: ["gen1"] };
+const row = { id: "tcgcsv-1", name: "Pikachu ex - 1/2", set: "S", setSlug: "h", kind: "SIR", num: "1/2", release: "2026-01-30", daysSinceRelease: 255, price: { price: 3, date: "2026-10-12" }, low: { price: 2, date: "2026-10-01" }, high: { price: 9, date: "2026-04-01" }, onFileSince: "2026-02-05", position: "Near its lowest on file", trend30: null, trend90: { pct: -30, from: { date: "2026-07-14", price: 4 }, to: { date: "2026-10-12", price: 3 } }, setListings: { name: "S Booster Box", n: 12, date: "2026-10-12" }, curve: { stage: "6 to 12 months", text: "c" }, popularity: ["gen1"], lifts: [{ factor: "range", text: "Near its lowest on file" }] };
 const doc = { asOf: "2026-10-12", rows: Array.from({ length: 6 }, (_, i) => ({ ...row, id: "tcgcsv-" + i })) };
 const free = watchlistBody(doc, {});
 const paid = watchlistBody(doc, { premium: true });
@@ -24,5 +24,6 @@ t("premium shows all", (paid.match(/class="wl-row"/g) || []).length === 6 && !/S
 const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|load up|best time)\b|\u2014/i;
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(cyclePanel(row, "2026-10-12").replace(/<[^>]+>/g, " ")));
 t("every price line carries a date", /\$3\.00 on Oct 12, 2026/.test(paid) && /12 eBay listings counted for S Booster Box on Oct 12, 2026/.test(paid));
+t("lift chips render", /rchip lift">Near its lowest on file/.test(paid) && /rchip lift/.test(cyclePanel(row, "2026-10-12")));
 t("says not advice", /not advice/.test(paid));
 if (fail) { console.log(`ir-cycle: ${fail} failed`); process.exit(1); } else console.log("ir-cycle ok");
