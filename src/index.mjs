@@ -12,6 +12,7 @@ import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
+import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
 import { addError, topErrors } from "./client-log.mjs";
@@ -473,6 +474,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
       rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationHtml);
     }
+    if (card && card.kind !== "sealed" && cardId) {
+      const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
+      const rows = (shard?.rows || []).filter((r) => r.id === cardId);
+      if (rows.length) {
+        const meta = await loadJson("feed/card-rating.json", fetchImpl).catch(() => null);
+        rotationHtml = rows.map((r) => ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true })).join("") + rotationHtml;
+      }
+    }
     return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
@@ -708,7 +717,7 @@ export default {
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
       let premium = false;
-      if (feed && kind === "feed") {
+      if (feed && (kind === "feed" || kind === "card" || kind === "ir-watchlist")) {
         try {
           const viewer = await readUser(request, env);
           premium = viewer?.premium === true;
