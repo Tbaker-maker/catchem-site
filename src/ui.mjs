@@ -633,10 +633,21 @@ function receiptBacked(row) {
   return false;
 }
 
+// Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
+// that carry their own source line and date. Behind reads.library in that repo.
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon"]);
+export function isBoardV3Row(row) {
+  if (!row || typeof row !== "object" || row.board !== "v3") return false;
+  if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
+  if (!String(row.source || "").trim() || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.asOf || ""))) return false;
+  return !/[\u2014\u2013]/.test(String(row.headline || row.path || ""));
+}
+
 export function keepFeedRead(row) {
   if (!row || typeof row !== "object") return false;
   if (!String(row.headline || row.path || "").trim()) return false;
   if (isFactRow(row)) return true;
+  if (isBoardV3Row(row)) return true;
   if (isLagRow(row)) return true;
   if (isSupplyRow(row)) return true;
   if (isOutlierRow(row)) return true;
@@ -2142,6 +2153,7 @@ ${marker.text ? `<p>${esc(marker.text)}</p>` : ""}
 ${opts.rotationHtml || ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
 ${opts.listingsHtml || ""}
+${opts.notMovedHtml || ""}
 <h2>Facts</h2>
 ${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
 <h2>Reads</h2>

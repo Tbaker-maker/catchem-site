@@ -143,3 +143,25 @@ export function listingsBlock(entry) {
 }
 
 export const FEATURE_CSS = `.sv-list{list-style:none;margin:8px 0;padding:0}.sv-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}.sv-row a{min-width:0;overflow-wrap:anywhere;color:inherit;text-decoration:none}.sv-row img,.sv-row .tile{width:64px;max-width:64px;height:auto}.sv-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.rot-badge a{display:inline-flex;align-items:center;gap:8px;min-height:44px}.rot-badge .rm{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--gold);border-radius:6px;font-weight:600;color:var(--gold)}.rel-list{list-style:none;margin:0;padding:0}.rel{border-bottom:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere}.rel h2{margin:4px 0;font-size:1.1rem}.rel-date{margin:0;color:var(--gold);font-weight:600}.pp-btn{min-height:44px;padding:0 20px;font-weight:600}.pp-grid{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pp-card{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}.pp-card img,.pp-card .tile{width:100%;max-width:100%;height:auto}.pp-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.practice select{max-width:100%}@media (min-width:768px){.pp-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}`;
+
+// Not moved yet: similar cards (same era, same rarity) or sealed items (same
+// era, same product type), matched by id in Catchem-data feed/not-moved.json,
+// whose price stayed flat over the same window. Hidden when the list is empty.
+export const NOT_MOVED_LABEL = "Similar cards that have not moved yet. A take, not a rule.";
+export function notMovedBlock(entry, { images = {}, sealed = false, pidFor = null } = {}) {
+  const list = Array.isArray(entry?.lagging) ? entry.lagging.filter((row) => row && row.id && Number(row.from) > 0 && Number(row.to) > 0 && isDay(row.start) && isDay(row.end)).slice(0, 6) : [];
+  if (!list.length || !(Number(entry.from) > 0) || !(Number(entry.to) > 0) || !isDay(entry.start) || !isDay(entry.end)) return "";
+  const pct = (a, b) => ((b - a) / a) * 100;
+  const fmt = (p) => `${p >= 0 ? "+" : ""}${p.toFixed(1)}%`;
+  const label = sealed ? "Similar sealed items that have not moved yet. A take, not a rule." : NOT_MOVED_LABEL;
+  const head = `This ${sealed ? "item" : "card"} went from ${cash(entry.from)} to ${cash(entry.to)} (${shortDay(entry.start)} to ${shortDay(entry.end)}, ${fmt(pct(entry.from, entry.to))}).`;
+  const items = list.map((row) => {
+    const pid = sealed ? (pidFor ? pidFor(row.id) : 0) : 0;
+    const pic = officialSrc(sealed ? { id: row.id, kind: "sealed", tcgPlayerId: pid || "" } : { id: row.id, kind: "single" }, images);
+    const img = imageTag(pic.src, sealed ? "sealed" : "card", row.name, { ...row, kind: sealed ? "sealed" : "single", crop: pic.crop, alts: pic.alts });
+    const href = sealed ? `/p/${encodeURIComponent(row.id)}` : `/c/${encodeURIComponent(row.id)}`;
+    const meta = [row.set, row.number ? `#${row.number}` : ""].filter(Boolean).join(" ");
+    return `<li class="pp-card nm-card"><a href="${href}">${img}<b>${esc(noDash(row.name))}</b></a>${meta ? `<span class="muted">${esc(noDash(meta))}</span>` : ""}<span>${cash(row.to)}, was ${cash(row.from)}</span><span class="muted">${fmt(pct(row.from, row.to))}, ${shortDay(row.start)} to ${shortDay(row.end)}</span></li>`;
+  }).join("");
+  return `<section class="nm" aria-labelledby="nm-h"><h2 id="nm-h">Not moved yet</h2><p>${esc(label)}</p><p class="muted">${esc(head)} Same era and same ${sealed ? "product type" : "rarity"}, matched by id. TCGplayer market prices.</p><ul class="pp-grid">${items}</ul></section>`;
+}
