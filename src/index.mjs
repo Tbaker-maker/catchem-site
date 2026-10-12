@@ -8,11 +8,12 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
+import { listingsBlock, listingsEntry, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -76,6 +77,7 @@ export function pageKind(pathname) {
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
   if (path === "/rotation") return "rotation";
+  if (path === "/releases") return "releases";
   if (path === "/accuracy") return "accuracy";
   if (path === "/faq") return "faq";
   if (path === "/build") return "build";
@@ -293,7 +295,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (rel.includes("calls.jsonl") || rel.includes("shelf.jsonl") || rel.startsWith("learning/")) return new Response("Not found", { status: 404 });
     return proxyPublic(rel, fetchImpl);
   }
-  if (kind === "sitemap") return proxyPublic(path.slice(1), fetchImpl);
+  if (kind === "sitemap") {
+    if (path !== "/sitemap-00.xml") return proxyPublic(path.slice(1), fetchImpl);
+    return withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl));
+  }
   if (kind === "feed") {
     const bundle = await loadJson("reads.json", fetchImpl);
     const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
@@ -323,8 +328,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
       const setDoc = await loadJson(`sets/${slug}.json`, fetchImpl);
-      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name }));
+      const extra = await setFeatureHtml(slug, fetchImpl);
+      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name, ...extra }));
     } catch {
+      if (SET_PAIRS[slug]) {
+        const valueDoc = await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
+        if (valueDoc) {
+          const extra = await setFeatureHtml(slug, fetchImpl, valueDoc);
+          return html(renderSetValuePage(slug, valueDoc.name || slug, extra.setValueHtml, stamp, pageOpts));
+        }
+      }
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.sets?.[slug];
       if (dest) return go(dest);
@@ -425,7 +438,17 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       } catch { listingSeries = []; }
     }
     const productReads = card ? await readsFor(cardId, fetchImpl) : [];
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
+    let listingsHtml = "";
+    if (card && card.kind === "sealed" && sealedId) {
+      const counted = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
+      listingsHtml = listingsBlock(listingsEntry(counted, sealedId));
+    }
+    let rotationHtml = "";
+    if (card && card.setSlug) {
+      const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
+      rotationHtml = rotationBadge(rotationRow(rot, card.setSlug), rot);
+    }
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -440,6 +463,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
+  if (kind === "releases") {
+    const doc = await loadJson("releases.json", fetchImpl).catch(() => null);
+    return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay() }));
+  }
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
@@ -710,4 +737,24 @@ export async function handleSetLogo(request, pathname, fetchImpl = fetch) {
     return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
   }
   return miss();
+}
+
+export function vancouverDay(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Vancouver", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+async function setFeatureHtml(slug, fetchImpl, valueDoc) {
+  const doc = valueDoc || await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
+  const images = doc ? await catalogueMap(fetchImpl) : {};
+  const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
+  const rotationHtml = rot ? rotationBadge(rotationRow(rot, slug), rot) : undefined;
+  return { setValueHtml: setValueBlock(doc, images, slug), rotationHtml };
+}
+
+export async function withReleasesInSitemap(res) {
+  if (!res || !res.ok) return res;
+  let text = await res.text();
+  const loc = "<url><loc>https://catchemtcg.com/releases</loc></url>";
+  if (!text.includes("https://catchemtcg.com/releases<")) text = text.replace("</urlset>", loc + "\n</urlset>");
+  return new Response(text, { status: 200, headers: res.headers });
 }
