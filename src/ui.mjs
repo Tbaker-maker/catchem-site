@@ -1467,7 +1467,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/practice", "Practice")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/indexes", "Indexes")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/practice", "Practice")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -1536,7 +1536,7 @@ export function renderSets(index, stamp, opts = {}) {
     const ib = order.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || String(a).localeCompare(String(b));
   });
-  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart.</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart. <a href="/indexes">Rarity indexes</a></p>
 ${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
 <nav class="filters sort-chips era-jump" aria-label="Jump to an era">${eras.map((era) => `<a class="sort-chip" href="#era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}">${esc(era)}</a>`).join("")}</nav>
 ${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>How this list works</summary>${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}</details>` : ""}

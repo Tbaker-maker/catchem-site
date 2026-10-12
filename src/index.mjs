@@ -13,6 +13,7 @@ import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
+import { indexListBody, indexPageBody } from "./indexes.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
@@ -84,6 +85,8 @@ export function pageKind(pathname) {
   if (path === "/methodology") return "method";
   if (path === "/rotation") return "rotation";
   if (path === "/ir-watchlist") return "ir-watchlist";
+  if (path === "/indexes") return "indexes";
+  if (path.startsWith("/indexes/")) return "index";
   if (path === "/releases") return "releases";
   if (path === "/practice") return "practice";
   if (path === "/accuracy") return "accuracy";
@@ -533,6 +536,18 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
+  if (kind === "indexes") {
+    const list = await loadJson("feed/rating/index/index-list.json", fetchImpl).catch(() => null);
+    return html(pageChrome("", indexListBody(list), "Indexes", stamp, "", pageOpts.feed === true));
+  }
+  if (kind === "index") {
+    const key = decodeURIComponent(path.slice("/indexes/".length));
+    const doc = /^[a-z0-9-]+$/.test(key) ? await loadJson(`feed/rating/index/${key}.json`, fetchImpl).catch(() => null) : null;
+    if (!doc) return html(pageChrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Index not found</h1><p class="muted">That index is not in tonight's list. Indexes with fewer than 5 cards are not shown.</p><p><a href="/indexes">All indexes</a></p></main>`, "Index not found", stamp, "", pageOpts.feed === true), 404);
+    const images = await catalogueMap(fetchImpl);
+    const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, images); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
+    return html(pageChrome("", indexPageBody(doc, { pic }), doc.name.replace(/, similar pull rates.*$/, ""), stamp, "", pageOpts.feed === true));
+  }
   if (kind === "ir-watchlist") {
     const doc = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
     const images = await catalogueMap(fetchImpl);

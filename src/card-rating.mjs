@@ -3,6 +3,7 @@
 // Free viewers see the verdict and the peer line. Premium sees the factor bars.
 import { esc } from "./ui.mjs";
 import { shortDate } from "./ir-cycle.mjs";
+import { indexHref, indexKeyOf } from "./indexes.mjs";
 
 export const ORDER = ["peer", "popularity", "scarcity", "pull", "demand", "age", "artist", "range"];
 export const LABEL = { peer: "Price vs similar cards", popularity: "Popularity", scarcity: "How rare this version is", pull: "Pull rate", demand: "Recent demand", age: "Age", artist: "Artist", range: "Price vs its own history" };
@@ -25,7 +26,7 @@ export function comparedWith(row, pool, pic = () => "") {
   const first = list.slice(0, SHOW_FIRST).map(li).join("");
   const rest = list.slice(SHOW_FIRST);
   const more = rest.length ? `<details class="cw-more"><summary>Show ${rest.length} more</summary><ul class="cw">${rest.map(li).join("")}</ul></details>` : "";
-  return `<div class="cw-wrap"><h3>Compared with ${list.length} ${esc(row.peers?.matched ? `${row.groupLabel} with similar popularity` : row.groupLabel)}</h3><ul class="cw">${first}</ul>${more}</div>`;
+  return `<div class="cw-wrap"><h3>Compared with ${list.length} ${esc(row.peers?.matched ? `${row.groupLabel} with similar pull rate and popularity` : row.groupLabel)}</h3><ul class="cw">${first}</ul>${more}</div>`;
 }
 
 export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}) {
@@ -37,7 +38,8 @@ export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}
   }
   const high = row.nearHigh ? `<p class="near">Near its own high on file (${cash(row.nearHigh.price)}, ${shortDate(row.nearHigh.date)})</p>` : "";
   const verdict = row.verdict || row.verdictNote || "Not enough similar cards for a fair comparison";
-  const peer = !row.verdict ? `${cash(row.price.price)} on ${shortDate(row.price.date)}, TCGplayer market. Fewer than 5 ${esc(row.groupLabel)} share its popularity, so we list them all below without a verdict.` : row.peers ? `Price vs similar cards: ${cash(row.price.price)} vs a typical ${cash(row.peers.median)} for ${esc(row.groupLabel)} (${row.peers.n} cards). TCGplayer market, ${shortDate(row.price.date)}.` : "";
+  const why = row.reason === "no published pull rate for this set" ? `No published pull rate for this set and rarity, so there is no fair group to compare against.` : `Fewer than 5 ${esc(row.groupLabel)} share its pull rate and popularity.`;
+  const peer = !row.verdict ? `${cash(row.price.price)} on ${shortDate(row.price.date)}, TCGplayer market. ${why} The cards below are listed without a verdict.` : row.peers ? `Price vs similar cards: ${cash(row.price.price)} vs a typical ${cash(row.peers.median)} for ${esc(row.groupLabel)} (${row.peers.n} cards). TCGplayer market, ${shortDate(row.price.date)}.` : "";
   let body = "";
   if (premium) {
     const items = ORDER.filter((k) => row.factors?.[k]).map((k) => {
@@ -52,6 +54,6 @@ export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}
     body = have.length ? `<p class="gate">Factor bars for ${esc(list)} are in <a href="/premium">Premium</a>.</p>` : "";
   }
   const w = doc?.weights ? ORDER.filter((k) => doc.weights[k] != null).map((k) => `${LABEL[k]} ${doc.weights[k]}`).join(", ") : "";
-  const about = `<details><summary>About this rating</summary><p>Similar cards are other ${esc(row.groupLabel)} with similar popularity, with at least 5 such cards. With fewer than 5 there is no verdict. The typical price is the middle price of those cards. "Below" means 0.8x the typical price or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with no data are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
-  return `<style>${RATING_CSS}</style><section class="crt" aria-label="Rating">${head}<p class="verdict${row.verdict ? "" : " none"}">${esc(verdict)}</p>${high}<p class="peer">${peer}</p>${comparedWith(row, pool, pic)}${body}${about}</section>`;
+  const about = `<details><summary>About this rating</summary><p>Similar cards are other ${esc(row.rarity || row.groupLabel)} cards from the same generation, in sets with a similar published pull rate, and with similar popularity. A verdict needs at least 5 such cards. With fewer than 5 there is no verdict. The typical price is the middle price of those cards. "Below" means 0.8x the typical price or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with no data are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
+  return `<style>${RATING_CSS}</style><section class="crt" aria-label="Rating">${head}<p class="verdict${row.verdict ? "" : " none"}">${esc(verdict)}</p>${high}<p class="peer">${peer}</p>${comparedWith(row, pool, pic)}${row.index ? `<p class="gate"><a href="${indexHref(indexKeyOf(row, !!row.verdict))}">See the index for these cards</a></p>` : ""}${body}${about}</section>`;
 }
