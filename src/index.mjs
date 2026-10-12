@@ -479,7 +479,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const rows = (shard?.rows || []).filter((r) => r.id === cardId);
       if (rows.length) {
         const meta = await loadJson("feed/card-rating.json", fetchImpl).catch(() => null);
-        rotationHtml = rows.map((r) => ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true })).join("") + rotationHtml;
+        const imgs = await catalogueMap(fetchImpl).catch(() => null);
+        const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, imgs || {}); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
+        const panels = [];
+        for (const r of rows) {
+          const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
+          panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
+        }
+        rotationHtml = panels.join("") + rotationHtml;
       }
     }
     return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
