@@ -1227,6 +1227,8 @@ const CSS = `.skip-link{position:absolute;left:8px;top:-60px;z-index:1000;backgr
 
 .paid-note,.paid-foot small{font:400 12px/1.4 var(--sans);color:#a39d93}
 .paid-note{margin-left:4px}
+:root{--r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:20px;--r-pill:999px;--r-card:4.8%/3.4%}
+img,svg,canvas,video,iframe{border-radius:var(--r-xs)}iframe,table{border-radius:var(--r-md)}table{border-collapse:separate;border-spacing:0;overflow:hidden}input,select,textarea,button{border-radius:var(--r-sm)}dialog{border-radius:var(--r-lg)}.chart svg{border-radius:var(--r-sm)}.dock{border-radius:var(--r-lg) var(--r-lg) 0 0}img.card-face,.card-face,.pp-front img,.pp-card img.card-face{border-radius:var(--r-card)!important}.tile{border-radius:var(--r-md)}
 :root{--bg:#12100e;--panel:#1a1815;--line:#2f2b26;--txt:#efe9de;--dim:#c4baab;--gold:#d9b779;--green:#7fc79a;--red:#e0675b;--serif:'Fraunces',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 var(--sans)}
 body{overflow-x:hidden;padding-bottom:72px}
@@ -5389,7 +5391,7 @@ export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
   const css = `.pp-stage{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;margin:12px 0;min-height:420px}
 .pp-pack{position:relative;width:min(240px,64vw);aspect-ratio:5/8.6;border:0;padding:0;background:none;cursor:pointer;touch-action:pan-y;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));animation:ppBob 2.4s ease-in-out infinite}
 .pp-pack .half{position:absolute;left:0;right:0;overflow:hidden;transition:transform .6s cubic-bezier(.2,.8,.3,1),opacity .6s}
-.pp-pack .top{top:0;height:18%}.pp-pack .bot{bottom:0;height:82%}
+.pp-pack .top{top:0;height:18%;border-radius:var(--r-sm) var(--r-sm) 0 0}.pp-pack .bot{bottom:0;height:82%;border-radius:0 0 var(--r-sm) var(--r-sm)}.pp-pack .half img{border-radius:0}
 .pp-pack .half img,.pp-pack .half .tile{position:absolute;left:0;width:100%;height:auto}
 .pp-pack .top img,.pp-pack .top .tile{top:0}.pp-pack .bot img,.pp-pack .bot .tile{bottom:0}
 .pp-pack.torn{animation:none}.pp-pack.torn .top{transform:translate(40%,-120%) rotate(18deg);opacity:0}.pp-pack.torn .bot{transform:translateY(130%);opacity:0}
@@ -5398,7 +5400,7 @@ export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
 .pp-deck{position:relative;width:min(260px,70vw);aspect-ratio:63/88;perspective:1200px}
 .pp-flip{position:absolute;inset:0;border:0;padding:0;background:none;cursor:pointer;transform-style:preserve-3d;transition:transform .55s ease}
 .pp-flip.up{transform:rotateY(180deg)}
-.pp-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.pp-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:var(--r-card);overflow:hidden;display:flex;align-items:center;justify-content:center}
 .pp-back{background:radial-gradient(circle at 50% 50%,#e8c05a 0 14%,#1b2333 15% 22%,#c33 23% 49%,#1b2333 50% 53%,#f4f4f4 54%);border:6px solid #1b2333}
 .pp-front{transform:rotateY(180deg);background:transparent}.pp-front img,.pp-front .tile{width:100%;height:100%;object-fit:contain;background:transparent;border-radius:10px}
 .pp-card img.card-face{width:100%;border-radius:10px;background:transparent}
