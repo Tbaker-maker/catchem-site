@@ -425,6 +425,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
     const card = (rows || []).find((row) => row.id === cardId);
+    if (card && card.kind !== "sealed") {
+      const long = await loadJson(`hist-long/${bucket}.json`, fetchImpl).catch(() => null);
+      if (long && long.rows && long.rows[cardId]) card.longHist = long.rows[cardId];
+    }
     const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
     const fact = facts && cardId ? facts[cardId] : null;
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
