@@ -1261,7 +1261,7 @@ a{color:var(--gold)}
   .site-bar nav.open{display:flex}
 }
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6;overflow-x:auto}
-.dock a{color:var(--dim);text-decoration:none;font:500 11px/1.15 var(--sans);min-height:44px;min-width:44px;flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:0 2px;text-align:center;overflow-wrap:anywhere}
+.dock a{color:var(--dim);text-decoration:none;font:500 11px/1.15 var(--sans);min-height:48px;min-width:44px;flex:1 1 0;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;padding:4px 2px;text-align:center;white-space:nowrap;border-radius:12px}.dock a svg{border-radius:0;display:block}
 .dock a[aria-current="page"]{color:var(--gold)}
 .chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
 .chart{height:180px;min-height:180px;flex:none;overflow:hidden}
@@ -1439,6 +1439,19 @@ export function priceBannerLine(updatedAt, nowMs = Date.now()) {
   return `Prices last updated ${day}.`;
 }
 
+const DOCK_ICON = {
+  home: '<path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/>',
+  feed: '<rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/>',
+  sets: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
+  practice: '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6"/>',
+  premium: '<path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
+};
+function dockNav(active, feed) {
+  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], ["/practice", "Practice", "practice"], [DISCORD, "Premium", "premium", "Discord Premium"]];
+  return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
+}
+
 function chrome(active, body, title, stamp, extraFoot = "", feed = false, share = null) {
   const item = (href, label) => `<a href="${href}"${active === label ? ' aria-current="page"' : ""}>${label}</a>`;
   const feedLink = feed ? item("/feed", "Feed") : "";
@@ -1461,7 +1474,7 @@ ${fresh}
 ${body}
 </div>
 <nav class="dock" aria-label="Primary">
-${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${dockNav(active, feed)}
 </nav>
 <footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
@@ -1524,10 +1537,9 @@ export function renderSets(index, stamp, opts = {}) {
   });
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart.</p>
 ${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
-${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}
-${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
-${chartBox(index?.singlesIndex || [], "Singles index, chain-linked")}
-${eras.map((era, eraIdx) => `<h2>${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
+<nav class="filters sort-chips era-jump" aria-label="Jump to an era">${eras.map((era) => `<a class="sort-chip" href="#era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}">${esc(era)}</a>`).join("")}</nav>
+${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>How this list works</summary>${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}</details>` : ""}
+${eras.map((era, eraIdx) => `<h2 id="era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}" style="scroll-margin-top:72px">${esc(era)}</h2><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
     const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
     const face = /^https:\/\//.test(String(s.logo || ""))
       ? `<img class="shot" alt="" width="160" height="64" loading="${load}" decoding="async" src="${esc(s.logo)}">`
@@ -2154,7 +2166,8 @@ export function renderCard(card, stamp, opts = {}) {
 ${storeLinksHtml(card, esc)}
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span></p>
 ${chips ? `<p>${chips}</p>` : ""}
-${marker.text ? `<p>${esc(marker.text)}</p>` : ""}
+${priceChart}
+${marker.text && !card.longHist ? `<p>${esc(marker.text)}</p>` : ""}
 ${opts.rotationHtml || ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
 ${opts.listingsHtml || ""}
@@ -2170,11 +2183,9 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
-${priceChart}
 ${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
-<p>Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
 <p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>

@@ -168,7 +168,7 @@ footer a{color:var(--gold)}
 .read a{color:var(--text);text-decoration:none;font:600 18px/1.3 var(--serif)}
 .read a:hover{color:var(--gold)}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6}
-.dock a{color:var(--soft);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.dock a{color:var(--soft);text-decoration:none;font:500 11px/1.1 var(--sans);min-height:48px;min-width:44px;flex:1 1 0;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;padding:4px 2px;white-space:nowrap;border-radius:12px}.dock a[aria-current="page"]{color:var(--gold)}
 @media (max-width:1279px){
   .menu-btn{display:inline-flex;align-items:center}
   .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
@@ -204,7 +204,7 @@ footer a{color:var(--gold)}
     <p class="lede">From Base Set to the latest drops.</p>
     <div class="actions">
       <a class="btn btn-primary" href="/sets">Browse sets</a>
-      <a class="btn btn-primary" href="/post-office">Post Office</a>
+      <a class="btn btn-ghost" href="/post-office">Post Office</a>
     </div>
     <p class="beta" id="fresh"><b>Open</b><span id="fresh-line"></span></p>
   </div>
@@ -306,11 +306,11 @@ footer a{color:var(--gold)}
   </div>
 </footer>
 <nav class="dock" aria-label="Primary">
-  <a href="/sets">Sets</a>
-  <a href="/artists">Artists</a>
-  <a href="/search">Search</a>
-  <a href="/post-office">Post Office</a>
-  <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
+  <a href="/" aria-current="page"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+  <a href="/sets"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Sets</span></a>
+  <a href="/search"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><span>Search</span></a>
+  <a href="/practice"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6"/></svg><span>Practice</span></a>
+  <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></svg><span>Premium</span></a>
 </nav>
 <script>
 (function(){
