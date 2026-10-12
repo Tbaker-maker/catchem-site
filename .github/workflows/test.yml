@@ -15,4 +15,10 @@ jobs:
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/post-office.test.mjs
       - run: node scripts/sealed-pid.test.mjs
+      - run: node scripts/card-img.test.mjs
+      - run: node scripts/set-logo.test.mjs
+      - run: node scripts/finish.test.mjs
+      - run: node scripts/long-read.test.mjs
+      - run: node scripts/track-record-hidden.test.mjs
+      - run: node scripts/trust.test.mjs
       - run: node scripts/check-ppt-safety.mjs
