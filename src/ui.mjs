@@ -5,7 +5,7 @@ import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForI
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
-import { PRACTICE_NOTE, PACK_SIZE, drawPack, seededRandom } from "./practice.mjs";
+import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 
 const DISCORD = DISCORD_INVITE;
@@ -5372,46 +5372,123 @@ export function renderSetValuePage(slug, title, html, stamp, opts = {}) {
 export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
   const options = sets.map((x) => `<option value="${esc(x.slug)}"${x.slug === slug ? " selected" : ""}>${esc(x.name)}${x.release ? ` (${esc(longDay(x.release))})` : ""}</option>`).join("");
   const name = setDoc?.name || slug;
-  const data = JSON.stringify({ slug, name, asOf: setDoc?.asOf || "", size: PACK_SIZE, pool }).replace(/</g, "\\u003c");
-  const body = `<main id="main" tabindex="-1" class="wrap practice"><h1>Practice pack</h1>
+  const art = opts.art || null;
+  const data = JSON.stringify({ slug, name, asOf: setDoc?.asOf || "", size: PACK_SIZE, pool, art }).replace(/</g, "\\u003c");
+  const css = `.pp-stage{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;margin:12px 0;min-height:420px}
+.pp-pack{position:relative;width:min(240px,64vw);aspect-ratio:5/8.6;border:0;padding:0;background:none;cursor:pointer;touch-action:pan-y;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));animation:ppBob 2.4s ease-in-out infinite}
+.pp-pack .half{position:absolute;left:0;right:0;overflow:hidden;transition:transform .6s cubic-bezier(.2,.8,.3,1),opacity .6s}
+.pp-pack .top{top:0;height:18%}.pp-pack .bot{bottom:0;height:82%}
+.pp-pack .half img,.pp-pack .half .tile{position:absolute;left:0;width:100%;height:auto}
+.pp-pack .top img,.pp-pack .top .tile{top:0}.pp-pack .bot img,.pp-pack .bot .tile{bottom:0}
+.pp-pack.torn{animation:none}.pp-pack.torn .top{transform:translate(40%,-120%) rotate(18deg);opacity:0}.pp-pack.torn .bot{transform:translateY(130%);opacity:0}
+.pp-pack .hint{position:absolute;left:50%;bottom:-34px;transform:translateX(-50%);white-space:nowrap;font-weight:600;color:var(--gold)}
+@keyframes ppBob{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-6px) rotate(1deg)}}
+.pp-deck{position:relative;width:min(260px,70vw);aspect-ratio:63/88;perspective:1200px}
+.pp-flip{position:absolute;inset:0;border:0;padding:0;background:none;cursor:pointer;transform-style:preserve-3d;transition:transform .55s ease}
+.pp-flip.up{transform:rotateY(180deg)}
+.pp-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.pp-back{background:radial-gradient(circle at 50% 50%,#e8c05a 0 14%,#1b2333 15% 22%,#c33 23% 49%,#1b2333 50% 53%,#f4f4f4 54%);border:6px solid #1b2333}
+.pp-front{transform:rotateY(180deg);background:#111}.pp-front img,.pp-front .tile{width:100%;height:100%;object-fit:cover}
+.pp-hit .pp-front{box-shadow:0 0 0 3px var(--gold),0 0 28px 6px rgba(232,192,90,.75)}
+.pp-hit .pp-front::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 45%,rgba(120,220,255,.35) 52%,transparent 65%);background-size:250% 100%;mix-blend-mode:screen;animation:ppShine 1.6s linear infinite}
+.pp-rh .pp-front::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,0,150,.18),rgba(0,200,255,.18),rgba(255,230,0,.18));mix-blend-mode:screen}
+@keyframes ppShine{from{background-position:150% 0}to{background-position:-100% 0}}
+.pp-shake{animation:ppShake .4s}@keyframes ppShake{0%,100%{transform:none}25%{transform:translate(-4px,2px)}50%{transform:translate(4px,-2px)}75%{transform:translate(-2px,1px)}}
+.pp-burst{position:absolute;inset:0;pointer-events:none;overflow:visible}.pp-burst i{position:absolute;left:50%;top:40%;width:8px;height:12px;border-radius:2px;animation:ppPop 1s ease-out forwards}
+@keyframes ppPop{to{transform:translate(var(--x),var(--y)) rotate(var(--r));opacity:0}}
+.pp-info{text-align:center;min-height:72px;overflow-wrap:anywhere}.pp-info .tag{display:inline-block;padding:2px 8px;border:1px solid var(--gold);border-radius:999px;color:var(--gold);font-weight:600;font-size:.85rem}
+.pp-big{font:700 1.3rem/1.2 var(--serif);color:var(--gold)}
+.pp-count{color:var(--muted,#999)}.pp-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.pp-card.hit{outline:2px solid var(--gold);border-radius:8px}
+@media (prefers-reduced-motion:reduce){.pp-pack,.pp-pack .half,.pp-flip{animation:none!important;transition:none!important}.pp-hit .pp-front::after,.pp-burst,.pp-shake{animation:none!important;display:none}}`;
+  const body = `<main id="main" tabindex="-1" class="wrap practice"><style>${css}</style><h1>Practice pack</h1>
 <p class="pp-note"><b>${esc(PRACTICE_NOTE)}</b></p>
 <form class="filters" method="get" action="/practice"><label for="pp-set">Set</label> <select id="pp-set" name="set" onchange="this.form.submit()">${options}</select><noscript><button type="submit">Pick</button></noscript></form>
-<p class="muted">${esc(name)}: ${pool.length} singles in the set file. Each pack is ${PACK_SIZE} different cards picked at random from that list.</p>
-<p><button type="button" id="pp-open" class="pp-btn">Open a pack</button></p>
+<p class="muted">${esc(name)}: ${pool.length} singles in the set file. Each pack is ${PACK_SIZE} cards: 5 Common, 3 Uncommon, 1 reverse holo slot, then 1 Rare or better last. Pack art: ${art ? esc(art.name) : "Catch'em tile, no booster pack in the set file"}.</p>
+<div class="pp-row"><button type="button" id="pp-open" class="pp-btn">Open a pack</button><button type="button" id="pp-binder-btn" class="pp-btn">My practice binder</button></div>
+<div id="pp-stage" class="pp-stage" aria-live="polite"></div>
 <div id="pp-out" aria-live="polite"></div>
+<section id="pp-binder" hidden></section>
 <script type="application/json" id="pp-data">${data}</script>
 <script>
 ${seededRandom.toString()}
-${drawPack.toString()}
+var SLOTS=${JSON.stringify(SLOTS)},TIERS=${JSON.stringify(TIERS)};
+${buildPack.toString()}
 ${productTypeLabel.toString()}
 ${brandedTile.toString()}
 (function(){
 var D=JSON.parse(document.getElementById("pp-data").textContent);
+var RM=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+var KEY="catchem-practice-binder";
 function h(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return "&#"+c.charCodeAt(0)+";"});}
 var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function day(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(s)?M[Number(s.slice(5,7))-1]+" "+Number(s.slice(8,10))+", "+s.slice(0,4):"";}
 function cash(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
-window.ppMiss=function(img){var a=(img.getAttribute("data-alts")||"").split("|").filter(Boolean);if(a.length){img.setAttribute("data-alts",a.slice(1).join("|"));img.src=a[0];return;}var d=document.createElement("div");d.innerHTML=brandedTile("card",{kind:"single",name:img.alt});img.replaceWith(d.firstChild);};
-function paint(seed){
-  var pack=drawPack(D.pool,D.size,seed);
-  var total=0,priced=0,dates={};
-  var rows=pack.map(function(c,i){
-    if(c.price>0){total+=c.price;priced++;if(c.date)dates[c.date]=1;}
-    var img=c.src?'<img class="shot card-face" alt="'+h(c.name)+'" width="160" height="223" loading="lazy" decoding="async" data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" src="'+h(c.src)+'" data-alts="'+h(c.alts.join("|"))+'" onerror="ppMiss(this)">':brandedTile("card",{kind:"single",name:c.name});
-    return '<li class="pp-card" data-id="'+h(c.id)+'">'+img+'<a href="/c/'+encodeURIComponent(c.id)+'"><b>'+h(c.name)+'</b></a><span class="muted">'+h(c.num)+(c.rarity?" · "+h(c.rarity):"")+'</span><span>'+(c.price>0?'<b>'+cash(c.price)+'</b> <span class="muted">'+h(day(c.date))+'</span>':'<span class="muted">No market price</span>')+'</span></li>';
-  }).join("");
-  var ds=Object.keys(dates).sort();
-  var when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
-  var link="/practice?set="+encodeURIComponent(D.slug)+"&seed="+seed;
-  document.getElementById("pp-out").innerHTML='<p class="pp-total">Pack total <b>'+cash(total)+'</b></p><p class="muted">'+priced+' of '+pack.length+' cards priced. TCGplayer market'+(when?", "+h(when):"")+'. Pack <a href="'+h(link)+'">#'+seed+'</a>.</p><ol class="pp-grid">'+rows+'</ol>';
+function $(id){return document.getElementById(id);}
+window.ppMiss=function(img){var a=(img.getAttribute("data-alts")||"").split("|").filter(Boolean);if(a.length){img.setAttribute("data-alts",a.slice(1).join("|"));img.src=a[0];return;}var d=document.createElement("div");d.innerHTML=brandedTile(img.getAttribute("data-k")||"card",{kind:img.getAttribute("data-k")==="sealed"?"sealed":"single",name:img.alt});img.replaceWith(d.firstChild);};
+function pic(src,alts,alt,k){return src?'<img alt="'+h(alt)+'" data-k="'+k+'" src="'+h(src)+'" data-alts="'+h((alts||[]).join("|"))+'" onerror="ppMiss(this)">':brandedTile(k,{kind:k==="sealed"?"sealed":"single",name:alt});}
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){return {};}}
+function save(b){try{localStorage.setItem(KEY,JSON.stringify(b));}catch(e){}}
+function collect(c){var b=load();var k=c.id+(c.rh?":rh":"");var e=b[k]||{id:c.id,name:c.name,num:c.num,rarity:c.rarity,rh:c.rh,set:D.name,src:c.src,alts:c.alts,n:0};e.n++;e.price=c.price;e.date=c.date;b[k]=e;save(b);}
+function priceLine(c){return c.price>0?'<b>'+cash(c.price)+'</b> <span class="muted">TCGplayer market, '+h(day(c.date))+'</span>':'<span class="muted">No market price in the file</span>';}
+function burst(el){if(RM)return;var b=document.createElement("div");b.className="pp-burst";var cols=["#e8c05a","#ff4d6d","#4dd2ff","#fff","#7cff7c"];for(var i=0;i<28;i++){var p=document.createElement("i");var a=Math.random()*6.283,r=90+Math.random()*120;p.style.setProperty("--x",Math.cos(a)*r+"px");p.style.setProperty("--y",Math.sin(a)*r+"px");p.style.setProperty("--r",(Math.random()*720)+"deg");p.style.background=cols[i%5];b.appendChild(p);}el.appendChild(b);setTimeout(function(){b.remove();},1100);}
+function shake(){if(RM)return;var m=$("main");m.classList.remove("pp-shake");void m.offsetWidth;m.classList.add("pp-shake");}
+var pack=[],seed=0,at=0;
+function showPack(s){
+  seed=s;pack=buildPack(D.pool,s);at=0;$("pp-out").innerHTML="";$("pp-binder").hidden=true;
+  var A=D.art||{};
+  var img=pic(A.src,A.alts,A.name||D.name+" booster pack","sealed");
+  $("pp-stage").innerHTML='<button type="button" class="pp-pack" id="pp-pack" aria-label="Tear open the '+h(A.name||D.name)+' pack"><span class="half top">'+img+'</span><span class="half bot">'+img+'</span><span class="hint">Tap or swipe to tear</span></button><p class="muted">Pack #'+s+'</p>';
+  var el=$("pp-pack"),x0=null;
+  el.addEventListener("click",tear);
+  el.addEventListener("pointerdown",function(e){x0=e.clientX;});
+  el.addEventListener("pointerup",function(e){if(x0!=null&&Math.abs(e.clientX-x0)>30)tear();x0=null;});
 }
+function tear(){var el=$("pp-pack");if(!el||el.classList.contains("torn"))return;el.classList.add("torn");setTimeout(deal,RM?0:650);}
+function deal(){
+  $("pp-stage").innerHTML='<div class="pp-deck" id="pp-deck"></div><div class="pp-info" id="pp-info"></div><p class="pp-count" id="pp-count"></p>';
+  next();
+}
+function next(){
+  if(at>=pack.length)return done();
+  var c=pack[at],last=at===pack.length-1;
+  $("pp-deck").innerHTML='<button type="button" class="pp-flip'+(c.hit?" pp-hit":"")+(c.rh?" pp-rh":"")+'" id="pp-flip" aria-label="Flip card '+(at+1)+'"><span class="pp-face pp-back"></span><span class="pp-face pp-front">'+pic(c.src,c.alts,c.name,"card")+'</span></button>';
+  $("pp-info").innerHTML=last?'<span class="tag">Rare slot</span><p>Tap to flip the last card</p>':'<p>Tap to flip</p>';
+  $("pp-count").textContent="Card "+(at+1)+" of "+pack.length;
+  var f=$("pp-flip");
+  f.addEventListener("click",function once(){
+    if(!f.classList.contains("up")){
+      f.classList.add("up");collect(c);
+      $("pp-info").innerHTML=(c.hit?'<p class="pp-big">Big hit!</p>':'')+'<p><span class="tag">'+h(c.rh?"Reverse Holo":c.rarity||"Card")+'</span></p><p><a href="/c/'+encodeURIComponent(c.id)+'"><b>'+h(c.name)+'</b></a> <span class="muted">'+h(c.num)+'</span></p><p>'+priceLine(c)+'</p><p class="muted">Added to your binder. Tap the card for the next one.</p>';
+      if(c.hit){setTimeout(function(){burst($("pp-deck"));shake();},RM?0:450);}
+    } else {at++;next();}
+  });
+}
+function done(){
+  var total=0,priced=0,dates={};
+  var rows=pack.map(function(c){if(c.price>0){total+=c.price;priced++;if(c.date)dates[c.date]=1;}
+    return '<li class="pp-card'+(c.hit?" hit":"")+'" data-id="'+h(c.id)+'" data-slot="'+h(c.slot)+'">'+pic(c.src,c.alts,c.name,"card")+'<a href="/c/'+encodeURIComponent(c.id)+'"><b>'+h(c.name)+'</b></a><span class="muted">'+h(c.num)+(c.rarity?" · "+h(c.rarity):"")+(c.rh?" · Reverse Holo":"")+'</span><span>'+priceLine(c)+'</span></li>';}).join("");
+  var ds=Object.keys(dates).sort(),when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
+  var link="/practice?set="+encodeURIComponent(D.slug)+"&seed="+seed;
+  $("pp-stage").innerHTML="";
+  $("pp-out").innerHTML='<p class="pp-total">Pack total <b>'+cash(total)+'</b></p><p class="muted">'+priced+' of '+pack.length+' cards priced. TCGplayer market'+(when?", "+h(when):"")+'. Pack <a href="'+h(link)+'">#'+seed+'</a>.</p><div class="pp-row"><button type="button" class="pp-btn" id="pp-again">Open another pack</button><button type="button" class="pp-btn" id="pp-see">My practice binder</button></div><ol class="pp-grid">'+rows+'</ol>';
+  $("pp-again").addEventListener("click",fresh);$("pp-see").addEventListener("click",binder);
+}
+function binder(){
+  var b=load(),keys=Object.keys(b),n=0,total=0,dates={};
+  keys.forEach(function(k){var e=b[k];n+=e.n;if(e.price>0){total+=e.price*e.n;if(e.date)dates[e.date]=1;}});
+  keys.sort(function(a,c){return (b[c].price||0)-(b[a].price||0);});
+  var ds=Object.keys(dates).sort(),when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
+  var el=$("pp-binder");el.hidden=false;$("pp-stage").innerHTML="";$("pp-out").innerHTML="";
+  el.innerHTML='<h2>My practice binder</h2><p>'+n+' cards, '+keys.length+' different. Total value <b>'+cash(total)+'</b>'+(when?' <span class="muted">TCGplayer market, '+h(when)+' (the date each card was pulled)</span>':'')+'.</p><p class="muted">Saved on this device only. No account needed.</p><div class="pp-row"><button type="button" class="pp-btn" id="pp-b-open">Open another pack</button>'+(keys.length?'<button type="button" class="pp-btn" id="pp-b-clear">Clear binder</button>':'')+'</div><ol class="pp-grid">'+keys.map(function(k){var e=b[k];return '<li class="pp-card">'+pic(e.src,e.alts,e.name,"card")+'<a href="/c/'+encodeURIComponent(e.id)+'"><b>'+h(e.name)+'</b></a><span class="muted">'+h(e.set)+' · '+h(e.rarity)+(e.rh?" · Reverse Holo":"")+'</span><span>x'+e.n+' · '+priceLine(e)+'</span></li>';}).join("")+'</ol>';
+  $("pp-b-open").addEventListener("click",fresh);
+  var cl=$("pp-b-clear");if(cl)cl.addEventListener("click",function(){if(confirm("Clear your practice binder?")){save({});binder();}});
+}
+function fresh(){var s=(Math.random()*4294967295)>>>0||1;history.replaceState(null,"","/practice?set="+encodeURIComponent(D.slug)+"&seed="+s);showPack(s);window.scrollTo(0,$("pp-stage").offsetTop-60);}
+$("pp-open").addEventListener("click",fresh);
+$("pp-binder-btn").addEventListener("click",binder);
 var q=new URLSearchParams(location.search).get("seed");
-document.getElementById("pp-open").addEventListener("click",function(){
-  var s=(Math.random()*4294967295)>>>0||1;
-  history.replaceState(null,"","/practice?set="+encodeURIComponent(D.slug)+"&seed="+s);
-  paint(s);
-});
-if(q&&/^\\d+$/.test(q)) paint(Number(q)>>>0);
+if(q&&/^\\d+$/.test(q)) showPack(Number(q)>>>0); else if(new URLSearchParams(location.search).get("view")==="binder") binder();
 })();
 </script>
 </main>`;

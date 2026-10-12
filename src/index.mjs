@@ -8,7 +8,7 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
-import { practicePool, practiceSets } from "./practice.mjs";
+import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { addError, topErrors } from "./client-log.mjs";
@@ -473,7 +473,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (!pick) return html(renderPractice([], "", null, [], stamp, pageOpts));
     const setDoc = await loadJson(`sets/${pick.slug}.json`, fetchImpl);
     const images = await catalogueMap(fetchImpl);
-    return html(renderPractice(list, pick.slug, setDoc, practicePool(setDoc, images), stamp, pageOpts));
+    return html(renderPractice(list, pick.slug, setDoc, practicePool(setDoc, images), stamp, { ...pageOpts, art: packArt(setDoc, images) }));
   }
   if (kind === "releases") {
     const doc = await loadJson("releases.json", fetchImpl).catch(() => null);
