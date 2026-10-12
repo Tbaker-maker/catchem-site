@@ -8,12 +8,13 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
+import { practicePool, practiceSets } from "./practice.mjs";
 import { listingsBlock, listingsEntry, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -78,6 +79,7 @@ export function pageKind(pathname) {
   if (path === "/methodology") return "method";
   if (path === "/rotation") return "rotation";
   if (path === "/releases") return "releases";
+  if (path === "/practice") return "practice";
   if (path === "/accuracy") return "accuracy";
   if (path === "/faq") return "faq";
   if (path === "/build") return "build";
@@ -463,6 +465,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
+  if (kind === "practice") {
+    const setsDoc = await loadJson("sets.json", fetchImpl);
+    const list = practiceSets(setsDoc, opts.today || vancouverDay());
+    const want = String(opts.set || "");
+    const pick = list.find((x) => x.slug === want) || list[0];
+    if (!pick) return html(renderPractice([], "", null, [], stamp, pageOpts));
+    const setDoc = await loadJson(`sets/${pick.slug}.json`, fetchImpl);
+    const images = await catalogueMap(fetchImpl);
+    return html(renderPractice(list, pick.slug, setDoc, practicePool(setDoc, images), stamp, pageOpts));
+  }
   if (kind === "releases") {
     const doc = await loadJson("releases.json", fetchImpl).catch(() => null);
     return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay() }));
@@ -676,7 +688,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

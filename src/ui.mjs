@@ -4,7 +4,8 @@ import { feedNews } from "../data/feed-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
-import { FEATURE_CSS, releasesBody } from "./features.mjs";
+import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
+import { PRACTICE_NOTE, PACK_SIZE, drawPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 
 const DISCORD = DISCORD_INVITE;
@@ -1437,7 +1438,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/practice", "Practice")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -5366,4 +5367,53 @@ export function renderReleases(doc, stamp, opts = {}) {
 export function renderSetValuePage(slug, title, html, stamp, opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>${esc(title)}</h1>${opts.rotationHtml || ""}${html}</main>`;
   return chrome("Sets", body, title, stamp, "", feedNav(opts));
+}
+
+export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
+  const options = sets.map((x) => `<option value="${esc(x.slug)}"${x.slug === slug ? " selected" : ""}>${esc(x.name)}${x.release ? ` (${esc(longDay(x.release))})` : ""}</option>`).join("");
+  const name = setDoc?.name || slug;
+  const data = JSON.stringify({ slug, name, asOf: setDoc?.asOf || "", size: PACK_SIZE, pool }).replace(/</g, "\\u003c");
+  const body = `<main id="main" tabindex="-1" class="wrap practice"><h1>Practice pack</h1>
+<p class="pp-note"><b>${esc(PRACTICE_NOTE)}</b></p>
+<form class="filters" method="get" action="/practice"><label for="pp-set">Set</label> <select id="pp-set" name="set" onchange="this.form.submit()">${options}</select><noscript><button type="submit">Pick</button></noscript></form>
+<p class="muted">${esc(name)}: ${pool.length} singles in the set file. Each pack is ${PACK_SIZE} different cards picked at random from that list.</p>
+<p><button type="button" id="pp-open" class="pp-btn">Open a pack</button></p>
+<div id="pp-out" aria-live="polite"></div>
+<script type="application/json" id="pp-data">${data}</script>
+<script>
+${seededRandom.toString()}
+${drawPack.toString()}
+${productTypeLabel.toString()}
+${brandedTile.toString()}
+(function(){
+var D=JSON.parse(document.getElementById("pp-data").textContent);
+function h(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return "&#"+c.charCodeAt(0)+";"});}
+var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function day(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(s)?M[Number(s.slice(5,7))-1]+" "+Number(s.slice(8,10))+", "+s.slice(0,4):"";}
+function cash(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+window.ppMiss=function(img){var a=(img.getAttribute("data-alts")||"").split("|").filter(Boolean);if(a.length){img.setAttribute("data-alts",a.slice(1).join("|"));img.src=a[0];return;}var d=document.createElement("div");d.innerHTML=brandedTile("card",{kind:"single",name:img.alt});img.replaceWith(d.firstChild);};
+function paint(seed){
+  var pack=drawPack(D.pool,D.size,seed);
+  var total=0,priced=0,dates={};
+  var rows=pack.map(function(c,i){
+    if(c.price>0){total+=c.price;priced++;if(c.date)dates[c.date]=1;}
+    var img=c.src?'<img class="shot card-face" alt="'+h(c.name)+'" width="160" height="223" loading="lazy" decoding="async" data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" src="'+h(c.src)+'" data-alts="'+h(c.alts.join("|"))+'" onerror="ppMiss(this)">':brandedTile("card",{kind:"single",name:c.name});
+    return '<li class="pp-card" data-id="'+h(c.id)+'">'+img+'<a href="/c/'+encodeURIComponent(c.id)+'"><b>'+h(c.name)+'</b></a><span class="muted">'+h(c.num)+(c.rarity?" · "+h(c.rarity):"")+'</span><span>'+(c.price>0?'<b>'+cash(c.price)+'</b> <span class="muted">'+h(day(c.date))+'</span>':'<span class="muted">No market price</span>')+'</span></li>';
+  }).join("");
+  var ds=Object.keys(dates).sort();
+  var when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
+  var link="/practice?set="+encodeURIComponent(D.slug)+"&seed="+seed;
+  document.getElementById("pp-out").innerHTML='<p class="pp-total">Pack total <b>'+cash(total)+'</b></p><p class="muted">'+priced+' of '+pack.length+' cards priced. TCGplayer market'+(when?", "+h(when):"")+'. Pack <a href="'+h(link)+'">#'+seed+'</a>.</p><ol class="pp-grid">'+rows+'</ol>';
+}
+var q=new URLSearchParams(location.search).get("seed");
+document.getElementById("pp-open").addEventListener("click",function(){
+  var s=(Math.random()*4294967295)>>>0||1;
+  history.replaceState(null,"","/practice?set="+encodeURIComponent(D.slug)+"&seed="+s);
+  paint(s);
+});
+if(q&&/^\\d+$/.test(q)) paint(Number(q)>>>0);
+})();
+</script>
+</main>`;
+  return chrome("Practice", body, "Practice pack", stamp, "", feedNav(opts));
 }
