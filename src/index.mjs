@@ -170,6 +170,22 @@ async function omitStalePriceReads(reads, fetchImpl) {
   return out;
 }
 
+async function trackBits(cardId, fetchImpl) {
+  try {
+    const doc = await loadJson("track-record.json", fetchImpl);
+    // Hidden with the page. A private file paints no card line and no wrong line.
+    if (doc?.public !== true) return { cardLine: "", wrongRead: null };
+    const cardLine = typeof doc?.cardLines?.[cardId] === "string" ? doc.cardLines[cardId] : "";
+    const row = (doc?.rows || []).find((item) => item && item.productId === cardId && (item.direction === "up" || item.direction === "down") && Number(item.price) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(item.shipped || "")));
+    return {
+      cardLine,
+      wrongRead: row ? { direction: row.direction, shipPrice: Number(row.price), shipped: String(row.shipped).slice(0, 10) } : null,
+    };
+  } catch {
+    return { cardLine: "", wrongRead: null };
+  }
+}
+
 async function readsFor(cardId, fetchImpl) {
   try {
     const bundle = await loadJson("reads.json", fetchImpl);
@@ -402,7 +418,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             source: hit.source,
             kind: "single",
           };
-          return html(renderCard(row, stamp, { ...pageOpts, ...(() => { const pic = officialSrc({ id: hit.id, kind: "single" }, images); return { catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts }; })(), productReads: await readsFor(hit.id, fetchImpl) }));
+          return html(renderCard(row, stamp, { ...pageOpts, ...(() => { const pic = officialSrc({ id: hit.id, kind: "single" }, images); return { catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts }; })(), productReads: await readsFor(hit.id, fetchImpl), ...(await trackBits(hit.id, fetchImpl)) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
@@ -425,7 +441,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       } catch { listingSeries = []; }
     }
     const productReads = card ? await readsFor(cardId, fetchImpl) : [];
-    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
+    const track = card ? await trackBits(cardId, fetchImpl) : { cardLine: "", wrongRead: null };
+    return html(renderCard(card, stamp, { ...pageOpts, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, ...track }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
