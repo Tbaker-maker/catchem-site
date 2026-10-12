@@ -32,7 +32,9 @@ export function rotationChipData(rot, slug, today) {
   }
   const exp = (rot.expected || []).find((e) => e.mark === row.mark);
   if (exp) return { mark: row.mark, official: false, text: `Mark ${row.mark} · Rotation date not announced`, sub: `Expected window: ${exp.window}`, basis: exp.basis };
-  return { mark: row.mark, official: false, text: `Mark ${row.mark} · In Standard`, sub: "No rotation date announced" };
+  if (row.status === "Standard") return { mark: row.mark, official: false, text: `Mark ${row.mark} · In Standard`, sub: "No rotation date announced" };
+  // Older marks (D, E) have no dated source in our file: name the mark only.
+  return { mark: row.mark, official: false, past: true, text: `Regulation mark ${row.mark}`, sub: "" };
 }
 
 export const CHIP_CSS = `.rchips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.rchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));font:600 13px/1.25 var(--sans);color:inherit;text-decoration:none}.rchip .dot{width:8px;height:8px;border-radius:999px;background:var(--gold);flex:none}.rchip.past .dot{background:#8a8f98}.rchip.est{border-style:dashed}.rchip .sub{font-weight:500;opacity:.72}.rchip.kind{border-color:var(--gold);color:var(--gold)}
@@ -44,7 +46,7 @@ export function chipsHtml(card, rot, today) {
   const r = rotationChipData(rot, card.setSlug, today);
   const kindChip = `<span class="rchip kind">${esc(kind)}</span>`;
   if (!r) return `<div class="rchips">${kindChip}</div>`;
-  const cls = r.rotated ? "rchip past" : r.official ? "rchip" : "rchip est";
+  const cls = r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est";
   const title = r.basis ? ` title="${esc(r.basis)}"` : "";
   return `<div class="rchips">${kindChip}<a class="${cls}" href="/rotation"${title}><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a></div>`;
 }
@@ -52,7 +54,7 @@ export function chipsHtml(card, rot, today) {
 export function setChipHtml(slug, rot, today, irCount) {
   const r = rotationChipData(rot, slug, today);
   if (!r && !irCount) return "";
-  const cls = r ? (r.rotated ? "rchip past" : r.official ? "rchip" : "rchip est") : "";
+  const cls = r ? (r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est") : "";
   const chip = r ? `<a class="${cls}" href="/rotation"><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a>` : "";
   const ir = irCount ? `<a class="rchip kind" href="/ir-watchlist?set=${encodeURIComponent(slug)}">${irCount} IRs and SIRs on the IR watchlist</a>` : "";
   return `<style>${CHIP_CSS}</style><div class="rchips">${chip}${ir}</div>`;
