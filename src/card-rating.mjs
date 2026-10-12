@@ -29,8 +29,9 @@ export function ratingPanel(row, doc, { premium = false } = {}) {
     }).join("");
     body = `<ul>${items}</ul>`;
   } else {
-    const n = ORDER.filter((k) => row.factors?.[k]).length;
-    body = `<p class="gate">${n} factor bars for this card, from popularity to artist and supply, are in <a href="/premium">Premium</a>.</p>`;
+    const have = ORDER.filter((k) => row.factors?.[k]).map((k) => LABEL[k].toLowerCase());
+    const list = have.length > 1 ? `${have.slice(0, -1).join(", ")} and ${have.at(-1)}` : have[0] || "";
+    body = have.length ? `<p class="gate">Factor bars for ${esc(list)} are in <a href="/premium">Premium</a>.</p>` : "";
   }
   const w = doc?.weights ? ORDER.filter((k) => doc.weights[k] != null).map((k) => `${LABEL[k]} ${doc.weights[k]}`).join(", ") : "";
   const about = `<details><summary>About this rating</summary><p>Similar cards are ${esc(row.groupLabel)} in the same popularity band, or all ${esc(row.groupLabel)} when a band has fewer than 5. "Below" means 0.8x the median or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with no data are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;

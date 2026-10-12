@@ -14,5 +14,6 @@ t("held row shows no verdict", !/Priced/.test(ratingPanel({ ...row, check: true,
 const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|stack\w*|load up)\b|\u2014/i;
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(free.replace(/<[^>]+>/g, " ")));
 t("says not advice", /not advice/.test(free));
+t("free line lists only the factors the card has", /Factor bars for peer value, popularity and artist are in/.test(free) && !/supply/i.test(free.replace(/Supply counted \d+/, "")));
 t("no row no panel", ratingPanel(null, doc) === "");
 if (fail) { console.log(`card-rating: ${fail} failed`); process.exit(1); } else console.log("card-rating ok");
