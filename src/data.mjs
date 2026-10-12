@@ -3,6 +3,24 @@ import { buildPokemonPages } from "./pokemon.mjs";
 const BASE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/";
 const mem = new Map();
 let pokemonBundle = null;
+export const MEM_TTL_MS = 5 * 60 * 1000;
+let nowFn = () => Date.now();
+export function setCacheClock(fn) { nowFn = fn || (() => Date.now()); }
+
+// Cached for MEM_TTL_MS; on a failed refetch the stale copy is served.
+async function cached(key, load) {
+  const hit = mem.get(key);
+  if (hit && nowFn() - hit.at < MEM_TTL_MS) return hit.data;
+  try {
+    const data = await load();
+    if (!hit && mem.size > 24) mem.clear();
+    mem.set(key, { data, at: nowFn() });
+    return data;
+  } catch (err) {
+    if (hit) return hit.data;
+    throw err;
+  }
+}
 
 export function resetJsonCache() {
   mem.clear();
@@ -10,13 +28,11 @@ export function resetJsonCache() {
 }
 
 export async function loadJson(rel, fetchImpl = fetch) {
-  if (mem.has(rel)) return mem.get(rel);
-  const res = await fetchImpl(BASE + rel, { cf: { cacheTtl: 300 } });
-  if (!res.ok) throw new Error(`${rel} ${res.status}`);
-  const data = await res.json();
-  if (mem.size > 24) mem.clear();
-  mem.set(rel, data);
-  return data;
+  return cached(rel, async () => {
+    const res = await fetchImpl(BASE + rel, { cf: { cacheTtl: 300 } });
+    if (!res.ok) throw new Error(`${rel} ${res.status}`);
+    return res.json();
+  });
 }
 
 export async function proxyPublic(rel, fetchImpl = fetch) {
@@ -38,24 +54,22 @@ export async function proxyPublic(rel, fetchImpl = fetch) {
 const DIVE_BASE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/pulse/dive/";
 
 export async function loadDiveIndex(fetchImpl = fetch) {
-  if (mem.has("dive:index")) return mem.get("dive:index");
-  const res = await fetchImpl(DIVE_BASE + "index.json", { cf: { cacheTtl: 300 } });
-  if (!res.ok) throw new Error(`dive index ${res.status}`);
-  const data = await res.json();
-  mem.set("dive:index", data);
-  return data;
+  return cached("dive:index", async () => {
+    const res = await fetchImpl(DIVE_BASE + "index.json", { cf: { cacheTtl: 300 } });
+    if (!res.ok) throw new Error(`dive index ${res.status}`);
+    return res.json();
+  });
 }
 
 export async function loadDive(id, fetchImpl = fetch) {
   const key = "dive:" + id;
-  if (mem.has(key)) return mem.get(key);
   const safe = String(id || "").replace(/[^a-zA-Z0-9._-]/g, "");
   if (!safe || safe !== id) throw new Error("bad dive id");
-  const res = await fetchImpl(DIVE_BASE + encodeURIComponent(safe) + ".json", { cf: { cacheTtl: 300 } });
-  if (!res.ok) throw new Error(`dive ${safe} ${res.status}`);
-  const data = await res.json();
-  mem.set(key, data);
-  return data;
+  return cached(key, async () => {
+    const res = await fetchImpl(DIVE_BASE + encodeURIComponent(safe) + ".json", { cf: { cacheTtl: 300 } });
+    if (!res.ok) throw new Error(`dive ${safe} ${res.status}`);
+    return res.json();
+  });
 }
 
 const CATALOGUE_ROOT = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/";
