@@ -2,6 +2,7 @@
 // Imported by rebuild.test.mjs so CI runs it without a workflow edit.
 import { renderPath, pageKind } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
+import { PRINT_RUN_LINE } from "../src/rotation.mjs";
 import { listingsCountedLine, rotationBadge, setValueBlock, upcomingReleases, noDash, COPY } from "../src/features.mjs";
 
 let fail = 0;
@@ -77,6 +78,8 @@ t("noDash", noDash("A \u2014 B") === "A: B");
 t("set value empty when no doc", setValueBlock(null).includes(COPY.setValue.empty));
 
 t("set value strips number from name", setValueBlock({ asOf: "2026-10-12", top: [{ id: "tcgcsv-1", name: "Magikarp - 203/193", number: "203/193", price: 5 }], master: { total: 5, priced: 1, unpriced: 0 } }).includes("1. Magikarp</b>"));
+t("print-run line is the approved text", PRINT_RUN_LINE === "Rotated sets historically stop getting new print runs. Older packs can still turn up in tins and collections.");
+t("print-run line never says supply", !/supply/i.test(PRINT_RUN_LINE));
 resetJsonCache();
 if (fail) { console.log(`features: ${fail} failed`); process.exitCode = 1; throw new Error(`features: ${fail} failed`); }
 console.log("features ok");
