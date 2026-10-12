@@ -637,7 +637,7 @@ function receiptBacked(row) {
 
 // Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
 // that carry their own source line and date. Behind reads.library in that repo.
-const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set"]);
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep"]);
 export function isBoardV3Row(row) {
   if (!row || typeof row !== "object" || (row.board !== "v3" && !(row.board === "hist" && (row.readKind || row.kind) === "set"))) return false;
   if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
@@ -3007,6 +3007,19 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-acts{display:flex;flex-wrap:wrap;gap:8px}
   .feed-acts button,.feed-acts a,.see-all{min-height:44px;display:inline-flex;align-items:center}
   .read-nav{display:flex;gap:8px}
+  .deep-card h2{font-size:1.15rem;line-height:1.35}
+  .deep-more{margin:10px 0 4px;border:1px solid rgba(217,183,121,.35);border-radius:14px;padding:10px 14px;background:rgba(217,183,121,.05)}
+  .deep-more summary{cursor:pointer;color:var(--gold);font-weight:600;list-style:none;min-height:28px}
+  .deep-more summary::-webkit-details-marker{display:none}
+  .deep-lines{margin:8px 0;padding-left:18px;display:grid;gap:6px;line-height:1.45}
+  .deep-chart{margin:10px 0 4px}
+  .deep-chart svg{width:100%;height:auto;display:block;border-radius:10px;background:rgba(255,255,255,.02)}
+  .deep-chart figcaption{font-size:.8rem;opacity:.7;margin-top:4px}
+  .deep-bar{display:grid;grid-template-columns:9em 1fr 3em;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}
+  .deep-bar-t{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+  .deep-bar-t i{display:block;height:100%;border-radius:999px;background:#d9b779}
+  .deep-bar-t i.neg{background:#c97a6a}
+  .deep-bar-v{text-align:right;font-variant-numeric:tabular-nums}
   .read-nav button{min-height:44px;flex:1 1 0}
   .feed-slide .read-nav{position:absolute;left:0;right:0;top:72px;z-index:2;justify-content:space-between;pointer-events:none;gap:0}
   .feed-slide .read-nav button{pointer-events:auto;min-width:44px;width:44px;flex:0 0 44px;padding:0;background:transparent;border-color:transparent;color:var(--gold);font:600 34px/1 var(--sans);opacity:.9}
@@ -3838,8 +3851,46 @@ function bindShare(el, card){
   });
   el.appendChild(btn);
 }
+// Deep read: a short headline, then 3 to 6 lines and a small chart behind one tap.
+function deepChartSvg(chart){
+  if(!chart) return "";
+  const W=320,H=96,P=8;
+  if(Array.isArray(chart.points) && chart.points.length>=2){
+    const vals=chart.points.map(function(p){return Number(p[1]);});
+    const lo=Math.min.apply(null, vals), hi=Math.max.apply(null, vals);
+    const span=hi-lo||1;
+    const xy=chart.points.map(function(p,i){
+      const x=P+(i*(W-2*P))/(chart.points.length-1);
+      const y=H-P-((Number(p[1])-lo)/span)*(H-2*P);
+      return x.toFixed(1)+","+y.toFixed(1);
+    });
+    const first=chart.points[0][0], last=chart.points[chart.points.length-1][0];
+    return '<figure class="deep-chart"><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+html(chart.label||"Chart")+'"><defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b779" stop-opacity=".35"/><stop offset="1" stop-color="#d9b779" stop-opacity="0"/></linearGradient></defs><polygon fill="url(#dg)" points="'+P+','+(H-P)+' '+xy.join(" ")+' '+(W-P)+','+(H-P)+'"/><polyline fill="none" stroke="#d9b779" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="'+xy.join(" ")+'"/></svg><figcaption>'+html(chart.label||"")+" · "+html(first)+" to "+html(last)+"</figcaption></figure>";
+  }
+  if(Array.isArray(chart.bars) && chart.bars.length){
+    const max=Math.max.apply(null, chart.bars.map(function(b){return Math.abs(Number(b[1]))||0;}))||1;
+    const rows=chart.bars.map(function(b){
+      const v=Number(b[1]);
+      const w=Math.max(2, Math.round((Math.abs(v)/max)*100));
+      return '<div class="deep-bar"><span class="deep-bar-l">'+html(b[0])+'</span><span class="deep-bar-t"><i class="'+(v<0?"neg":"pos")+'" style="width:'+w+'%"></i></span><span class="deep-bar-v">'+html(String(v))+"</span></div>";
+    }).join("");
+    return '<figure class="deep-chart">'+rows+"<figcaption>"+html(chart.label||"")+"</figcaption></figure>";
+  }
+  return "";
+}
+function deepEl(card){
+  const el=document.createElement("article");
+  el.className="feed-card deep-card";
+  el.id="r-"+card.id;
+  const lines=(Array.isArray(card.lines)?card.lines:[]).slice(0,6).map(function(l){return "<li>"+html(l)+"</li>";}).join("");
+  const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(card.href)+'">Open it</a></p>':"";
+  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p><h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
+  bindShare(el, card);
+  return el;
+}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
+  if(card && (card.readKind==="deep" || card.kind==="deep")) return deepEl(card);
   if(card && (card.readKind==="news" || card.kind==="news")) return newsEl(card);
   const el=document.createElement("article");
   el.className="feed-card";
