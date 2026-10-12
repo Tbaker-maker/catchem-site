@@ -2013,6 +2013,26 @@ export function quickView(card, extra = {}) {
   };
 }
 
+function addDaysIso(iso, days) {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+}
+
+function dollarsPlain(n) {
+  const x = Number(n);
+  if (!(x > 0)) return "";
+  return Number.isInteger(x) ? `$${x}` : `$${x.toFixed(2)}`;
+}
+
+// Shown only when a logged read has a direction and a ship price from the price file.
+export function wrongLine(read) {
+  const direction = read?.direction === "up" || read?.direction === "down" ? read.direction : "";
+  const ship = Number(read?.shipPrice ?? read?.price);
+  const day = String(read?.shipped || read?.asOf || "").slice(0, 10);
+  if (!direction || !(ship > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+  const word = direction === "up" ? "below" : "above";
+  return `This line would be wrong if the TCGplayer market on ${addDaysIso(day, 14)} is ${word} ${dollarsPlain(ship)}. If that date is missing, there is no score.`;
+}
+
 export function sourceLine(card) {
   const src = String(card && card.source || "TCGplayer market");
   return /^tcgcsv-/.test(String(card && card.id || "")) && !/tcgcsv/i.test(src) ? `${src} via TCGCSV` : src;
@@ -2033,7 +2053,6 @@ export function renderCard(card, stamp, opts = {}) {
   ].join("");
   const marker = rangeMarker(hist, endDay);
   const sealed = card.kind === "sealed";
-  const listingsLine = sealed ? listingTrend(opts.listingSeries || [], endDay) : "";
   const reads = (opts.productReads || []).filter((read) => read && (read.headline || read.path)).slice(0, 3);
   const readHtml = reads.length
     ? `<ul class="glance-reads">${reads.map((read) => {
@@ -2047,13 +2066,18 @@ export function renderCard(card, stamp, opts = {}) {
     ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>`
     : "";
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
-  const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
-  const priceChart = `<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>${pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : `<p class="muted">No price points in that file.</p>`}`;
-  const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
+  const chartSvg = pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : `<p class="muted">No price points in that file.</p>`;
+  const priceChart = `${chartSvg}<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>`;
+  const wrong = wrongLine(opts.wrongRead);
+  const factHtml = renderFacts({
+    market: shown,
+    low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null),
+    date: endDay,
+    source: sourceLine(card),
+  });
+  const cardLine = typeof opts.cardLine === "string" ? opts.cardLine.trim() : "";
   const breakBits = [];
-  const listings = Number(fact?.listings);
-  if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
   const flagged = flagHtml(fact?.flagged);
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
@@ -2086,11 +2110,9 @@ ${storeLinksHtml(card, esc)}
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span></p>
 ${chips ? `<p>${chips}</p>` : ""}
 ${marker.text ? `<p>${esc(marker.text)}</p>` : ""}
-${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
-<h2>Facts</h2>
-${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
 <h2>Reads</h2>
 ${readHtml}
+${cardLine ? `<p>${esc(cardLine)}</p>` : ""}
 ${supplyNote}
 </div>
 </div>
@@ -2100,8 +2122,8 @@ ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
 ${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${priceChart}
-${listChart}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
+${wrong ? `<p>${esc(wrong)}</p>` : ""}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
 <details><summary>See the math</summary>
 <p>Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")} · Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"}</p>
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
@@ -2132,6 +2154,7 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
     .catch(function(){status.textContent="Not stored. The server store is not on."});
 });
 </script>
+${factHtml ? `<h2>Facts</h2>${factHtml}` : ""}
 </main>`;
   return chrome("", body, card.name, stamp, "", feedNav(opts));
 }
@@ -2312,17 +2335,18 @@ document.getElementById("share-card").addEventListener("click", function(){
 }
 
 export function factsLines(row) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(row?.date || ""))) return [];
   const lines = [];
   if (Number(row?.market) > 0) lines.push({ label: "Market", value: money(row.market) });
   if (Number(row?.low) > 0) lines.push({ label: "Low", value: money(row.low) });
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(row?.date || ""))) lines.push({ label: "Date", value: String(row.date).slice(0, 10) });
+  lines.push({ label: "Date", value: String(row.date).slice(0, 10) });
   if (typeof row?.source === "string" && row.source.trim()) lines.push({ label: "Source", value: row.source.trim() });
   return lines;
 }
 
 export function renderFacts(row) {
   const lines = factsLines(row);
-  if (!lines.length) return `<p class="muted">No market line in the price file.</p>`;
+  if (!lines.length) return "";
   return lines.map((line) => `<p>${esc(line.label)}: ${esc(line.value)}</p>`).join("");
 }
 
@@ -2359,24 +2383,21 @@ ${left?.name || right?.name ? `<table><thead><tr><th></th><th>${esc(left?.name |
 }
 
 export function renderTrackRecord(doc, stamp, opts = {}) {
-  const horizonLine = (label, scored) => {
-    const n = Number(scored) || 0;
-    return `${label}: ${n} scored so far`;
+  const cell = (row, key) => {
+    const stored = row?.cells?.[key];
+    if (typeof stored === "string" && stored) return stored;
+    if (row?.status === "too-early") return "too early";
+    if (row?.status === "no-later-price") return "no later price, so no score";
+    if (row?.marks?.[key]?.price > 0) return String(row.marks[key].price);
+    return "no score";
   };
-  const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${esc(row.line14 || horizonLine("14-day", row.scored14))}</td><td>${esc(row.line28 || horizonLine("28-day", row.scored28))}</td><td>${esc(row.line56 || horizonLine("56-day", row.scored56))}</td></tr>`).join("");
-  const rows = [...(doc?.rows || [])].sort((a, b) => String(b.shipped || "").localeCompare(String(a.shipped || ""))).map((row) => {
-    const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "");
-    const later = (n) => row.marks?.[n]?.price > 0 ? (money(row.marks[n].price) || "—") : "—";
-    const dir = row.direction === "up" || row.direction === "down" ? row.direction : "—";
-    return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : "—"}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
-  }).join("");
+  const rows = [...(doc?.rows || [])].sort((a, b) => String(b.shipped || "").localeCompare(String(a.shipped || ""))).map((row) => `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${esc(row.label || row.type || "")}</td><td>${esc(row.sentence || "")}</td><td>${esc(cell(row, "14"))}</td><td>${esc(cell(row, "28"))}</td><td>${esc(cell(row, "56"))}</td></tr>`).join("");
+  const scoredLine = (doc?.types || []).map((row) => row.line || row.line14 || `${Number(row.scored) || Number(row.scored14) || 0} scored so far`).join(". ") || "0 scored so far";
   const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Track record</h1>
-<p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || "—")}.</p>
-<p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
-<p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. ${esc(horizonLine("14-day", doc?.scored14))}. ${esc(horizonLine("28-day", doc?.scored28))}. ${esc(horizonLine("56-day", doc?.scored56))}.</p>
-<table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>14-day</th><th>28-day</th><th>56-day</th></tr></thead><tbody>${types}</tbody></table>
-<table><thead><tr><th>Ship date</th><th>Name</th><th>Ship price</th><th>Direction</th><th>14-day</th><th>28-day</th><th>56-day</th><th>Note</th></tr></thead><tbody>${rows || `<tr><td colspan="8">No reads in the track record file.</td></tr>`}</tbody></table>
+<p class="muted">Newest first. Scored through ${esc(doc?.asOf || "")}. Oldest read ${esc(doc?.oldest || "not in the file")}.</p>
+<p>${esc(scoredLine)}</p>
+<table><thead><tr><th>Date</th><th>Product</th><th>Label</th><th>Original sentence</th><th>2 weeks</th><th>4 weeks</th><th>8 weeks</th></tr></thead><tbody>${rows || `<tr><td colspan="7">No reads in the track record file.</td></tr>`}</tbody></table>
 </main>`;
   return chrome("", body, "Track record", stamp, "", feedNav(opts));
 }
