@@ -1,3 +1,4 @@
+import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
@@ -2115,7 +2116,8 @@ export function renderCard(card, stamp, opts = {}) {
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
-  const priceChart = `<p class="muted">File: ${esc(chartFile)}. As of ${esc(endDay)}. Missing days show as gaps.</p>${pricePts.length >= 2 ? gapChartSvg(splitDated(pricePts, "ask")) : `<p class="muted">No price points in that file.</p>`}`;
+  void chartFile; void pricePts;
+  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(mergeHistory(hist, sealed ? "" : card.longHist), { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
   const breakBits = [];
   const listings = Number(fact?.listings);

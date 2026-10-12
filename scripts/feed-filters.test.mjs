@@ -9,7 +9,14 @@ import { renderFeed, isVolumeRow, isShapeRow, isFactRow, newsSlice, readStaleAga
 import { feedNews } from "../data/feed-news.mjs";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("/workspace/node_modules/playwright");
+function loadPlaywright() {
+  const tries = [process.env.PLAYWRIGHT_PATH, "playwright", "/workspace/node_modules/playwright", "/tmp/pw/node_modules/playwright"].filter(Boolean);
+  for (const t of tries) { try { return require(t); } catch {} }
+  return null;
+}
+const pw = loadPlaywright();
+if (!pw) { console.log("feed-filters: playwright not installed, skipped (run locally with playwright)"); process.exit(0); }
+const { chromium } = pw;
 
 const pub = process.env.CATCHEM_PUBLIC || "/tmp/cdata/research/assets/public";
 const outDir = "/workspace/artifacts/feed-filters";
@@ -134,6 +141,9 @@ const expectCount = {
   dive: uniq(items("dive").concat(lead.filter((r) => r && (r.readKind === "dive" || r.kind === "dive")))).length,
   volume: uniq(items("volume").filter(isVolumeRow).concat(lead.filter(isVolumeRow))).length,
 };
+let readLib = {};
+try { readLib = load("feed/read-library.json"); } catch {}
+expectCount.signals = uniq((readLib.signals || []).filter((r) => r && r.id && ["mover", "set", "high", "streak"].includes(r.signal))).length;
 const shapeKinds = ["quiet", "mix", "conditions", "soldflat", "solddown", "setshare", "spread", "askmove", "mktmove", "still"];
 for (const kind of shapeKinds) {
   expectCount[kind] = uniq(items(kind).filter(isShapeRow).concat(lead.filter((r) => isShapeRow(r) && (r.readKind === kind || r.kind === kind)))).length;
