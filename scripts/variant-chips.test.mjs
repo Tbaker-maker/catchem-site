@@ -9,3 +9,11 @@ assert.ok(renderSearch({}).includes('id="vtag"') && renderSearch({}).includes("T
 assert.ok(renderSetShell("x", "2026-10-12", {}).includes('id="vtag"'), "set page has a variant filter");
 assert.ok(/\.vchip\{[^}]*border-radius:999px/.test(page), "chips are rounded");
 console.log("variant chip tests passed");
+import { renderFeed } from "../src/ui.mjs";
+{
+  const feed = renderFeed({ asOf: "2026-10-12", reads: [] }, "", "", {});
+  assert.ok(feed.includes("card.tags||[]") && feed.includes('class="vchips sm"'), "feed read cards draw variant chips");
+  const s = renderSearch({});
+  assert.ok(s.includes('row srow') && /@media\(max-width:480px\)\{\.srow\{flex-wrap:wrap/.test(s) && s.includes(".srow>svg.spark30"), "search rows wrap and drop the mini chart on phones");
+  console.log("feed and search chip tests passed");
+}
