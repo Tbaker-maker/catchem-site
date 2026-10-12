@@ -1275,7 +1275,7 @@ a{color:var(--gold)}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
-.vchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.vchip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--gold);background:rgba(212,175,55,.10);border:1px solid rgba(212,175,55,.35);text-decoration:none}a.vchip:hover{background:rgba(212,175,55,.18)}.vchips.sm{margin:4px 0 0}.row a:has(.vchips){flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;overflow-wrap:normal}.row a:has(.vchips) br{display:none}.row a:has(.vchips) b,.row a:has(.vchips) .muted{overflow-wrap:break-word;word-break:normal}.vchips.sm .vchip{padding:2px 9px;font-size:11px}
+.vchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.vchip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--gold);background:rgba(212,175,55,.10);border:1px solid rgba(212,175,55,.35);text-decoration:none}a.vchip:hover{background:rgba(212,175,55,.18)}.vchips.sm{margin:4px 0 0}@media(max-width:480px){.srow{flex-wrap:wrap;align-items:flex-start;row-gap:6px}.srow>svg.spark30,.srow>img[height="28"]{display:none}.srow>a{flex:1 1 0;min-width:0}.srow>a b,.srow>a .muted{overflow-wrap:break-word;word-break:normal}.srow>b{align-self:flex-start;padding-top:2px}.srow>.store-links{order:9;flex-basis:100%;padding-left:76px}}.feed-card .vchips{margin:2px 0 6px}.row a:has(.vchips){flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;overflow-wrap:normal}.row a:has(.vchips) br{display:none}.row a:has(.vchips) b,.row a:has(.vchips) .muted{overflow-wrap:break-word;word-break:normal}.vchips.sm .vchip{padding:2px 9px;font-size:11px}
 .chart-note{font-size:15px;line-height:1.45;margin:8px 0 0}
 .counts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .counts b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:44px}
@@ -2609,7 +2609,7 @@ function rowHtml(r){
   var cash=price==null?"No market price":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
   var spark=window.catchemSpark?catchemSpark(bag[r[0]]||"", sparkAsOf):"";
-  return '<div class="row" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span> '+chips+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
+  return '<div class="row srow" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span> '+chips+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
 }
 let drawN=0;
 let manifest=null;
@@ -3940,7 +3940,8 @@ function cardEl(card, facts){
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
-  const head=h2+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
+  const vchips=(card.tags||[]).length?'<div class="vchips sm" aria-label="Variant">'+card.tags.map(function(t){return '<a class="vchip" href="/search?tag='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</div>':"";
+  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){
