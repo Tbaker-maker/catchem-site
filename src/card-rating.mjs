@@ -4,8 +4,8 @@
 import { esc } from "./ui.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 
-export const ORDER = ["peer", "popularity", "scarcity", "pull", "demand", "age", "artist", "supply", "range"];
-export const LABEL = { peer: "Peer value", popularity: "Popularity", scarcity: "Scarcity of the treatment", pull: "Pull rate", demand: "Demand signals", age: "Age and print window", artist: "Artist", supply: "Supply counted", range: "Range on file" };
+export const ORDER = ["peer", "popularity", "scarcity", "pull", "demand", "age", "artist", "range"];
+export const LABEL = { peer: "Price vs similar cards", popularity: "Popularity", scarcity: "How rare this version is", pull: "Pull rate", demand: "Recent demand", age: "Age", artist: "Artist", range: "Price vs its own history" };
 const cash = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function shardOf(id) { const n = Number(String(id || "").replace(/\D/g, "")) || 0; return String(n % 64).padStart(2, "0"); }
@@ -19,7 +19,7 @@ export function ratingPanel(row, doc, { premium = false } = {}) {
   if (row.check || !row.verdict) {
     return `<style>${RATING_CSS}</style><section class="crt" aria-label="Rating">${head}<p class="peer">The price on file for this card is far from similar cards, so we are checking it before we compare.</p></section>`;
   }
-  const peer = row.peers ? `${cash(row.price.price)} on ${shortDate(row.price.date)}, TCGplayer market. Median of ${row.peers.n} similar ${esc(row.groupLabel)}: ${cash(row.peers.median)}.` : "";
+  const peer = row.peers ? `Price vs similar cards: ${cash(row.price.price)} vs a typical ${cash(row.peers.median)} for ${esc(row.groupLabel)} (${row.peers.n} cards). TCGplayer market, ${shortDate(row.price.date)}.` : "";
   let body = "";
   if (premium) {
     const items = ORDER.filter((k) => row.factors?.[k]).map((k) => {
@@ -34,6 +34,6 @@ export function ratingPanel(row, doc, { premium = false } = {}) {
     body = have.length ? `<p class="gate">Factor bars for ${esc(list)} are in <a href="/premium">Premium</a>.</p>` : "";
   }
   const w = doc?.weights ? ORDER.filter((k) => doc.weights[k] != null).map((k) => `${LABEL[k]} ${doc.weights[k]}`).join(", ") : "";
-  const about = `<details><summary>About this rating</summary><p>Similar cards are ${esc(row.groupLabel)} in the same popularity band, or all ${esc(row.groupLabel)} when a band has fewer than 5. "Below" means 0.8x the median or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with no data are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
+  const about = `<details><summary>About this rating</summary><p>Similar cards are other ${esc(row.groupLabel)} with similar popularity, or all ${esc(row.groupLabel)} when there are fewer than 5. The typical price is the middle price of those cards. "Below" means 0.8x the typical price or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with no data are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
   return `<style>${RATING_CSS}</style><section class="crt" aria-label="Rating">${head}<p class="verdict">${esc(row.verdict)}</p><p class="peer">${peer}</p>${body}${about}</section>`;
 }
