@@ -5528,3 +5528,4 @@ if(q&&/^\\d+$/.test(q)) showPack(Number(q)>>>0); else if(new URLSearchParams(loc
 </main>`;
   return chrome("Practice", body, "Practice pack", stamp, "", feedNav(opts));
 }
+export { chrome as pageChrome };
