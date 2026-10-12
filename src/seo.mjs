@@ -25,7 +25,7 @@ export function describePage(kind, name) {
     case "sets": return "Every Pokémon TCG set, with card counts and TCGplayer market prices.";
     case "artists": return "Pokémon TCG illustrators and the cards they drew.";
     case "search": return "Search every Pokémon TCG card and sealed product by name, set, or number.";
-    default: return "Prices, reads and set pages for every Pokémon card and product, from Base Set to tonight's drop.";
+    default: return "Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.";
   }
 }
 
@@ -49,7 +49,7 @@ export function addShareMeta(html, pathname, kind) {
 <meta property="og:image" content="${OG_IMAGE}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Catch'em. Prices, reads and set pages for every Pokémon card and product, from Base Set to tonight's drop.">
+<meta property="og:image:alt" content="Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escAttr(fullTitle)}">
 <meta name="twitter:description" content="${escAttr(desc)}">
