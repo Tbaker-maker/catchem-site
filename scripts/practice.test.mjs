@@ -30,6 +30,10 @@ t("name drops the trailing number", pool[1].name === "Card 1");
 const list = practiceSets(setsDoc, "2026-10-12");
 t("default is newest dated set with singles", list[0].slug === "new-set" && !list.some((x) => x.slug === "future-set"));
 
+// A set with no Uncommon and odd rarities still fills from Commons only.
+const odd = practicePool({ asOf: "2026-10-12", items: [...Array.from({ length: 12 }, (_, i) => ({ id: `tcgcsv-${6000 + i}`, name: `C${i}`, kind: "single", rarity: "Common", price: 1 })), { id: "tcgcsv-6100", name: "CC", kind: "single", rarity: "Classic Collection", price: 9 }, { id: "tcgcsv-6101", name: "R", kind: "single", rarity: "Rare", price: 2 }] }, {});
+const op = buildPack(odd, 5);
+t("filler never pulls special subsets", op.slice(0, 9).every((c) => c.rarity === "Common") && op[9].rarity === "Rare");
 // Slot layout on a mixed-rarity pool.
 const rar = ["Common", "Uncommon", "Rare", "Double Rare", "Illustration Rare", "Special Illustration Rare"];
 const mixed = Array.from({ length: 90 }, (_, i) => ({ id: `tcgcsv-${7000 + i}`, name: `M${i}`, num: `${i + 1}/90`, kind: "single", rarity: i < 30 ? "Common" : i < 55 ? "Uncommon" : rar[2 + (i % 4)], price: i + 1, printing: "Normal", printings: [{ name: "Normal", price: i + 1, asOf: "2026-10-12" }, ...(i < 70 ? [{ name: "Reverse Holofoil", price: i + 2, asOf: "2026-10-11" }] : [])] }));
