@@ -942,7 +942,44 @@ export function chartBox(hist, caption = "TCGplayer market, daily", release = ""
   });
   if (!hasPoint) return `<p class="muted">${esc(caption)}. No daily points in this file.</p>`;
   const payload = esc(JSON.stringify(hist || []));
-  return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>`;
+  return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges>${rangeButtons(hist)}</div><p class="muted chart-note"></p></div>`;
+}
+
+function datedPricePoints(hist) {
+  const rows = Array.isArray(hist) ? hist : [];
+  const out = [];
+  for (const point of rows) {
+    const d = Array.isArray(point) ? point[0] : (point && point.d);
+    const v = Number(Array.isArray(point) ? point[1] : (point && point.v != null ? point.v : point));
+    if (d && v > 0) out.push({ d: String(d).slice(0, 10), v });
+  }
+  out.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  const dedup = [];
+  for (const row of out) {
+    if (dedup.length && dedup[dedup.length - 1].d === row.d) dedup[dedup.length - 1] = row;
+    else dedup.push(row);
+  }
+  return dedup;
+}
+
+function pointsInRange(pts, range) {
+  if (!pts.length || range === "All") return pts.length;
+  const days = range === "7D" ? 7 : range === "30D" ? 30 : range === "90D" ? 90 : 365;
+  const end = Date.parse(`${pts[pts.length - 1].d}T00:00:00Z`);
+  const cut = new Date(end - (days - 1) * 86400000).toISOString().slice(0, 10);
+  return pts.filter((p) => p.d >= cut).length;
+}
+
+function rangeButtons(hist) {
+  const pts = datedPricePoints(hist);
+  const span = pts.length < 2 ? 0 : Math.round((Date.parse(`${pts[pts.length - 1].d}T00:00:00Z`) - Date.parse(`${pts[0].d}T00:00:00Z`)) / 86400000) + 1;
+  const names = [];
+  if (span >= 7 && pointsInRange(pts, "7D") >= 2) names.push("7D");
+  if (span >= 30 && pointsInRange(pts, "30D") >= 2) names.push("30D");
+  if (span >= 90 && pointsInRange(pts, "90D") >= 2) names.push("90D");
+  if (span >= 365 && pointsInRange(pts, "1Y") >= 2) names.push("1Y");
+  names.push("All");
+  return names.map((name) => `<button type="button" data-range="${name}"${name === "All" ? ' aria-pressed="true"' : ""}>${name}</button>`).join("");
 }
 
 export function splitDated(points, key) {
@@ -1181,6 +1218,9 @@ const CSS = `.skip-link{position:absolute;left:8px;top:-60px;z-index:1000;backgr
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 var(--sans)}
 body{overflow-x:hidden;padding-bottom:72px}
 a{color:var(--gold)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.skip{position:fixed;top:8px;left:12px;z-index:80;transform:translateY(-200%);background:var(--gold);color:#1a1407;padding:8px 12px;border-radius:8px;font-weight:600;min-height:44px;display:inline-flex;align-items:center}
+.skip:focus,.skip:focus-visible{transform:none}
 .px{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin:8px 0}
 .win{font:600 16px/1.2 var(--sans)}
 .win.up{color:var(--green)}
@@ -1196,15 +1236,15 @@ a{color:var(--gold)}
 .site-bar .logo span{color:var(--gold)}
 .menu-btn{display:none;min-height:44px}
 .site-bar nav{display:flex;flex-wrap:wrap;gap:8px 14px}
-.site-bar nav a{color:var(--dim);text-decoration:none;font:500 14px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center}
+.site-bar nav a{color:var(--dim);text-decoration:none;font:500 14px/1 var(--sans);min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px}
 .site-bar nav a[aria-current="page"],.site-bar nav a:hover{color:var(--gold)}
-@media (max-width:1279px){
+@media (max-width:1023px){
   .menu-btn{display:inline-flex;align-items:center;justify-content:center}
   .site-bar nav{display:none;position:absolute;top:100%;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
 }
-.dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6}
-.dock a{color:var(--dim);text-decoration:none;font:500 12px/1 var(--sans);min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6;overflow-x:auto}
+.dock a{color:var(--dim);text-decoration:none;font:500 11px/1.15 var(--sans);min-height:44px;min-width:44px;flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:0 2px;text-align:center;overflow-wrap:anywhere}
 .dock a[aria-current="page"]{color:var(--gold)}
 .chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
 .chart{height:180px;min-height:180px;flex:none;overflow:hidden}
@@ -1271,7 +1311,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .shot{width:min(280px,100%);height:auto;border-radius:16px;background:#12100e;display:block}
 .row .shot{width:48px;height:auto;border-radius:8px;object-fit:contain}
 .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:44px;align-items:center;min-width:0;max-width:100%}
-.row a{color:var(--txt);text-decoration:none;min-width:0;flex:1;overflow-wrap:anywhere}
+.row a{color:var(--txt);text-decoration:none;min-width:44px;min-height:44px;flex:1;overflow-wrap:anywhere;display:flex;align-items:center}
 .row b{overflow-wrap:anywhere}
 .row > b{flex:none;white-space:nowrap}
 .own{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
@@ -1290,18 +1330,25 @@ img,svg{max-width:100%}
 .sort-chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);text-decoration:none;white-space:nowrap}
 .sort-chip[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
 @media (max-width:600px){.sort-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}}
-.filters input,.filters select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 10px;font:15px var(--sans)}
-button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);cursor:pointer}
+.filters input,.filters select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;min-height:44px;min-width:44px;padding:0 10px;font:15px var(--sans)}
+button{min-height:44px;min-width:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:600 14px var(--sans);cursor:pointer}
+.filters [data-range]{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+.store-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center}
 button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 .site-foot{max-width:1040px;margin:0 auto;padding:8px 16px 24px;color:var(--dim);font-size:14px}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{scroll-behavior:auto!important;transition:none!important}}
-@media (max-width:1279px){
+@media (max-width:1023px){
   .menu-btn{display:inline-flex;align-items:center;justify-content:center}
   .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
 }
-@media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
-@media (min-width:1280px){.site-bar nav{display:flex}}
+@media (min-width:1024px){
+  .menu-btn{display:none}
+  .site-bar{height:auto;max-height:none}
+  .site-bar nav{display:flex;position:static;flex-direction:row;background:transparent;border-bottom:0;padding:0}
+  .dock{display:none}
+  body{padding-bottom:24px}
+}
 /* One card face, the Post Office formula (its .card img rule):
    aspect-ratio 63/88, object-fit contain, centered, Post Office sheet behind, rounded to the card corner.
    Every single-card picture on the site uses this class. */
@@ -1389,13 +1436,15 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
+<div id="content" tabindex="-1">
 ${body}
+</div>
 <nav class="dock" aria-label="Primary">
-${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav>
 <footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
@@ -2061,20 +2110,21 @@ export function renderCard(card, stamp, opts = {}) {
   const setBit = card.setSlug
     ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || "");
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const body = `<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
-.glance{display:block}
-.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:112px;height:auto}
-.win{display:inline-block;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
+.glance{display:block;max-width:100%}
+.glance-photo{max-width:100%}
+.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
+.win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
 @media (min-width:768px){
-  .glance{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:start}
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:168px}
+  .glance{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(200px,100%)}
 }
 @media (min-width:1100px){
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:200px}
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(240px,100%)}
 }
 </style>
 <div class="glance">
@@ -2098,7 +2148,6 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 <p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || "No market price"}</li>`).join("")}</ul>` : ""}
-${opts.video ? `<p><a href="/video/studio.html?ids=${esc(card.id)}">Make a Short</a></p>` : ""}
 ${priceChart}
 ${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
@@ -2676,7 +2725,8 @@ export function renderPost(stamp, mark = "", opts = {}) {
 }
 
 const RATE_LOCK = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
-const PAUSE_STAY = "Pause up to 2 months in any 12, your number and rate stay.";
+const PAUSE_STAY = "Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.";
+const WATCH_PERK = "Premium gets a Discord note on up to 25 saved products: when one is on the next Feed read, when the labeled market price crosses the amount you set, or when its filtered eBay listings cross the count you set (20 or more).";
 
 export function renderPremium(stamp, opts = {}) {
   void stamp;
@@ -2706,8 +2756,8 @@ export function renderPremium(stamp, opts = {}) {
 .prem-q b{display:block;font:600 15px/1.4 var(--sans)}
 .prem-q p{margin:4px 0 0;color:var(--dim);font-size:15px}
 .prem-manage{margin:18px 0 0;color:var(--dim);font-size:14px}
-.prem-acts{display:flex;flex-wrap:nowrap;gap:8px;margin:8px 0 0}
-.prem-acts a{flex:1 1 0;min-width:0;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans)}
+.prem-acts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.prem-acts a{flex:1 1 220px;min-width:44px;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans);padding:8px 12px}
 @media(min-width:840px){
   .prem-grid{grid-template-columns:repeat(6,1fr)}
   .prem-card{grid-column:span 2}
@@ -2718,16 +2768,15 @@ export function renderPremium(stamp, opts = {}) {
 </style>
 <section class="prem-hero">
 <p class="prem-kicker">Discord Premium</p>
-<h1>Join the club.<br>Claim your First 222 number.</h1>
-<p class="prem-lede">Hang out with serious collectors, rippers and flippers.</p>
-<p class="prem-price">$14.99 a month. Cancel anytime.</p>
-<p>Cancelling stops the next renewal. 7-day refund on the first charge.</p>
-<a class="prem-join" href="${DISCORD}">Join Premium</a>
-<p class="prem-fine">One number per person. Never reused. Card payments only. Checkout starts in Discord.</p>
+<h1>Join the club.</h1>
+<p class="prem-lede">Premium members get a number and the Premium role.</p>
+<p class="prem-price">Discord Premium is $14.99/mo through Stripe.</p>
+<p>Cancel whenever.</p>
+<a class="prem-join" href="${DISCORD}">Join in Discord</a>
 </section>
 <h2>What you're joining</h2>
 <div class="prem-grid">
-${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Your First 222 number + Premium role", "Premium members get a number and the Premium role. One person, one number. Never reused.")}
+${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Premium role", "Premium members get a number and the Premium role.")}
 </div>
 <h2>Your price stays locked</h2>
 <div class="prem-lock">
@@ -2736,17 +2785,16 @@ ${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Your First 222 nu
 </div>
 <h2>Members also get</h2>
 <div class="prem-also">
-<p>Watching the Stadium for free is fine.</p>
+<p>${WATCH_PERK}</p>
 </div>
 <h2>Questions</h2>
 <div class="prem-faq">
-<div class="prem-q"><b>What's free?</b><p>All tools on the site stay free.</p></div>
 <div class="prem-q"><b>Can I pause?</b><p>${PAUSE_STAY}</p></div>
 <div class="prem-q"><b>What happens if I cancel?</b><p>Cancel and the number is retired. If you come back, you pay the public rate then on the site.</p></div>
-<div class="prem-q"><b>How do I manage it?</b><p>Use /premium in Discord.</p></div>
+<div class="prem-q"><b>How do I manage it?</b><p>Pause in Discord with /premium. Cancel in Discord with /premium.</p></div>
 </div>
 <p class="prem-manage">Already in?</p>
-<div class="prem-acts"><a href="${DISCORD}">Pause</a><a href="${DISCORD}">Cancel</a></div>
+<div class="prem-acts"><a href="${DISCORD}">Pause in Discord with /premium</a><a href="${DISCORD}">Cancel in Discord with /premium</a></div>
 </main>`;
   return chrome("", body, "Discord Premium", "", "", feedNav(opts));
 }
@@ -2841,7 +2889,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const diveLead = JSON.stringify(opts.diveMap || { ids: [], byTcgcsv: {} }).replace(/</g, "\u003c");
   const css = `
   .feed-page{padding-top:8px}
-  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start}
+  .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start;position:relative}
   #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;width:100%}
   .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%}
   .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:0;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
@@ -2850,7 +2898,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
   .chip-more{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:5;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--gold);font:600 28px/1 var(--sans)}
   .chip-more[hidden]{display:none}
-  .pill-native{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .pill-native{position:absolute;width:44px;height:44px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;pointer-events:none}
   .set-picker{display:flex;flex-direction:column;gap:8px;width:100%;max-width:100%;min-width:0;position:relative;z-index:6}
   .set-picker[hidden]{display:none}
   .set-picker input{min-height:44px;width:100%;max-width:100%}
@@ -2880,14 +2928,15 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .news-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
   .news-kicker .k{font:600 12px/1 var(--sans);letter-spacing:.08em;color:var(--gold)}
   .news-kicker .tag{font:600 12px/1 var(--sans);color:#1a1407;background:var(--gold);border-radius:999px;padding:4px 8px}
-  .news-card h3{font:600 20px/1.3 var(--serif)}
+  .news-card h2{font:600 20px/1.3 var(--serif)}
   .news-sum{margin:0;font:400 15px/1.45 var(--sans)}
   .news-meta{list-style:none;margin:0;padding:10px 12px;background:#211e1a;border-radius:12px;display:flex;flex-direction:column;gap:4px}
   .news-meta li{margin:0;font:500 14px/1.35 var(--sans);color:var(--dim)}
   .news-meta b{color:var(--gold);font-weight:600}
   .news-by{margin:0;color:var(--dim);font:500 14px/1.3 var(--sans)}
   .news-go{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
-  .feed-card h3{font:600 22px/1.25 var(--serif);margin:0}
+  .feed-card h2{font:600 22px/1.25 var(--serif);margin:0}
+  .feed-card h2 a{min-height:44px;display:inline-flex;align-items:center}
   .one-line{margin:0}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
@@ -2972,7 +3021,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .mine-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:12px 0}
   .mine-row a{font:600 18px/1.3 var(--serif);flex:1;min-width:160px}
   .mine-row button{min-height:44px}
-  @media (max-width:420px){.feed-card h3{font-size:20px}}
+  @media (max-width:420px){.feed-card h2{font-size:20px}}
   `;
   const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };
   const focusTitle = titles[String(opts.section || "")] || "";
@@ -3013,7 +3062,7 @@ const lead=JSON.parse(document.getElementById("feed-lead").textContent);
 const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-${opts.video ? "const shortFor=card=>'<a href=\"/video/studio.html?ids='+encodeURIComponent(String(card.href||'').split('/').pop())+'\">Make a Short</a>';" : "const shortFor=()=>'';"}
+const shortFor=()=>'';
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
@@ -3428,7 +3477,7 @@ function waveEl(card){
   const line=shownRead(card);
   const setName=setLine(card);
   const link=card.href?'<p><a href="'+html(card.href)+'">'+html(card.source||"Source")+"</a></p>":"";
-  el.innerHTML=safeNewsHtml(card)+"<h3>"+html(card.name||card.headline||"Read")+"</h3>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
+  el.innerHTML=safeNewsHtml(card)+"<h2>"+html(card.name||card.headline||"Read")+"</h2>"+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(line?'<p class="one-line">'+html(line)+"</p>":"")+link;
   return el;
 }
 function matterLines(card){
@@ -3659,14 +3708,8 @@ function productIdOf(card){
   const m=href.match(new RegExp("/(?:c|p)/(tcgcsv-[0-9]+)"));
   return m?m[1]:"";
 }
-function mountMon(el, card){
-  const slug=pokemonSlug(card&&card.name);
-  if(!slug) return;
-  const link=document.createElement("a");
-  link.className="mon-btn";
-  link.href="/pokemon/"+encodeURIComponent(slug);
-  link.textContent="Cards";
-  el.appendChild(link);
+function mountMon(){
+  return;
 }
 function newsDetailHtml(card){
   const rows=Array.isArray(card.details)?card.details:[];
@@ -3691,7 +3734,7 @@ function newsEl(card){
   const source=String(card.source||"").trim();
   const by='<p class="news-by">'+html(source||"Source")+(when?" · "+html(when):"")+"</p>";
   const link=card.href?'<a class="news-go" href="'+html(card.href)+'">Read at '+html(source||"the source")+"</a>":"";
-  el.innerHTML=safeNewsHtml(card)+kicker+"<h3>"+html(card.name||"")+"</h3>"+blurb+newsDetailHtml(card)+by+link;
+  el.innerHTML=safeNewsHtml(card)+kicker+"<h2>"+html(card.name||"")+"</h2>"+blurb+newsDetailHtml(card)+by+link;
   bindShare(el, card);
   return el;
 }
@@ -3733,7 +3776,7 @@ function bindShare(el, card){
     }
     pen.fillStyle="#efe9de";
     pen.font="36px Georgia, serif";
-    var sentence=el.querySelector(".one-line") || el.querySelector("h3");
+    var sentence=el.querySelector(".one-line") || el.querySelector("h2");
     var text=sentence?sentence.textContent:String(card.headline||"");
     var words=String(text||"").split(" ");
     var cur="";
@@ -3776,12 +3819,12 @@ function cardEl(card, facts){
   const runHtml=run?'<p class="print-run">'+html(run)+' <a href="/rotation">Rotation and print runs</a>.</p>':"";
   const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const pid=productIdOf(card);
-  const h3=pageMode==="read"?"<h3>"+title+"</h3>":(pid?'<h3><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h3>":'<h3><a href="'+readHref+'">'+title+"</a></h3>");
+  const h2=pageMode==="read"?"<h2>"+title+"</h2>":(pid?'<h2><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h2>":'<h2><a href="'+readHref+'">'+title+"</a></h2>");
   const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
-  const head=h3+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
+  const head=h2+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){
@@ -3802,7 +3845,7 @@ function cardEl(card, facts){
       remember();
       location.href=readHref;
     });
-    const nameLink=el.querySelector("h3 a");
+    const nameLink=el.querySelector("h2 a");
     if(nameLink) nameLink.addEventListener("click", remember);
     bindShare(el, card);
     return el;
@@ -3947,7 +3990,7 @@ function trackedEl(row){
   const el=document.createElement("article");
   el.className="feed-card";
   const p=Number.isFinite(Number(row.pct))?(" ("+pct(row.pct)+")"):"";
-  el.innerHTML='<h3>'+html(row.claim)+'</h3><p>Flagged '+html(row.printed_on)+' at '+money(row.price_at_flag)+', now '+money(row.price_now)+p+'.</p><p class="muted">TCGplayer market, '+html(row.price_as_of||row.printed_on)+'</p>';
+  el.innerHTML='<h2>'+html(row.claim)+'</h2><p>Flagged '+html(row.printed_on)+' at '+money(row.price_at_flag)+', now '+money(row.price_now)+p+'.</p><p class="muted">TCGplayer market, '+html(row.price_as_of||row.printed_on)+'</p>';
   return el;
 }
 function listFor(part){

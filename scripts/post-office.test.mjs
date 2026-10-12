@@ -141,7 +141,7 @@ t("feed stays home without the flag", feedHidden.status === 302 && feedHidden.he
 const feedVideoOff = await (await renderPath("/feed", fetchImpl, { feed: true })).text();
 t("short button stays off without the video flag", !feedVideoOff.includes("Make a Short"));
 const feedOn = await (await renderPath("/feed", fetchImpl, { feed: true, video: true })).text();
-t("short button is in the feed when both flags are on", feedOn.includes("Make a Short"));
+t("short button stays off even when the video flag is on", !feedOn.includes("Make a Short") && !feedOn.includes("/video/studio.html"));
 t("dock rule wins", feedVideoOff.lastIndexOf(".dock{display:none") > feedVideoOff.lastIndexOf(".dock{display:flex"));
 
 const env = {

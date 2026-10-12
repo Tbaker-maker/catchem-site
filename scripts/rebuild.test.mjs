@@ -2,7 +2,7 @@ import "./trust.test.mjs";
 import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare, TAKE_LABELS, TAKE_FOOTER } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare, TAKE_LABELS, TAKE_FOOTER, chartBox } from "../src/ui.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps, imageTag as chainTag } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -404,14 +404,15 @@ const premium = await worker.fetch(new Request("https://catchemtcg.com/premium")
 const premiumHtml = await premium.text();
 const lock = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
 t("premium is a worker page", pageKind("/premium") === "premium" && premium.status === 200);
-t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause</a><a href=") && premiumHtml.includes(">Cancel</a>"));
+t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause in Discord with /premium</a>") && premiumHtml.includes(">Cancel in Discord with /premium</a>") && premiumHtml.includes('href="https://discord.gg/fUSjxDX4Hy"'));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
-t("premium sells the club", premiumHtml.includes("Join the club.") && premiumHtml.includes("Claim your First 222 number.") && premiumHtml.includes("Hang out with serious collectors, rippers and flippers.") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes("Join Premium") && premiumHtml.includes("$14.99 a month"));
+t("premium sells the club", premiumHtml.includes("<h1>Join the club.</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join in Discord</a>") && premiumHtml.includes("Discord Premium is $14.99/mo through Stripe.") && premiumHtml.includes("Cancel whenever.") && premiumHtml.includes("Premium members get a number and the Premium role."));
+t("premium drops the blanket number claim, the refund line, and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("7-day refund on the first charge.") && !premiumHtml.includes("Card payments only."));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));
 t("premium drops the internal notes", !premiumHtml.includes("does not take a payment") && !premiumHtml.includes("same weight"));
-t("premium has the joining card and the faq", premiumHtml.includes("What you're joining") && premiumHtml.includes("Your First 222 number + Premium role") && premiumHtml.includes("Cancelling stops the next renewal. 7-day refund on the first charge.") && !premiumHtml.includes("Early beta access") && !premiumHtml.includes("Private member channels") && !premiumHtml.includes("Bigger tool limits") && !premiumHtml.includes("50 AI Ideas") && premiumHtml.includes("What's free?") && premiumHtml.includes("Pause up to 2 months in any 12, your number and rate stay.") && premiumHtml.includes("Use /premium in Discord."));
+t("premium has the joining card and the faq", premiumHtml.includes("What you're joining") && premiumHtml.includes("Premium role") && !premiumHtml.includes("Early beta access") && !premiumHtml.includes("Private member channels") && !premiumHtml.includes("Bigger tool limits") && !premiumHtml.includes("50 AI Ideas") && premiumHtml.includes("Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.") && premiumHtml.includes("Pause in Discord with /premium"));
 const paid = await (await worker.fetch(new Request("https://catchemtcg.com/?premium=success"), env)).text();
 const stopped = await (await worker.fetch(new Request("https://catchemtcg.com/premium?premium=cancel"), env)).text();
 t("a paid return names the role and the number", paid.includes("Payment sent.") && paid.includes("Discord Premium turns on when the payment lands. You get the Premium role and a First 222 number in Discord. Then run /pull week."));
@@ -419,7 +420,7 @@ t("a canceled checkout says nothing was charged", stopped.includes("No charge.")
 
 t("premium does not claim free entry or AMOE", !/free entry|AMOE|no purchase necessary|mail-?in/i.test(premiumHtml));
 t("premium does not invent ungated perks", !premiumHtml.includes("Vault votes") && !premiumHtml.includes("member-only drops") && !premiumHtml.includes("Premium votes"));
-t("premium does not promise a Stadium giveaway auto-entry", !premiumHtml.includes("monthly Stadium giveaway auto-entry") && !premiumHtml.includes("giveaway auto-entry") && premiumHtml.includes("Watching the Stadium for free is fine."));
+t("premium does not promise a Stadium giveaway auto-entry", !premiumHtml.includes("monthly Stadium giveaway auto-entry") && !premiumHtml.includes("giveaway auto-entry") && premiumHtml.includes("Premium gets a Discord note on up to 25 saved products:"));
 t("join premium uses the discord flow", premiumHtml.includes('class="prem-join" href="https://discord.gg/fUSjxDX4Hy"') && !premiumHtml.includes("checkout.stripe.com") && !/href="\/(feed|board|receipts|accuracy)/.test(premiumHtml));
 t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
 
@@ -692,7 +693,7 @@ const leadJson = JSON.parse(factHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/
 const keptFact = leadJson.find((r) => r.id === "pokemon-duraludon");
 t("the live lead keeps the no-price fact and drops the empty one", keptFact && keptFact.cardCount === 19 && keptFact.dex === 884 && !("price" in keptFact) && !leadJson.some((r) => r.id === "pokemon-missing"));
 const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.indexOf("function cardEl"));
-t("the fact card says the English count, keeps Cards on the Pokémon page, and does not change the filters", factHtml.includes("pokemonFactLine(card)") && monFn.includes('className="mon-btn"') && monFn.includes('"/pokemon/"+') && monFn.includes("pokemonSlug(card&&card.name)") && !monFn.includes("fetch(") && !monFn.includes("tcgcsv") && !monFn.includes("The picture is missing.") && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
+t("the fact card says the English count and does not link a Pokémon page", factHtml.includes("pokemonFactLine(card)") && !factHtml.includes('"/pokemon/"+') && !factHtml.includes("/video/studio.html") && !factHtml.includes('href="/news"') && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
 t("a missing cutout is a branded tile and the news filter says there is no news", !factHtml.includes("The cutout is missing.") && factHtml.includes("function factCutLine") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("brandedTile(") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("cutoutSrc(card)") && !factHtml.includes("The picture is missing.") && factHtml.includes("function newsTile") && factHtml.includes("news-tile") && !factHtml.includes("news-preview") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news."));
 const newsFn = factHtml.slice(factHtml.indexOf("function newsDetailHtml"), factHtml.indexOf("function factCutLine"));
 t("a news read is sized to the file and keeps Previous and Next on the card", newsFn.includes('className="feed-card news-card"') && newsFn.includes(">NEWS<") && newsFn.includes("news-sum") && newsFn.includes("Read at ") && newsFn.includes("dayLabel") && !newsFn.includes("card.asOf") && factHtml.includes("is-news") && factHtml.includes("Swipe sideways for the next read.") && factHtml.includes('textContent=news?"Previous"') && factHtml.includes("news-card{flex:0 0 auto"));
@@ -921,6 +922,37 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   const product = paintCard({ id: "tcgcsv-1", name: "Booster Box", set: "SV02: Paldea Evolved", setSlug: "sv02-paldea-evolved", kind: "sealed", price: 90, source: "TCGplayer market" }, "");
   const other = paintCard({ id: "tcgcsv-2", name: "ETB", set: "SV: Prismatic Evolutions", setSlug: "sv-prismatic-evolutions", kind: "sealed", price: 80, source: "TCGplayer market" }, "");
   t("a product on a rotated set gets the one-liner and prismatic does not", product.includes("<h2>Reads</h2>") && product.includes(line) && !product.includes("Regulation mark") && !other.includes(line) && !/reprint/i.test(product));
+}
+
+{
+  const named = [
+    ["home", indexHtml],
+    ["feed", await (await renderPath("/feed", fetchImpl, { feed: true })).text()],
+    ["set", await (await renderPath("/sets/base", fetchImpl)).text()],
+    ["product", await (await renderPath("/c/tcgcsv-10", fetchImpl, { feed: true })).text()],
+    ["premium", renderPremium("")],
+  ];
+  const missed = [];
+  for (const [name, html] of named) {
+    const paths = localPaths(html);
+    const dead = deadLocals(paths, pageKind);
+    if (dead.length) missed.push(name + " dead " + dead.join(","));
+    for (const path of paths) {
+      if (path === "/" || path.startsWith("/api/") || path.startsWith("/data/") || path.startsWith("/auth/")) continue;
+      const res = await worker.fetch(new Request("https://catchemtcg.com" + path), { ...env, FEED_ENABLED: "true" });
+      if (res.status === 404) missed.push(name + " " + path + " " + res.status);
+    }
+  }
+  t("home, feed, a set, a product, and premium link no 404", missed.length === 0);
+  if (missed.length) console.error(missed.join("\n"));
+  const one = chartBox([["2026-01-01", 10], ["2026-10-01", 12]], "TCGplayer market, daily");
+  t("30D, 90D, and 1Y stay off when that range has one price", !one.includes('data-range="30D"') && !one.includes('data-range="90D"') && !one.includes('data-range="1Y"') && one.includes('data-range="All"'));
+  const run = [];
+  for (let i = 0; i < 40; i++) run.push([new Date(Date.parse("2026-08-01T00:00:00Z") + i * 86400000).toISOString().slice(0, 10), 10 + i]);
+  const many = chartBox(run, "TCGplayer market, daily");
+  t("30D stays when that range has two or more prices", many.includes('data-range="30D"') && !many.includes('data-range="1Y"'));
+  t("a missing calendar day is its own segment", splitDated([{ date: "2026-08-01", ask: 10 }, { date: "2026-08-03", ask: 12 }], "ask").length === 2);
+  t("premium copy strings from the old hero are absent", !renderPremium("").includes("Claim your First 222 number.") && !renderPremium("").includes("7-day refund on the first charge.") && !renderPremium("").includes("Card payments only."));
 }
 
 if (fail) process.exit(1);

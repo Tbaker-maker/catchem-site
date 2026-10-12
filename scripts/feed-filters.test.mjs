@@ -241,7 +241,7 @@ async function readState(page) {
       set: new URLSearchParams(location.search).get("set") || "",
       f: new URLSearchParams(location.search).get("f") || "",
       meta: card ? (card.querySelector(".card-meta") || {}).textContent || "" : "",
-      title: card ? (card.querySelector("h3") || {}).textContent || "" : "",
+      title: card ? (card.querySelector("h2") || {}).textContent || "" : "",
       options: Array.from(document.querySelectorAll("#f-loop-set option")).filter((o) => o.value).map((o) => ({ value: o.value, text: o.textContent, logo: o.dataset.logo || "" })),
       hits: document.querySelectorAll("#set-hits button").length,
       hitImg: document.querySelectorAll("#set-hits img").length,
