@@ -4,6 +4,7 @@ const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
 const rot = { sources: [{ mark: "G", date: "2026-04-10" }], expected: [{ mark: "H", window: "spring 2027", basis: "x" }], sets: [{ slug: "e", mark: "E", status: null }, { slug: "s", mark: "J", status: "Standard" }, { slug: "g", mark: "G" }, { slug: "h", mark: "H" }, { slug: "j", mark: "J" }, { slug: "n", mark: null }] };
 t("IR kind", artKind({ rarity: "Illustration Rare" }) === "Illustration Rare");
 t("TG kind", artKind({ rarity: "Ultra Rare", num: "TG05" }) === "Trainer Gallery");
+t("SM tag team alt art is its own kind", artKind({ name: "Pheromosa & Buzzwole GX (192) (Alternate Full Art)", release: "2019-05-03" }) === "Tag Team (Alternate Art)" && artKind({ name: "Latias & Latios GX (Alternate Full Art)" }) === "Tag Team (Alternate Art)");
 t("alt art kind", artKind({ name: "Umbreon VMAX (Alternate Art Secret)" }) === "Alternate Art");
 t("plain holo has no kind", artKind({ rarity: "Holo Rare", num: "5/100" }) === "");
 t("rotated wording", rotationChipData(rot, "g", "2026-10-12").text === "Rotated Apr 10, 2026");
@@ -26,7 +27,7 @@ t("free shows a preview and a Premium button", (free.match(/class="wl-row"/g) ||
 t("premium shows all", (paid.match(/class="wl-row"/g) || []).length === 6 && !/See it with Premium/.test(paid));
 const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|load up|best time)\b|\u2014/i;
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(cyclePanel(row, "2026-10-12").replace(/<[^>]+>/g, " ")));
-t("every price line carries a date", /\$3\.00 on Oct 12, 2026/.test(paid) && /12 eBay listings counted for S Booster Box on Oct 12, 2026/.test(paid));
+t("every price line carries a date", /\$3\.00 on Oct 12, 2026/.test(paid) && !/listings|sealed/i.test(paid.replace(/<[^>]+>/g, " ").replace(/Premium/g, "")));
 t("lift chips render", /rchip lift">Near its lowest on file/.test(paid) && /rchip lift/.test(cyclePanel(row, "2026-10-12")));
 t("free count line is exact", /Showing 3 of <b>6 cards<\/b>\. Premium shows all 6/.test(free));
 const big = { asOf: "2026-10-12", rows: Array.from({ length: 250 }, (_, i) => ({ ...row, id: "tcgcsv-" + i })) };

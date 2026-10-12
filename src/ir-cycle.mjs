@@ -17,7 +17,7 @@ export function artKind(card) {
   if (r === "Special Illustration Rare") return "Special Illustration Rare";
   if (/^TG\d/i.test(num)) return "Trainer Gallery";
   if (/^GG\d/i.test(num)) return "Galarian Gallery";
-  if (/Alternate (Full )?Art|Alternate Art Secret/i.test(name)) return "Alternate Art";
+  if (/Alternate (Full )?Art|Alternate Art Secret/i.test(name)) return / & /.test(name) || (card?.release && String(card.release) < "2020-02") ? "Tag Team (Alternate Art)" : "Alternate Art";
   return "";
 }
 
@@ -85,8 +85,7 @@ export function cycleRows(row) {
     ["Where it sits", row.position || "Range too flat to place"],
     ["30 days", trendText(row.trend30)],
     ["90 days", trendText(row.trend90)],
-    ["Sealed supply", listingsText(row.setListings)],
-    ["IR curve", `Stage: ${row.curve.stage}. ${row.curve.text}`],
+    ["Price pattern", `Stage: ${row.curve.stage}. ${row.curve.text}`],
   ];
 }
 
@@ -102,7 +101,7 @@ export function cyclePanel(row, asOf) {
   if (!row) return "";
   const chips = liftChips(row);
   const dl = cycleRows(row).filter(([k]) => !(k === "Where it sits" && hasRangeChip(row))).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
-  return `<section class="ircy" aria-label="IR cycle"><h2>IR cycle${row.kindLabel ? ` <span class="sub" style="font:500 13px/1 var(--sans);opacity:.7">· ${esc(row.kindLabel)}</span>` : ""}</h2>${chips ? `<div class="rchips">${chips}</div>` : ""}<dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Curve from our IR study of TCGplayer market history.</p></section>`;
+  return `<section class="ircy" aria-label="Release cycle"><h2>Release cycle${row.kindLabel ? ` <span class="sub" style="font:500 13px/1 var(--sans);opacity:.7">· ${esc(row.kindLabel)}</span>` : ""}</h2>${chips ? `<div class="rchips">${chips}</div>` : ""}<dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Pattern from our study of TCGplayer market history.</p></section>`;
 }
 
 export function cardArtHtml(card, rot, doc, today, marks) {
@@ -127,7 +126,7 @@ export function watchlistBody(doc, opts = {}) {
   const pager = premium && pages > 1 ? `<nav class="wl-pager" aria-label="Pages"><span>Showing ${fmt((page - 1) * PAGE + 1)} to ${fmt(Math.min(all.length, page * PAGE))} of ${fmt(all.length)}</span>${page > 1 ? `<a class="rchip" href="${qs(page - 1)}">Previous</a>` : ""}${page < pages ? `<a class="rchip kind" href="${qs(page + 1)}">Next ${PAGE}</a>` : ""}</nav>` : "";
   const pic = typeof opts.pic === "function" ? opts.pic : () => "";
   const items = shown.map((r) => {
-    const facts = cycleRows(r).filter(([k]) => k !== "IR curve" && !(k === "Where it sits" && hasRangeChip(r))).map(([k, v]) => `<li><span>${esc(k)}</span> ${esc(v)}</li>`).join("");
+    const facts = cycleRows(r).filter(([k]) => k !== "Price pattern" && !(k === "Where it sits" && hasRangeChip(r))).map(([k, v]) => `<li><span>${esc(k)}</span> ${esc(v)}</li>`).join("");
     const tags = liftChips(r);
     return `<li class="wl-row"><a class="wl-pic" href="/c/${esc(r.id)}">${pic(r)}</a><div class="wl-main"><p class="wl-set">${esc(r.set)} · ${esc(r.kindLabel || r.kind)} · ${esc(r.num || "")}</p><h2><a href="/c/${esc(r.id)}">${esc(r.name.replace(/\s+-\s+\S+$/, ""))}</a></h2><ul class="wl-facts">${facts}</ul><p class="wl-curve">${esc(r.curve.text)}</p>${tags ? `<div class="rchips">${tags}</div>` : ""}</div></li>`;
   }).join("");
@@ -138,9 +137,9 @@ export function watchlistBody(doc, opts = {}) {
 @media (min-width:768px){.wl-row{grid-template-columns:120px minmax(0,1fr)}.wl-pic img,.wl-pic .tile{width:120px;max-width:120px}}</style>
 <p class="kicker" style="letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)">Premium</p>
 <h1>IR watchlist</h1>
-<p class="lede">Illustration Rares, Special Illustration Rares, Trainer Gallery and Galarian Gallery cards, and Sword &amp; Shield alt arts. Each one shows its age, where its price sits against its own low and high on file, its 30 and 90 day trend, and the sealed listings we counted for its set.</p>
+<p class="lede">Illustration Rares and Special Illustration Rares (Scarlet &amp; Violet and Mega), Trainer Gallery, Galarian Gallery and Alternate Art cards (Sword &amp; Shield), and Tag Team (Alternate Art) cards (Sun &amp; Moon), each named by its own rarity. Each one shows its age, where its price sits against its own low and high on file, and its 30 and 90 day trend.</p>
 ${filter}<ul class="wl-list">${items}</ul>${pager}${gate}
-<p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. Listings are eBay listings we counted for one sealed product of the set, not for the card. The order weighs several facts together: time since release, where the price sits in its range on file, the Pokémon's popularity (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others), how its 90 days compare with set and era peers, its trend, and the sealed listings counted. The chips on each card name the facts that weigh most for it. This is a factual signal, not advice.</p></main>`;
+<p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. The order weighs several facts together: time since release, where the price sits in its range on file, the Pokémon's popularity (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others), how its 90 days compare with set and era peers, and its trend. The chips on each card name the facts that weigh most for it. This is a factual signal, not advice.</p></main>`;
 }
 
 const TAG_LABEL = { headliner: "Fan favourite", eeveelution: "Eeveelution", gen1: "Gen 1", starter: "Starter", popular: "Popular Pokémon" };
