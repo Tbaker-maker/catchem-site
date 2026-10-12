@@ -945,7 +945,7 @@ export function renderSupply(doc, stamp, opts = {}) {
     const listSeg = splitDated((read.series || []).map((point) => ({ date: point.date, listings: point.listings })), "listings");
     return `<article class="card" style="margin:12px 0"><h2>${esc(read.sentence)}</h2><p class="muted">${esc(read.wrong || "")}</p><p class="muted">eBay ask</p>${gapChartSvg(askSeg, "#d9b779")}<p class="muted">eBay listings</p>${gapChartSvg(listSeg, "#7fc79a")}</article>`;
   }).join("");
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Listing supply</h1>
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>Counts are active eBay listings, not sales. Both exact nights have to be on file, and the change has to be at least 15%.</p>
@@ -964,7 +964,7 @@ export function renderSetValue(doc, stamp, opts = {}) {
   const reads = on ? (doc?.reads || []) : [];
   const days = (doc?.priceDaysOnFile || []).join(", ");
   const cards = reads.map((read) => `<article class="card" style="margin:12px 0"><h2>${esc(read.sentence)}</h2><p>${esc(read.count)} cards priced on both days. ${money(read.from)} on ${esc(read.fromDate)} and ${money(read.to)} on ${esc(read.toDate)}. Days between are not filled in.</p></article>`).join("");
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Set value</h1>
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>The sum is TCGplayer market for singles priced on both exact days. A missing day drops the set. The card count is how many singles had a price on both days.</p>
@@ -1085,17 +1085,19 @@ function catchemMount(root){
     var release=host.getAttribute("data-release")||"";
     var box=host.parentElement;
     var span=all.length<2?0:Math.round((Date.parse(all[all.length-1].d+"T00:00:00Z")-Date.parse(all[0].d+"T00:00:00Z"))/86400000)+1;
-    var allow=["All"];
+    var allow=all.length>=2?["All"]:[];
     if(span>=7) allow.unshift("7D");
     if(span>=30) allow.splice(allow.indexOf("All"),0,"30D");
     if(span>=90) allow.splice(allow.indexOf("All"),0,"90D");
     if(span>=365) allow.splice(allow.indexOf("All"),0,"1Y");
+    allow=allow.filter(function(r){ return catchemFilter(all, r).length>=2; });
     function paint(range){ catchemDraw(host, catchemFilter(all, range), release, caption); }
     paint("All");
     if(!box) return;
     var keep=box.getAttribute("data-keep-ranges")==="1";
     box.querySelectorAll("[data-range]").forEach(function(btn){
-      if(!keep && allow.indexOf(btn.getAttribute("data-range"))<0) btn.hidden=true;
+      var r=btn.getAttribute("data-range");
+      if((!keep && allow.indexOf(r)<0) || catchemFilter(all, r).length<2) btn.hidden=true;
       btn.addEventListener("click", function(){
         box.querySelectorAll("[data-range]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
         btn.setAttribute("aria-pressed","true");
@@ -1107,7 +1109,8 @@ function catchemMount(root){
 `;
 
 const QUICK_JS = "function catchemSpark(packed, asOf){\n  var end=String(asOf||\"\").slice(0,10);\n  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(end) || !packed) return \"\";\n  var endMs=Date.parse(end+\"T00:00:00Z\");\n  var pts=[];\n  String(packed).split(\",\").forEach(function(bit){\n    var m=bit.match(/^([0-9]+):([0-9]+(?:[.][0-9]+)?)$/);\n    if(!m) return;\n    var off=Number(m[1]);\n    var v=Number(m[2]);\n    if(off<0 || off>29 || !(v>0)) return;\n    pts.push([new Date(endMs-off*86400000).toISOString().slice(0,10), v]);\n  });\n  pts.sort(function(a,b){ return a[0]<b[0]?-1:a[0]>b[0]?1:0; });\n  if(pts.length<2) return \"\";\n  var w=72,h=28,vals=pts.map(function(p){return p[1]}),min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=max-min||1;\n  var t0=Date.parse(pts[0][0]+\"T00:00:00Z\"), t1=Date.parse(pts[pts.length-1][0]+\"T00:00:00Z\");\n  function x(d){ var t=Date.parse(d+\"T00:00:00Z\"); if(t1===t0) return 2; return 2+((t-t0)/(t1-t0))*(w-4); }\n  function y(v){ return 2+((max-v)/span)*(h-4); }\n  var d=\"\", prev=\"\";\n  pts.forEach(function(p){\n    var expected=prev?new Date(Date.parse(prev+\"T00:00:00Z\")+86400000).toISOString().slice(0,10):\"\";\n    d+=(!prev || p[0]!==expected ? \"M\" : \"L\")+x(p[0]).toFixed(1)+\",\"+y(p[1]).toFixed(1);\n    prev=p[0];\n  });\n  return '<svg class=\"spark30\" width=\"72\" height=\"28\" viewBox=\"0 0 72 28\" aria-hidden=\"true\"><path d=\"'+d+'\" fill=\"none\" stroke=\"#d9b779\" stroke-width=\"1.5\"></path></svg>';\n}\nwindow.catchemSpark=catchemSpark;\nvar qCache={};\nvar qAnchor=null;\nfunction qEls(){\n  return {back:document.getElementById(\"qback\"), sheet:document.getElementById(\"qsheet\"), body:document.getElementById(\"q-body\")};\n}\nfunction qClose(){\n  var el=qEls();\n  if(!el.sheet) return;\n  el.sheet.hidden=true;\n  if(el.back) el.back.hidden=true;\n  document.body.classList.remove(\"q-open\");\n  el.sheet.style.transform=\"\";\n  el.sheet.classList.remove(\"tall\");\n}\nfunction qPlace(anchor){\n  var el=qEls();\n  var sheet=el.sheet;\n  if(!sheet) return;\n  var wide=window.matchMedia(\"(min-width:768px)\").matches;\n  sheet.classList.toggle(\"pop\", wide);\n  if(!wide){\n    sheet.style.left=\"\";\n    sheet.style.top=\"\";\n    sheet.style.width=\"\";\n    return;\n  }\n  var w=Math.min(440, window.innerWidth-32);\n  var r=anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;\n  var left=r ? Math.min(window.innerWidth-w-16, Math.max(16, r.left)) : (window.innerWidth-w)/2;\n  var top=r ? r.bottom+8 : 24;\n  if(top>window.innerHeight-180) top=r ? Math.max(16, r.top-16) : 24;\n  sheet.style.left=left+\"px\";\n  sheet.style.top=Math.max(16, top)+\"px\";\n  sheet.style.width=w+\"px\";\n}\nfunction qAttr(s){\n  return String(s==null?\"\":s).replace(/[&<>\"']/g, function(c){\n    if(c===\"&\") return \"&\"+\"amp;\";\n    if(c===\"<\") return \"&\"+\"lt;\";\n    if(c===\">\") return \"&\"+\"gt;\";\n    if(c==='\"') return \"&\"+\"quot;\";\n    return \"&\"+\"#39;\";\n  });\n}\nfunction qText(s){\n  return qAttr(s).replace(new RegExp(\"tcg\"+\"csv-\"+\"[0-9]+\",\"gi\"), \"\").replace(/\\s{2,}/g, \" \").trim();\n}\nfunction qMoney(n){\n  if(!(Number(n)>0)) return \"\";\n  return \"$\"+Number(n).toLocaleString(\"en-US\",{minimumFractionDigits:2,maximumFractionDigits:2});\n}\nfunction qSaved(id){\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    return Array.isArray(cur) && cur.some(function(row){ return row && (row.sku||row.id)===id; });\n  }catch(e){ return false; }\n}\nfunction qSave(id, doc){\n  var body={ id:id, sku:id, name:doc.name||\"\", market:doc.price, kind:doc.kind||\"\", headline:doc.name||\"\", href:\"/p/\"+encodeURIComponent(id) };\n  var wins=doc.windows||[];\n  for(var i=0;i<wins.length;i++){ if(wins[i].label===\"7D\" && typeof wins[i].pct===\"number\") body.change7=wins[i].pct; }\n  try{\n    var cur=JSON.parse(localStorage.getItem(\"catchem-watch\")||\"[]\");\n    if(!Array.isArray(cur)) cur=[];\n    cur=cur.filter(function(row){ return row && (row.sku||row.id)!==id && row.id!==id; });\n    cur.unshift(body);\n    localStorage.setItem(\"catchem-watch\", JSON.stringify(cur.slice(0,100)));\n    return true;\n  }catch(e){ return false; }\n}\nfunction qPaint(id, doc){\n  var el=qEls();\n  var box=el.body;\n  if(!box) return;\n  var cash=qMoney(doc.price);\n  var price=cash?qText(cash):\"No market price\";\n  var when=(doc.asOf?qText(doc.source||\"TCGplayer market\")+\", \"+qText(doc.asOf):qText(doc.source||\"TCGplayer market\"))+\". Missing days show as gaps.\";\n  var wins=(doc.windows||[]).map(function(w){\n    if(typeof w.pct!==\"number\") return \"\";\n    var cls=w.pct>0?\" up\":w.pct<0?\" down\":\"\";\n    var sign=w.pct>0?\"+\":\"\";\n    var note=w.from&&w.to?'<span class=\"muted\"> '+qText(w.from)+\" to \"+qText(w.to)+\"</span>\":\"\";\n    return '<span class=\"win'+cls+'\">'+qText(w.label)+\" \"+sign+w.pct+\"%</span>\"+note;\n  }).filter(Boolean).join(\" \");\n  var photo=\"\";\n  if(doc.photo && doc.photo.src){\n    var crop=doc.kind!==\"sealed\" && doc.photo.crop;\n    photo='<img alt=\"'+qText(doc.name)+'\" width=\"168\" height=\"234\" class=\"'+(crop?\"card-face\":\"shot\")+'\" '+(crop?'data-crop-card=\"1\" onload=\"if(window.cropCardEdge)cropCardEdge(this)\" ':\"\")+(doc.photo.alts&&doc.photo.alts.length?'data-alts=\"'+qAttr(doc.photo.alts.join(\"|\"))+'\" ':\"\")+'onerror=\"var a=(this.getAttribute(\\'data-alts\\')||\\'\\').split(\\'|\\').filter(Boolean);if(a.length){this.setAttribute(\\'data-alts\\',a.slice(1).join(\\'|\\'));this.src=a[0]}else{this.remove()}\" src=\"'+qAttr(doc.photo.src)+'\">';\n  }\n  var list=\"\";\n  if(doc.listings && doc.listings.text){\n    list='<p>'+qText(doc.listings.text||\"eBay listings —\")+'</p><p class=\"muted\">'+qText(doc.listings.source||\"eBay listings\")+(doc.listings.asOf?\", \"+qText(doc.listings.asOf):\"\")+\". Listings are not sales.</p>\";\n    if((doc.listings.points||[]).length>=2){\n      list+='<p class=\"muted\">eBay listings. A missing night is a gap.</p><div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"140\" data-caption=\"eBay listings\" data-chart=\"'+qAttr(JSON.stringify(doc.listings.points))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>';\n    }\n  }\n  var reads=(doc.reads||[]).map(function(read){\n    var line=qText(read.date)+\" \"+qText(read.text);\n    var src=read.source?'<p class=\"muted\">'+qText(read.source)+(read.date?\", \"+qText(read.date):\"\")+\"</p>\":\"\";\n    var body=read.href?'<a href=\"'+qAttr(read.href)+'\">'+line+\"</a>\":line;\n    return \"<li>\"+body+src+\"</li>\";\n  }).join(\"\");\n  var tcgA=doc.tcgUrl?'<a href=\"'+qAttr(doc.tcgUrl)+'\" rel=\"sponsored noopener\">TCGplayer</a>':\"\";\n  var ebA=doc.ebayUrl?'<a href=\"'+qAttr(doc.ebayUrl)+'\" rel=\"sponsored noopener\">eBay</a>':\"\";\n  var tcg=(tcgA||ebA)?'<p class=\"store-links\">'+[tcgA,ebA].filter(Boolean).join(\" · \")+' <small class=\"paid-note\">Paid link</small></p>':\"\";\n  var page=\"/p/\"+encodeURIComponent(id);\n  box.innerHTML=photo\n    +\"<h2>\"+qText(doc.name)+\"</h2>\"\n    +'<p class=\"muted\">'+qText(doc.set||\"not in the file\")+\" · \"+qText(doc.num||\"not in the file\")+\" · \"+qText(doc.printing||\"not in the file\")+\"</p>\"\n    +'<p class=\"px\"><span class=\"q-price\">'+price+\"</span></p>\"\n    +(when?'<p class=\"muted\">'+when+\"</p>\":\"\")\n    +(wins?\"<p>\"+wins+\"</p>\":\"\")\n    +(doc.range?\"<p>\"+qText(doc.range)+\"</p>\":\"\")\n    +list\n    +'<div class=\"chart-box\" data-keep-ranges=\"1\"><div class=\"chart\" data-h=\"160\" data-caption=\"TCGplayer market, daily\" data-chart=\"'+qAttr(JSON.stringify(doc.hist||[]))+'\"></div><div class=\"filters\" data-ranges><button type=\"button\" data-range=\"7D\">7D</button><button type=\"button\" data-range=\"30D\">30D</button><button type=\"button\" data-range=\"90D\">90D</button><button type=\"button\" data-range=\"All\" aria-pressed=\"true\">All</button></div><p class=\"chart-note muted\"></p></div>'\n    +\"<h3>Reads</h3>\"\n    +(reads?'<ul class=\"glance-reads\">'+reads+\"</ul>\":'<p class=\"muted\">'+\"No reads on \"+\"file for this product.</p>\")\n    +tcg\n    +'<p class=\"q-acts\"><button type=\"button\" id=\"q-save\">'+(qSaved(id)?\"Saved\":\"Save\")+'</button><a class=\"q-page\" href=\"'+qAttr(page)+'\">Full page</a></p>';\n  var save=document.getElementById(\"q-save\");\n  if(save) save.onclick=function(){ if(qSave(id, doc)) save.textContent=\"Saved\"; };\n  if(typeof catchemMount===\"function\") catchemMount(box);\n  qPlace(qAnchor);\n}\nfunction catchemQuick(id, anchor){\n  if(!id) return;\n  qAnchor=anchor||null;\n  var el=qEls();\n  if(!el.sheet || !el.body) return;\n  el.sheet.hidden=false;\n  if(el.back) el.back.hidden=false;\n  document.body.classList.add(\"q-open\");\n  el.sheet.style.transform=\"\";\n  qPlace(anchor);\n  if(qCache[id]){ qPaint(id, qCache[id]); return; }\n  el.body.innerHTML='<p class=\"muted\">'+\"Opening this product.\"+'</p>';\n  fetch(\"/api/quick?id=\"+encodeURIComponent(id)).then(function(r){\n    if(!r.ok) throw 0;\n    return r.json();\n  }).then(function(doc){\n    qCache[id]=doc;\n    if(!el.sheet.hidden) qPaint(id, doc);\n  }).catch(function(){\n    if(!el.sheet.hidden) el.body.innerHTML='<p>Not in the catalog.</p>';\n  });\n}\nwindow.catchemQuick=catchemQuick;\nfunction qInit(){\n  var el=qEls();\n  if(!el.sheet || el.sheet.dataset.ready) return;\n  el.sheet.dataset.ready=\"1\";\n  var closeBtn=document.getElementById(\"q-close\");\n  if(closeBtn) closeBtn.addEventListener(\"click\", qClose);\n  if(el.back) el.back.addEventListener(\"click\", qClose);\n  document.addEventListener(\"keydown\", function(ev){ if(ev.key===\"Escape\") qClose(); });\n  document.addEventListener(\"click\", function(ev){\n    if(ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;\n    var node=ev[\"tar\"+\"get\"];\n    if(!node || !node.closest) return;\n    if(node.closest(\"#qsheet\")) return;\n    if(node.closest(\"button, input, select, textarea, label\")) return;\n    var link=node.closest(\"a\");\n    if(link && !link.hasAttribute(\"data-quick\")) return;\n    var hit=node.closest(\"[data-quick]\");\n    if(!hit) return;\n    var qid=hit.getAttribute(\"data-quick\");\n    if(!qid) return;\n    ev.preventDefault();\n    catchemQuick(qid, hit);\n  });\n  var drag=null;\n  el.sheet.addEventListener(\"pointerdown\", function(ev){\n    if(el.sheet.classList.contains(\"pop\")) return;\n    var from=ev[\"tar\"+\"get\"];\n    var grab=from && from.closest && from.closest(\".q-grab, .q-head\");\n    if(!grab && el.sheet.scrollTop>0) return;\n    if(!grab && from && from.closest && from.closest(\"a, button, input, select, textarea\")) return;\n    drag={y:ev.clientY, dy:0, id:ev.pointerId};\n  });\n  el.sheet.addEventListener(\"pointermove\", function(ev){\n    if(!drag || drag.id!==ev.pointerId) return;\n    drag.dy=ev.clientY-drag.y;\n    if(drag.dy>0) el.sheet.style.transform=\"translateY(\"+drag.dy+\"px)\";\n  });\n  function endDrag(ev){\n    if(!drag || (ev && drag.id!==ev.pointerId)) return;\n    var dy=drag.dy;\n    drag=null;\n    el.sheet.style.transform=\"\";\n    if(dy>90) qClose();\n    else if(dy<-40) el.sheet.classList.add(\"tall\");\n  }\n  el.sheet.addEventListener(\"pointerup\", endDrag);\n  el.sheet.addEventListener(\"pointercancel\", endDrag);\n}\nif(document.readyState===\"loading\") document.addEventListener(\"DOMContentLoaded\", qInit);\nelse qInit();";
-const CSS = `
+const CSS = `.skip-link{position:absolute;left:8px;top:-60px;z-index:1000;background:#111;color:#fff;padding:8px 12px;border-radius:6px}.skip-link:focus{top:8px}:focus-visible{outline:3px solid #d9b779;outline-offset:2px}main:focus{outline:none}
+
 .paid-note,.paid-foot small{font:400 12px/1.4 var(--sans);color:#a39d93}
 .paid-note{margin-left:4px}
 :root{--bg:#12100e;--panel:#1a1815;--line:#2f2b26;--txt:#efe9de;--dim:#c4baab;--gold:#d9b779;--green:#7fc79a;--red:#e0675b;--serif:'Fraunces',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif}
@@ -1317,7 +1320,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <title>${esc(title)} · Catch'em</title>
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
@@ -1386,7 +1389,7 @@ export function renderSets(index, stamp, opts = {}) {
     const ib = order.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || String(a).localeCompare(String(b));
   });
-  const body = `<main class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart.</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart.</p>
 ${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
 ${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}
 ${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}
@@ -1417,7 +1420,7 @@ function setRotationBlock(slug) {
 }
 
 export function renderSetShell(slug, stamp, opts = {}) {
-  const body = `<main class="wrap"><h1 id="title">Set</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1 id="title">Set</h1>
 <p class="muted" id="completion"></p>
 ${setRotationBlock(slug)}
 <div id="lines"></div><div id="charts"></div>
@@ -1725,7 +1728,7 @@ function pokemonFace(card) {
 
 export function renderPokemon(page, stamp, opts = {}) {
   if (!page) {
-    return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, "Not found", stamp, "", feedNav(opts));
+    return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, "Not found", stamp, "", feedNav(opts));
   }
   const cards = sortPokemonCards(page.cards || [], "price");
   const hero = page.cutout
@@ -1738,7 +1741,7 @@ export function renderPokemon(page, stamp, opts = {}) {
     return `<article class="mon-tile" data-price="${card.price > 0 ? card.price : ""}" data-release="${esc(release)}" data-set="${esc(card.set)}" data-num="${esc(card.number)}" data-name="${esc(card.name)}">${open}${shop}</article>`;
   }).join("");
   const line = pokemonCatalogLine(page);
-  const body = `<main class="wrap poke-page">
+  const body = `<main id="main" tabindex="-1" class="wrap poke-page">
 <div class="poke-hero">${hero}</div>
 <h1>${esc(page.name)}</h1>
 ${line ? `<p>${esc(line)}</p>` : ""}
@@ -1949,7 +1952,7 @@ export function sourceLine(card) {
 }
 
 export function renderCard(card, stamp, opts = {}) {
-  if (!card) return chrome("", `<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
+  if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
   const shown = fact?.price > 0 ? fact.price : card.price;
   const price = money(shown);
@@ -1993,7 +1996,7 @@ export function renderCard(card, stamp, opts = {}) {
     : esc(card.set || "");
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: opts.catalogueCrop, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
-  const body = `<main class="wrap product-glance">
+  const body = `<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block}
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:112px;height:auto}
@@ -2068,7 +2071,7 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
 
 export function renderArtists(index, stamp, opts = {}) {
   const rows = index?.artists || [];
-  const body = `<main class="wrap"><p class="muted">${esc(index?.note || "")}</p><h1>Artists</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">${esc(index?.note || "")}</p><h1>Artists</h1>
 <div class="filters"><input id="q" aria-label="Find an artist" placeholder="Find an artist"></div>
 <div id="list" class="grid">${rows.map((a) => `<a class="card" data-name="${esc(a.name.toLowerCase())}" href="/artists/${esc(a.slug)}"><b>${esc(a.name)}</b><p class="muted">${a.count} matched cards</p></a>`).join("") || `<p class="muted">No artists in the file.</p>`}</div>
 <script>document.getElementById("q").addEventListener("input",ev=>{const q=ev.currentTarget.value.toLowerCase();document.querySelectorAll("#list a").forEach(a=>{a.hidden=!a.dataset.name.includes(q)})})</script>
@@ -2117,7 +2120,7 @@ export function sortArtistCards(cards, sort = "", releaseBySlug = {}) {
 }
 
 export function renderArtist(doc, stamp, opts = {}) {
-  if (!doc) return chrome("Artists", `<main class="wrap"><h1>Artist not found</h1><p class="muted">That artist is not in the file.</p></main>`, "Artist", stamp, "", feedNav(opts));
+  if (!doc) return chrome("Artists", `<main id="main" tabindex="-1" class="wrap"><h1>Artist not found</h1><p class="muted">That artist is not in the file.</p></main>`, "Artist", stamp, "", feedNav(opts));
   const sort = ARTIST_SORTS.some(([k]) => k && k === opts.sort) ? opts.sort : "";
   const cards = sortArtistCards(doc.cards || [], sort, opts.releaseBySlug || {});
   const top = cards.slice(0, 12);
@@ -2129,7 +2132,7 @@ export function renderArtist(doc, stamp, opts = {}) {
   const relMap = opts.releaseBySlug || {};
   const undated = cards.filter((c) => !(relMap.__strict ? relMap[c.setSlug] : c.release || relMap[c.setSlug])).length;
   const caption = `Artist index, chain-linked${Number(doc.indexCards) > 0 ? `. ${Number(doc.indexCards)} of ${cards.length} cards` : ""}`;
-  const body = `<main class="wrap"><h1>${esc(doc.name)}</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>${esc(doc.name)}</h1>
 ${chartBox(doc.index || [], caption)}
 ${doc.indexNote ? `<p class="muted">${esc(doc.indexNote)}</p>` : ""}
 <p class="muted">${esc(doc.source || "")}</p>
@@ -2161,7 +2164,7 @@ export function renderMovers(doc, stamp, opts = {}) {
     return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
-  const body = `<main class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
 <h1>Movers</h1>
 <div id="index-charts"></div>
 <div class="filters"><button type="button" data-tab="singles" aria-pressed="true">Singles</button><button type="button" data-tab="sealed">Sealed</button><button type="button" data-tab="slabs">Slabs</button></div>
@@ -2191,7 +2194,7 @@ export function renderToday(doc, stamp, opts = {}) {
   }).join("");
   const supply = doc?.supply === "on" ? "" : `<p>The listings line is off.</p>`;
   const payload = JSON.stringify((doc?.lines || []).map((line) => ({ text: line.text }))).replace(/</g, "\\u003c");
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Today</h1>
 <p class="muted">${esc(doc?.asOf || "")}</p>
 ${supply}
@@ -2275,7 +2278,7 @@ export function compareRows(left, right) {
 
 export function renderCompare(left, right, stamp, opts = {}) {
   const rows = compareRows(left, right);
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Compare two products</h1>
 <form method="get" action="/compare">
 <label>First <input name="a" value="${esc(opts.a || "")}" aria-label="First product"></label>
@@ -2300,7 +2303,7 @@ export function renderTrackRecord(doc, stamp, opts = {}) {
     const dir = row.direction === "up" || row.direction === "down" ? row.direction : "—";
     return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : "—"}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
   }).join("");
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Track record</h1>
 <p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || "—")}.</p>
 <p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
@@ -2317,7 +2320,7 @@ const mark = (r) => {
     const v = String(r.result || "open").toLowerCase();
     return v === "hit" ? "Hit" : v === "miss" ? "Miss" : "Open";
   };
-  const body = `<main class="wrap"><p class="muted" id="fresh">Updated ${esc(doc?.asOf || "")}</p><h1>Receipts</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted" id="fresh">Updated ${esc(doc?.asOf || "")}</p><h1>Receipts</h1>
 <p>${esc(doc?.note || "")}</p>
 <p class="muted">Scored calls: ${Number(doc?.scored) || 0}. Hit rate: ${doc?.hitRate == null ? "not shown until 20 calls are scored" : esc(String(doc.hitRate))}</p>
 ${chartBox(doc?.series || [], "TCGplayer market")}
@@ -2332,7 +2335,7 @@ export function renderStatus(doc, stamp, opts = {}) {
   const gap = doc?.gap;
   const errors = Array.isArray(doc?.errors) ? doc.errors : [];
   if (!status) {
-    const body = `<main class="wrap"><h1>Status</h1><p class="muted">The status file is not in the public feed.</p></main>`;
+    const body = `<main id="main" tabindex="-1" class="wrap"><h1>Status</h1><p class="muted">The status file is not in the public feed.</p></main>`;
     return chrome("", body, "Status", stamp, "", feedNav(opts));
   }
   const steps = (status.steps || []).map((row) => `<li><b>${esc(row.name)}</b>: ${esc(row.result || "not in the files")}${row.detail ? ` (${esc(row.detail)})` : ""}. <span class="muted">${esc(row.file || "")}</span></li>`).join("");
@@ -2347,7 +2350,7 @@ export function renderStatus(doc, stamp, opts = {}) {
   const err = errors.length
     ? `<ol>${errors.map((row) => `<li>${esc(row.message)} <span class="muted">${Number(row.count) || 0}</span></li>`).join("")}</ol>`
     : `<p class="muted">No client errors stored on this server yet.</p>`;
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Status</h1>
 <p>${esc(status.note || "")}</p>
 <p>Last time in the files: ${status.lastFileTimePt ? esc(status.lastFileTimePt) : "not in the files"}${status.lastFile ? ` (${esc(status.lastFile)})` : ""}.</p>
@@ -2369,7 +2372,7 @@ ${err}
 }
 
 export function renderSearch(opts = {}) {
-  const body = `<main class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
 <div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus></div>
 <p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
@@ -2521,7 +2524,7 @@ export function renderMethod(counts, stamp, opts = {}) {
   const catalog = Number.isFinite(single) && Number.isFinite(sealed)
     ? `The public catalog is ${single.toLocaleString("en-US")} singles and ${sealed.toLocaleString("en-US")} sealed products. Slabs are not in it.`
     : "Singles and sealed are counted apart. Slabs are not in the catalog.";
-  const body = `<main class="wrap"><h1>How the numbers are made</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>How the numbers are made</h1>
 <p>Catch'em shows one price for a product: the TCGplayer market price. Singles and sealed are never added into one index.</p>
 <ul>
 <li><b>TCGplayer market</b> is the catalog price. ${catalog}</li>
@@ -2538,7 +2541,7 @@ export function renderMethod(counts, stamp, opts = {}) {
 export function renderRotation(stamp, opts = {}) {
   const paras = GUIDE_PARAS.map((p) => `<p class="copy">${esc(p)}</p>`).join("");
   const sources = ROTATION_SOURCES.map((src) => `<li><a href="${esc(src.href)}">${esc(src.label)}</a></li>`).join("");
-  const body = `<main class="wrap rot"><style>
+  const body = `<main id="main" tabindex="-1" class="wrap rot"><style>
 .rot h1{font:500 clamp(32px,8vw,52px)/1.05 var(--serif);letter-spacing:-.03em;margin:0 0 12px;max-width:12em}
 .rot .kicker{margin:0 0 12px;letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)}
 .rot .marks{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
@@ -2565,7 +2568,7 @@ ${paras}
 }
 
 export function renderAccuracy(doc, stamp, opts = {}) {
-  const body = `<main class="wrap"><h1>Accuracy</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Accuracy</h1>
 <p>${esc(doc?.note || "A hit rate is shown after 20 calls had a direction written down first.")}</p>
 <p class="muted">Scored ${Number(doc?.scored) || 0}. Hits ${Number(doc?.hits) || 0}. Misses ${Number(doc?.misses) || 0}. Crowd votes are not in this score until the server store is on.</p>
 <p>Baseline: a read that says the price stays the same. We do not print a rate from a handful of calls.</p>
@@ -2583,7 +2586,7 @@ export function renderRetired(kind, opts = {}) {
     creators: ["This page is retired", "Creator notes from the old site are not the current product."],
   };
   const [title, line] = pages[kind] || pages.faq;
-  const body = `<main class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>${esc(title)}</h1><p>${esc(line)}</p><p><a href="/sets">Sets</a> · <a href="/methodology">How the numbers are made</a> · <a href="https://discord.gg/fUSjxDX4Hy">Discord</a></p></main>`;
   return chrome("", body, title, "", "", feedNav(opts));
 }
 
@@ -2592,7 +2595,7 @@ export function renderOfficeGate(opts = {}) {
   const sign = opts.ready && !opts.signedIn
     ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a></p>`
     : "";
-  const body = `<main class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
   return chrome("Post Office", body, "Post Office", "", "", feedNav(opts));
 }
 
@@ -2612,7 +2615,7 @@ export function renderPremium(stamp, opts = {}) {
   void stamp;
   const ico = (paths) => `<span class="prem-ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></span>`;
   const card = (paths, title, copy) => `<article class="prem-card">${ico(paths)}<h3>${title}</h3><p>${copy}</p></article>`;
-  const body = `<main class="wrap prem">
+  const body = `<main id="main" tabindex="-1" class="wrap prem">
 <style>
 .prem-hero{padding:18px 0 6px}
 .prem-kicker{margin:0 0 14px;letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)}
@@ -2687,13 +2690,13 @@ export function renderPremiumResult(kind) {
   const rest = success
     ? "Discord Premium turns on when the payment lands. You get the Premium role and a First 222 number in Discord. Then run /pull week."
     : "Checkout was canceled. Nothing was charged. Run /premium in Discord when you want to try again.";
-  const body = `<main class="wrap"><h1>${title}</h1><p>${rest}</p></main>`;
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>${title}</h1><p>${rest}</p></main>`;
   return chrome("", body, success ? "Payment sent" : "No charge", "", "");
 }
 
 export function renderDive(doc, stamp, opts = {}) {
   if (!doc || !doc.id) {
-    return chrome("", `<main class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts), {
+    return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Deep dive not found</h1><p class="muted">No payload for that product yet.</p><p><a href="/feed">Back to the feed</a></p></main>`, "Not found", stamp, "", feedNav(opts), {
       description: "That deep-dive payload is not on file yet. Open the Feed for live market reads.",
       url: "https://catchemtcg.com/feed",
     });
@@ -2721,7 +2724,7 @@ export function renderDive(doc, stamp, opts = {}) {
   const buyoutLine = browse
     ? `<p>Browse total (eBay): <b>${esc(browse)}</b>${buyout.browseTotalBefore != null ? ` · prior ${esc(String(buyout.browseTotalBefore))}` : ""} · level ${esc(String(buyout.level || "unscored"))}</p>`
     : `<p class="muted">Browse total: not on file for this product.</p>`;
-  const body = `<main class="wrap">
+  const body = `<main id="main" tabindex="-1" class="wrap">
 <p class="muted"><a href="/feed">Feed</a> · <a href="/board">Board</a> · Deep dive</p>
 <h1>${esc(doc.name || doc.id)}</h1>
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
@@ -2831,6 +2834,11 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .more-block{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
   .more-block h4{margin:0;font:600 16px/1.3 var(--sans)}
   .more-block p{margin:0}
+  .numbers-block{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+  .numbers-block h4{margin:0;font:600 16px/1.3 var(--sans)}
+  .numbers-block p,.numbers-block ul{margin:0}
+  .numbers,.streak-days{list-style:none;padding:0;display:grid;gap:4px}
+  .source-line{font-size:12px;color:#8a8a8a}
   .vote-q{margin:4px 0 0;font-weight:600}
   .set-ph{min-height:160px;display:flex;align-items:center;justify-content:center;background:#211e1a;border-radius:12px;padding:16px;text-align:center;font:600 16px/1.3 var(--sans);color:var(--gold)}
   .stats{display:flex;flex-direction:column;gap:4px}
@@ -2900,7 +2908,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };
   const focusTitle = titles[String(opts.section || "")] || "";
   const page = opts.page === "read" ? "read" : "feed";
-  const body = `<style>${css}</style><main class="wrap feed-page">
+  const body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
@@ -3385,15 +3393,60 @@ function shipReady(card){
   const price=Number(card&&card.shipPrice);
   return (dir==="up"||dir==="down") && price>0;
 }
+const NUM_LABELS={low:"Low ask",high:"High ask",median:"Median ask",count:"Listings",basis:"Basis",from:"Start date",to:"End date",askFrom:"Start ask",askTo:"End ask",market:"TCGplayer market",startPrice:"Start price",endPrice:"End price",startDate:"Start date",endDate:"End date",shipPrice:"Price when posted"};
+const NUM_MONEY={low:1,high:1,median:1,askFrom:1,askTo:1,market:1,startPrice:1,endPrice:1,shipPrice:1};
+function numbersSource(card){
+  const given=String(card&&card.source||"").trim();
+  if(given) return given;
+  const k=String(card&&(card.readKind||card.signal||card.kind)||"");
+  if(k==="spread") return "eBay asks";
+  if(k==="askmove") return "eBay asks and TCGplayer market";
+  if(card&&card.receipt||card&&card.startDate) return "TCGplayer market";
+  return "";
+}
+function numbersBlock(card){
+  if(!card) return "";
+  const rec=card.receipt&&typeof card.receipt==="object"?card.receipt:{};
+  const rows=[];
+  const seen={};
+  function put(key, val){
+    if(val===null||val===undefined||val===""||seen[key]) return;
+    if(typeof val==="object") return;
+    seen[key]=1;
+    const label=NUM_LABELS[key]||key;
+    const shown=NUM_MONEY[key]&&Number(val)>0?money(Number(val)):String(val);
+    rows.push("<li><b>"+html(label)+"</b> "+html(shown)+"</li>");
+  }
+  Object.keys(rec).forEach(function(k){ put(k, rec[k]); });
+  ["startDate","endDate","startPrice","endPrice"].forEach(function(k){ put(k, card[k]); });
+  if(!rows.length) return "";
+  const asOf=String(card.asOf||"").trim();
+  const src=numbersSource(card);
+  const line=String(card.sourceLine||"").trim();
+  return '<section class="numbers-block"><h4>The numbers</h4><ul class="numbers">'+rows.join("")+"</ul>"
+    +((src||asOf)?'<p class="muted">'+html([src,asOf?"as of "+asOf:""].filter(Boolean).join(", "))+"</p>":"")
+    +(line?'<p class="source-line">'+html(line)+"</p>":"")+"</section>";
+}
+function streakDays(card){
+  const days=Array.isArray(card&&card.days)?card.days:[];
+  const bits=[];
+  days.forEach(function(d){
+    if(!d||!d.date||!(Number(d.price)>0)) return;
+    bits.push("<li>"+html(d.date)+" "+html(money(Number(d.price)))+"</li>");
+  });
+  return bits.length?'<ul class="streak-days">'+bits.join("")+"</ul>":"";
+}
 function moreBlock(card){
-  const lines=matterLines(card);
-  const note=String(card&&card["why"]||"").trim();
-  const path=String(card&&(card.path||"")||"").trim();
-  const extra=note && note!==path ? "<p>"+html(note)+"</p>" : "";
-  if(!lines && !extra) return "";
-  const why=lines?"<p><b>Why it matters.</b> "+html(lines.why)+"</p>":"";
-  const wrong=lines && shipReady(card)?"<p><b>What would make this wrong.</b> "+html(lines.wrong)+"</p>":"";
-  return '<section class="more-block"><h4>More</h4>'+why+wrong+extra+"</section>";
+  if(!card) return "";
+  const whyText=String(card["whyItMatters"]||card["why"]||"").trim();
+  const wrongText=String(card["whatWouldMakeThisWrong"]||"").trim();
+  const path=String(card.path||"").trim();
+  const why=whyText&&whyText!==path?"<p><b>Why it matters.</b> "+html(whyText)+"</p>":"";
+  const wrong=wrongText?"<p><b>What would make this wrong.</b> "+html(wrongText)+"</p>":"";
+  const nums=numbersBlock(card);
+  const days=streakDays(card);
+  if(!why&&!wrong&&!nums&&!days) return "";
+  return nums+'<section class="more-block"><h4>More</h4>'+why+wrong+days+"</section>";
 }
 function productIdOf(card){
   const sku=String(card&&card.sku||"");
@@ -4251,7 +4304,7 @@ function buildFlat(){
       if(!row || !row.id) return;
       if(row.signal!=="mover" && row.signal!=="set" && row.signal!=="high" && row.signal!=="streak") return;
       const full=cards && cards[row.id];
-      const card=full ? Object.assign({}, full, {signal:row.signal, whyItMatters:row.whyItMatters, whatWouldMakeThisWrong:row.whatWouldMakeThisWrong}) : row;
+      const card=full ? Object.assign({}, full, {signal:row.signal, whyItMatters:row.whyItMatters, whatWouldMakeThisWrong:row.whatWouldMakeThisWrong, receipt:row.receipt||full.receipt, sourceLine:row.sourceLine||full.sourceLine, startDate:row.startDate||full.startDate, endDate:row.endDate||full.endDate, days:row.days||full.days}) : row;
       add(card);
     });
     flat=rows;
@@ -4895,7 +4948,7 @@ export function renderMine(stamp, opts = {}) {
   .mine-row button,.mine-sort{min-height:44px}
   .mine-row p{margin:0;flex:1 1 100%}
   `;
-  const body = `<style>${css}</style><main class="wrap">
+  const body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap">
 <p><a href="/feed">Back</a></p>
 <h1>Tracked</h1>
 <p class="muted" id="mine-note">Nothing saved on this device yet.</p>
@@ -5016,7 +5069,7 @@ draw();
 
 export function renderAll(bundle, stamp, opts = {}) {
   const reads = bundle?.reads || [];
-  const body = `<main class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
+  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
 ${reads.map((r) => {
     const line = soldSafeText(r, r.headline);
     if (!line) return "";
