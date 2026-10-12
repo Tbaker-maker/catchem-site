@@ -923,3 +923,4 @@ if (fail) process.exit(1);
 console.log("rebuild routes ok");
 
 await import("./track-record-hidden.test.mjs");
+await import("./data-cache.test.mjs");
