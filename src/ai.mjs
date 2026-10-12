@@ -121,26 +121,37 @@ export function rowFact(row, date) {
   };
 }
 
+async function ensurePaperMap(fetchImpl) {
+  if (paperIdMap) return paperIdMap;
+  paperIdMap = new Map();
+  try {
+    const { patchedPaper } = await import("./full-editor.mjs");
+    const rows = JSON.parse(await patchedPaper(fetchImpl));
+    for (const row of rows) if (row && row[0] && row[22]) paperIdMap.set(String(row[0]), String(row[22]));
+  } catch { /* catalog id map stays empty */ }
+  return paperIdMap;
+}
+
 async function resolveIds(ids, fetchImpl) {
   const list = (ids || []).map(String).filter(Boolean).slice(0, 4);
   const direct = list.filter((id) => id.startsWith("tcgcsv-") || id.startsWith("tcgp-"));
   const paper = list.filter((id) => !id.startsWith("tcgcsv-") && !id.startsWith("tcgp-"));
   if (!paper.length) return direct;
-  if (!paperIdMap) {
-    paperIdMap = new Map();
-    try {
-      const { patchedPaper } = await import("./full-editor.mjs");
-      const rows = JSON.parse(await patchedPaper(fetchImpl));
-      for (const row of rows) if (row && row[0] && row[22]) paperIdMap.set(String(row[0]), String(row[22]));
-    } catch { /* catalog id map stays empty */ }
-  }
+  await ensurePaperMap(fetchImpl);
   const extra = paper.map((id) => paperIdMap.get(id)).filter(Boolean);
   return [...new Set(direct.concat(extra))];
 }
 
+function catalogId(id) {
+  const s = String(id);
+  if (s.startsWith("tcgcsv-") || s.startsWith("tcgp-")) return s;
+  return paperIdMap ? (paperIdMap.get(s) || "") : "";
+}
+
 export async function factsFor(ids, fetchImpl) {
   const date = await asOf(fetchImpl);
-  const resolved = await resolveIds(ids, fetchImpl);
+  const requested = (ids || []).map(String).filter(Boolean).slice(0, 4);
+  const resolved = await resolveIds(requested, fetchImpl);
   const want = new Set(resolved);
   const out = [];
   if ([...want].some((id) => id.startsWith("tcgcsv-"))) {
@@ -155,7 +166,12 @@ export async function factsFor(ids, fetchImpl) {
       if (want.has(row[0])) out.push(rowFact(row, date));
     }
   }
-  return { asOf: date, cards: out };
+  const byId = new Map(out.map((card) => [card.id, card]));
+  const pins = requested.map((id) => {
+    const cat = catalogId(id);
+    return { id, card: (cat && byId.get(cat)) || null };
+  });
+  return { asOf: date, cards: out, pins };
 }
 
 function lineOf(card) {
@@ -165,15 +181,27 @@ function lineOf(card) {
   return bits.join(". ") + ".";
 }
 
-export function factIdeas(cards) {
-  const card = cards && cards[0];
-  if (!card) return [];
-  const line = lineOf(card);
-  const also = cards[1] ? lineOf(cards[1]) : "";
+export function factIdeas(cards, pins) {
+  const rows = Array.isArray(cards) ? cards.filter(Boolean) : [];
+  const asked = Array.isArray(pins) ? pins : [];
+  const byId = new Map(rows.map((card) => [String(card.id), card]));
+  const parts = [];
+  if (asked.length) {
+    for (const pin of asked) {
+      const id = String(pin && pin.id != null ? pin.id : pin || "");
+      if (!id) continue;
+      const card = (pin && pin.card) || byId.get(id) || null;
+      parts.push(card && card.name ? lineOf(card) : "No catalog row for " + id + ".");
+    }
+  } else {
+    for (const card of rows) parts.push(lineOf(card));
+  }
+  if (!parts.length) return [];
+  const all = parts.join(" ");
   return [
-    `Notable Pokémon print: ${line}`,
-    `Same Pokémon catalog row: ${line}`,
-    also ? `Also on the Pokémon page: ${also}` : `Read the Pokémon printing: ${line}`,
+    `Notable Pokémon print: ${all}`,
+    `Same Pokémon catalog row: ${all}`,
+    `Pinned Pokémon cards: ${all}`,
   ];
 }
 
@@ -285,7 +313,10 @@ export async function handleIdeas(request, env, fetchImpl = fetch) {
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const facts = await factsFor(body.ids || [], fetchImpl);
-  if (!facts.cards.length) return json({ ok: false, error: "No catalog rows for those ids." }, 400);
+  if (!facts.cards.length) {
+    const missing = (facts.pins || []).map((pin) => "No catalog row for " + pin.id + ".");
+    return json({ ok: false, error: missing.length ? missing.join(" ") : "No catalog rows for those ids." }, 400);
+  }
   let ideas = null;
   let fromModel = false;
   const drafted = await modelText(env, "Give exactly 3 short catalog ideas. Use only the JSON facts. No prices you were not given. Spell Pokémon with the accent. Do not use investment language.", JSON.stringify(facts), env.AI_IDEAS_MODEL || "grok-3");
@@ -296,7 +327,7 @@ export async function handleIdeas(request, env, fetchImpl = fetch) {
       fromModel = true;
     }
   }
-  if (!ideas) ideas = factIdeas(facts.cards);
+  if (!ideas) ideas = factIdeas(facts.cards, facts.pins);
   commit(user, "ideas");
   return json({ ok: true, ideas, asOf: facts.asOf, quota: usageOf(user, "ideas"), model: fromModel ? "catalog-model" : "fact-pack" });
 }
