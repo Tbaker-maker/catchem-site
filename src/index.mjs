@@ -537,7 +537,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
   if (kind === "indexes") {
-    const list = await loadJson("feed/rating/index/index-list.json", fetchImpl).catch(() => null);
+    const list = await loadJson("feed/rating/index-list.json", fetchImpl).catch(() => null);
     return html(pageChrome("", indexListBody(list), "Indexes", stamp, "", pageOpts.feed === true));
   }
   if (kind === "index") {
