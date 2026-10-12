@@ -637,9 +637,9 @@ function receiptBacked(row) {
 
 // Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
 // that carry their own source line and date. Behind reads.library in that repo.
-const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon"]);
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set"]);
 export function isBoardV3Row(row) {
-  if (!row || typeof row !== "object" || row.board !== "v3") return false;
+  if (!row || typeof row !== "object" || (row.board !== "v3" && !(row.board === "hist" && (row.readKind || row.kind) === "set"))) return false;
   if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
   if (!String(row.source || "").trim() || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.asOf || ""))) return false;
   return !/[\u2014\u2013]/.test(String(row.headline || row.path || ""));
@@ -4835,7 +4835,7 @@ async function showFlat(index, dir){
     stage.className="feed-stage";
     host.appendChild(stage);
   }
-  stage.classList.toggle("is-news", news);
+  stage.classList.remove("is-news");
   let pos=stage.querySelector(".read-pos");
   if(!pos){
     pos=document.createElement("p");
@@ -4895,31 +4895,14 @@ async function showFlat(index, dir){
     nav.appendChild(prev);
     nav.appendChild(next);
   }
+  // News reads use the same card and the same side arrows as every other read.
   const buttons=nav.querySelectorAll("button");
-  if(buttons[0]) buttons[0].textContent=news?"Previous":"‹";
-  if(buttons[1]) buttons[1].textContent=news?"Next":"›";
-  nav.classList.toggle("hint", !news && wantHint());
-  let bar=stage.querySelector(".news-bar");
-  if(news){
-    if(!bar){
-      bar=document.createElement("div");
-      bar.className="news-bar";
-      stage.appendChild(bar);
-    }
-    let hint=bar.querySelector(".swipe-hint");
-    if(wantHint()){
-      if(!hint){
-        hint=document.createElement("p");
-        hint.className="swipe-hint";
-        hint.textContent="Swipe sideways for the next read.";
-        bar.insertBefore(hint, bar.firstChild);
-      }
-    }else if(hint) hint.remove();
-    bar.appendChild(nav);
-  }else{
-    if(nav.parentElement!==slide) slide.appendChild(nav);
-    if(bar) bar.remove();
-  }
+  if(buttons[0]) buttons[0].textContent="‹";
+  if(buttons[1]) buttons[1].textContent="›";
+  nav.classList.toggle("hint", wantHint());
+  const bar=stage.querySelector(".news-bar");
+  if(nav.parentElement!==slide) slide.appendChild(nav);
+  if(bar) bar.remove();
   bindSwipe(card);
   commitReadUrl(row);
 }
