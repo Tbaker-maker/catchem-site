@@ -1,7 +1,7 @@
 import { artKind, rotationChipData, chipsHtml, watchlistBody, cyclePanel, FREE_ROWS } from "../src/ir-cycle.mjs";
 let fail = 0;
 const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
-const rot = { sources: [{ mark: "G", date: "2026-04-10" }], expected: [{ mark: "H", window: "spring 2027", basis: "x" }], sets: [{ slug: "g", mark: "G" }, { slug: "h", mark: "H" }, { slug: "j", mark: "J" }, { slug: "n", mark: null }] };
+const rot = { sources: [{ mark: "G", date: "2026-04-10" }], expected: [{ mark: "H", window: "spring 2027", basis: "x" }], sets: [{ slug: "e", mark: "E", status: null }, { slug: "s", mark: "J", status: "Standard" }, { slug: "g", mark: "G" }, { slug: "h", mark: "H" }, { slug: "j", mark: "J" }, { slug: "n", mark: null }] };
 t("IR kind", artKind({ rarity: "Illustration Rare" }) === "Illustration Rare");
 t("TG kind", artKind({ rarity: "Ultra Rare", num: "TG05" }) === "Trainer Gallery");
 t("alt art kind", artKind({ name: "Umbreon VMAX (Alternate Art Secret)" }) === "Alternate Art");
@@ -11,6 +11,8 @@ t("countdown", rotationChipData({ ...rot, sources: [{ mark: "G", date: "2026-10-
 const h = rotationChipData(rot, "h", "2026-10-12");
 t("unannounced H labeled, no countdown", h.official === false && /not announced/.test(h.text + h.sub) && !/Rotates in/.test(h.text));
 t("J has no invented date", !/\d{4}/.test(rotationChipData(rot, "j", "2026-10-12").text));
+t("old mark with no date never claims Standard", rotationChipData(rot, "e", "2026-10-12").text === "Regulation mark E");
+t("Standard only when the file says so", /In Standard/.test(rotationChipData(rot, "s", "2026-10-12").text));
 t("no mark no chip", rotationChipData(rot, "n", "2026-10-12") === null);
 t("chips only on art cards", chipsHtml({ rarity: "Common", setSlug: "h" }, rot, "2026-10-12") === "");
 const row = { id: "tcgcsv-1", name: "Pikachu ex - 1/2", set: "S", setSlug: "h", kind: "SIR", num: "1/2", release: "2026-01-30", daysSinceRelease: 255, price: { price: 3, date: "2026-10-12" }, low: { price: 2, date: "2026-10-01" }, high: { price: 9, date: "2026-04-01" }, onFileSince: "2026-02-05", position: "Near its lowest on file", trend30: null, trend90: { pct: -30, from: { date: "2026-07-14", price: 4 }, to: { date: "2026-10-12", price: 3 } }, setListings: { name: "S Booster Box", n: 12, date: "2026-10-12" }, curve: { stage: "6 to 12 months", text: "c" }, popularity: ["gen1"] };
