@@ -30,9 +30,10 @@ t("printing preference keeps the crown ahead of a flat tie", preferPrinting([
 ])[0][0] === "c");
 
 const home = await readFile(join(root, "index.html"), "utf8");
-t("homepage h1 says the free tools and the club price", home.includes("<h1>The catalog, the Feed, and the Post Office are free, and the Discord club is $14.99.</h1>"));
+t("homepage h1 is the doing line", home.includes("<h1>Know what every card and pack is doing.</h1>"));
 t("homepage title dropped the old line", !home.includes("Know what to rip"));
-t("homepage drops rippers and Request access", !/rippers and flippers/i.test(home) && !home.includes("Request access") && !home.includes("Opening soon"));
+t("homepage drops crowd, rip, and tonight", !home.includes("card crowd") && !home.includes("still rip") && !home.includes("tonight"));
+t("homepage keeps the bans", !/rippers and flippers/i.test(home) && !home.includes("Request access") && !home.includes("Opening soon") && !home.includes("forever") && !home.includes("$14.99") && !/\b(buy|sell|invest)\b/i.test(home) && !home.includes("\u2014"));
 const title = (home.match(/<title>([^<]*)<\/title>/) || [,""])[1];
 const desc = (home.match(/<meta name="description" content="([^"]*)"/) || [,""])[1];
 t("homepage title is under 60 and description under 160", title.length > 0 && title.length < 60 && desc.length > 0 && desc.length < 160);
