@@ -14,7 +14,7 @@ const spread = { readKind: "spread", path: "p", why: "The high ask is $484.32.",
 let out = more(spread);
 ok(out.includes("The numbers"), "numbers block"); ok(out.includes("$275.65") && out.includes("55"), "receipt values");
 ok(out.includes("eBay asks"), "source name"); ok(out.includes('class="source-line">rsv10pt5-wf-pc-etb'), "sourceLine");
-ok(out.includes("What would make this wrong.") && out.includes("Why it matters."), "why and wrong on a spread");
+ok(out.includes("What would make this wrong.") && out.includes("<b>Why.</b>"), "why and wrong on a spread");
 const ask = { readKind: "askmove", whyItMatters: "Up $1.99.", whatWouldMakeThisWrong: "Wrong if Y.", receipt: { from: "2026-10-10", to: "2026-10-11", askFrom: 333, askTo: 334.99, market: 320.44 }, sourceLine: "swsh12pt5-etb" };
 out = more(ask); ok(out.includes("2026-10-10") && out.includes("$334.99") && out.includes("Wrong if Y."), "askmove");
 const streak = { readKind: "streak", startDate: "2026-10-01", endDate: "2026-10-07", whyItMatters: "w", days: [{ date: "2026-10-01", price: 5 }, { date: "2026-10-02", price: 6 }] };
