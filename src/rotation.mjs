@@ -8,7 +8,7 @@
 // announcements. F left Standard on April 11, 2025. G left on April 10, 2026.
 // No other letter has a date here. This file does not say a set was printed again.
 
-export const PRINT_RUN_LINE = "Rotated sets historically stop getting new print runs. What's already out there is the supply.";
+export const PRINT_RUN_LINE = "Rotated sets historically stop getting new print runs. Older packs can still turn up in tins and collections.";
 
 export const GUIDE_PARAS = [
   "Every spring, Pokémon updates the Standard tournament format. Each card has a small letter near the set symbol, its regulation mark, and the oldest letter leaves Standard. In 2025 that was F (April 11). In 2026 it was G (April 10), which covered 2023 sets like Scarlet & Violet, Paldea Evolved, Obsidian Flames and 151.",
