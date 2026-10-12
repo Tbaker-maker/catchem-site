@@ -5388,7 +5388,8 @@ export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
 .pp-flip.up{transform:rotateY(180deg)}
 .pp-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .pp-back{background:radial-gradient(circle at 50% 50%,#e8c05a 0 14%,#1b2333 15% 22%,#c33 23% 49%,#1b2333 50% 53%,#f4f4f4 54%);border:6px solid #1b2333}
-.pp-front{transform:rotateY(180deg);background:#111}.pp-front img,.pp-front .tile{width:100%;height:100%;object-fit:cover}
+.pp-front{transform:rotateY(180deg);background:transparent}.pp-front img,.pp-front .tile{width:100%;height:100%;object-fit:contain;background:transparent;border-radius:10px}
+.pp-card img.card-face{width:100%;border-radius:10px;background:transparent}
 .pp-hit .pp-front{box-shadow:0 0 0 3px var(--gold),0 0 28px 6px rgba(232,192,90,.75)}
 .pp-hit .pp-front::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 45%,rgba(120,220,255,.35) 52%,transparent 65%);background-size:250% 100%;mix-blend-mode:screen;animation:ppShine 1.6s linear infinite}
 .pp-rh .pp-front::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,0,150,.18),rgba(0,200,255,.18),rgba(255,230,0,.18));mix-blend-mode:screen}
@@ -5399,13 +5400,22 @@ export function renderPractice(sets, slug, setDoc, pool, stamp, opts = {}) {
 .pp-info{text-align:center;min-height:72px;overflow-wrap:anywhere}.pp-info .tag{display:inline-block;padding:2px 8px;border:1px solid var(--gold);border-radius:999px;color:var(--gold);font-weight:600;font-size:.85rem}
 .pp-big{font:700 1.3rem/1.2 var(--serif);color:var(--gold)}
 .pp-count{color:var(--muted,#999)}.pp-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.pp-actions{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin:16px 0;width:100%}
+.pp-actions .pp-btn{width:100%;min-height:48px;padding:0 22px;border-radius:12px;font:600 16px/1 var(--sans);cursor:pointer}
+.pp-primary{background:var(--gold);border:1px solid var(--gold);color:#12100e}
+.pp-primary:hover{filter:brightness(1.08)}
+.pp-secondary{background:transparent;border:1px solid var(--gold);color:var(--gold)}
+.pp-quiet{align-self:center;min-height:44px;padding:0 12px;background:none;border:0;color:var(--muted,#9a9184);font:500 14px var(--sans);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pp-quiet:hover{color:var(--txt)}
+@media (min-width:600px){.pp-actions{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center}.pp-actions .pp-btn{width:auto;min-width:200px}.pp-quiet{align-self:center}}
+
 .pp-card.hit{outline:2px solid var(--gold);border-radius:8px}
 @media (prefers-reduced-motion:reduce){.pp-pack,.pp-pack .half,.pp-flip{animation:none!important;transition:none!important}.pp-hit .pp-front::after,.pp-burst,.pp-shake{animation:none!important;display:none}}`;
   const body = `<main id="main" tabindex="-1" class="wrap practice"><style>${css}</style><h1>Practice pack</h1>
 <p class="pp-note"><b>${esc(PRACTICE_NOTE)}</b></p>
 <form class="filters" method="get" action="/practice"><label for="pp-set">Set</label> <select id="pp-set" name="set" onchange="this.form.submit()">${options}</select><noscript><button type="submit">Pick</button></noscript></form>
 <p class="muted">${esc(name)}: ${pool.length} singles in the set file. Each pack is ${PACK_SIZE} cards: 5 Common, 3 Uncommon, 1 reverse holo slot, then 1 Rare or better last. Pack art: ${art ? esc(art.name) : "Catch'em tile, no booster pack in the set file"}.</p>
-<div class="pp-row"><button type="button" id="pp-open" class="pp-btn">Open a pack</button><button type="button" id="pp-binder-btn" class="pp-btn">My practice binder</button></div>
+<div class="pp-actions"><button type="button" id="pp-open" class="pp-btn pp-primary">Open a pack</button><button type="button" id="pp-binder-btn" class="pp-btn pp-secondary">View binder</button></div>
 <div id="pp-stage" class="pp-stage" aria-live="polite"></div>
 <div id="pp-out" aria-live="polite"></div>
 <section id="pp-binder" hidden></section>
@@ -5426,7 +5436,7 @@ function day(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(s)?M[Number(s.slice(5,7))-1
 function cash(n){return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function $(id){return document.getElementById(id);}
 window.ppMiss=function(img){var a=(img.getAttribute("data-alts")||"").split("|").filter(Boolean);if(a.length){img.setAttribute("data-alts",a.slice(1).join("|"));img.src=a[0];return;}var d=document.createElement("div");d.innerHTML=brandedTile(img.getAttribute("data-k")||"card",{kind:img.getAttribute("data-k")==="sealed"?"sealed":"single",name:img.alt});img.replaceWith(d.firstChild);};
-function pic(src,alts,alt,k){return src?'<img alt="'+h(alt)+'" data-k="'+k+'" src="'+h(src)+'" data-alts="'+h((alts||[]).join("|"))+'" onerror="ppMiss(this)">':brandedTile(k,{kind:k==="sealed"?"sealed":"single",name:alt});}
+function pic(src,alts,alt,k){return src?'<img alt="'+h(alt)+'" data-k="'+k+'"'+(k==="card"?' class="shot card-face" data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)"':'')+' src="'+h(src)+'" data-alts="'+h((alts||[]).join("|"))+'" onerror="ppMiss(this)">':brandedTile(k,{kind:k==="sealed"?"sealed":"single",name:alt});}
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){return {};}}
 function save(b){try{localStorage.setItem(KEY,JSON.stringify(b));}catch(e){}}
 function collect(c){var b=load();var k=c.id+(c.rh?":rh":"");var e=b[k]||{id:c.id,name:c.name,num:c.num,rarity:c.rarity,rh:c.rh,set:D.name,src:c.src,alts:c.alts,n:0};e.n++;e.price=c.price;e.date=c.date;b[k]=e;save(b);}
@@ -5471,7 +5481,7 @@ function done(){
   var ds=Object.keys(dates).sort(),when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
   var link="/practice?set="+encodeURIComponent(D.slug)+"&seed="+seed;
   $("pp-stage").innerHTML="";
-  $("pp-out").innerHTML='<p class="pp-total">Pack total <b>'+cash(total)+'</b></p><p class="muted">'+priced+' of '+pack.length+' cards priced. TCGplayer market'+(when?", "+h(when):"")+'. Pack <a href="'+h(link)+'">#'+seed+'</a>.</p><div class="pp-row"><button type="button" class="pp-btn" id="pp-again">Open another pack</button><button type="button" class="pp-btn" id="pp-see">My practice binder</button></div><ol class="pp-grid">'+rows+'</ol>';
+  $("pp-out").innerHTML='<p class="pp-total">Pack total <b>'+cash(total)+'</b></p><p class="muted">'+priced+' of '+pack.length+' cards priced. TCGplayer market'+(when?", "+h(when):"")+'. Pack <a href="'+h(link)+'">#'+seed+'</a>.</p><div class="pp-actions"><button type="button" class="pp-btn pp-primary" id="pp-again">Open another pack</button><button type="button" class="pp-btn pp-secondary" id="pp-see">View binder</button></div><ol class="pp-grid">'+rows+'</ol>';
   $("pp-again").addEventListener("click",fresh);$("pp-see").addEventListener("click",binder);
 }
 function binder(){
@@ -5480,7 +5490,7 @@ function binder(){
   keys.sort(function(a,c){return (b[c].price||0)-(b[a].price||0);});
   var ds=Object.keys(dates).sort(),when=ds.length?(ds.length===1?day(ds[0]):day(ds[0])+" to "+day(ds[ds.length-1])):"";
   var el=$("pp-binder");el.hidden=false;$("pp-stage").innerHTML="";$("pp-out").innerHTML="";
-  el.innerHTML='<h2>My practice binder</h2><p>'+n+' cards, '+keys.length+' different. Total value <b>'+cash(total)+'</b>'+(when?' <span class="muted">TCGplayer market, '+h(when)+' (the date each card was pulled)</span>':'')+'.</p><p class="muted">Saved on this device only. No account needed.</p><div class="pp-row"><button type="button" class="pp-btn" id="pp-b-open">Open another pack</button>'+(keys.length?'<button type="button" class="pp-btn" id="pp-b-clear">Clear binder</button>':'')+'</div><ol class="pp-grid">'+keys.map(function(k){var e=b[k];return '<li class="pp-card">'+pic(e.src,e.alts,e.name,"card")+'<a href="/c/'+encodeURIComponent(e.id)+'"><b>'+h(e.name)+'</b></a><span class="muted">'+h(e.set)+' · '+h(e.rarity)+(e.rh?" · Reverse Holo":"")+'</span><span>x'+e.n+' · '+priceLine(e)+'</span></li>';}).join("")+'</ol>';
+  el.innerHTML='<h2>My practice binder</h2><p>'+n+' cards, '+keys.length+' different. Total value <b>'+cash(total)+'</b>'+(when?' <span class="muted">TCGplayer market, '+h(when)+' (the date each card was pulled)</span>':'')+'.</p><p class="muted">Saved on this device only. No account needed.</p><div class="pp-actions"><button type="button" class="pp-btn pp-primary" id="pp-b-open">Open another pack</button>'+(keys.length?'<button type="button" class="pp-quiet" id="pp-b-clear">Clear binder</button>':'')+'</div><ol class="pp-grid">'+keys.map(function(k){var e=b[k];return '<li class="pp-card">'+pic(e.src,e.alts,e.name,"card")+'<a href="/c/'+encodeURIComponent(e.id)+'"><b>'+h(e.name)+'</b></a><span class="muted">'+h(e.set)+' · '+h(e.rarity)+(e.rh?" · Reverse Holo":"")+'</span><span>x'+e.n+' · '+priceLine(e)+'</span></li>';}).join("")+'</ol>';
   $("pp-b-open").addEventListener("click",fresh);
   var cl=$("pp-b-clear");if(cl)cl.addEventListener("click",function(){if(confirm("Clear your practice binder?")){save({});binder();}});
 }
