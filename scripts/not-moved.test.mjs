@@ -23,3 +23,13 @@ assert.ok(isBoardV3Row(v3) && keepFeedRead(v3), "board v3 row kept");
 assert.ok(!keepFeedRead({ ...v3, source: "" }), "no source, not kept");
 assert.ok(!keepFeedRead({ ...v3, headline: "a \u2014 b" }), "em dash dropped");
 console.log("not-moved tests passed");
+
+{
+  const breadth = { board: "v3", readKind: "breadth", headline: "This week in chase cards: 1 went up.", source: "TCGplayer market, 2026-10-05 and 2026-10-12", asOf: "2026-10-12" };
+  const chase = { ...breadth, readKind: "sealedchase", headline: "Box went $1.00 to $2.00 while its top chase card went $3.00 to $3.01." };
+  const setRow = { ...breadth, board: "hist", readKind: "set", headline: "Set, about 30 days: 5 of 12 priced cards up 10% or more." };
+  const histPrice = { board: "hist", readKind: "year", headline: "One year on: X, $1.00 (Oct 9, 2025) to $5.00 (Oct 12).", price: 5, asOf: "2026-10-12" };
+  assert.ok(keepFeedRead(breadth) && keepFeedRead(chase) && keepFeedRead(setRow), "breadth, sealed vs chase and set rows kept");
+  assert.ok(keepFeedRead(histPrice), "long-history price row kept");
+  assert.ok(!isBoardV3Row({ ...setRow, board: "hist", readKind: "climb" }), "hist tag only admits set rows without a price");
+}
