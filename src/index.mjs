@@ -124,12 +124,12 @@ export function addFeedEntry(html) {
     '<nav id="site-nav">\n    <a href="/feed">Feed</a>\n    <a href="/sets">Sets</a>',
   );
   out = out.replace(
-    '<nav class="dock" aria-label="Primary">\n  <a href="/sets">Sets</a>',
-    '<nav class="dock" aria-label="Primary">\n  <a href="/feed">Feed</a>\n  <a href="/sets">Sets</a>',
+    '<nav class="dock" aria-label="Primary">\n  <a href="/" aria-current="page"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>',
+    '<nav class="dock" aria-label="Primary">\n  <a href="/feed"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/></svg><span>Feed</span></a>',
   );
   out = out.replace(
     '<div class="actions">\n      <a class="btn btn-primary" href="/sets">Browse sets</a>',
-    '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Feed</a>\n      <a class="btn btn-primary" href="/sets">Browse sets</a>',
+    '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Open the Feed</a>\n      <a class="btn btn-ghost" href="/sets">Browse sets</a>',
   );
   return out;
 }
