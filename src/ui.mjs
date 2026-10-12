@@ -5,6 +5,7 @@ import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForI
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
+import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 
@@ -3077,6 +3078,13 @@ ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 <script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script>
+const SEEN_KEY=${JSON.stringify(SEEN_KEY)};
+${freshRandom.toString()}
+${freshSeed.toString()}
+${freshOrder.toString()}
+${pickWording.toString()}
+${readSeen.toString()}
+${markSeen.toString()}
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
 const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
@@ -4613,7 +4621,13 @@ function buildFlat(){
       if(rows.length!==before && ei<extras.length) add(extras[ei++]);
     });
     while(ei<extras.length) add(extras[ei++]);
-    flat=rows;
+    // Unranked: a new seed on every visit or refresh, unseen reads first,
+    // kinds and sets spread out, one file-built wording chosen.
+    const visitSeed=freshSeed();
+    const seenNow=readSeen(window.localStorage);
+    const wordRnd=freshRandom(visitSeed ^ 0x9e3779b9);
+    flat=freshOrder(rows,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
+    markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
     return;
   }
   const order=browse && ranked ? browse.ranked : [];
