@@ -32,8 +32,7 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel } 
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Price history. Gaps are days with no price on file."></svg><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<p class="hc-gaps muted" hidden></p>
-<figcaption class="hc-src muted">${src.map(esc).join(". ")}. Dashed stretches have no price on file; nothing is filled in. Missing days show as gaps.${asOf ? ` As of ${esc(asOf)}.` : ""}</figcaption>
+<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${src.map(esc).join(". ")}. Dashed stretches have no price on file; nothing is filled in. Missing days show as gaps.${asOf ? ` As of ${esc(asOf)}.` : ""}</p><p class="hc-gaps" hidden></p></div></details>
 </figure>`;
 }
 
@@ -46,7 +45,7 @@ export const HISTORY_CSS = `.hc{margin:16px 0;padding:16px 16px 12px;border-radi
 .hc-plot{position:relative;height:220px;touch-action:pan-y}.hc-svg{width:100%;height:100%;display:block;overflow:visible}
 .hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;padding:6px 10px;border-radius:12px;background:rgba(24,22,20,.92);border:1px solid rgba(255,255,255,.1);font-size:12px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .hc-axis{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
-.hc-gaps{margin:6px 2px 0;font-size:12px}
+.hc-about{margin-top:8px}.hc-about summary{display:inline-flex;align-items:center;gap:6px;list-style:none;cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.06);opacity:.75}.hc-about summary::-webkit-details-marker{display:none}.hc-about summary::before{content:"i";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-style:italic}.hc-about[open] summary{opacity:1}.hc-about-body{margin-top:8px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);font-size:12px;line-height:1.45}.hc-about-body p{margin:0 0 6px}.hc-gaps{}
 .hc-src{margin:8px 2px 0;font-size:12px;line-height:1.45}
 @media(max-width:600px){.hc{padding:14px 12px 10px;border-radius:18px}.hc-plot{height:180px}.hc-pill{padding:6px 10px}}`;
 
@@ -74,7 +73,7 @@ svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><s
 svg._X=X;svg._Y=Y;head(view[view.length-1]);var gl=fig.querySelector(".hc-gaps");if(gl){var big=gaps.filter(function(q){return (ms(q.to)-ms(q.from))/864e5>=2;});gl.textContent=big.length?big.map(gapText).join(" · ")+".":"";gl.hidden=!big.length;}}
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,best=view[0],bd=1e9;view.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
 function inGap(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W;for(var i=0;i<gaps.length;i++){if(x>svg._X(gaps[i].a[0])&&x<svg._X(gaps[i].b[0]))return gaps[i];}return null;}
-function show(cx){var p=near(cx),gq=inGap(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=gq?gapText(gq)+" · nearest: "+short(p[0])+" "+money(p[1]):nice(p[0])+"  "+money(p[1]);var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
+function show(cx){var p=near(cx),gq=inGap(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+money(p[1]);var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
 function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");head(view[view.length-1]);}
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
