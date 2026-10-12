@@ -9,7 +9,7 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
-import { listingsBlock, listingsEntry, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
+import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
@@ -445,12 +445,24 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const counted = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
       listingsHtml = listingsBlock(listingsEntry(counted, sealedId));
     }
+    let notMovedHtml = "";
+    if (card) {
+      const nm = await loadJson("feed/not-moved.json", fetchImpl).catch(() => null);
+      if (nm && nm.on !== false) {
+        if (card.kind === "sealed") {
+          const entry = sealedId ? nm.sealed?.[sealedId] : null;
+          notMovedHtml = notMovedBlock(entry, { images, sealed: true, pidFor: (id) => Number(entry?.lagging?.find((row) => row.id === id)?.pid) || 0 });
+        } else {
+          notMovedHtml = notMovedBlock(nm.cards?.[cardId], { images });
+        }
+      }
+    }
     let rotationHtml = "";
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationHtml = rotationBadge(rotationRow(rot, card.setSlug), rot);
     }
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
