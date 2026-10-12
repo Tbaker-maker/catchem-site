@@ -38,3 +38,4 @@ console.log("public routes ok");
 
 // Card Rating panel checks (CI runs this file).
 await import("./card-rating.test.mjs");
+await import("./no-data-charts.test.mjs");
