@@ -25,5 +25,10 @@ const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|load
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(cyclePanel(row, "2026-10-12").replace(/<[^>]+>/g, " ")));
 t("every price line carries a date", /\$3\.00 on Oct 12, 2026/.test(paid) && /12 eBay listings counted for S Booster Box on Oct 12, 2026/.test(paid));
 t("lift chips render", /rchip lift">Near its lowest on file/.test(paid) && /rchip lift/.test(cyclePanel(row, "2026-10-12")));
+t("free count line is exact", /Showing 3 of <b>6 cards<\/b>\. Premium shows all 6/.test(free));
+const big = { asOf: "2026-10-12", rows: Array.from({ length: 250 }, (_, i) => ({ ...row, id: "tcgcsv-" + i })) };
+const p3 = watchlistBody(big, { premium: true, page: "3" });
+t("premium pages through every card", (p3.match(/class="wl-row"/g) || []).length === 50 && /Showing 201 to 250 of 250/.test(p3));
+t("no duplicate lowest line when the chip shows", (paid.match(/Near its lowest on file/g) || []).length === 6 && !/Where it sits/.test(paid));
 t("says not advice", /not advice/.test(paid));
 if (fail) { console.log(`ir-cycle: ${fail} failed`); process.exit(1); } else console.log("ir-cycle ok");

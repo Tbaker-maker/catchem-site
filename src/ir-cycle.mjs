@@ -92,10 +92,12 @@ export function liftChips(r) {
   return [...lifts, ...pop].join("");
 }
 
+export const hasRangeChip = (r) => (r.lifts || []).some((l) => l.factor === "range");
+
 export function cyclePanel(row, asOf) {
   if (!row) return "";
   const chips = liftChips(row);
-  const dl = cycleRows(row).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+  const dl = cycleRows(row).filter(([k]) => !(k === "Where it sits" && hasRangeChip(row))).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
   return `<section class="ircy" aria-label="IR cycle"><h2>IR cycle${row.kindLabel ? ` <span class="sub" style="font:500 13px/1 var(--sans);opacity:.7">· ${esc(row.kindLabel)}</span>` : ""}</h2>${chips ? `<div class="rchips">${chips}</div>` : ""}<dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Curve from our IR study of TCGplayer market history.</p></section>`;
 }
 
@@ -112,22 +114,28 @@ export function watchlistBody(doc, opts = {}) {
   const set = String(opts.set || "");
   const all = (doc?.rows || []).filter((r) => !set || r.setSlug === set);
   const premium = opts.premium === true;
-  const shown = premium ? all.slice(0, 120) : all.slice(0, FREE_ROWS);
+  const PAGE = 100;
+  const pages = Math.max(1, Math.ceil(all.length / PAGE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt(opts.page, 10) || 1));
+  const shown = premium ? all.slice((page - 1) * PAGE, page * PAGE) : all.slice(0, FREE_ROWS);
+  const fmt = (n) => Number(n).toLocaleString("en-US");
+  const qs = (n) => `/ir-watchlist?${set ? `set=${encodeURIComponent(set)}&` : ""}page=${n}`;
+  const pager = premium && pages > 1 ? `<nav class="wl-pager" aria-label="Pages"><span>Showing ${fmt((page - 1) * PAGE + 1)} to ${fmt(Math.min(all.length, page * PAGE))} of ${fmt(all.length)}</span>${page > 1 ? `<a class="rchip" href="${qs(page - 1)}">Previous</a>` : ""}${page < pages ? `<a class="rchip kind" href="${qs(page + 1)}">Next ${PAGE}</a>` : ""}</nav>` : "";
   const pic = typeof opts.pic === "function" ? opts.pic : () => "";
   const items = shown.map((r) => {
-    const facts = cycleRows(r).filter(([k]) => k !== "IR curve").map(([k, v]) => `<li><span>${esc(k)}</span> ${esc(v)}</li>`).join("");
+    const facts = cycleRows(r).filter(([k]) => k !== "IR curve" && !(k === "Where it sits" && hasRangeChip(r))).map(([k, v]) => `<li><span>${esc(k)}</span> ${esc(v)}</li>`).join("");
     const tags = liftChips(r);
-    return `<li class="wl-row"><a class="wl-pic" href="/c/${esc(r.id)}">${pic(r)}</a><div class="wl-main"><p class="wl-set">${esc(r.set)} · ${esc(r.kindLabel || r.kind)} · ${esc(r.num || "")}</p><h2><a href="/c/${esc(r.id)}">${esc(r.name.replace(/\s+-\s+\S+$/, ""))}</a></h2><p class="wl-pos">${esc(r.position || "")}</p><ul class="wl-facts">${facts}</ul><p class="wl-curve">${esc(r.curve.text)}</p>${tags ? `<div class="rchips">${tags}</div>` : ""}</div></li>`;
+    return `<li class="wl-row"><a class="wl-pic" href="/c/${esc(r.id)}">${pic(r)}</a><div class="wl-main"><p class="wl-set">${esc(r.set)} · ${esc(r.kindLabel || r.kind)} · ${esc(r.num || "")}</p><h2><a href="/c/${esc(r.id)}">${esc(r.name.replace(/\s+-\s+\S+$/, ""))}</a></h2><ul class="wl-facts">${facts}</ul><p class="wl-curve">${esc(r.curve.text)}</p>${tags ? `<div class="rchips">${tags}</div>` : ""}</div></li>`;
   }).join("");
-  const gate = premium ? "" : `<div class="wl-gate"><p><b>${all.length} cards</b> are on the full watchlist, with every fact dated.</p><a class="wl-btn" href="/premium">See it with Premium</a></div>`;
+  const gate = premium ? "" : `<div class="wl-gate"><p>Showing ${Math.min(FREE_ROWS, all.length)} of <b>${fmt(all.length)} cards</b>${set ? " in this set" : ""}. Premium shows all ${fmt(all.length)}, with every fact dated.</p><a class="wl-btn" href="/premium">See it with Premium</a></div>`;
   const filter = set ? `<p class="muted">One set. <a href="/ir-watchlist">Show every set</a></p>` : "";
   return `<main id="main" tabindex="-1" class="wrap wl"><style>${CHIP_CSS}
-.wl h1{font:500 clamp(30px,7vw,46px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 8px}.wl .lede{max-width:40em;font-size:16px;line-height:1.5;opacity:.85}.wl-list{list-style:none;margin:16px 0;padding:0;display:grid;gap:14px}.wl-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:16px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01))}.wl-pic img,.wl-pic .tile{width:96px;max-width:96px;height:auto;border-radius:10px}.wl-set{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}.wl h2{margin:4px 0;font:600 20px/1.25 var(--serif)}.wl h2 a{color:inherit;text-decoration:none}.wl-pos{margin:0 0 8px;color:var(--gold);font-weight:600}.wl-facts{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}.wl-facts span{opacity:.6;margin-right:6px}.wl-curve{margin:8px 0 0;font-size:13px;opacity:.7}.wl-gate{margin:18px 0;padding:20px;border-radius:20px;border:1px solid var(--gold);text-align:center}.wl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;background:var(--gold);color:#111;font-weight:700;text-decoration:none}.wl .fine{font-size:12px;opacity:.6;max-width:44em}
+.wl h1{font:500 clamp(30px,7vw,46px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 8px}.wl .lede{max-width:40em;font-size:16px;line-height:1.5;opacity:.85}.wl-list{list-style:none;margin:16px 0;padding:0;display:grid;gap:14px}.wl-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:16px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01))}.wl-pic img,.wl-pic .tile{width:96px;max-width:96px;height:auto;border-radius:10px}.wl-set{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}.wl h2{margin:4px 0;font:600 20px/1.25 var(--serif)}.wl h2 a{color:inherit;text-decoration:none}.wl-pos{margin:0 0 8px;color:var(--gold);font-weight:600}.wl-facts{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}.wl-facts span{opacity:.6;margin-right:6px}.wl-curve{margin:8px 0 0;font-size:13px;opacity:.7}.wl-gate{margin:18px 0;padding:20px;border-radius:20px;border:1px solid var(--gold);text-align:center}.wl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;background:var(--gold);color:#111;font-weight:700;text-decoration:none}.wl-pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 16px;font-size:14px}.wl .fine{font-size:12px;opacity:.6;max-width:44em}
 @media (min-width:768px){.wl-row{grid-template-columns:120px minmax(0,1fr)}.wl-pic img,.wl-pic .tile{width:120px;max-width:120px}}</style>
 <p class="kicker" style="letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)">Premium</p>
 <h1>IR watchlist</h1>
 <p class="lede">Illustration Rares, Special Illustration Rares, Trainer Gallery and Galarian Gallery cards, and Sword &amp; Shield alt arts. Each one shows its age, where its price sits against its own low and high on file, its 30 and 90 day trend, and the sealed listings we counted for its set.</p>
-${filter}<ul class="wl-list">${items}</ul>${gate}
+${filter}<ul class="wl-list">${items}</ul>${pager}${gate}
 <p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. Listings are eBay listings we counted for one sealed product of the set, not for the card. The order weighs several facts together: time since release, where the price sits in its range on file, the Pokémon's popularity (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others), how its 90 days compare with set and era peers, its trend, and the sealed listings counted. The chips on each card name the facts that weigh most for it. This is a factual signal, not advice.</p></main>`;
 }
 
