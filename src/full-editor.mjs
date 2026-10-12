@@ -448,6 +448,8 @@ function stripMarketPrompts(html) {
 
 const SITE_SKIN = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style id="site-skin">
+:root{--r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:20px;--r-pill:999px;--r-card:4.8%/3.4%}
+img,svg,canvas,video,iframe{border-radius:var(--r-xs)}iframe,table{border-radius:var(--r-md)}input,select,textarea,button{border-radius:var(--r-sm)}dialog{border-radius:var(--r-lg)}.dock{border-radius:var(--r-lg) var(--r-lg) 0 0}img.card-face,.card-face{border-radius:var(--r-card)!important}
 :root{
   --paper:#12100e;--sheet:#1a1815;--ink:#efe9de;--mute:#c4baab;
   --line:#2f2b26;--accent:#d9b779;--accent-ink:#1a1407;
