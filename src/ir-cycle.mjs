@@ -21,8 +21,11 @@ export function artKind(card) {
   return "";
 }
 
-export function rotationChipData(rot, slug, today) {
-  const row = (rot?.sets || []).find((s) => s && s.slug === slug);
+export function rotationChipData(rot, slug, today, cardMark) {
+  // A card's own mark (mixed sets) wins over the set-wide mark.
+  const row = cardMark
+    ? { mark: cardMark, status: (rot?.sources || []).some((s) => s.mark === cardMark) ? "Rotated" : (rot?.expected || []).some((e) => e.mark === cardMark) || /^[H-Z]$/.test(cardMark) ? "Standard" : null, own: true }
+    : (rot?.sets || []).find((s) => s && s.slug === slug);
   if (!row || !row.mark) return null;
   const src = (rot.sources || []).find((s) => s.mark === row.mark && isDay(s.date));
   if (src) {
@@ -40,10 +43,11 @@ export function rotationChipData(rot, slug, today) {
 export const CHIP_CSS = `.rchips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.rchip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));font:600 13px/1.25 var(--sans);color:inherit;text-decoration:none}.rchip .dot{width:8px;height:8px;border-radius:999px;background:var(--gold);flex:none}.rchip.past .dot{background:#8a8f98}.rchip.est{border-style:dashed}.rchip .sub{font-weight:500;opacity:.72}.rchip.kind{border-color:var(--gold);color:var(--gold)}.rchip.lift{border-color:rgba(212,175,55,.45);background:rgba(212,175,55,.08)}
 .ircy{margin:14px 0;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}.ircy h2{margin:0 0 10px;font:600 18px/1.3 var(--serif)}.ircy dl{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr);gap:6px 14px;margin:0}.ircy dt{opacity:.7;font-size:13px}.ircy dd{margin:0;font-size:14px;overflow-wrap:anywhere}.ircy .fine{margin:10px 0 0;font-size:12px;opacity:.65}`;
 
-export function chipsHtml(card, rot, today) {
+export function chipsHtml(card, rot, today, cardMark) {
   const kind = artKind(card);
   if (!kind || !card?.setSlug) return "";
-  const r = rotationChipData(rot, card.setSlug, today);
+  const r = rotationChipData(rot, card.setSlug, today, cardMark);
+  if (r && cardMark) r.sub = [r.sub, "this card's own mark"].filter(Boolean).join(" · ");
   // The kind itself is shown by the catalogue variant tag under the name.
   const kindChip = "";
   if (!r) return `<div class="rchips">${kindChip}</div>`;
@@ -101,8 +105,8 @@ export function cyclePanel(row, asOf) {
   return `<section class="ircy" aria-label="IR cycle"><h2>IR cycle${row.kindLabel ? ` <span class="sub" style="font:500 13px/1 var(--sans);opacity:.7">· ${esc(row.kindLabel)}</span>` : ""}</h2>${chips ? `<div class="rchips">${chips}</div>` : ""}<dl>${dl}</dl><p class="fine">Facts from our files as of ${esc(shortDate(asOf))}. Not advice. Curve from our IR study of TCGplayer market history.</p></section>`;
 }
 
-export function cardArtHtml(card, rot, doc, today) {
-  const chips = chipsHtml(card, rot, today);
+export function cardArtHtml(card, rot, doc, today, marks) {
+  const chips = chipsHtml(card, rot, today, marks?.cards?.[card.id]?.mark);
   if (!chips) return "";
   const row = (doc?.rows || []).find((r) => r.id === card.id);
   return `<style>${CHIP_CSS}</style>${chips}${cyclePanel(row, doc?.asOf)}`;
@@ -140,3 +144,10 @@ ${filter}<ul class="wl-list">${items}</ul>${pager}${gate}
 }
 
 const TAG_LABEL = { headliner: "Fan favourite", eeveelution: "Eeveelution", gen1: "Gen 1", starter: "Starter", popular: "Popular Pokémon" };
+
+// Replaces the set badge on a mixed-set card: the card's own mark, cited.
+export function cardMarkBadge(entry, doc) {
+  if (!entry?.mark) return "";
+  const day = shortDate(String(doc?.attrsGenerated || ""));
+  return `<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark ${esc(entry.mark)}"><span class="rm">${esc(entry.mark)}</span> Regulation mark ${esc(entry.mark)} on this card</a> <span class="muted">Mixed set. pokemontcg.io ${esc(entry.ptcgId)}${day ? `, card file ${esc(day)}` : ""}.</span></p>`;
+}

@@ -11,7 +11,7 @@ import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
-import { cardArtHtml, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
+import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
@@ -471,7 +471,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationHtml = rotationBadge(rotationRow(rot, card.setSlug), rot);
       const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
-      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay()) + rotationHtml;
+      const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
+      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationHtml);
     }
     if (card && card.kind !== "sealed" && cardId) {
       const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);

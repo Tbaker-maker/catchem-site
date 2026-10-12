@@ -1,4 +1,4 @@
-import { artKind, rotationChipData, chipsHtml, watchlistBody, cyclePanel, FREE_ROWS } from "../src/ir-cycle.mjs";
+import { cardMarkBadge, artKind, rotationChipData, chipsHtml, watchlistBody, cyclePanel, FREE_ROWS } from "../src/ir-cycle.mjs";
 let fail = 0;
 const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
 const rot = { sources: [{ mark: "G", date: "2026-04-10" }], expected: [{ mark: "H", window: "spring 2027", basis: "x" }], sets: [{ slug: "e", mark: "E", status: null }, { slug: "s", mark: "J", status: "Standard" }, { slug: "g", mark: "G" }, { slug: "h", mark: "H" }, { slug: "j", mark: "J" }, { slug: "n", mark: null }] };
@@ -13,6 +13,9 @@ t("unannounced H labeled, no countdown", h.official === false && /not announced/
 t("J has no invented date", !/\d{4}/.test(rotationChipData(rot, "j", "2026-10-12").text));
 t("old mark with no date never claims Standard", rotationChipData(rot, "e", "2026-10-12").text === "Regulation mark E");
 t("Standard only when the file says so", /In Standard/.test(rotationChipData(rot, "s", "2026-10-12").text));
+t("card mark G in a mixed set says Rotated", rotationChipData(rot, "n", "2026-10-12", "G").text === "Rotated Apr 10, 2026");
+t("card mark H in a mixed set shows the H window", /Expected window: spring 2027/.test(rotationChipData(rot, "n", "2026-10-12", "H").sub));
+t("card mark I is In Standard", /In Standard/.test(rotationChipData(rot, "n", "2026-10-12", "I").text));
 t("no mark no chip", rotationChipData(rot, "n", "2026-10-12") === null);
 t("chips only on art cards", chipsHtml({ rarity: "Common", setSlug: "h" }, rot, "2026-10-12") === "");
 const row = { id: "tcgcsv-1", name: "Pikachu ex - 1/2", set: "S", setSlug: "h", kind: "SIR", num: "1/2", release: "2026-01-30", daysSinceRelease: 255, price: { price: 3, date: "2026-10-12" }, low: { price: 2, date: "2026-10-01" }, high: { price: 9, date: "2026-04-01" }, onFileSince: "2026-02-05", position: "Near its lowest on file", trend30: null, trend90: { pct: -30, from: { date: "2026-07-14", price: 4 }, to: { date: "2026-10-12", price: 3 } }, setListings: { name: "S Booster Box", n: 12, date: "2026-10-12" }, curve: { stage: "6 to 12 months", text: "c" }, popularity: ["gen1"], lifts: [{ factor: "range", text: "Near its lowest on file" }] };
@@ -30,5 +33,9 @@ const big = { asOf: "2026-10-12", rows: Array.from({ length: 250 }, (_, i) => ({
 const p3 = watchlistBody(big, { premium: true, page: "3" });
 t("premium pages through every card", (p3.match(/class="wl-row"/g) || []).length === 50 && /Showing 201 to 250 of 250/.test(p3));
 t("no duplicate lowest line when the chip shows", (paid.match(/Near its lowest on file/g) || []).length === 6 && !/Where it sits/.test(paid));
+t("card badge cites the card id", /sv8pt5-159/.test(cardMarkBadge({ mark: "G", ptcgId: "sv8pt5-159" }, { attrsGenerated: "2026-08-24" })));
 t("says not advice", /not advice/.test(paid));
 if (fail) { console.log(`ir-cycle: ${fail} failed`); process.exit(1); } else console.log("ir-cycle ok");
+import { rotationBadge } from "../src/features.mjs";
+if (!/Checked Oct 12, 2026/.test(rotationBadge({ mark: "I", status: "Standard", checked: "2026-10-12" }, { asOf: "2026-08-24" }))) { console.log("  FAIL badge checked"); process.exit(1); }
+if (!/Card file, Aug 24, 2026/.test(rotationBadge({ mark: "H", status: "Standard" }, { asOf: "2026-08-24" }))) { console.log("  FAIL badge card file"); process.exit(1); }
