@@ -41,7 +41,7 @@ export function buildPack(pool, seed) {
   const by = (f) => pool.filter(f);
   const com = by((c) => c.rarity === "Common"), unc = by((c) => c.rarity === "Uncommon");
   const rares = by((c) => tierOf(c.rarity) >= 0);
-  const filler = by((c) => tierOf(c.rarity) < 0);
+  const filler = by((c) => c.rarity === "Common" || c.rarity === "Uncommon");
   const used = {};
   const pick = (list) => {
     const open = list.filter((c) => !used[c.id]);
@@ -56,10 +56,10 @@ export function buildPack(pool, seed) {
   for (const slot of SLOTS) {
     let c = null, rh = false;
     if (slot === "C") c = pick(com.length ? com : filler.length ? filler : pool);
-    else if (slot === "U") c = pick(unc.length ? unc : filler.length ? filler : pool);
+    else if (slot === "U") c = pick(unc.length ? unc : com.length ? com : filler.length ? filler : pool);
     else if (slot === "RH") {
-      const rev = pool.filter((x) => x.rh && tierOf(x.rarity) < 0);
-      const r2 = rev.length ? rev : pool.filter((x) => x.rh);
+      const rev = filler.filter((x) => x.rh);
+      const r2 = rev.length ? rev : pool.filter((x) => x.rh && tierOf(x.rarity) >= 0);
       c = pick(r2.length ? r2 : filler.length ? filler : pool);
       rh = !!(c && c.rh);
     } else {
