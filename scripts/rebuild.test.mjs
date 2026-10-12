@@ -921,3 +921,5 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
 
 if (fail) process.exit(1);
 console.log("rebuild routes ok");
+
+await import("./track-record-hidden.test.mjs");

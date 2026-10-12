@@ -456,6 +456,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "track") {
     const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored14: 0, scored28: 0, scored56: 0 }));
+    // Hidden unless the data repo marks the track record public. No page, no score, no card line.
+    if (doc?.public !== true) return html(`<main class="wrap"><h1>Not found</h1><p class="muted">That page is not here.</p><p><a href="/feed">Feed</a></p></main>`, 404);
     return html(renderTrackRecord(doc, stamp, pageOpts));
   }
   if (kind === "compare") {
