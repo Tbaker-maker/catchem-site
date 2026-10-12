@@ -15,4 +15,5 @@ jobs:
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/post-office.test.mjs
       - run: node scripts/sealed-pid.test.mjs
+      - run: node scripts/data-cache.test.mjs
       - run: node scripts/check-ppt-safety.mjs
