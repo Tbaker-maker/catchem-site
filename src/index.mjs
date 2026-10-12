@@ -11,6 +11,9 @@ import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig } from "./pokemon.mjs";
+import { cardArtHtml, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
+import { imageTag as picTag } from "./catalogue-image.mjs";
+import { pageChrome } from "./ui.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
@@ -78,6 +81,7 @@ export function pageKind(pathname) {
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
   if (path === "/rotation") return "rotation";
+  if (path === "/ir-watchlist") return "ir-watchlist";
   if (path === "/releases") return "releases";
   if (path === "/practice") return "practice";
   if (path === "/accuracy") return "accuracy";
@@ -465,6 +469,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationHtml = rotationBadge(rotationRow(rot, card.setSlug), rot);
+      const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
+      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay()) + rotationHtml;
     }
     return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
   }
@@ -501,6 +507,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
+  if (kind === "ir-watchlist") {
+    const doc = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
+    const images = await catalogueMap(fetchImpl);
+    const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, images); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
+    const body = watchlistBody(doc, { premium: opts.premium === true, set: opts.set || "", pic });
+    return html(pageChrome("", body, "IR watchlist", stamp, "", pageOpts.feed === true));
+  }
   if (kind === "supply") {
     const doc = await loadJson("feed/supply-lead.json", fetchImpl).catch(() => ({ enabled: false, reads: [], wouldQualify: 0 }));
     return html(renderSupply(doc, stamp, pageOpts));
@@ -775,7 +788,12 @@ async function setFeatureHtml(slug, fetchImpl, valueDoc) {
   const doc = valueDoc || await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
   const images = doc ? await catalogueMap(fetchImpl) : {};
   const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
-  const rotationHtml = rot ? rotationBadge(rotationRow(rot, slug), rot) : undefined;
+  let rotationHtml = rot ? rotationBadge(rotationRow(rot, slug), rot) : undefined;
+  if (rot) {
+    const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
+    const n = (ir?.rows || []).filter((r) => r.setSlug === slug).length;
+    rotationHtml = setChipHtml(slug, rot, vancouverDay(), n) + (rotationHtml || "");
+  }
   return { setValueHtml: setValueBlock(doc, images, slug), rotationHtml };
 }
 
