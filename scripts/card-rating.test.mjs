@@ -30,4 +30,15 @@ t("no sealed data on the card panel", !/sealed|listings/i.test(paid.replace(/<[^
 }
 t("comparison names are clean", (await import("../src/card-rating.mjs")).cleanName("Gardevoir & Sylveon GX (205) (Alternate Full Art)") === "Gardevoir & Sylveon GX");
 t("no row no panel", ratingPanel(null, doc) === "");
+{
+  const np = ratingPanel({ ...row, verdict: null, verdictNote: "Not enough similar cards for a fair comparison", reason: "no published pull rate for this set", index: "ir~illustration-rare~scarlet-and-violet", prBand: null }, doc, {});
+  t("no pull rate gives the reason", /No published pull rate for this set and rarity/.test(np) && !/Priced (below|above)/.test(np));
+  t("panel links to its index", /href="\/indexes\/ir--illustration-rare--scarlet-and-violet--all"/.test(np));
+  const { indexListBody, indexPageBody } = await import("../src/indexes.mjs");
+  const doc2 = { key: "k", name: "Tag Team (Alternate Art) Index, Sun & Moon", kind: "all", rarity: "Ultra Rare", era: "Sun & Moon", smallGroup: true, method: "m", source: "TCGplayer market", pullRates: [], points: [["2026-10-05", 1000, 100, 6], ["2026-10-12", 1100, 110, 6]], changes: [{ date: "2026-10-12", started: 6 }], members: Array.from({ length: 6 }, (_, i) => [`tcgcsv-${i}`, `Card ${i} - ${i}/9`, "Set", `${i}/9`, 100 + i, "2026-10-12", "Ultra Rare"]) };
+  const ip = indexPageBody(doc2, {});
+  t("index page: two lines, members, dated changes, about, small note", (ip.match(/<svg/g) || []).length === 2 && /Cards in this index/.test(ip) && /Oct 12, 2026<\/b>: index started with 6 cards/.test(ip) && /About this index/.test(ip) && /Small group/.test(ip));
+  t("index pages never say No data", !/No data/i.test(ip + indexListBody({ asOf: "2026-10-12", indexes: [] })));
+  t("index list links each index", /href="\/indexes\/k"/.test(indexListBody({ asOf: "2026-10-12", indexes: [{ key: "k", name: doc2.name, kind: "all", era: "Sun & Moon", last: ["2026-10-12", 1100, 110, 6] }] })));
+}
 if (fail) { console.log(`card-rating: ${fail} failed`); process.exit(1); } else console.log("card-rating ok");
