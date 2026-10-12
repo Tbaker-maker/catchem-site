@@ -511,7 +511,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const doc = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
     const images = await catalogueMap(fetchImpl);
     const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, images); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
-    const body = watchlistBody(doc, { premium: opts.premium === true, set: opts.set || "", pic });
+    const body = watchlistBody(doc, { premium: opts.premium === true, set: opts.set || "", page: opts.page || "", pic });
     return html(pageChrome("", body, "IR watchlist", stamp, "", pageOpts.feed === true));
   }
   if (kind === "supply") {
@@ -717,7 +717,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
