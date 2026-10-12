@@ -4528,6 +4528,7 @@ function leadRows(){
     if(!r || !(r.headline || r.path)) return false;
     if(isFact(r)) return !hideFacts;
     if(isLag(r) || isSupply(r)) return true;
+    if((r.board==="v3" || r.board==="hist") && r.source && r.asOf) return true;
     if(r.readKind==="outlier" || r.kind==="outlier" || r.readKind==="dive" || r.kind==="dive") return true;
     if(isVolumeRow(r)) return true;
     if(isShapeRow(r)) return true;

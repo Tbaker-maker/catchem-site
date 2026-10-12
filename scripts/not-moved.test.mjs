@@ -38,3 +38,10 @@ console.log("not-moved tests passed");
   const deep = { board: "v3", readKind: "deep", kind: "deep", deep: "set", headline: "Set deep dive: 20 cards worth $100.00 together, up 5% in a year.", lines: ["a", "b", "c"], chart: { label: "x", points: [["2025-10-12", 1], ["2026-10-12", 2]] }, source: "TCGplayer market, 2025-10-12 to 2026-10-12", asOf: "2026-10-12" };
   assert.ok(isBoardV3Row(deep) && keepFeedRead(deep), "deep read kept");
 }
+
+{
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
+  const lead = src.slice(src.indexOf("function leadRows(){"), src.indexOf("function accepts(card){"));
+  assert.ok(lead.includes('r.board==="v3"') && lead.includes('r.board==="hist"'), "the All loop keeps v3 and history rows that carry no price");
+}
