@@ -35,3 +35,6 @@ t("pulse itself is neutralized", pulse.includes("Demand") && pulse.includes("HEA
 await rm(dir, { recursive: true, force: true });
 if (fail) process.exit(1);
 console.log("public routes ok");
+
+// Card Rating panel checks (CI runs this file).
+await import("./card-rating.test.mjs");
