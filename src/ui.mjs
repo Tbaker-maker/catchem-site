@@ -1275,6 +1275,7 @@ a{color:var(--gold)}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
+.vchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.vchip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--gold);background:rgba(212,175,55,.10);border:1px solid rgba(212,175,55,.35);text-decoration:none}a.vchip:hover{background:rgba(212,175,55,.18)}.vchips.sm{margin:4px 0 0}.vchips.sm .vchip{padding:2px 9px;font-size:11px}
 .chart-note{font-size:15px;line-height:1.45;margin:8px 0 0}
 .counts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .counts b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:44px}
@@ -1572,6 +1573,7 @@ ${opts.setValueHtml || ""}
 <div id="lines"></div><div id="charts"></div>
 <div class="filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
+<select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
 </div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
@@ -1624,7 +1626,7 @@ function rowHtml(r){
     var owned=readOwned();
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span></a><b>'+money(r.price)+'</b></div>';
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span>'+((r.tags||[]).length?'<span class="vchips sm">'+r.tags.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a><b>'+money(r.price)+'</b></div>';
 }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
 function readOwned(){
@@ -1696,7 +1698,11 @@ function draw(){
   const sort=document.getElementById("sort").value;
   let list=expand(rows, scope);
   list=list.filter(r=>!kind||r.kind===kind);
-  if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")).toLowerCase().includes(q));
+  const vsel=document.getElementById("vtag");
+  if(vsel && vsel.options.length===1){var seenT={};rows.forEach(function(r){(r.tags||[]).forEach(function(t){seenT[t]=(seenT[t]||0)+1;});});Object.keys(seenT).sort().forEach(function(t){var o=document.createElement("option");o.value=t;o.textContent=t+" ("+seenT[t]+")";vsel.appendChild(o);});}
+  const vtag=vsel?vsel.value:"";
+  if(vtag) list=list.filter(r=>(r.tags||[]).indexOf(vtag)>=0);
+  if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")+" "+(r.tags||[]).join(" ")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
   const main=list.filter(r=>!r.section);
   const order=[];
@@ -1764,7 +1770,7 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   var title=document.getElementById("title");
   if(title && title.textContent==="Set") title.textContent="This set did not load.";
 });
-["kind","q","sort","scope"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
+["kind","q","sort","scope","vtag"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 document.getElementById("mine-toggle").addEventListener("click", function(){
   var on=this.getAttribute("aria-pressed")==="true";
@@ -2163,6 +2169,7 @@ export function renderCard(card, stamp, opts = {}) {
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
+${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span></p>
 ${chips ? `<p>${chips}</p>` : ""}
@@ -2522,7 +2529,7 @@ ${err}
 
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
-<div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus></div>
+<div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
 <p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
@@ -2597,7 +2604,7 @@ function rowHtml(r){
   var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto" onerror="this.remove()">':"";
   var chips="";
   if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
-  if(r[9]) chips+='<span class="win">'+html(r[9])+'</span>';
+  if(Array.isArray(r[9])&&r[9].length) chips+='<span class="vchips sm">'+r[9].map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
   var price=stored(r);
   var cash=price==null?"No market price":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
@@ -2645,11 +2652,27 @@ async function ensureRows(q){
 async function draw(){
   const n=++drawN;
   const q=document.getElementById("q").value.trim();
-  if(q.length<2){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters.";return}
+  const vtag=document.getElementById("vtag").value;
+  const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
+  if(q.length<2 && !vtag){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant.";return}
+  if(q.length<2 && vtag){
+    try{ await ensureBags(); if(!usedLite){ rows=await (await fetch("/data/search-lite.json")).json(); usedLite=true; } }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
+    if(n!==drawN) return;
+    var all=rows.filter(hasTag);
+    var top=all.slice().sort(function(a,b){return (b[6]||0)-(a[6]||0);}).slice(0,40);
+    await ensureSparks(top);
+    if(n!==drawN) return;
+    document.getElementById("meta").textContent=all.length.toLocaleString("en-US")+" "+vtag+" cards. Top 40 by TCGplayer market price.";
+    document.getElementById("list").innerHTML=top.map(rowHtml).join("");
+    return;
+  }
   try{ await ensureBags(); await ensureRows(q); }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
   if(n!==drawN) return;
-  var hits=rankCatalog(q, rows, 40, codes);
-  var found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]});
+  const src=rows;
+  var hits, found;
+  { const rows=vtag?src.filter(hasTag):src;
+  hits=rankCatalog(q, rows, 40, codes);
+  found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]}); }
   const shown=take(found.hits);
   const near=take(found.nearest);
   await ensureSparks(shown.concat(near));
@@ -2663,6 +2686,8 @@ async function draw(){
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("");
 }
 document.getElementById("q").addEventListener("input",draw);
+document.getElementById("vtag").addEventListener("input",draw);
+(function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));
 }
