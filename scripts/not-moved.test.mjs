@@ -45,3 +45,10 @@ console.log("not-moved tests passed");
   const lead = src.slice(src.indexOf("function leadRows(){"), src.indexOf("function accepts(card){"));
   assert.ok(lead.includes('r.board==="v3"') && lead.includes('r.board==="hist"'), "the All loop keeps v3 and history rows that carry no price");
 }
+
+{
+  const { renderFeed } = await import("../src/ui.mjs");
+  const mk = (i) => ({ id: `breadth-set-${i}`, board: "v3", readKind: "breadth", kind: "breadth", headline: `Set ${i} this week: 1 chase card up 8% or more, of 9 counted.`, path: "x", source: "TCGplayer market, 2026-10-05 and 2026-10-12", asOf: "2026-10-12", href: "/feed?f=prices" });
+  const html = renderFeed({ reads: [mk(1), mk(2), mk(3)] }, "", "Oct 12");
+  assert.ok(html.includes("breadth-set-1") && html.includes("breadth-set-2") && html.includes("breadth-set-3"), "reads that share a filter link all stay on the Feed");
+}
