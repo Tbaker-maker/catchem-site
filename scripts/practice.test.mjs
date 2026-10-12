@@ -1,7 +1,7 @@
 // Practice pack. Imported by rebuild.test.mjs so CI runs it.
 import { renderPath, pageKind } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
-import { drawPack, practicePool, practiceSets, PRACTICE_NOTE } from "../src/practice.mjs";
+import { drawPack, buildPack, packArt, practicePool, practiceSets, PRACTICE_NOTE, SLOTS, TIERS } from "../src/practice.mjs";
 import vm from "node:vm";
 
 let fail = 0;
@@ -29,6 +29,31 @@ t("unpriced card has no date", pool.find((c) => c.id === "tcgcsv-9000").price ==
 t("name drops the trailing number", pool[1].name === "Card 1");
 const list = practiceSets(setsDoc, "2026-10-12");
 t("default is newest dated set with singles", list[0].slug === "new-set" && !list.some((x) => x.slug === "future-set"));
+
+// Slot layout on a mixed-rarity pool.
+const rar = ["Common", "Uncommon", "Rare", "Double Rare", "Illustration Rare", "Special Illustration Rare"];
+const mixed = Array.from({ length: 90 }, (_, i) => ({ id: `tcgcsv-${7000 + i}`, name: `M${i}`, num: `${i + 1}/90`, kind: "single", rarity: i < 30 ? "Common" : i < 55 ? "Uncommon" : rar[2 + (i % 4)], price: i + 1, printing: "Normal", printings: [{ name: "Normal", price: i + 1, asOf: "2026-10-12" }, ...(i < 70 ? [{ name: "Reverse Holofoil", price: i + 2, asOf: "2026-10-11" }] : [])] }));
+mixed.push({ id: "tcgcsv-5", name: "Mix Set Booster Pack", kind: "sealed", pid: 5, price: 5 }, { id: "tcgcsv-6", name: "Mix Set Booster Box", kind: "sealed", pid: 6 });
+const mdoc = { slug: "mix", name: "Mix", asOf: "2026-10-12", items: mixed };
+const mpool = practicePool(mdoc, {});
+const mids = new Set(mixed.filter((r) => r.kind === "single").map((r) => r.id));
+let layoutOk = true, tierCount = {};
+for (let seed = 1; seed <= 500; seed++) {
+  const p = buildPack(mpool, seed);
+  const ok = p.length === 10 && p.map((c) => c.slot).join() === SLOTS.join() && p.every((c) => mids.has(c.id)) && new Set(p.map((c) => c.id)).size === 10
+    && p.slice(0, 5).every((c) => c.rarity === "Common") && p.slice(5, 8).every((c) => c.rarity === "Uncommon") && p[8].rh && TIERS.includes(p[9].rarity) && p.some((c) => c.hit);
+  if (!ok) layoutOk = false;
+  tierCount[p[9].rarity] = (tierCount[p[9].rarity] || 0) + 1;
+}
+t("slot layout: 5 C, 3 U, reverse holo, rare last, ids from the file, 500 seeds", layoutOk);
+t("rare slot leans to lower tiers", tierCount["Rare"] > tierCount["Double Rare"] && tierCount["Double Rare"] > tierCount["Special Illustration Rare"]);
+t("seeded pack is repeatable", JSON.stringify(buildPack(mpool, 99)) === JSON.stringify(buildPack(mpool, 99)) && JSON.stringify(buildPack(mpool, 1)) !== JSON.stringify(buildPack(mpool, 2)));
+const rhCard = buildPack(mpool, 3)[8];
+t("reverse slot uses the reverse printing price and date", rhCard.price === mixed.find((r) => r.id === rhCard.id).printings[1].price && rhCard.date === "2026-10-11");
+const art = packArt(mdoc, { images: {} });
+t("pack art is the booster pack by id, not the box", art.id === "tcgcsv-5" && art.src === "/api/card-img?pid=5");
+t("note says layout, not odds", PRACTICE_NOTE === "Typical pack layout. Not real pull rates.");
+t("promo sets are not packs", !practiceSets({ sets: [{ slug: "x-promos", name: "X Promos", single: 40 }] }, "2026-10-12").length);
 
 const files = { "counts.json": { asOf: "2026-10-12" }, "sets.json": setsDoc, "sets/new-set.json": setDoc, "sets/old-set.json": { ...setDoc, name: "Old Set" }, "catalogue-images.json": { images: {} } };
 const fetchImpl = async (u) => { const rel = String(u).split("/research/assets/public/")[1]; return rel in files ? new Response(JSON.stringify(files[rel])) : new Response("x", { status: 404 }); };
