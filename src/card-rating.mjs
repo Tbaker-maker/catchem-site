@@ -4,8 +4,8 @@
 import { esc } from "./ui.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 
-export const ORDER = ["peer", "popularity", "scarcity", "demand", "age", "artist", "supply", "range"];
-export const LABEL = { peer: "Peer value", popularity: "Popularity", scarcity: "Scarcity of the treatment", demand: "Demand signals", age: "Age and print window", artist: "Artist", supply: "Supply counted", range: "Range on file" };
+export const ORDER = ["peer", "popularity", "scarcity", "pull", "demand", "age", "artist", "supply", "range"];
+export const LABEL = { peer: "Peer value", popularity: "Popularity", scarcity: "Scarcity of the treatment", pull: "Pull rate", demand: "Demand signals", age: "Age and print window", artist: "Artist", supply: "Supply counted", range: "Range on file" };
 const cash = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function shardOf(id) { const n = Number(String(id || "").replace(/\D/g, "")) || 0; return String(n % 64).padStart(2, "0"); }
