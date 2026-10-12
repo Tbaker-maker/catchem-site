@@ -2932,7 +2932,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const seen = new Set();
   const reads = (bundle?.reads || []).filter((r) => {
     if (!keepFeedRead(r)) return false;
-    const key = String(r.href || r.id || r.headline);
+    const href = String(r.href || "");
+    const key = /^\/(?:c|p)\//.test(href) ? href : String(r.id || r.headline);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
