@@ -13,6 +13,7 @@ import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow
 import { setAffiliateConfig } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
+import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
 import { addError, topErrors } from "./client-log.mjs";
@@ -487,6 +488,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
         }
         rotationHtml = panels.join("") + rotationHtml;
+      }
+    }
+    if (card && card.kind === "sealed" && cardId) {
+      const shard = await loadJson(`feed/sealed-rating/${sealedShard(cardId)}.json`, fetchImpl).catch(() => null);
+      const row = shard?.rows?.[cardId];
+      if (row) {
+        const meta = await loadJson("feed/sealed-rating.json", fetchImpl).catch(() => null);
+        rotationHtml = sealedRatingPanel(row, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true }) + rotationHtml;
       }
     }
     return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
