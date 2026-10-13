@@ -1990,6 +1990,72 @@ export function rangeMarker(hist, endDate) {
   return { text: `${highBit} ${lowBit}` };
 }
 
+const RANGE_YEAR_DAYS = 366;
+
+function rangeDay(iso, withYear) {
+  const s = String(iso || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  const bit = `${PRICE_MONTHS[Number(s.slice(5, 7)) - 1]} ${Number(s.slice(8, 10))}`;
+  return withYear ? `${bit}, ${s.slice(0, 4)}` : bit;
+}
+
+// Low and high from the same series the price chart draws. A full year is labeled
+// 12-month. A shorter series uses the days on file and names the first one.
+export function yearRange(points, endDate) {
+  const endDay = String(endDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDay)) return null;
+  const rows = [];
+  for (const point of points || []) {
+    if (!Array.isArray(point) || point[3]) continue;
+    const day = String(point[0] || "").slice(0, 10);
+    const val = Number(point[1]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !(val > 0) || day > endDay) continue;
+    rows.push([day, val]);
+  }
+  rows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const byDay = new Map();
+  for (const [day, val] of rows) byDay.set(day, val);
+  const days = [...byDay.keys()];
+  if (days.length < 2) return null;
+  const first = days[0];
+  const yearStart = new Date(Date.parse(`${endDay}T00:00:00Z`) - RANGE_YEAR_DAYS * 86400000).toISOString().slice(0, 10);
+  const full = first <= yearStart;
+  const use = full ? days.filter((day) => day >= yearStart) : days;
+  if (use.length < 2) return null;
+  let loD = use[0];
+  let hiD = use[0];
+  for (const day of use) {
+    const val = byDay.get(day);
+    if (val < byDay.get(loD) || (val === byDay.get(loD) && day > loD)) loD = day;
+    if (val > byDay.get(hiD) || (val === byDay.get(hiD) && day > hiD)) hiD = day;
+  }
+  const nowD = byDay.has(endDay) ? endDay : days.at(-1);
+  const now = byDay.get(nowD);
+  const lo = byDay.get(loD);
+  const hi = byDay.get(hiD);
+  const at = hi === lo ? 50 : Math.max(0, Math.min(100, ((now - lo) / (hi - lo)) * 100));
+  const endYear = endDay.slice(0, 4);
+  const label = full ? "12-month" : `Since ${rangeDay(first, false)}`;
+  return {
+    label,
+    low: lo,
+    lowDate: loD,
+    high: hi,
+    highDate: hiD,
+    price: now,
+    priceDate: nowD,
+    at,
+    text: `${label} low ${money(lo)} (${rangeDay(loD, loD.slice(0, 4) !== endYear)}) · high ${money(hi)} (${rangeDay(hiD, hiD.slice(0, 4) !== endYear)})`,
+  };
+}
+
+export function yearRangeHtml(points, endDate) {
+  const row = yearRange(points, endDate);
+  if (!row || /\u2014|\u2013|No data/i.test(row.text)) return "";
+  const at = (Math.round(row.at * 10) / 10).toFixed(1);
+  return `<div class="yr"><p class="yr-line">${esc(row.text)}</p><div class="yr-track" aria-hidden="true"><span class="yr-fill" style="width:${at}%"></span><span class="yr-knob" style="left:${at}%"></span></div></div>`;
+}
+
 function exactChip(label, n) {
   if (typeof n !== "number" || !Number.isFinite(n)) return "";
   const cls = n > 0 ? "up" : n < 0 ? "down" : "";
@@ -2135,7 +2201,6 @@ export function renderCard(card, stamp, opts = {}) {
     exactChip("30D", exactWindowPct(hist, 30, endDay)),
     exactChip("90D", exactWindowPct(hist, 90, endDay)),
   ].join("");
-  const marker = rangeMarker(hist, endDay);
   const sealed = card.kind === "sealed";
   const listingsLine = sealed ? listingTrend(opts.listingSeries || [], endDay) : "";
   const reads = (opts.productReads || []).filter((read) => read && (read.headline || read.path)).slice(0, 3);
@@ -2153,7 +2218,9 @@ export function renderCard(card, stamp, opts = {}) {
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
   void chartFile; void pricePts;
-  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(mergeHistory(sealed && Array.isArray(card.fillHist) ? [...card.fillHist, ...hist] : hist, sealed ? "" : card.longHist, sealed ? card.fillTo || "" : ""), { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
+  const priceSeries = mergeHistory(sealed && Array.isArray(card.fillHist) ? [...card.fillHist, ...hist] : hist, sealed ? "" : card.longHist, sealed ? card.fillTo || "" : "");
+  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
+  const rangeRow = yearRangeHtml(priceSeries, endDay);
   const listReal = (opts.listingSeries || [])
     .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
@@ -2187,6 +2254,12 @@ export function renderCard(card, stamp, opts = {}) {
 @media (min-width:1100px){
   .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(240px,100%)}
 }
+.yr{margin:2px 0 14px;max-width:100%}
+.yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
+.yr-track{position:relative;height:6px;margin:0 9px;border-radius:999px;background:rgba(255,255,255,.10)}
+.yr-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,rgba(217,183,121,.28),#d9b779)}
+.yr-knob{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#f6f1e7;border:2px solid #1a1815;box-shadow:0 0 0 3px rgba(217,183,121,.45);transform:translate(-50%,-50%)}
+@media(max-width:480px){.yr-line{font-size:11px;letter-spacing:-.03em}}
 </style>
 <div class="glance">
 <div class="glance-photo">${img}</div>
@@ -2198,7 +2271,7 @@ ${storeLinksHtml(card, esc)}
 <p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price || "No market price"}</span></p>
 ${chips ? `<p>${chips}</p>` : ""}
 ${priceChart}
-${marker.text && !card.longHist ? `<p>${esc(marker.text)}</p>` : ""}
+${rangeRow}
 ${opts.rotationHtml || ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
 ${opts.listingsHtml || ""}

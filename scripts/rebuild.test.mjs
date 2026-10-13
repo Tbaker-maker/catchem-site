@@ -967,3 +967,4 @@ console.log("rebuild routes ok");
 await import("./track-record-hidden.test.mjs");
 await import("./data-cache.test.mjs");
 await import("./chart-no-gaps.test.mjs");
+await import("./year-range.test.mjs");
