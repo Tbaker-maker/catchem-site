@@ -2154,7 +2154,7 @@ export function renderCard(card, stamp, opts = {}) {
   const listPts = (opts.listingSeries || []).map((point) => ({ date: point.date, listings: Number(point.listingCount) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
   void chartFile; void pricePts;
-  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(mergeHistory(hist, sealed ? "" : card.longHist, sealed ? card.fillTo || "" : ""), { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
+  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(mergeHistory(sealed && Array.isArray(card.fillHist) ? [...card.fillHist, ...hist] : hist, sealed ? "" : card.longHist, sealed ? card.fillTo || "" : ""), { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const listChart = sealed && listPts.length >= 2 ? `<p class="muted">eBay listings. A missing night is a gap.</p>${gapChartSvg(splitDated(listPts, "listings"), "#7fc79a")}` : "";
   const breakBits = [];
   const listings = Number(fact?.listings);
