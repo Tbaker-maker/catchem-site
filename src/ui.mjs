@@ -955,7 +955,7 @@ export function chartBox(hist, caption = "TCGplayer market, daily", release = ""
     if (!point || typeof point !== "object") return false;
     return Object.values(point).some((v) => typeof v === "number" && Number.isFinite(v));
   });
-  if (!hasPoint) return `<p class="muted">${esc(caption)}. No daily points in this file.</p>`;
+  if (!hasPoint) return `<div class="chart-empty"><svg class="chart-faded" style="height:48px;min-height:0" width="100%" height="48" viewBox="0 0 320 48" preserveAspectRatio="none" aria-hidden="true"><path d="M8,24 L312,24" fill="none" stroke="#d9b779" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"></path></svg><p class="muted chart-note">${esc(caption)}. The line fills in as nightly prices land.</p></div>`;
   const payload = esc(JSON.stringify(hist || []));
   return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges>${rangeButtons(hist)}</div><p class="muted chart-note"></p></div>`;
 }
@@ -1126,9 +1126,11 @@ function catchemDraw(host,pts,release,caption){
   if(pts.length<2){
     host.style.height="auto";
     host.style.minHeight="0";
-    host.innerHTML='<p class="muted" style="margin:0">No daily points in this range.</p>';
+    host.style.height="48px";
+    host.style.minHeight="48px";
+    host.innerHTML='<svg class="chart-faded" style="height:48px;min-height:0" width="100%" height="48" viewBox="0 0 320 48" preserveAspectRatio="none" aria-hidden="true"><path d="M8,24 L312,24" fill="none" stroke="#d9b779" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"></path>'+(pts.length===1?'<circle cx="312" cy="24" r="3" fill="#d9b779"></circle>':'')+'</svg>';
     if(hover) hover.textContent="";
-    if(note) note.textContent=(caption||"TCGplayer market, daily")+". No daily points in this range.";
+    if(note) note.textContent=(caption||"TCGplayer market, daily")+(pts.length===1?". One price on file, "+pts[0].d+". The line fills in as nightly prices land.":". The line fills in as nightly prices land.");
     return;
   }
   var wMeasured=host.getBoundingClientRect?Math.round(host.getBoundingClientRect().width):0;
@@ -1207,7 +1209,13 @@ function catchemMount(root){
     if(span>=90) allow.splice(allow.indexOf("All"),0,"90D");
     if(span>=365) allow.splice(allow.indexOf("All"),0,"1Y");
     allow=allow.filter(function(r){ return catchemFilter(all, r).length>=2; });
-    function paint(range){ catchemDraw(host, catchemFilter(all, range), release, caption); }
+    // An empty range never draws a notice: step out to the nearest range that has points.
+    var order=["7D","30D","90D","1Y","All"];
+    function paint(range){
+      var pts=catchemFilter(all, range);
+      for(var oi=order.indexOf(range)+1; pts.length<2 && oi>0 && oi<order.length; oi++) pts=catchemFilter(all, order[oi]);
+      catchemDraw(host, pts, release, caption);
+    }
     paint("All");
     if(!box) return;
     var keep=box.getAttribute("data-keep-ranges")==="1";

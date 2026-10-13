@@ -23,7 +23,7 @@ assert.equal(priceBannerLine("", at), "");
 assert.ok(renderFacts({}).includes("No market line in the price file."));
 assert.ok(renderFacts({ market: 2.64, date: "2026-10-10", source: "TCGplayer market" }).includes("Market"));
 assert.ok(!renderFacts({ market: 2.64, date: "2026-10-10", source: "TCGplayer market" }).includes("No market line"));
-assert.ok(chartBox([], "TCGplayer market").includes("No daily points in this file."));
+assert.ok(chartBox([], "TCGplayer market").includes("chart-faded") && !/no daily points/i.test(chartBox([], "TCGplayer market")));
 assert.ok(!chartBox([], "TCGplayer market").includes("chart-box"));
 assert.ok(chartBox([["2026-10-10", 2.64]], "TCGplayer market").includes("chart-box"));
 assert.ok(renderStatus({}, "").includes("The status file is not in the public feed."));
