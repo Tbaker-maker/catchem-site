@@ -54,7 +54,8 @@ const card = renderCard({
   fillHist: [[iso(-20), 3]],
 }, "stamp", { listingSeries: [{ date: "2026-10-12", listingCount: 999 }, { date: "2026-10-11", listingCount: 998 }] });
 const cardYr = yrBlock(card);
-check("card row uses the archive price", cardYr.includes("12-month low $5.00") && cardYr.includes("high $20.00"));
+check("card row takes singles fill after the archive ends", cardYr.includes("12-month low $3.00") && cardYr.includes("high $20.00"));
+check("card page names the fan-site source in About this chart", card.includes("About this chart") && card.includes("public fan-site data (PokeVizInvestor"));
 check("card row leaves sealed counts off", !cardYr.includes("999") && !cardYr.includes("998") && !/listing|eBay|sealed/i.test(cardYr));
 check("card page keeps the line on one row", card.includes(".yr-line{") && card.includes("white-space:nowrap") && card.includes("border-radius:999px") && card.includes("border-radius:50%"));
 
@@ -89,7 +90,20 @@ const singleSkip = renderCard({
   fillHist: [[iso(-20), 3]],
 }, "stamp");
 const skipYr = yrBlock(singleSkip);
-check("a card does not take the sealed fill", skipYr.includes("low $8.00") && !skipYr.includes("$3.00"));
+check("a single with no archive takes its fill", skipYr.includes("low $3.00"));
+const overlap = renderCard({
+  id: "tcgcsv-4",
+  name: "Archive Wins",
+  kind: "single",
+  price: 9,
+  asOf: "2026-10-12",
+  hist: [[iso(-10), 8], [iso(0), 9]],
+  longHist: `${epoch(iso(-100))}:6,${epoch(iso(-30))}:7`,
+  fillHist: [[iso(-60), 2], [iso(-20), 4]],
+  fillTo: iso(-10),
+}, "stamp");
+const ovYr = yrBlock(overlap);
+check("archive wins over fill on overlapping days", ovYr.includes("low $4.00") && !ovYr.includes("$2.00"));
 
 if (fail) process.exit(1);
 console.log("year range ok");
