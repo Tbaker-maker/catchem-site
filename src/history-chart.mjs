@@ -25,9 +25,12 @@ export function historySources(points, ownLabel = "TCGplayer market price via tc
   return out;
 }
 
-// Daily series with no gaps. A carried day is [date, price, tag, lastRealDate].
-export function fillDaily(points) {
-  const pts = (points || []).filter((p) => p && Number(p[1]) > 0);
+// Daily series with no gaps. A carried day is [date, value, tag, lastRealDate].
+// Counts may be 0. A price of 0 is not a point.
+export function fillDaily(points, opts = {}) {
+  const allowZero = opts.allowZero === true;
+  const keep = (n) => allowZero ? Number.isFinite(Number(n)) && Number(n) >= 0 : Number(n) > 0;
+  const pts = (points || []).filter((p) => p && keep(p[1]));
   const out = [];
   for (const p of pts) {
     const last = out.at(-1);
@@ -40,20 +43,30 @@ export function fillDaily(points) {
   return out;
 }
 
-export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel } = {}) {
-  const real = (points || []).filter((p) => p && Number(p[1]) > 0 && !p[3]);
-  if (real.length < 2) return `<div class="hc hc-empty"><p class="muted">${real.length ? `First price on file ${esc(real[0][0])}. The line starts here and grows each night.` : "The line starts at the first price on file."}</p></div>`;
-  const src = historySources(real, ownLabel);
-  const pts = fillDaily(real);
+export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel, unit = "price", snap = "all" } = {}) {
+  const count = unit === "count";
+  const keep = (n) => count ? Number.isFinite(Number(n)) && Number(n) >= 0 : Number(n) > 0;
+  const real = (points || []).filter((p) => p && keep(p[1]) && !p[3]);
+  if (real.length < 2) {
+    const line = count
+      ? (real.length ? `First listings counted on ${esc(real[0][0])}. The line starts here and grows each night.` : "The line starts at the first night with listings counted.")
+      : (real.length ? `First price on file ${esc(real[0][0])}. The line starts here and grows each night.` : "The line starts at the first price on file.");
+    return `<div class="hc hc-empty"><p class="muted">${line}</p></div>`;
+  }
+  const pts = fillDaily(real, { allowZero: count });
   const carried = pts.filter((p) => p[3]).length;
   const spanDays = (Date.parse(pts.at(-1)[0]) - Date.parse(pts[0][0])) / DAY;
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
-  return `<figure class="hc" data-pts="${esc(JSON.stringify(pts))}" data-color="${esc(color)}">
+  const about = count
+    ? `eBay listings counted, ${esc(real[0][0])} to ${esc(real.at(-1)[0])}. The line starts at the first night with a count.${carried ? ` ${carried} nights with no new count carry the last real count forward. Hover lands on a night that has a count on file.` : ""} Listings are not sales.${asOf ? ` As of ${esc(asOf)}.` : ""}`
+    : `${historySources(real, ownLabel).map(esc).join(". ")}. The line starts at the first real price.${carried ? ` ${carried} days with no new price carry the last real price forward; tap a day to see its last real date.` : ""}${asOf ? ` As of ${esc(asOf)}.` : ""}`;
+  const label = count ? "eBay listings counted" : "Price history";
+  return `<figure class="hc" data-unit="${esc(unit)}" data-snap="${esc(count ? "real" : snap)}" data-pts="${esc(JSON.stringify(pts))}" data-color="${esc(color)}">
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
-<div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Price history"></svg><div class="hc-tip" hidden></div></div>
+<div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${src.map(esc).join(". ")}. The line starts at the first real price.${carried ? ` ${carried} days with no new price carry the last real price forward; tap a day to see its last real date.` : ""}${asOf ? ` As of ${esc(asOf)}.` : ""}</p></div></details>
+<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${about}</p></div></details>
 </figure>`;
 }
 
@@ -77,10 +90,11 @@ function nice(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+", "+p[0];}
 function ms(d){return Date.parse(d+"T00:00:00Z");}function iso(t){return new Date(t).toISOString().slice(0,10);}function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2]);}
 function smooth(xy){if(xy.length<2)return "M"+xy[0][0]+","+xy[0][1];var d="M"+xy[0][0].toFixed(1)+","+xy[0][1].toFixed(1);for(var i=0;i<xy.length-1;i++){var p0=xy[i-1]||xy[i],p1=xy[i],p2=xy[i+1],p3=xy[i+2]||p2;var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;var lo=Math.min(p1[1],p2[1]),hi=Math.max(p1[1],p2[1]);c1y=Math.max(lo,Math.min(hi,c1y));c2y=Math.max(lo,Math.min(hi,c2y));d+=" C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);}return d;}
 function mount(fig){if(fig.dataset.ready)return;fig.dataset.ready="1";
-var all=JSON.parse(fig.getAttribute("data-pts")||"[]"),color=fig.getAttribute("data-color")||"#d9b779";
+var all=JSON.parse(fig.getAttribute("data-pts")||"[]"),color=fig.getAttribute("data-color")||"#d9b779",unit=fig.getAttribute("data-unit")||"price",snap=fig.getAttribute("data-snap")||"all";
 var svg=fig.querySelector(".hc-svg"),tip=fig.querySelector(".hc-tip"),plot=fig.querySelector(".hc-plot"),priceEl=fig.querySelector(".hc-price"),dateEl=fig.querySelector(".hc-date");
 var W=600,H=220,PT=14,PB=4,view=all,gid="g"+Math.random().toString(36).slice(2,8);
-function head(p,a){priceEl.textContent=money(p[1]);dateEl.textContent=nice(p[0])+(a?"":" · latest");}
+function showVal(v){return unit==="count"?String(Math.round(Number(v))):money(v);}
+function head(p,a){priceEl.textContent=showVal(p[1]);dateEl.textContent=nice(p[0])+(a?"":" · latest");}
 function draw(days){var end=ms(all[all.length-1][0]);view=days?all.filter(function(p){return ms(p[0])>=end-days*864e5;}):all;if(view.length<2)view=all.slice(-2);
 var vals=view.map(function(p){return p[1]}),mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),pad=(mx-mn)*.12||mx*.05||1;mn-=pad;mx+=pad;
 var t0=ms(view[0][0]),t1=ms(view[view.length-1][0])||t0+1;
@@ -91,8 +105,8 @@ var body="";segs.forEach(function(s){if(s.length===1){body+='<circle cx="'+s[0][
 var lab="";var ax=fig.querySelector(".hc-axis");if(ax)ax.innerHTML="<span>"+nice(view[0][0])+"</span><span>"+nice(view[view.length-1][0])+"</span>";
 svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".28"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+g+bridge+body+lab+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+color+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
 svg._X=X;svg._Y=Y;head(view[view.length-1]);}
-function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,best=view[0],bd=1e9;view.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
-function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+money(p[1])+(p[3]?" · last price on file "+nice(p[3]):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
+function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=view;if(snap==="real"){var reals=view.filter(function(p){return !p[3];});if(reals.length)pool=reals;}var best=pool[0],bd=1e9;pool.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
+function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+showVal(p[1])+(p[3]?(unit==="count"?" · last count on file "+nice(p[3]):" · last price on file "+nice(p[3])):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
 function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");head(view[view.length-1]);}
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
