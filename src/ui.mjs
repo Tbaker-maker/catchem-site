@@ -2291,6 +2291,10 @@ const SINGLE_CSS = `
 .cp-facts span{color:var(--dim);font:500 13px/1.2 var(--sans)}
 .cp-facts b{font-weight:600;text-align:right}
 .cp-mon{display:block;margin-top:12px;padding:14px 14px;border-radius:16px;background:rgba(217,183,121,.08);color:var(--txt);text-decoration:none;font:600 15px/1.35 var(--sans)}
+.cp-panels{display:grid;gap:16px;margin:18px 0}
+.card-page .crt,.card-page .ircy{border-radius:22px;max-width:100%;min-width:0}
+.card-page .crt ul.cw a{border-radius:16px;min-width:0}
+.card-page .rchip{border-radius:999px}
 .cp-reads{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .cp-reads li{padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.04)}
 .cp-reads p{margin:0}
@@ -2355,6 +2359,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const factBlock = (factList || rotation || mon || printRun)
     ? `<section class="cp-sec"><h2>Card facts</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
     : "";
+  const panels = [opts.ratingHtml, opts.cycleHtml].map((html) => String(html || "").trim()).filter(Boolean).join("");
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const math = [];
   if (card.rank && card.of) math.push(`<p>Rank ${esc(card.rank)} of ${esc(card.of)} priced singles in this set.</p>`);
@@ -2376,6 +2381,7 @@ ${chips ? `<p class="cp-wins">${chips}</p>` : ""}
 ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
 ${factBlock}
+${panels ? `<div class="cp-panels">${panels}</div>` : ""}
 ${board.length ? `<section class="cp-sec"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : ""}
 <details><summary>See the math</summary>
 ${math.join("")}

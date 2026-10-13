@@ -1,6 +1,6 @@
 // Single-card page: sections show only when the passed data has them.
 import { renderCard } from "../src/ui.mjs";
-import { speciesPageToken } from "../src/pokemon.mjs";
+import { speciesPageToken, nightlyIdsForPage, nightlySpeciesStrip } from "../src/pokemon.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -56,16 +56,58 @@ const wins = (full.match(/<p class="cp-wins">[\s\S]*?<\/p>/) || [""])[0];
 t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("7d +25%") && wins.includes("30d +50%") && !/90/.test(wins) && !full.includes("7D —") && !full.includes("30D —"));
 t("price stays on one line", full.includes(".cp-price{") && /white-space:nowrap/.test(full.slice(full.indexOf(".cp-price{"), full.indexOf(".cp-price{") + 220)));
 t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
-t("chart and since range ignore the sealed fill", full.includes("About this chart") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
+t("chart keeps the since range", full.includes("About this chart") && full.includes("Since Sep 3") && full.includes("$8.00"));
 t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-unit="count"') && full.includes('data-snap="real"') && full.includes("has-counts"));
 t("a trainer name does not become a pokemon strip", speciesPageToken("Gengar Spirit Link") === "" && speciesPageToken("Charizard") === "Charizard" && speciesPageToken("Solosis - 118/086") === "Solosis" && speciesPageToken("Charizard ex") === "Charizard");
+const nightly = nightlySpeciesStrip({
+  name: "Pikachu",
+  slug: "pikachu",
+  cards: [
+    { id: "base-1", tcgPlayerId: 10, price: 1, priceDate: "2026-08-22" },
+    { id: "base-2", tcgPlayerId: 11, price: 99, priceDate: "2026-08-22" },
+    { id: "base-3", tcgPlayerId: 12, price: 50, priceDate: "2026-08-22" },
+  ],
+}, {
+  "tcgcsv-10": { price: 12.5, date: "2026-10-13" },
+  "tcgcsv-11": { price: 4, date: "2026-10-13" },
+});
+t("the strip uses tonight's quotes and drops a card with no nightly price", nightly && nightly.count === 2 && nightly.low === 4 && nightly.high === 12.5 && nightly.lowDate === "2026-10-13" && nightly.highDate === "2026-10-13" && !JSON.stringify(nightly).includes("2026-08-22"));
+const joinedIds = nightlyIdsForPage({
+  cards: [
+    { id: "base-1", name: "Pikachu", set: "Base", number: "58", price: 1, priceDate: "2026-08-22" },
+    { id: "base-2", name: "Pikachu", tcgPlayerId: 11, set: "Base", number: "58", price: 99, priceDate: "2026-08-22" },
+    { id: "base-3", name: "Charizard-GX", set: "Burning Shadows", number: "20", price: 50, priceDate: "2026-08-22" },
+    { id: "base-4", name: "Charizard", set: "Base", number: "4", price: 80, priceDate: "2026-08-22" },
+  ],
+}, {
+  "base-1": "/img/base/1",
+  "tcgcsv-10": "/img/base/1",
+  "tcgcsv-99": "/img/other",
+}, [
+  ["tcgcsv-138496", "Charizard GX", "SM - Burning Shadows", "20/147", "", "single", 26.4],
+  ["tcgcsv-1", "Charizard", "Base Set", "4/102", "", "single", 900],
+  ["tcgcsv-2", "Charizard", "Base Set", "4/102", "", "single", 2000],
+  ["tcgcsv-3", "Charizard GX", "SM - Burning Shadows", "20/147", "", "sealed", 1],
+]);
+const joined = nightlySpeciesStrip({
+  name: "Pikachu",
+  slug: "pikachu",
+  cards: [{ id: "base-1", price: 1, priceDate: "2026-08-22" }],
+}, { "tcgcsv-10": { price: 12.5, date: "2026-10-13" } }, joinedIds.filter((id) => id === "tcgcsv-10"));
+t("a shared picture path joins a catalogue card to tonight's quote", joinedIds.includes("tcgcsv-10") && joinedIds.includes("tcgcsv-11") && joinedIds.includes("tcgcsv-138496") && !joinedIds.includes("tcgcsv-99") && !joinedIds.includes("tcgcsv-1") && !joinedIds.includes("tcgcsv-2") && !joinedIds.includes("tcgcsv-3") && joined && joined.count === 1 && joined.low === 12.5 && joined.lowDate === "2026-10-13" && !JSON.stringify(joined).includes("2026-08-22"));
 t("where it sits is the card sentences only", full.includes("Where it sits") && full.includes("A year ago it was $8.00") && full.includes("Same 30 days last year") && full.indexOf("A year ago") < full.indexOf("Same 30 days") && !full.includes("Sealed range should not show"));
 t("facts, release, rotation, and the priced strip", full.includes("Card facts") && full.includes("Common") && full.includes("Mitsuhiro Arita") && full.includes("Jan 9, 1999") && full.includes("Regulation mark G") && full.includes('href="/pokemon/pikachu"') && full.includes("Every Pikachu card we price: 12 cards, $1.25 on Oct 2, 2026 to $15.00 on Oct 13, 2026."));
 const main = full.slice(full.indexOf("<main"), full.indexOf("</main>"));
 t("board reads are newest five", main.includes("Reads about this card") && main.includes("Newest board read.") && main.indexOf("Newest board read.") < main.indexOf("Second board read.") && main.indexOf("Fourth board read.") < main.indexOf("Peak: then a return.") && !main.includes("Sixth read should stay off") && !main.includes("\u2014") && !main.includes("\u2013"));
 
 const quiet = renderCard({ ...card, hist: [[end, 15]], tags: ["Normal"], printing: "Normal", release: "" }, "stamp", { sitReads: [], boardReads: [] });
-t("no listings, no reads, and no empty copy", !quiet.includes("eBay listings counted") && !quiet.includes("Where it sits") && !quiet.includes("Reads about this card") && !quiet.includes("No reads on file") && !/No data/i.test(quiet) && !quiet.includes("7d") && !quiet.includes(">Normal<") && quiet.includes("$15.00"));
+const shown = renderCard(card, "stamp", {
+  ratingHtml: '<section class="crt" aria-label="Rating"><h2>Rating</h2><p class="verdict">Near the middle of similar cards.</p><p class="peer">Price vs similar cards: $15.00 vs a typical $14.00 (12 cards). TCGplayer market, Oct 13, 2026.</p></section>',
+  cycleHtml: '<section class="ircy" aria-label="Release cycle"><h2>Release cycle</h2><dl><dt>Price</dt><dd>$15.00 on Oct 13, 2026, TCGplayer market</dd></dl></section>',
+});
+const shownMain = shown.slice(shown.indexOf("<main"), shown.indexOf("</main>"));
+t("rating and release cycle sit after card facts", shownMain.includes("Card facts") && shownMain.indexOf("Card facts") < shownMain.indexOf(">Rating<") && shownMain.indexOf(">Rating<") < shownMain.indexOf("Release cycle") && shownMain.indexOf("Release cycle") < shownMain.indexOf("See the math") && shownMain.includes("Oct 13, 2026") && shown.includes("border-radius:22px") && !/No data/i.test(shownMain));
+t("no listings, no reads, and no empty copy", !quiet.includes("eBay listings counted") && !quiet.includes("Where it sits") && !quiet.includes("Reads about this card") && !quiet.includes(">Rating<") && !quiet.includes("Release cycle") && !quiet.includes("No reads on file") && !/No data/i.test(quiet) && !quiet.includes("7d") && !quiet.includes(">Normal<") && quiet.includes("$15.00"));
 
 const noList = renderCard(card, "stamp", { sitReads: [], boardReads: [] });
 t("a price chart without counts hides the listings chart", noList.includes("About this chart") && !noList.includes("eBay listings counted"));

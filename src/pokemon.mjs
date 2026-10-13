@@ -33,6 +33,116 @@ export function speciesPageToken(name) {
   return text;
 }
 
+// Nightly bucket id. Catalogue rows keep their own id and a TCGplayer product id.
+// A catalogue id with no product id can still join when the public image map
+// stores the same picture path on a tcgcsv id. That path is the join. A name is not.
+export function nightlyIdOf(card) {
+  const id = String(card?.id || "");
+  if (/^tcgcsv-\d+$/.test(id)) return id;
+  const n = Number(card?.tcgPlayerId);
+  return Number.isInteger(n) && n > 0 ? `tcgcsv-${n}` : "";
+}
+
+function normName(name) {
+  return String(name || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^A-Za-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function normSet(name) {
+  let text = String(name || "").toLowerCase().replace(/&/g, "and");
+  text = text.replace(/^(?:sv\d*|swsh\d*|sm|xy|bw)\s*[:\-]\s*/, "");
+  return text.replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normNum(num) {
+  return String(num || "").trim().toLowerCase().split("/")[0].trim().replace(/^0+/, "");
+}
+
+function cardPath(path) {
+  return typeof path === "string" && /^\/img\/[A-Za-z0-9]+\/[A-Za-z0-9]+$/.test(path);
+}
+
+// Picture path first. A catalogue card with no shared path can still match one
+// search-lite single by name, set, and number. Two hits is no match.
+export function nightlyIdsForPage(page, images, rows) {
+  const byPath = new Map();
+  if (images && typeof images === "object") {
+    for (const [id, path] of Object.entries(images)) {
+      if (!/^tcgcsv-\d+$/.test(id) || !cardPath(path)) continue;
+      const list = byPath.get(path);
+      if (list) list.push(id);
+      else byPath.set(path, [id]);
+    }
+  }
+  const byName = new Map();
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      if (!Array.isArray(row) || row[5] !== "single") continue;
+      const id = String(row[0] || "");
+      if (!/^tcgcsv-\d+$/.test(id)) continue;
+      const name = normName(row[1]);
+      const set = normSet(row[2]);
+      const num = normNum(row[3]);
+      if (!name || !set || !num) continue;
+      const key = `${name}\n${set}\n${num}`;
+      const list = byName.get(key);
+      if (list) list.push(id);
+      else byName.set(key, [id]);
+    }
+  }
+  const out = [];
+  const seen = new Set();
+  const push = (id) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+  for (const card of page?.cards || []) {
+    const direct = nightlyIdOf(card);
+    if (direct) { push(direct); continue; }
+    const path = images && typeof images === "object" ? images[card?.id] : "";
+    const hits = cardPath(path) ? byPath.get(path) : null;
+    if (hits && hits.length) { hits.forEach(push); continue; }
+    const name = normName(card?.name);
+    const set = normSet(card?.set);
+    const num = normNum(card?.number);
+    const named = name && set && num ? byName.get(`${name}\n${set}\n${num}`) : null;
+    if (named && named.length === 1) push(named[0]);
+  }
+  return out;
+}
+
+// Price range for one Pokémon page from tonight's quotes only. A catalogue
+// price on the card is not used. A quote needs a price and a date.
+export function nightlySpeciesStrip(page, quotes, ids) {
+  const name = String(page?.name || "").trim();
+  const slug = String(page?.slug || "").trim();
+  if (!name || !slug) return null;
+  const wanted = Array.isArray(ids)
+    ? [...new Set(ids.filter((id) => /^tcgcsv-\d+$/.test(String(id))))]
+    : (page?.cards || []).map(nightlyIdOf).filter(Boolean);
+  const rows = [];
+  for (const id of wanted) {
+    const quote = quotes ? quotes[id] : null;
+    const price = Number(quote?.price);
+    const date = String(quote?.date || quote?.asOf || "").slice(0, 10);
+    if (!(price > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    rows.push({ price, date });
+  }
+  if (!rows.length) return null;
+  let low = rows[0];
+  let high = rows[0];
+  for (const row of rows) {
+    if (row.price < low.price || (row.price === low.price && row.date > low.date)) low = row;
+    if (row.price > high.price || (row.price === high.price && row.date > high.date)) high = row;
+  }
+  return { name, slug, count: rows.length, low: low.price, lowDate: low.date, high: high.price, highDate: high.date };
+}
+
 export function pokemonSlug(name) {
   return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
