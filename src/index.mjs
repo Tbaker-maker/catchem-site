@@ -17,6 +17,7 @@ import { indexListBody, indexPageBody } from "./indexes.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
+import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
@@ -101,6 +102,7 @@ export function pageKind(pathname) {
   if (path === "/compare") return "compare";
   if (path === "/today") return "today";
   if (path === "/status") return "status";
+  if (path === "/terms" || path === "/privacy" || path === "/disclaimer") return "legal";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -616,6 +618,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
+  if (kind === "legal") return html(renderLegal(LEGAL_PATHS[path], stamp, pageOpts));
   if (kind === "practice") {
     const setsDoc = await loadJson("sets.json", fetchImpl);
     const list = practiceSets(setsDoc, opts.today || vancouverDay());

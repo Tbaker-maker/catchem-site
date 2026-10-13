@@ -36,5 +36,29 @@ t("set share meta has its own title and description", set.includes('og:title" co
 const signin = fs.readFileSync(new URL("../src/auth.mjs", import.meta.url), "utf8");
 t("sign in has a description", /<meta name="description" content="Sign in/.test(signin));
 
+// Legal pages. The banned-word copy check skips only these three pages (legal text exception).
+const { renderLegal, LEGAL_PATHS, LEGAL_UPDATED } = await import("../src/legal.mjs");
+const { renderPath } = await import("../src/index.mjs");
+const LEGAL_EXEMPT = new Set(Object.keys(LEGAL_PATHS));
+const noData = async () => new Response("{}", { status: 200 });
+for (const [path, key] of Object.entries(LEGAL_PATHS)) {
+  const r = await renderPath(path, noData, {});
+  const body = await r.text();
+  t(`${path} renders in the site chrome`, r.status === 200 && body.includes('class="logo"') && body.includes('id="site-nav"') && body.includes("site-foot") && body.includes(LEGAL_UPDATED) && body.includes("border-radius:22px"));
+  t(`${path} has no em or en dashes`, !/[\u2014\u2013]/.test(visible(body)));
+  t(`${path} is exempt from the banned-word check`, LEGAL_EXEMPT.has(path));
+}
+const terms = renderLegal("terms");
+t("terms keeps the approved giveaway line", terms.includes("No purchase is necessary. A free entry route and its details will be posted in the official rules before any draw.") && !/POP|web form/.test(visible(terms)));
+const pages = [nf, renderRotation(""), renderLegal("privacy")];
+t("footer links Terms, Privacy, Disclaimer on every chrome page", pages.every((p) => p.includes('<a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a>')));
+const home = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+t("home footer and newsletter carry the legal links", home.includes('<a href="/disclaimer">Disclaimer</a>') && home.includes("By subscribing you agree to the"));
+const { renderPremium } = await import("../src/ui.mjs");
+let prem = "";
+try { prem = renderPremium(""); } catch { prem = fs.readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8"); }
+t("premium checkout carries the agree line", prem.includes('By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.'));
+for (const p of [nf, renderRotation("")]) t("non-legal chrome page passes the banned-word check", !BANNED.test(visible(p).replace(/Terms|Privacy|Disclaimer/g, "")));
+
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("launch fixes: all passed");

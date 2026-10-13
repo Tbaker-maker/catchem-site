@@ -1497,7 +1497,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${dockNav(active, feed)}
 </nav>
-<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p>${foot}</footer>
+<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -3162,6 +3162,7 @@ export function renderPremium(stamp, opts = {}) {
 <p class="prem-price">Discord Premium is $14.99/mo through Stripe.</p>
 <p>Cancel whenever.</p>
 <a class="prem-join" href="${DISCORD}">Join in Discord</a>
+<p class="prem-agree muted"><small>By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></p>
 </section>
 <h2>What you're joining</h2>
 <div class="prem-grid">
