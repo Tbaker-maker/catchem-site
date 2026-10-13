@@ -17,3 +17,4 @@ import { renderFeed } from "../src/ui.mjs";
   assert.ok(s.includes('row srow') && /@media\(max-width:480px\)\{\.srow\{flex-wrap:wrap/.test(s) && s.includes(".srow>svg.spark30"), "search rows wrap and drop the mini chart on phones");
   console.log("feed and search chip tests passed");
 }
+import "./variant-row.test.mjs";

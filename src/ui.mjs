@@ -955,7 +955,7 @@ export function chartBox(hist, caption = "TCGplayer market, daily", release = ""
     if (!point || typeof point !== "object") return false;
     return Object.values(point).some((v) => typeof v === "number" && Number.isFinite(v));
   });
-  if (!hasPoint) return `<p class="muted">${esc(caption)}. No daily points in this file.</p>`;
+  if (!hasPoint) return `<div class="chart-empty"><svg class="chart-faded" style="height:48px;min-height:0" width="100%" height="48" viewBox="0 0 320 48" preserveAspectRatio="none" aria-hidden="true"><path d="M8,24 L312,24" fill="none" stroke="#d9b779" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"></path></svg><p class="muted chart-note">${esc(caption)}. The line fills in as nightly prices land.</p></div>`;
   const payload = esc(JSON.stringify(hist || []));
   return `<div class="chart-box"><div class="chart" data-chart="${payload}" data-release="${esc(release || "")}" data-caption="${esc(caption)}" style="height:180px;min-height:180px"></div><div class="filters" data-ranges>${rangeButtons(hist)}</div><p class="muted chart-note"></p></div>`;
 }
@@ -1126,9 +1126,11 @@ function catchemDraw(host,pts,release,caption){
   if(pts.length<2){
     host.style.height="auto";
     host.style.minHeight="0";
-    host.innerHTML='<p class="muted" style="margin:0">No daily points in this range.</p>';
+    host.style.height="48px";
+    host.style.minHeight="48px";
+    host.innerHTML='<svg class="chart-faded" style="height:48px;min-height:0" width="100%" height="48" viewBox="0 0 320 48" preserveAspectRatio="none" aria-hidden="true"><path d="M8,24 L312,24" fill="none" stroke="#d9b779" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"></path>'+(pts.length===1?'<circle cx="312" cy="24" r="3" fill="#d9b779"></circle>':'')+'</svg>';
     if(hover) hover.textContent="";
-    if(note) note.textContent=(caption||"TCGplayer market, daily")+". No daily points in this range.";
+    if(note) note.textContent=(caption||"TCGplayer market, daily")+(pts.length===1?". One price on file, "+pts[0].d+". The line fills in as nightly prices land.":". The line fills in as nightly prices land.");
     return;
   }
   var wMeasured=host.getBoundingClientRect?Math.round(host.getBoundingClientRect().width):0;
@@ -1207,7 +1209,13 @@ function catchemMount(root){
     if(span>=90) allow.splice(allow.indexOf("All"),0,"90D");
     if(span>=365) allow.splice(allow.indexOf("All"),0,"1Y");
     allow=allow.filter(function(r){ return catchemFilter(all, r).length>=2; });
-    function paint(range){ catchemDraw(host, catchemFilter(all, range), release, caption); }
+    // An empty range never draws a notice: step out to the nearest range that has points.
+    var order=["7D","30D","90D","1Y","All"];
+    function paint(range){
+      var pts=catchemFilter(all, range);
+      for(var oi=order.indexOf(range)+1; pts.length<2 && oi>0 && oi<order.length; oi++) pts=catchemFilter(all, order[oi]);
+      catchemDraw(host, pts, release, caption);
+    }
     paint("All");
     if(!box) return;
     var keep=box.getAttribute("data-keep-ranges")==="1";
@@ -1331,6 +1339,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:44px;align-items:center;min-width:0;max-width:100%}
 .row a{color:var(--txt);text-decoration:none;min-width:44px;min-height:44px;flex:1;overflow-wrap:anywhere;display:flex;align-items:center}
 .row b{overflow-wrap:anywhere}
+.row>a{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;overflow-wrap:normal}.row>a br{display:none}.row>a>b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;overflow-wrap:break-word;word-break:normal;max-width:100%}.row>b{flex:none;white-space:nowrap;overflow-wrap:normal}.vpill{display:inline-block;margin-top:2px;padding:2px 8px;border-radius:999px;font-size:12px;line-height:1.4;color:var(--dim);border:1px solid var(--line);white-space:nowrap}
 .row > b{flex:none;white-space:nowrap}
 .own{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
 .row svg{flex:none}
@@ -1617,7 +1626,6 @@ function rowHtml(r){
   const bits=[];
   if(r.num) bits.push(html(r.num));
   if(r.rarity) bits.push(html(r.rarity));
-  if(r.printing) bits.push(html(r.printing));
   if(r.kind==="sealed" && r.subtype==="case") bits.push("Case");
   if(r.artist) bits.push(html(r.artist));
   var tick="";
@@ -1626,8 +1634,9 @@ function rowHtml(r){
     var owned=readOwned();
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span>'+((r.tags||[]).length?'<span class="vchips sm">'+r.tags.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a><b>'+money(r.price)+'</b></div>';
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b>'+(bits.length?'<span class="muted">'+bits.join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a><b>'+money(r.price)+'</b></div>';
 }
+function visTags(t){ return (Array.isArray(t)?t:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())}); }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
 function readOwned(){
   try { return JSON.parse(localStorage.getItem("catchem-set:"+slug)||"{}"); }
@@ -2604,7 +2613,8 @@ function rowHtml(r){
   var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto" onerror="this.remove()">':"";
   var chips="";
   if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
-  if(Array.isArray(r[9])&&r[9].length) chips+='<span class="vchips sm">'+r[9].map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
+  var vt=(Array.isArray(r[9])?r[9]:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())});
+  if(vt.length) chips+='<span class="vchips sm">'+vt.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
   var price=stored(r);
   var cash=price==null?"No market price":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
