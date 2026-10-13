@@ -23,4 +23,5 @@ else {
   const out = catchemPoints([["2026-09-25", 100], ["2026-10-12", 120]]);
   if (out.length !== 18 || maxGap(out.map((p) => p.d)) > 1 || out[5].f !== "2026-09-25") { console.error("FAIL client fill", out.length); fail++; }
 }
+if (/missing night is a gap/i.test(ui)) { console.error("FAIL listings chart still says a missing night is a gap"); fail++; }
 if (fail) process.exit(1); else console.log("chart no-gaps ok");
