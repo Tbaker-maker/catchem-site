@@ -2183,6 +2183,229 @@ export function quickView(card, extra = {}) {
   };
 }
 
+function printingTags(card) {
+  const out = [];
+  const seen = new Set();
+  const add = (value) => {
+    const text = String(value || "").trim();
+    if (!text || /^normal$/i.test(text)) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(text);
+  };
+  for (const tag of card?.tags || []) add(tag);
+  add(card?.printing);
+  return out;
+}
+
+function artistSlug(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function plainRead(read) {
+  const raw = String(read?.headline || read?.path || "").trim();
+  return raw.replace(/\s*[\u2014\u2013]\s*/g, ": ").replace(/\s+/g, " ").trim();
+}
+
+function readForCard(read, cardId) {
+  if (!read || typeof read !== "object") return false;
+  const href = String(read.href || "");
+  if (href.startsWith("/p/") || href.startsWith("/dive/") || href.startsWith("/sets/")) return false;
+  const sku = String(read.sku || read.cardId || read.leadId || "");
+  if (sku && sku !== cardId) return false;
+  if (href.startsWith("/c/") && href !== `/c/${cardId}`) return false;
+  return !!plainRead(read);
+}
+
+const SIT_KINDS = new Set(["year-range", "year-ago", "season"]);
+
+function readKindOf(read) {
+  return String(read?.readKind || read?.kind || read?.type || "");
+}
+
+function newestReads(list) {
+  return (list || []).slice().sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")) || String(a.id || "").localeCompare(String(b.id || "")));
+}
+
+function readItems(list, cardId) {
+  const out = [];
+  const seen = new Set();
+  for (const read of newestReads(list)) {
+    if (!readForCard(read, cardId)) continue;
+    const text = plainRead(read);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    out.push({ text, asOf: String(read.asOf || "").slice(0, 10), kind: readKindOf(read) });
+  }
+  return out;
+}
+
+function readListHtml(items) {
+  return `<ul class="cp-reads">${items.map((item) => {
+    const when = priceDay(item.asOf);
+    return `<li><p>${esc(item.text)}</p>${when ? `<p class="muted">${esc(when)}</p>` : ""}</li>`;
+  }).join("")}</ul>`;
+}
+
+export function pokemonStripHtml(strip) {
+  const name = String(strip?.name || "").trim();
+  const slug = String(strip?.slug || "").trim();
+  const count = Number(strip?.count);
+  if (!name || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !Number.isInteger(count) || count < 1) return "";
+  const end = (amount, day) => {
+    const cash = money(amount);
+    const when = priceDay(day);
+    return cash && when ? `${cash} on ${when}` : "";
+  };
+  const low = end(strip.low, strip.lowDate);
+  const high = end(strip.high, strip.highDate);
+  if (!low || !high) return "";
+  const noun = count === 1 ? "card" : "cards";
+  const range = count === 1 || low === high ? low : `${low} to ${high}`;
+  const text = `Every ${name} card we price: ${count} ${noun}, ${range}.`;
+  if (/[\u2014\u2013]/.test(text)) return "";
+  return `<a class="cp-mon" href="/pokemon/${esc(slug)}">${esc(text)}</a>`;
+}
+
+const SINGLE_CSS = `
+.card-page{padding-bottom:48px}
+.cp-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;margin:0 0 8px}
+.cp-photo{width:min(240px,72%)}
+.cp-photo img,.cp-photo .tile{width:100%;height:auto;border-radius:22px;background:#1a1815}
+.cp-id{min-width:0;max-width:100%}
+.cp-set{margin:0 0 4px;color:var(--dim);font:500 14px/1.3 var(--sans)}
+.cp-set a{color:inherit;text-decoration:none}
+.card-page h1{margin:0;font:600 34px/1.05 var(--serif);letter-spacing:-.03em}
+.cp-price{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:12px 0 2px;white-space:nowrap}
+.cp-now{font:600 34px/1 var(--serif);color:var(--gold);letter-spacing:-.03em}
+.cp-date{font:500 13px/1 var(--sans);color:var(--dim)}
+.cp-src{margin:0 0 8px;color:var(--dim);font:500 13px/1.3 var(--sans)}
+.cp-wins{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 0}
+.card-page .win{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06)}
+.cp-charts{margin:8px 0 18px}
+.cp-sec{margin:18px 0;padding:18px 16px;border-radius:22px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.cp-sec h2{margin:0 0 10px;font:600 13px/1.2 var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+.cp-facts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cp-facts li{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04)}
+.cp-facts span{color:var(--dim);font:500 13px/1.2 var(--sans)}
+.cp-facts b{font-weight:600;text-align:right}
+.cp-mon{display:block;margin-top:12px;padding:14px 14px;border-radius:16px;background:rgba(217,183,121,.08);color:var(--txt);text-decoration:none;font:600 15px/1.35 var(--sans)}
+.cp-reads{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.cp-reads li{padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.04)}
+.cp-reads p{margin:0}
+.cp-reads .muted{margin-top:4px}
+.yr{margin:2px 0 14px;max-width:100%}
+.yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
+.yr-track{position:relative;height:6px;margin:0 9px;border-radius:999px;background:rgba(255,255,255,.10)}
+.yr-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,rgba(217,183,121,.28),#d9b779)}
+.yr-knob{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#f6f1e7;border:2px solid #1a1815;box-shadow:0 0 0 3px rgba(217,183,121,.45);transform:translate(-50%,-50%)}
+@media(max-width:480px){
+  .card-page h1{font-size:28px}
+  .cp-now{font-size:28px}
+  .cp-date{font-size:12px}
+  .yr-line{font-size:11px;letter-spacing:-.03em}
+}
+@media(min-width:768px){
+  .cp-head{flex-direction:row;align-items:flex-start;text-align:left;gap:28px}
+  .cp-photo{width:240px;flex:none}
+  .cp-price,.cp-wins{justify-content:flex-start}
+}
+@media(min-width:1100px){
+  .cp-charts.has-counts{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:16px;align-items:start}
+}
+`;
+
+function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
+  const tags = printingTags(card);
+  const chips = [
+    exactChip("7d", exactWindowPct(priceSeries.length ? priceSeries : hist, 7, endDay)),
+    exactChip("30d", exactWindowPct(priceSeries.length ? priceSeries : hist, 30, endDay)),
+  ].filter(Boolean).join("");
+  const when = priceDay(endDay);
+  const num = String(card.num || "").trim();
+  const numBit = num ? ` · ${num.startsWith("#") ? num : `#${num}`}` : "";
+  const priceReal = (priceSeries || []).filter((point) => point && Number(point[1]) > 0 && !point[3]);
+  const priceChart = priceReal.length >= 2 ? historyChart(priceSeries, { asOf: endDay }) : "";
+  const listReal = (opts.listingSeries || [])
+    .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
+    .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const listChart = listReal.length >= 2
+    ? `<section class="cp-sec cp-counts"><h2>eBay listings counted</h2>${historyChart(listReal, { asOf: endDay, color: "#7fc79a", unit: "count", snap: "real" })}</section>`
+    : "";
+  const chartOn = !!(priceChart || rangeRow || listChart);
+  const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
+  const boardSrc = Array.isArray(opts.boardReads) ? opts.boardReads : (opts.productReads || []);
+  const board = readItems(boardSrc, card.id).filter((item) => !SIT_KINDS.has(item.kind)).slice(0, 5);
+  const facts = [];
+  if (card.rarity) facts.push(["Rarity", esc(card.rarity)]);
+  if (card.artist) {
+    const slug = artistSlug(card.artist);
+    const artist = slug ? `<a href="/artists/${esc(slug)}">${esc(card.artist)}</a>` : esc(card.artist);
+    facts.push(["Artist", artist]);
+  }
+  if (card.set) facts.push(["Set", setBit || esc(card.set)]);
+  const released = priceDay(String(card.release || "").slice(0, 10));
+  if (released) facts.push(["Released", esc(released)]);
+  const factList = facts.map(([label, value]) => `<li><span>${label}</span><b>${value}</b></li>`).join("");
+  const mon = pokemonStripHtml(opts.pokemon);
+  const rotation = String(opts.rotationFact || "");
+  const printRun = isRotatedSet(card) ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>` : "";
+  const factBlock = (factList || rotation || mon || printRun)
+    ? `<section class="cp-sec"><h2>Card facts</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
+    : "";
+  const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
+  const math = [];
+  if (card.rank && card.of) math.push(`<p>Rank ${esc(card.rank)} of ${esc(card.of)} priced singles in this set.</p>`);
+  if (also) math.push(`<p>Also in this set: ${also}</p>`);
+  if (card.sold && Number(card.sold.n) > 0) math.push(`<p>Recent sales: TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).</p>`);
+  return `<main id="main" tabindex="-1" class="wrap product-glance card-page">
+<style>${SINGLE_CSS}</style>
+<header class="cp-head">
+<div class="cp-photo">${img}</div>
+<div class="cp-id">
+<p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
+<h1>${esc(card.name)}</h1>
+${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
+${storeLinksHtml(card, esc)}
+${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
+${chips ? `<p class="cp-wins">${chips}</p>` : ""}
+</div>
+</header>
+${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
+${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
+${factBlock}
+${board.length ? `<section class="cp-sec"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : ""}
+<details><summary>See the math</summary>
+${math.join("")}
+<p><button type="button" id="paid">I paid or sold at a price</button></p>
+<form id="paid-form" hidden>
+<label>Price <input name="price" inputmode="decimal" required></label>
+<label>Date <input name="date" type="date" required></label>
+<label>Condition <input name="condition" required></label>
+<label>Where <input name="where" required></label>
+<button type="submit">Send</button>
+<p class="muted" id="paid-status"></p>
+<p class="muted">A report stays private. A community median shows only after 5 reports of the same product. We do not attach your name. Proof photos are not accepted on this page.</p>
+</form>
+</details>
+<script type="application/json" id="paid-id">${esc(card.id)}</script>
+<script>
+document.getElementById("paid").addEventListener("click",function(){document.getElementById("paid-form").hidden=false});
+document.getElementById("paid-form").addEventListener("submit",function(ev){
+  ev.preventDefault();
+  var fd=new FormData(ev.currentTarget);
+  var status=document.getElementById("paid-status");
+  fetch("/api/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:document.getElementById("paid-id").textContent,price:fd.get("price"),date:fd.get("date"),condition:fd.get("condition"),where:fd.get("where")})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){status.textContent=res.ok?"Saved.":(res.j&&res.j.error)||"Not stored. The server store is not on."})
+    .catch(function(){status.textContent="Not stored. The server store is not on."});
+});
+</script>
+</main>`;
+}
+
 export function sourceLine(card) {
   const src = String(card && card.source || "TCGplayer market");
   return /^tcgcsv-/.test(String(card && card.id || "")) && !/tcgcsv/i.test(src) ? `${src} via TCGCSV` : src;
@@ -2240,6 +2463,9 @@ export function renderCard(card, stamp, opts = {}) {
     : esc(card.set || "");
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
+  if (!sealed) {
+    return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }), card.name, stamp, "", feedNav(opts));
+  }
   const body = `<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}

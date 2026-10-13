@@ -10,7 +10,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
-import { setAffiliateConfig } from "./pokemon.mjs";
+import { setAffiliateConfig, speciesPageToken, pokemonSlug } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
@@ -196,6 +196,70 @@ async function readsFor(cardId, fetchImpl) {
     return rows.slice(0, 3);
   } catch {
     return [];
+  }
+}
+
+function collectReadRows(doc) {
+  if (!doc || typeof doc !== "object") return [];
+  const out = [];
+  const take = (list) => {
+    if (!Array.isArray(list)) return;
+    for (const row of list) if (row && typeof row === "object") out.push(row);
+  };
+  take(doc.reads);
+  for (const key of ["lag", "group", "shape", "flagged", "dives", "volume", "supplyNotes"]) take(doc[key]);
+  return out;
+}
+
+async function cardReadSplit(cardId, fetchImpl) {
+  const rows = [];
+  try { rows.push(...collectReadRows(await loadJson("reads.json", fetchImpl))); } catch { /* no reads file */ }
+  try { rows.push(...collectReadRows(await loadJson("feed/extra-reads.json", fetchImpl))); } catch { /* no extra file */ }
+  const sit = [];
+  const board = [];
+  const seen = new Set();
+  for (const read of rows) {
+    const href = String(read.href || "");
+    if (href.startsWith("/p/") || href.startsWith("/dive/") || href.startsWith("/sets/")) continue;
+    const sku = String(read.sku || "");
+    const lead = String(read.cardId || read.leadId || "");
+    if (sku !== cardId && lead !== cardId && href !== `/c/${cardId}`) continue;
+    const text = String(read.headline || read.path || "").trim();
+    if (!text) continue;
+    const key = String(read.id || text);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const kind = String(read.readKind || read.kind || read.type || "");
+    if (kind === "year-range" || kind === "year-ago" || kind === "season") sit.push(read);
+    else board.push(read);
+  }
+  const byDate = (a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")) || String(a.id || "").localeCompare(String(b.id || ""));
+  sit.sort(byDate);
+  board.sort(byDate);
+  return { sitReads: sit, boardReads: board.slice(0, 5) };
+}
+
+async function pokemonStripFor(card, fetchImpl) {
+  if (!card || card.kind === "sealed" || !card.name) return null;
+  try {
+    const bundle = await loadPokemonBundle(fetchImpl);
+    const direct = bundle.byId?.[card.id];
+    const token = direct?.species || speciesPageToken(card.name);
+    const slug = direct?.slug || (token ? pokemonSlug(token) : "");
+    const page = slug ? bundle.bySlug?.[slug] : null;
+    if (!page) return null;
+    if (!direct && token && page.name !== token) return null;
+    const priced = (page.cards || []).filter((row) => Number(row.price) > 0);
+    if (!priced.length) return null;
+    let lo = priced[0];
+    let hi = priced[0];
+    for (const row of priced) {
+      if (row.price < lo.price || (row.price === lo.price && String(row.priceDate || "") > String(lo.priceDate || ""))) lo = row;
+      if (row.price > hi.price || (row.price === hi.price && String(row.priceDate || "") > String(hi.priceDate || ""))) hi = row;
+    }
+    return { name: page.name, slug: page.slug, count: priced.length, low: lo.price, lowDate: lo.priceDate || "", high: hi.price, highDate: hi.priceDate || "" };
+  } catch {
+    return null;
   }
 }
 
@@ -424,9 +488,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             price: hit.price,
             asOf: hit.priceDate,
             source: hit.source,
+            release: hit.release || "",
+            printing: hit.finish || "",
             kind: "single",
           };
-          return html(renderCard(row, stamp, { ...pageOpts, ...(() => { const pic = officialSrc({ id: hit.id, kind: "single" }, images); return { catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts }; })(), productReads: await readsFor(hit.id, fetchImpl) }));
+          const pic = officialSrc({ id: hit.id, kind: "single" }, images);
+          const reads = await cardReadSplit(hit.id, fetchImpl);
+          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
@@ -442,11 +510,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const fact = facts && cardId ? facts[cardId] : null;
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
-    const diveHref = sealedId ? `/dive/${sealedId}` : "";
+    const sealedPage = !!(card && card.kind === "sealed");
+    const diveHref = sealedPage && sealedId ? `/dive/${sealedId}` : "";
     const images = await catalogueMap(fetchImpl);
     const hit = card ? officialSrc(card, images) : { src: "", crop: false };
     let listingSeries = [];
-    if (sealedId) {
+    if (sealedPage && sealedId) {
       try {
         const dive = await loadDive(sealedId, fetchImpl);
         listingSeries = Array.isArray(dive?.series) ? dive.series : [];
@@ -471,12 +540,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       }
     }
     let rotationHtml = "";
+    let rotationFact = "";
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
-      rotationHtml = rotationBadge(rotationRow(rot, card.setSlug), rot);
+      rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
       const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
       const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
-      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationHtml);
+      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
     }
     if (card && card.kind !== "sealed" && cardId) {
       const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
@@ -501,7 +571,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         rotationHtml = sealedRatingPanel(row, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true }) + rotationHtml;
       }
     }
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads }), card ? 200 : 404);
+    let sitReads;
+    let boardReads;
+    let pokemon = null;
+    if (card && card.kind !== "sealed") {
+      const split = await cardReadSplit(card.id, fetchImpl);
+      sitReads = split.sitReads;
+      boardReads = split.boardReads;
+      pokemon = await pokemonStripFor(card, fetchImpl);
+    }
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
