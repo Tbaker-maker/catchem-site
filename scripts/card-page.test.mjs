@@ -56,7 +56,7 @@ const wins = (full.match(/<p class="cp-wins">[\s\S]*?<\/p>/) || [""])[0];
 t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("7d +25%") && wins.includes("30d +50%") && !/90/.test(wins) && !full.includes("7D —") && !full.includes("30D —"));
 t("price stays on one line", full.includes(".cp-price{") && /white-space:nowrap/.test(full.slice(full.indexOf(".cp-price{"), full.indexOf(".cp-price{") + 220)));
 t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
-t("chart keeps the since range", full.includes("About this chart") && full.includes("Since Sep 3") && full.includes("$8.00"));
+t("chart and since range ignore the sealed fill", full.includes("About this chart") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
 t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-unit="count"') && full.includes('data-snap="real"') && full.includes("has-counts"));
 t("a trainer name does not become a pokemon strip", speciesPageToken("Gengar Spirit Link") === "" && speciesPageToken("Charizard") === "Charizard" && speciesPageToken("Solosis - 118/086") === "Solosis" && speciesPageToken("Charizard ex") === "Charizard");
 const nightly = nightlySpeciesStrip({

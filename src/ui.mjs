@@ -2447,12 +2447,22 @@ export function renderCard(card, stamp, opts = {}) {
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
   void chartFile; void pricePts;
-  // Fan-site fill (sealed and singles) only charts days before our first own day. For singles the
-  // tcgcsv daily archive (longHist) wins on overlap, so fill only covers days after its last point.
+  // Fan-site fill (sealed and singles) only charts days before our first own day.
+  // A fill price on or after that day is not a card price and must not move the
+  // chart or the since range. For singles the tcgcsv daily archive (longHist)
+  // wins on overlap, so fill only covers days after its last point.
+  const ownDays = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0]))).map((point) => String(point[0])).sort();
+  const firstOwn = ownDays[0] || "";
   const longLast = sealed ? "" : String(card.longHist || "").split(",").map((b) => Number(b.split(":")[0])).filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
   const longLastIso = longLast ? new Date(longLast * 86400000).toISOString().slice(0, 10) : "";
-  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((p) => Array.isArray(p) && (!longLastIso || String(p[0]) > longLastIso)) : [];
-  const priceSeries = mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? card.fillTo || (hist[0] && hist[0][0]) || "" : "");
+  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((point) => {
+    if (!Array.isArray(point) || !/^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) || !(Number(point[1]) > 0)) return false;
+    const day = String(point[0]);
+    if (firstOwn && day >= firstOwn) return false;
+    if (longLastIso && day <= longLastIso) return false;
+    return true;
+  }) : [];
+  const priceSeries = mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? (card.fillTo || firstOwn) : "");
   const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const listReal = (opts.listingSeries || [])
