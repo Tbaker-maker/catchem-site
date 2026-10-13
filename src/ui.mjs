@@ -2051,7 +2051,7 @@ export function yearRange(points, endDate) {
 
 export function yearRangeHtml(points, endDate) {
   const row = yearRange(points, endDate);
-  if (!row || /\u2014|\u2013|No data/i.test(row.text)) return "";
+  if (!row || /\u2014|\u2013/.test(row.text)) return "";
   const at = (Math.round(row.at * 10) / 10).toFixed(1);
   return `<div class="yr"><p class="yr-line">${esc(row.text)}</p><div class="yr-track" aria-hidden="true"><span class="yr-fill" style="width:${at}%"></span><span class="yr-knob" style="left:${at}%"></span></div></div>`;
 }
