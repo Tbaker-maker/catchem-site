@@ -6,8 +6,9 @@ const DAY = 86400000;
 const isoOf = (n) => new Date(n * DAY).toISOString().slice(0, 10);
 
 // Long series is "epochDay:price,..." (change-only, 7-day heartbeat). Own nightly series wins.
-export function mergeHistory(own, longPacked) {
-  const mine = (own || []).filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0).map((p) => [String(p[0]), Number(p[1]), "n"]);
+// fillTo: our first own day when the data build added earlier fan-site days; those days are tagged "f".
+export function mergeHistory(own, longPacked, fillTo = "") {
+  const mine = (own || []).filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0).map((p) => [String(p[0]), Number(p[1]), fillTo && String(p[0]) < fillTo ? "f" : "n"]);
   const firstOwn = mine.length ? mine[0][0] : "9999-12-31";
   const long = String(longPacked || "").split(",").map((b) => b.split(":")).filter((b) => b.length === 2 && Number(b[1]) > 0).map(([d, v]) => [isoOf(Number(d)), Number(v), "a"]).filter((p) => p[0] < firstOwn);
   return [...long, ...mine].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
@@ -17,6 +18,8 @@ export function historySources(points, ownLabel = "TCGplayer market price via tc
   const out = [];
   const a = points.filter((p) => p[2] === "a");
   const n = points.filter((p) => p[2] === "n");
+  const f = points.filter((p) => p[2] === "f");
+  if (f.length) out.push(`Earlier history comes from public fan-site data (PokeVizInvestor, TCGplayer market), ${f[0][0]} to ${f.at(-1)[0]}`);
   if (a.length) out.push(`TCGplayer market price via tcgcsv daily archive, ${a[0][0]} to ${a.at(-1)[0]}`);
   if (n.length) out.push(`${ownLabel}, ${n[0][0]} to ${n.at(-1)[0]}`);
   return out;
@@ -43,7 +46,6 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel } 
   const src = historySources(real, ownLabel);
   const pts = fillDaily(real);
   const carried = pts.filter((p) => p[3]).length;
-  const filler = real.filter((p) => p[2] === "f").length;
   const spanDays = (Date.parse(pts.at(-1)[0]) - Date.parse(pts[0][0])) / DAY;
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
@@ -51,7 +53,7 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel } 
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Price history"></svg><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${src.map(esc).join(". ")}. The line starts at the first real price.${carried ? ` ${carried} days with no new price carry the last real price forward; tap a day to see its last real date.` : ""}${filler ? ` ${filler} points are filler from another public source.` : ""}${asOf ? ` As of ${esc(asOf)}.` : ""}</p></div></details>
+<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${src.map(esc).join(". ")}. The line starts at the first real price.${carried ? ` ${carried} days with no new price carry the last real price forward; tap a day to see its last real date.` : ""}${asOf ? ` As of ${esc(asOf)}.` : ""}</p></div></details>
 </figure>`;
 }
 
