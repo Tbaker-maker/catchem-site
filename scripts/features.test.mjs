@@ -49,7 +49,7 @@ const shadow = await page("/sets/base-set-shadowless");
 t("Shadowless page renders", shadow.status === 200 && shadow.text.includes("$9,525.05") && shadow.text.includes('href="/sets/base-set"'));
 const pe = await page("/sets/sv02-paldea-evolved");
 t("rotation badge with status links /rotation", pe.text.includes('class="rm">G<') && pe.text.includes("Rotated April 10, 2026") && pe.text.includes('href="/rotation"'));
-t("empty set value line", pe.text.includes(COPY.setValue.empty));
+t("empty set value hides", !pe.text.includes(COPY.setValue.empty) && !pe.text.includes("No market price"));
 t("badge null mark", rotationBadge({ mark: null }, {}) === "");
 t("pageKind releases", pageKind("/releases") === "releases");
 const rel = await page("/releases", { today: "2026-10-12" });
@@ -75,7 +75,7 @@ for (const [name, p] of [["base", base], ["shadow", shadow], ["pe", pe], ["relea
 const prodBody = visible(prod.text.split('<h2 id="lc-h"')[1]?.split("</section>")[0] || "");
 t("listings block: no supply or dash", prodBody && !/supply|\u2014/i.test(prodBody));
 t("noDash", noDash("A \u2014 B") === "A: B");
-t("set value empty when no doc", setValueBlock(null).includes(COPY.setValue.empty));
+t("set value hides when no doc", setValueBlock(null) === "");
 
 t("set value strips number from name", setValueBlock({ asOf: "2026-10-12", top: [{ id: "tcgcsv-1", name: "Magikarp - 203/193", number: "203/193", price: 5 }], master: { total: 5, priced: 1, unpriced: 0 } }).includes("1. Magikarp</b>"));
 t("print-run line is the approved text", PRINT_RUN_LINE === "Rotated sets historically stop getting new print runs. Older packs can still turn up in tins and collections.");

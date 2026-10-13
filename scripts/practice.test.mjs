@@ -65,7 +65,7 @@ resetJsonCache();
 const page = await (await renderPath("/practice", fetchImpl, { today: "2026-10-12" })).text();
 t("page kind", pageKind("/practice") === "practice");
 t("page says the practice note", page.includes(PRACTICE_NOTE) && page.includes("Open a pack"));
-t("nav links practice", page.includes('href="/practice"'));
+t("nav hides practice until the overhaul", !page.includes('href="/practice"'));
 const data = JSON.parse(page.match(/<script type="application\/json" id="pp-data">([\s\S]*?)<\/script>/)[1]);
 t("page pool is the default set file", data.slug === "new-set" && data.pool.length === 40 && data.pool.every((c) => ids.has(c.id)));
 const visible = page.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
