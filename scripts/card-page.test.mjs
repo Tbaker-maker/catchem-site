@@ -1,0 +1,90 @@
+// Single-card page: sections show only when the passed data has them.
+import { renderCard } from "../src/ui.mjs";
+import { speciesPageToken } from "../src/pokemon.mjs";
+
+let fail = 0;
+const t = (name, cond) => {
+  if (cond) console.log("  ok ", name);
+  else { fail++; console.log("  FAIL", name); }
+};
+
+const end = "2026-10-13";
+const day = (off) => new Date(Date.parse(`${end}T00:00:00Z`) + off * 86400000).toISOString().slice(0, 10);
+
+const card = {
+  id: "tcgcsv-99",
+  name: "Pikachu",
+  kind: "single",
+  set: "Base Set",
+  setSlug: "base",
+  num: "58/102",
+  rarity: "Common",
+  artist: "Mitsuhiro Arita",
+  printing: "Normal",
+  tags: ["Normal", "Reverse Holo"],
+  price: 15,
+  asOf: end,
+  source: "TCGplayer market",
+  release: "1999-01-09",
+  hist: [[day(-40), 8], [day(-30), 10], [day(-7), 12], [day(0), 15]],
+  fillHist: [[day(-20), 3]],
+};
+
+const full = renderCard(card, "stamp", {
+  listingSeries: [
+    { date: day(-2), listingCount: 4 },
+    { date: day(0), listingCount: 6 },
+  ],
+  sitReads: [
+    { id: "season", readKind: "season", asOf: "2026-10-01", sku: "tcgcsv-99", href: "/c/tcgcsv-99", headline: "Same 30 days last year, $4.00 on Sep 13, 2025 to $9.00 on Oct 13, 2025." },
+    { id: "year-ago", readKind: "year-ago", asOf: end, sku: "tcgcsv-99", href: "/c/tcgcsv-99", headline: "A year ago it was $8.00 on Oct 13, 2025, now $15.00 on Oct 13, 2026." },
+    { id: "sealed-range", readKind: "year-range", asOf: end, sku: "tcgcsv-1", href: "/p/tcgcsv-1", headline: "Sealed range should not show." },
+  ],
+  boardReads: [
+    { id: "n1", asOf: "2026-10-13", board: "v3", sku: "tcgcsv-99", headline: "Newest board read." },
+    { id: "n2", asOf: "2026-10-12", board: "hist", sku: "tcgcsv-99", headline: "Second board read." },
+    { id: "n3", asOf: "2026-10-11", board: "v3", sku: "tcgcsv-99", headline: "Third board read." },
+    { id: "n4", asOf: "2026-10-10", board: "v3", sku: "tcgcsv-99", headline: "Fourth board read." },
+    { id: "n5", asOf: "2026-10-09", board: "v3", sku: "tcgcsv-99", headline: "Peak \u2014 then a return." },
+    { id: "old", asOf: "2026-10-08", board: "v3", sku: "tcgcsv-99", headline: "Sixth read should stay off." },
+  ],
+  pokemon: { name: "Pikachu", slug: "pikachu", count: 12, low: 1.25, lowDate: "2026-10-02", high: 15, highDate: end },
+  rotationFact: '<p class="rot-badge"><a href="/rotation"><span class="rm">G</span> Regulation mark G</a></p>',
+});
+
+const wins = (full.match(/<p class="cp-wins">[\s\S]*?<\/p>/) || [""])[0];
+t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("7d +25%") && wins.includes("30d +50%") && !/90/.test(wins) && !full.includes("7D —") && !full.includes("30D —"));
+t("price stays on one line", full.includes(".cp-price{") && /white-space:nowrap/.test(full.slice(full.indexOf(".cp-price{"), full.indexOf(".cp-price{") + 220)));
+t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
+t("chart and since range ignore the sealed fill", full.includes("About this chart") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
+t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-unit="count"') && full.includes('data-snap="real"') && full.includes("has-counts"));
+t("a trainer name does not become a pokemon strip", speciesPageToken("Gengar Spirit Link") === "" && speciesPageToken("Charizard") === "Charizard" && speciesPageToken("Solosis - 118/086") === "Solosis" && speciesPageToken("Charizard ex") === "Charizard");
+t("where it sits is the card sentences only", full.includes("Where it sits") && full.includes("A year ago it was $8.00") && full.includes("Same 30 days last year") && full.indexOf("A year ago") < full.indexOf("Same 30 days") && !full.includes("Sealed range should not show"));
+t("facts, release, rotation, and the priced strip", full.includes("Card facts") && full.includes("Common") && full.includes("Mitsuhiro Arita") && full.includes("Jan 9, 1999") && full.includes("Regulation mark G") && full.includes('href="/pokemon/pikachu"') && full.includes("Every Pikachu card we price: 12 cards, $1.25 on Oct 2, 2026 to $15.00 on Oct 13, 2026."));
+const main = full.slice(full.indexOf("<main"), full.indexOf("</main>"));
+t("board reads are newest five", main.includes("Reads about this card") && main.includes("Newest board read.") && main.indexOf("Newest board read.") < main.indexOf("Second board read.") && main.indexOf("Fourth board read.") < main.indexOf("Peak: then a return.") && !main.includes("Sixth read should stay off") && !main.includes("\u2014") && !main.includes("\u2013"));
+
+const quiet = renderCard({ ...card, hist: [[end, 15]], tags: ["Normal"], printing: "Normal", release: "" }, "stamp", { sitReads: [], boardReads: [] });
+t("no listings, no reads, and no empty copy", !quiet.includes("eBay listings counted") && !quiet.includes("Where it sits") && !quiet.includes("Reads about this card") && !quiet.includes("No reads on file") && !/No data/i.test(quiet) && !quiet.includes("7d") && !quiet.includes(">Normal<") && quiet.includes("$15.00"));
+
+const noList = renderCard(card, "stamp", { sitReads: [], boardReads: [] });
+t("a price chart without counts hides the listings chart", noList.includes("About this chart") && !noList.includes("eBay listings counted"));
+
+const sealed = renderCard({
+  id: "tcgcsv-2",
+  name: "Range Box",
+  kind: "sealed",
+  set: "Test",
+  price: 10,
+  asOf: end,
+  hist: [[day(-5), 12], [day(0), 10]],
+}, "stamp", {
+  listingSeries: [
+    { date: day(-1), listingCount: 40 },
+    { date: day(0), listingCount: 30 },
+  ],
+});
+t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-unit="count"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"'));
+
+if (fail) process.exit(1);
+console.log("card page ok");

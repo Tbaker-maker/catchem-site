@@ -23,6 +23,16 @@ export function speciesToken(name) {
   return token;
 }
 
+// The priced-card strip is for a card that is that Pokémon, not a trainer
+// whose name starts with one. Leftover words (Spirit Link, Energy) stay off.
+export function speciesPageToken(name) {
+  let text = String(name || "").replace(/\s*\([^)]*\)/g, " ").replace(/\s+-\s+\S+$/, " ").replace(/\s+/g, " ").trim();
+  for (let i = 0; i < 2; i += 1) text = text.replace(FORM, "");
+  text = text.replace(MECH, "").trim();
+  if (!text || /\s/.test(text) || NOT_A_MON.test(text)) return "";
+  return text;
+}
+
 export function pokemonSlug(name) {
   return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
