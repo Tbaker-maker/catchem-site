@@ -1331,6 +1331,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:44px;align-items:center;min-width:0;max-width:100%}
 .row a{color:var(--txt);text-decoration:none;min-width:44px;min-height:44px;flex:1;overflow-wrap:anywhere;display:flex;align-items:center}
 .row b{overflow-wrap:anywhere}
+.row>a{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;overflow-wrap:normal}.row>a br{display:none}.row>a>b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;overflow-wrap:break-word;word-break:normal;max-width:100%}.row>b{flex:none;white-space:nowrap;overflow-wrap:normal}.vpill{display:inline-block;margin-top:2px;padding:2px 8px;border-radius:999px;font-size:12px;line-height:1.4;color:var(--dim);border:1px solid var(--line);white-space:nowrap}
 .row > b{flex:none;white-space:nowrap}
 .own{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
 .row svg{flex:none}
@@ -1617,7 +1618,6 @@ function rowHtml(r){
   const bits=[];
   if(r.num) bits.push(html(r.num));
   if(r.rarity) bits.push(html(r.rarity));
-  if(r.printing) bits.push(html(r.printing));
   if(r.kind==="sealed" && r.subtype==="case") bits.push("Case");
   if(r.artist) bits.push(html(r.artist));
   var tick="";
@@ -1626,8 +1626,9 @@ function rowHtml(r){
     var owned=readOwned();
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b><br><span class="muted">'+bits.join(" · ")+'</span>'+((r.tags||[]).length?'<span class="vchips sm">'+r.tags.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a><b>'+money(r.price)+'</b></div>';
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b>'+(bits.length?'<span class="muted">'+bits.join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a><b>'+money(r.price)+'</b></div>';
 }
+function visTags(t){ return (Array.isArray(t)?t:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())}); }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
 function readOwned(){
   try { return JSON.parse(localStorage.getItem("catchem-set:"+slug)||"{}"); }
@@ -2604,7 +2605,8 @@ function rowHtml(r){
   var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto" onerror="this.remove()">':"";
   var chips="";
   if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
-  if(Array.isArray(r[9])&&r[9].length) chips+='<span class="vchips sm">'+r[9].map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
+  var vt=(Array.isArray(r[9])?r[9]:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())});
+  if(vt.length) chips+='<span class="vchips sm">'+vt.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
   var price=stored(r);
   var cash=price==null?"No market price":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
