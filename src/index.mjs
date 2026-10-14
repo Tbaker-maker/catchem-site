@@ -497,7 +497,26 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     if (id) {
       const readYear = readYearEarly;
-      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear }));
+      const slug = String(readYear?.meta?.setSlug || "");
+      let logo = "";
+      let rotation = null;
+      if (slug) {
+        const logos = await loadJson("set-logos.json", fetchImpl).catch(() => null);
+        const hit = logos?.logos && logos.logos[slug];
+        if (hit && typeof hit.logo === "string") logo = hit.logo;
+        const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
+        const row = (rot?.sets || []).find((set) => set && set.slug === slug);
+        if (row && (row.mark || row.status)) {
+          const until = String(row.until || "").slice(0, 10);
+          const asOf = String(rot?.asOf || "").slice(0, 10);
+          let daysLeft = null;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(until) && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+            daysLeft = Math.round((Date.parse(until + "T00:00:00Z") - Date.parse(asOf + "T00:00:00Z")) / 86400000);
+          }
+          rotation = { mark: row.mark || "", status: row.status || "", asOf, until: daysLeft != null && daysLeft >= 0 ? until : "", daysLeft: daysLeft != null && daysLeft >= 0 ? daysLeft : null };
+        }
+      }
+      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation }));
     }
     return html(renderFeed(freshBundle, "", stamp, withDive));
   }
@@ -1111,7 +1130,17 @@ export async function readYearFor(id, fetchImpl = fetch) {
       if (packed) card.longHist = packed;
     }
     const chart = readYearChart(card, card.asOf || "");
-    return chart ? { id: String(id), html: chart } : null;
+    const meta = {
+      name: card.name || "",
+      num: String(card.num || card.number || ""),
+      rarity: card.rarity || "",
+      artist: card.artist || "",
+      set: card.set || "",
+      setSlug: card.setSlug || "",
+      kind: card.kind || "",
+    };
+    if (!chart && !meta.rarity && !meta.artist && !meta.num && !meta.setSlug) return null;
+    return { id: String(id), html: chart || "", meta };
   } catch {
     return null;
   }

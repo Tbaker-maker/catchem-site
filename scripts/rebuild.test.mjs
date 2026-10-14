@@ -991,4 +991,5 @@ await import("./card-page.test.mjs");
 await import("./rip.test.mjs");
 await import("./indexes-fill.test.mjs");
 await import("./polish.test.mjs");
+await import("./read-sheet.test.mjs");
 await import("./compare.test.mjs");
