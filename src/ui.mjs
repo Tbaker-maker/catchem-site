@@ -557,6 +557,83 @@ function newsDetails(item, asOf) {
   return out;
 }
 
+// One link when the story names exactly one set or sealed product already on file.
+// A shorter name buried inside a longer one drops. Two different pages stay off.
+export function newsLinkTarget(card, sets, products) {
+  const parts = [];
+  if (card && card.name) parts.push(card.name);
+  if (card && card.summary) parts.push(card.summary);
+  if (card && card.originalTitle) parts.push(card.originalTitle);
+  const details = card && Array.isArray(card.details) ? card.details : [];
+  for (let i = 0; i < details.length; i++) {
+    const row = details[i];
+    const label = String(row && row.label || "");
+    if (label === "Date" || label === "Set date" || label === "Wave") continue;
+    if (row && row.value) parts.push(row.value);
+  }
+  const text = parts.join(" ").toLowerCase();
+  if (!text) return null;
+  const hits = [];
+  function edge(ch) {
+    return !ch || !/[a-z0-9]/.test(ch);
+  }
+  function hasPhrase(phrase) {
+    const p = String(phrase || "").toLowerCase();
+    if (p.length < 8) return false;
+    let from = 0;
+    while (from <= text.length) {
+      const at = text.indexOf(p, from);
+      if (at < 0) return false;
+      const before = at === 0 ? "" : text.charAt(at - 1);
+      const after = at + p.length >= text.length ? "" : text.charAt(at + p.length);
+      if (edge(before) && edge(after)) return true;
+      from = at + 1;
+    }
+    return false;
+  }
+  function add(match, href, label) {
+    if (!hasPhrase(match)) return;
+    hits.push({ match: String(match).toLowerCase(), href, label });
+  }
+  const setRows = Array.isArray(sets) ? sets : [];
+  for (let i = 0; i < setRows.length; i++) {
+    const tile = setRows[i];
+    if (!tile || !tile.slug || !tile.name) continue;
+    const name = String(tile.name).trim();
+    const href = "/sets/" + encodeURIComponent(tile.slug);
+    add(name, href, name);
+    const cut = name.indexOf(": ");
+    if (cut > 0) add(name.slice(cut + 2).trim(), href, name);
+  }
+  const prodRows = Array.isArray(products) ? products : [];
+  for (let i = 0; i < prodRows.length; i++) {
+    const row = prodRows[i];
+    if (!row || !row.id || !row.name) continue;
+    const id = String(row.id);
+    if (!/^tcgcsv-[0-9]+$/.test(id)) continue;
+    const name = String(row.name).trim();
+    add(name, "/p/" + encodeURIComponent(id), name);
+  }
+  const kept = [];
+  for (let i = 0; i < hits.length; i++) {
+    let buried = false;
+    for (let j = 0; j < hits.length; j++) {
+      if (i === j) continue;
+      if (hits[j].match.length > hits[i].match.length && hits[j].match.indexOf(hits[i].match) >= 0) buried = true;
+    }
+    if (!buried) kept.push(hits[i]);
+  }
+  const seen = {};
+  const uniq = [];
+  for (let i = 0; i < kept.length; i++) {
+    if (seen[kept[i].href]) continue;
+    seen[kept[i].href] = 1;
+    uniq.push(kept[i]);
+  }
+  if (uniq.length !== 1) return null;
+  return { href: uniq[0].href, label: uniq[0].label };
+}
+
 // A short slice of an item already in the news file. No headline, date, or link is added.
 export function newsSlice(doc) {
   const root = Array.isArray(doc) ? { items: doc } : (doc && typeof doc === "object" ? doc : null);
@@ -3383,19 +3460,24 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card img.is-skel{background:#1c1915}
   .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
   .feed-card>.news-tile{width:100%;height:220px;margin:0}
-  .feed-card.news-card{flex:0 0 auto;gap:10px;margin:0}
+  .feed-card.news-card{flex:0 0 auto;gap:8px;margin:0;min-width:0}
   .feed-card.news-card>.news-tile{height:112px;padding:12px 14px}
   .feed-card.news-card>.news-tile .mark{font-size:18px}
   .feed-card.news-card>.news-tile .src{font-size:20px}
   .news-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
   .news-kicker .k{font:600 12px/1 var(--sans);letter-spacing:.08em;color:var(--gold)}
+  .news-card .news-kicker .k{color:#1a1407;background:var(--gold);border-radius:999px;padding:4px 8px}
   .news-kicker .tag{font:600 12px/1 var(--sans);color:#1a1407;background:var(--gold);border-radius:999px;padding:4px 8px}
-  .news-card h2{font:600 20px/1.3 var(--serif)}
-  .news-sum{margin:0;font:400 15px/1.45 var(--sans)}
+  .news-card h2{font:600 22px/1.25 var(--serif);margin:0;overflow-wrap:break-word}
+  .news-sum{margin:0;font:400 15px/1.45 var(--sans);overflow-wrap:break-word}
   .news-meta{list-style:none;margin:0;padding:10px 12px;background:#211e1a;border-radius:12px;display:flex;flex-direction:column;gap:4px}
   .news-meta li{margin:0;font:500 14px/1.35 var(--sans);color:var(--dim)}
   .news-meta b{color:var(--gold);font-weight:600}
   .news-by{margin:0;color:var(--dim);font:500 14px/1.3 var(--sans)}
+  .news-chip{margin:0}
+  .news-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .news-acts .news-go{flex:1 1 auto}
+  .news-acts button{flex:0 0 auto;border-radius:12px}
   .news-go{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
   .feed-card h2{font:600 22px/1.25 var(--serif);margin:0}
   .feed-card h2 a{min-height:44px;display:inline-flex;align-items:center}
@@ -3847,6 +3929,7 @@ ${nextImage.toString()}
 ${brandedTile.toString()}
 ${newsVariant.toString()}
 ${newsTile.toString()}
+${newsLinkTarget.toString()}
 function logoFor(card){
   return catalogueUrl(cataloguePath(catalogueImages, card&&card.id))||"";
 }
@@ -4199,16 +4282,33 @@ function productIdOf(card){
 function mountMon(){
   return;
 }
-function newsDetailHtml(card){
-  const rows=Array.isArray(card.details)?card.details:[];
-  const bits=[];
-  for(let i=0;i<rows.length;i++){
-    const row=rows[i];
-    if(!row || !row.value) continue;
-    bits.push("<li><b>"+html(row.label||"")+"</b> "+html(row.value)+"</li>");
+function newsDetailHtml(){
+  return "";
+}
+function newsTrackChip(card){
+  const sets=[];
+  if(setBook && setBook.bySlug){
+    Object.keys(setBook.bySlug).forEach(function(slug){
+      const tile=setBook.bySlug[slug];
+      if(tile && tile.name) sets.push({slug:slug, name:String(tile.name)});
+    });
   }
-  if(!bits.length) return "";
-  return '<ul class="news-meta">'+bits.join("")+"</ul>";
+  const products=[];
+  const sealed=sealedList();
+  for(let i=0;i<sealed.length;i++){
+    const row=sealed[i];
+    const sku=String(row&&row.sku||"");
+    let id="";
+    if(/^tcgcsv-[0-9]+$/.test(sku)) id=sku;
+    else {
+      const m=String(row&&row.id||"").match(/tcgcsv-([0-9]+)/);
+      if(m) id="tcgcsv-"+m[1];
+    }
+    if(id && row && row.name) products.push({id:id, name:String(row.name)});
+  }
+  const hit=newsLinkTarget(card, sets, products);
+  if(!hit || !hit.href || !hit.label) return "";
+  return '<p class="news-chip"><a class="vchip" href="'+html(hit.href)+'">'+html(hit.label)+"</a></p>";
 }
 function newsEl(card){
   const el=document.createElement("article");
@@ -4220,10 +4320,17 @@ function newsEl(card){
   const blurb=sum?'<p class="news-sum">'+html(sum)+"</p>":"";
   const when=String(card.dayLabel||"").trim();
   const source=String(card.source||"").trim();
-  const by='<p class="news-by">'+html(source||"Source")+(when?" · "+html(when):"")+"</p>";
+  const metaBits=[];
+  if(source) metaBits.push(html(source));
+  if(when) metaBits.push(html(when));
+  const by=metaBits.length?'<p class="news-by">'+metaBits.join(" · ")+"</p>":"";
   const link=card.href?'<a class="news-go" href="'+html(card.href)+'">Read at '+html(source||"the source")+"</a>":"";
-  el.innerHTML=safeNewsHtml(card)+kicker+"<h2>"+html(card.name||"")+"</h2>"+blurb+newsDetailHtml(card)+by+link;
+  const chip=newsTrackChip(card);
+  el.innerHTML=kicker+"<h2>"+html(card.name||"")+"</h2>"+by+blurb+chip+(link?'<div class="news-acts">'+link+"</div>":"");
   bindShare(el, card);
+  const share=el.querySelector("button");
+  const acts=el.querySelector(".news-acts");
+  if(share && acts) acts.appendChild(share);
   return el;
 }
 function factCutLine(card){

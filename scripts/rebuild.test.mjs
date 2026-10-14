@@ -8,7 +8,8 @@ import "./ir-cycle.test.mjs";
 import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";
-import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare, TAKE_LABELS, TAKE_FOOTER, chartBox } from "../src/ui.mjs";
+import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, newsLinkTarget, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare, TAKE_LABELS, TAKE_FOOTER, chartBox } from "../src/ui.mjs";
+import { feedNews } from "../data/feed-news.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps, imageTag as chainTag } from "../src/catalogue-image.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
@@ -16,7 +17,6 @@ import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
 import { buildPokemonPages, productLink } from "../src/pokemon.mjs";
-import { feedNews } from "../data/feed-news.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -519,6 +519,22 @@ t("an old item stays off unless the source states a release inside two weeks", !
 t("news keeps Pokémon TCG and drops GO, games, anime, and merch", newsRows.some((row) => row.href === "https://example.com/go-tcg") && !newsRows.some((row) => row.href === "https://example.com/go") && !newsRows.some((row) => row.href === "https://example.com/masters") && !newsRows.some((row) => row.href === "https://example.com/anime") && !newsRows.some((row) => row.href === "https://example.com/merch"));
 const boxDate = newsRows.find((row) => row.href === "https://example.com/f");
 t("a news row keeps the product and set date already in the file", boxDate && boxDate.details.some((row) => row.label === "Product" && row.value === "Booster Box") && boxDate.details.some((row) => row.label === "Set date" && row.value === "November 6th"));
+const linkSets = [
+  { slug: "me06-delta-reign", name: "ME06: Delta Reign" },
+  { slug: "me01-mega-evolution", name: "ME01: Mega Evolution" },
+  { slug: "me-30th-celebration", name: "ME: 30th Celebration" },
+  { slug: "sv-prismatic-evolutions", name: "SV: Prismatic Evolutions" },
+  { slug: "sv02-paldea-evolved", name: "SV02: Paldea Evolved" },
+  { slug: "celebrations", name: "Celebrations" },
+];
+const linkProducts = [{ id: "tcgcsv-1", name: "Celebrations Ultra-Premium Collection" }];
+const fileStory = newsSlice(feedNews).find((row) => String(row.href || "").includes("3382236_pokemon-card-game-collection-file-premium"));
+t("the collection file story keeps one source and date and hides a missing summary", fileStory && fileStory.source === "PokeGuardian" && fileStory.dayLabel === "Sep 25, 2026" && fileStory.name.includes("Collection File Premium") && !fileStory.summary);
+t("that story does not invent a set or product link", newsLinkTarget(fileStory, linkSets, linkProducts) == null);
+t("two named sets stay off the chip", newsLinkTarget({ name: "Mega Evolution - Delta Reign revealed" }, linkSets, linkProducts) == null);
+t("one named set is a set page chip", newsLinkTarget({ name: "Prismatic Evolutions checklist" }, linkSets, linkProducts)?.href === "/sets/sv-prismatic-evolutions");
+t("a sealed product name beats the shorter set name", newsLinkTarget({ name: "Celebrations Ultra-Premium Collection restock" }, linkSets, linkProducts)?.href === "/p/tcgcsv-1");
+t("a date chip is not a link", newsLinkTarget({ name: "A note", details: [{ label: "Date", value: "Sep 25, 2026" }] }, linkSets, linkProducts) == null);
 const japan = newsRows.find((row) => row.href === "https://example.com/d");
 t("Japan news says it is Japan news and the file keeps the original title", japan && japan.place === "Japan news" && japan.name === "Japan: A first event is being held" && japan.originalTitle === "「ここから」開催！" && japan.href === "https://example.com/d");
 t("the news filter does not walk price rows", buildFeedLoop([priced, fact], browseDoc, { filter: "news" }).length === 0);
@@ -702,7 +718,7 @@ const monFn = factHtml.slice(factHtml.indexOf("function mountMon"), factHtml.ind
 t("the fact card says the English count and does not link a Pokémon page", factHtml.includes("pokemonFactLine(card)") && !factHtml.includes('"/pokemon/"+') && !factHtml.includes("/video/studio.html") && !factHtml.includes('href="/news"') && factHtml.includes(">Prices<") && factHtml.includes(">Sealed<") && factHtml.includes(">One set<") && factHtml.includes(">News<") && factHtml.includes(">Pokémon facts<") && factHtml.includes(">Waves & reprints<") && factHtml.includes(">Flagged<") && factHtml.includes(">Dive<") && !factHtml.includes("card.why"));
 t("a missing cutout is a branded tile and the news filter says there is no news", !factHtml.includes("The cutout is missing.") && factHtml.includes("function factCutLine") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("brandedTile(") && factHtml.slice(factHtml.indexOf("function factCutLine"), factHtml.indexOf("function cardEl")).includes("cutoutSrc(card)") && !factHtml.includes("The picture is missing.") && factHtml.includes("function newsTile") && factHtml.includes("news-tile") && !factHtml.includes("news-preview") && factHtml.includes("There is no news.") && factHtml.includes("No flagged prices.") && factHtml.includes("No deep dives.") && factHtml.includes("No wave or reprint news."));
 const newsFn = factHtml.slice(factHtml.indexOf("function newsDetailHtml"), factHtml.indexOf("function factCutLine"));
-t("a news read is the same modern card with the side arrows, no Previous or Next bar", newsFn.includes('className="feed-card news-card"') && newsFn.includes(">NEWS<") && newsFn.includes("news-sum") && newsFn.includes("Read at ") && newsFn.includes("dayLabel") && !newsFn.includes("card.asOf") && !factHtml.includes('textContent=news?"Previous"') && !factHtml.includes('bar.className="news-bar"') && factHtml.includes('stage.classList.remove("is-news")') && factHtml.includes("news-card{flex:0 0 auto"));
+t("a news read is the same modern card with the side arrows, no Previous or Next bar", newsFn.includes('className="feed-card news-card"') && newsFn.includes(">NEWS<") && newsFn.includes("news-sum") && newsFn.includes("Read at ") && newsFn.includes("dayLabel") && newsFn.includes("news-by") && newsFn.includes("news-chip") && !newsFn.includes("safeNewsHtml") && !newsFn.includes("news-meta") && !newsFn.includes(">Date<") && !newsFn.includes("card.asOf") && !factHtml.includes('textContent=news?"Previous"') && !factHtml.includes('bar.className="news-bar"') && factHtml.includes('stage.classList.remove("is-news")') && factHtml.includes("news-card{flex:0 0 auto"));
 t("a fact with the same headline and path paints that sentence once", factHtml.includes("headline===pathText") && factHtml.includes("sameSentence||line") && !factHtml.includes("The cutout is missing."));
 t("premium sees the hide control and the unranked loop walks the shuffled file", factHtml.includes("Hide Pokémon facts") && factHtml.includes("browse.ranked") && factHtml.includes("browse.unfiltered") && !factHtml.includes('id="hide-facts" hidden') && !factHtml.includes("No path is stored") && !factHtml.includes("the last step is"));
 t("the unranked loop mixes news and wave rows already on the file", factHtml.includes("Mix news, wave, flagged, and dive rows already on the file into the shuffled walk.") && factHtml.includes("while(ei<extras.length)"));
