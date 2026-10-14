@@ -1,4 +1,5 @@
 import { withShareMeta } from "./seo.mjs";
+import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { bucketRow, bucketRows, longHistOf, loadJson, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
@@ -856,6 +857,9 @@ export default {
           "access-control-allow-origin": "*",
         },
       });
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/og/card.svg") {
+      return handleShareCard(request, url);
     }
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/img/")) {
       return handleSetLogo(request, url.pathname, fetchImpl);
