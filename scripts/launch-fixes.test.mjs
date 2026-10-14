@@ -31,7 +31,7 @@ const ui = fs.readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 t("set list does not print No market price", !ui.includes('const money=n=>!(n>0)?"No market price"'));
 const card = `<html><head><title>Charizard · Catch'em</title></head><body><img alt="Charizard" loading="eager" src="/data/editor/tcg/base1/4_hires.png"><span>$968.91</span><span>Oct 13, 2026</span></body></html>`;
 const meta = addShareMeta(card, "/c/tcgcsv-42382", "card");
-t("card share meta uses the card picture and price", meta.includes('og:image" content="https://catchemtcg.com/data/editor/tcg/base1/4_hires.png"') && meta.includes('og:title" content="Charizard · Catch\'em"') && meta.includes("$968.91 TCGplayer market on Oct 13, 2026"));
+t("card share meta uses the branded card and price", meta.includes("og:image\" content=\"https://catchemtcg.com/og/card.svg?k=card\u0026amp;n=Charizard\u0026amp;p=968.91\u0026amp;img=%2Fdata%2Feditor%2Ftcg%2Fbase1%2F4_hires.png\"") && meta.includes("og:title\" content=\"Charizard · Catch'em\"") && meta.includes("$968.91 TCGplayer market on Oct 13, 2026") && meta.includes("og:image:width\" content=\"1200\"") && meta.includes("og:image:height\" content=\"630\""));
 const set = addShareMeta(`<html><head><title>ME06: Delta Reign · Catch'em</title></head><body></body></html>`, "/sets/me06-delta-reign", "set");
 t("set share meta has its own title and description", set.includes('og:title" content="ME06: Delta Reign · Catch\'em"') && set.includes("in ME06: Delta Reign"));
 const signin = fs.readFileSync(new URL("../src/auth.mjs", import.meta.url), "utf8");

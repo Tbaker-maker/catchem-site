@@ -2,6 +2,8 @@
 // Every page gets a description, canonical URL, and Open Graph / Twitter tags.
 // The share image is Catch'em's own og.png, or for a card or product page the
 // picture the site itself serves on that page (a same-origin path), never a store URL.
+import { shareCardUrl } from "./share-card.mjs";
+
 const ORIGIN = "https://catchemtcg.com";
 const OG_IMAGE = `${ORIGIN}/og.png`;
 
@@ -49,6 +51,30 @@ export function pageDescription(html, kind, name) {
   return `${name}: ${m[1]} TCGplayer market on ${m[2]}. Price chart and 12-month range on Catch'em.`;
 }
 
+function brandedShare(html, kind, name, pic) {
+  const s = String(html || "");
+  let num = "";
+  const numbered = s.match(/\bNumber ([^<·]+)/);
+  if (numbered) num = unesc(numbered[1]).trim();
+  if (!num || /^not in the file$/i.test(num)) {
+    const hash = s.match(/class="cp-set"[\s\S]{0,500}?(#[A-Za-z0-9][A-Za-z0-9./-]*)/);
+    num = hash ? unesc(hash[1]).trim() : "";
+  }
+  if (/^not in the file$/i.test(num)) num = "";
+  const priceM = s.match(/\$([0-9][0-9,]*(?:\.[0-9]{2})?)/);
+  const changeM = s.match(/\b30[dD]\s+([+-]?[0-9]+(?:\.[0-9]+)?)%/);
+  const setM = s.match(/href="\/sets\/[^"]+">([^<]+)</);
+  return shareCardUrl({
+    kind: "card",
+    name,
+    num,
+    price: priceM ? priceM[1].replace(/,/g, "") : "",
+    change: changeM ? changeM[1] : "",
+    img: pic,
+    setName: setM ? unesc(setM[1]).trim() : "",
+  });
+}
+
 export function addShareMeta(html, pathname, kind) {
   const s = String(html ?? "");
   if (!/<head\b/i.test(s) || /<meta\s+name="description"/i.test(s)) return s;
@@ -59,8 +85,9 @@ export function addShareMeta(html, pathname, kind) {
   const url = ORIGIN + canonicalPath(pathname);
   const desc = pageDescription(s, kind, name);
   const pic = pageImage(s, kind);
-  const image = pic || OG_IMAGE;
-  const size = pic ? "" : `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
+  const branded = kind === "card" || kind === "product" ? brandedShare(s, kind, name, pic) : "";
+  const image = branded || pic || OG_IMAGE;
+  const size = `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
   const alt = pic ? name : "Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.";
   const tags = `<meta name="description" content="${escAttr(desc)}">
 <link rel="canonical" href="${escAttr(url)}">

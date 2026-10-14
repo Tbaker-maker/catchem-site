@@ -1,4 +1,5 @@
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
@@ -5929,9 +5930,12 @@ boot();
     : "https://catchemtcg.com/feed";
   // Inline feed script: drop leading indentation (the script has no template strings).
   body = body.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => js.includes("`") ? m : `<script>${js.replace(/\n[ \t]+/g, "\n")}</script>`);
+  const read = page === "read" && startId ? reads.find((row) => String(row.id) === String(startId)) : null;
+  const shareImage = read ? readShareUrl(read) : "";
   return chrome("Feed", body, feedTitle, stamp, "", feedNav(opts), {
     description: feedDesc,
     url: feedUrl,
+    ...(shareImage ? { image: shareImage, imageAlt: read.name || read.headline || "Catch'em read" } : {}),
   });
 }
 
