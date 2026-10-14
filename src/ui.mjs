@@ -1328,7 +1328,7 @@ const CSS = `.skip-link{position:absolute;left:8px;top:-60px;z-index:1000;backgr
 img,svg,canvas,video,iframe{border-radius:var(--r-xs)}iframe,table{border-radius:var(--r-md)}table{border-collapse:separate;border-spacing:0;overflow:hidden}input,select,textarea,button{border-radius:var(--r-sm)}dialog{border-radius:var(--r-lg)}.chart svg{border-radius:var(--r-sm)}.dock{border-radius:var(--r-lg) var(--r-lg) 0 0}img.card-face,.card-face,.pp-front img,.pp-card img.card-face{border-radius:var(--r-card)!important}.tile{border-radius:var(--r-md)}
 :root{--bg:#12100e;--panel:#1a1815;--line:#2f2b26;--txt:#efe9de;--dim:#c4baab;--gold:#d9b779;--green:#7fc79a;--red:#e0675b;--serif:'Fraunces',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 var(--sans)}
-body{overflow-x:hidden;padding-bottom:72px}
+body{overflow-x:hidden;padding-bottom:88px}
 a{color:var(--gold)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 .skip{position:fixed;top:8px;left:12px;z-index:80;transform:translateY(-200%);background:var(--gold);color:#1a1407;padding:8px 12px;border-radius:8px;font-weight:600;min-height:44px;display:inline-flex;align-items:center}
@@ -1360,8 +1360,9 @@ a{color:var(--gold)}
   .site-bar nav.open{display:flex}
 }
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid var(--line);z-index:6;overflow-x:auto}
-.dock a{color:var(--dim);text-decoration:none;font:500 11px/1.15 var(--sans);min-height:48px;min-width:44px;flex:1 1 0;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;padding:4px 2px;text-align:center;white-space:nowrap;border-radius:12px}.dock a svg{border-radius:0;display:block}
+.dock a{color:var(--dim);text-decoration:none;font:500 11px/1.15 var(--sans);min-height:48px;min-width:44px;flex:1 1 0;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;padding:4px 2px;text-align:center;white-space:nowrap;border-radius:14px}.dock a svg{border-radius:8px;display:block}
 .dock a[aria-current="page"]{color:var(--gold)}
+@media (max-width:420px){.dock a{font-size:10px;padding:4px 0}}
 .chart,.chart svg,.chart-box{display:block;width:100%;min-height:180px}
 .chart{height:180px;min-height:180px;flex:none;overflow:hidden}
 .chart-box.chart-sm{min-height:0;height:auto}
@@ -1548,11 +1549,12 @@ const DOCK_ICON = {
   feed: '<rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/>',
   sets: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
+  indexes: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 2 5-6"/>',
   practice: '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6"/>',
   premium: '<path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
 };
 function dockNav(active, feed) {
-  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], [DISCORD, "Premium", "premium", "Discord Premium"]];
+  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], ["/indexes", "Indexes", "indexes"], [DISCORD, "Premium", "premium", "Discord Premium"]];
   return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
 }
 
@@ -3374,7 +3376,7 @@ ${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Premium role", "P
 <p class="prem-manage">Already in?</p>
 <div class="prem-acts"><a href="${DISCORD}">Pause in Discord with /premium</a><a href="${DISCORD}">Cancel in Discord with /premium</a></div>
 </main>`;
-  return chrome("", body, "Discord Premium", "", "", feedNav(opts));
+  return chrome("Discord Premium", body, "Discord Premium", "", "", feedNav(opts));
 }
 
 export function renderPremiumResult(kind) {
