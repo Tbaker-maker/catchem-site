@@ -2420,6 +2420,32 @@ export function sourceLine(card) {
   return /^tcgcsv-/.test(String(card && card.id || "")) && !/tcgcsv/i.test(src) ? `${src} via TCGCSV` : src;
 }
 
+// Chart series for a card: fan-site fill only before our first own night (and,
+// for singles, only after the tcgcsv archive ends), archive, then our own days.
+export function cardPriceSeries(card, hist, sealed = card?.kind === "sealed") {
+  const ownDays = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0]))).map((point) => String(point[0])).sort();
+  const firstOwn = ownDays[0] || "";
+  const longLast = sealed ? "" : String(card.longHist || "").split(",").map((b) => Number(b.split(":")[0])).filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
+  const longLastIso = longLast ? new Date(longLast * 86400000).toISOString().slice(0, 10) : "";
+  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((point) => {
+    if (!Array.isArray(point) || !/^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) || !(Number(point[1]) > 0)) return false;
+    const day = String(point[0]);
+    if (firstOwn && day >= firstOwn) return false;
+    if (longLastIso && day <= longLastIso) return false;
+    return true;
+  }) : [];
+  return mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? (card.fillTo || firstOwn) : "");
+}
+
+// Read pages: the card's year chart, same component as the card page. Tooltips
+// snap only to real dated points. The read's own numbers stay on our own days.
+export function readYearChart(card, asOf = "") {
+  if (!card || !Array.isArray(card.hist)) return "";
+  const series = cardPriceSeries(card, card.hist);
+  if (series.length < 2) return "";
+  return `<div class="read-year"><style>${HISTORY_CSS}</style>${historyChart(series, { asOf: String(asOf || "").slice(0, 10), snap: "real" })}</div>`;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
@@ -2454,18 +2480,7 @@ export function renderCard(card, stamp, opts = {}) {
   // A fill price on or after that day is not a card price and must not move the
   // chart or the since range. For singles the tcgcsv daily archive (longHist)
   // wins on overlap, so fill only covers days after its last point.
-  const ownDays = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0]))).map((point) => String(point[0])).sort();
-  const firstOwn = ownDays[0] || "";
-  const longLast = sealed ? "" : String(card.longHist || "").split(",").map((b) => Number(b.split(":")[0])).filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
-  const longLastIso = longLast ? new Date(longLast * 86400000).toISOString().slice(0, 10) : "";
-  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((point) => {
-    if (!Array.isArray(point) || !/^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) || !(Number(point[1]) > 0)) return false;
-    const day = String(point[0]);
-    if (firstOwn && day >= firstOwn) return false;
-    if (longLastIso && day <= longLastIso) return false;
-    return true;
-  }) : [];
-  const priceSeries = mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? (card.fillTo || firstOwn) : "");
+  const priceSeries = cardPriceSeries(card, hist, sealed);
   const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const listReal = (opts.listingSeries || [])
@@ -3518,6 +3533,8 @@ ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 <script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
 <script type="application/json" id="feed-rest">${restCfg}</script>
+<script type="application/json" id="read-year">${JSON.stringify(opts.readYear || null).replace(/</g, "\\u003c")}</script>
+${page === "read" ? `<style>.read-year{margin:8px 0 4px}.read-year .hc{margin:0}</style><script>${HISTORY_JS}</script><script>(function(){var host=document.getElementById("feed-one");if(!host||!window.MutationObserver)return;new MutationObserver(function(){if(window.catchemHistoryMount)window.catchemHistoryMount();}).observe(host,{childList:true,subtree:true});})();</script>` : ""}
 <script>
 const SEEN_KEY=${JSON.stringify(SEEN_KEY)};
 ${freshRandom.toString()}
@@ -4052,7 +4069,10 @@ function chartPointsOf(card){
   pts.sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:0; });
   return pts;
 }
+var READ_YEAR=(function(){try{var el=document.getElementById("read-year");return el?JSON.parse(el.textContent):null;}catch(e){return null;}})();
 function readChartHtml(card){
+  if(card && typeof card.yearChart==="string" && card.yearChart) return card.yearChart;
+  if(card && READ_YEAR && READ_YEAR.html && String(card.id)===String(READ_YEAR.id)) return READ_YEAR.html;
   const pts=chartPointsOf(card);
   if(pts.length<2) return "";
   const rec=card&&card.receipt&&typeof card.receipt==="object"?card.receipt:{};
