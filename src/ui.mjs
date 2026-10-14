@@ -3529,11 +3529,14 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .deep-more{margin:10px 0 4px;border:1px solid rgba(217,183,121,.35);border-radius:14px;padding:10px 14px;background:rgba(217,183,121,.05)}
   .deep-more summary{cursor:pointer;color:var(--gold);font-weight:600;list-style:none;min-height:28px}
   .deep-more summary::-webkit-details-marker{display:none}
-  .deep-lines{margin:8px 0;padding-left:18px;display:grid;gap:6px;line-height:1.45}
+  .deep-lines{margin:8px 0;padding-left:0;list-style:none;display:grid;gap:6px;line-height:1.45}
+  .deep-line{display:flex;align-items:center;gap:8px}
+  .card-thumb{width:28px;height:38px;object-fit:cover;border-radius:6px;flex:none;background:#1c1916}
   .deep-chart{margin:10px 0 4px}
   .deep-chart svg{width:100%;height:auto;display:block;border-radius:10px;background:rgba(255,255,255,.02)}
   .deep-chart figcaption{font-size:.8rem;opacity:.7;margin-top:4px}
-  .deep-bar{display:grid;grid-template-columns:9em 1fr 3em;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}
+  .deep-bar{display:grid;grid-template-columns:minmax(9em,18em) 1fr 3.5em;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}
+  .deep-bar-l{white-space:normal;display:flex;align-items:center;gap:6px}
   .deep-bar-t{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
   .deep-bar-t i{display:block;height:100%;border-radius:999px;background:#d9b779}
   .deep-bar-t i.neg{background:#c97a6a}
@@ -4421,7 +4424,8 @@ function deepChartSvg(chart){
     const rows=chart.bars.map(function(b){
       const v=Number(b[1]);
       const w=Math.max(2, Math.round((Math.abs(v)/max)*100));
-      return '<div class="deep-bar"><span class="deep-bar-l">'+html(b[0])+'</span><span class="deep-bar-t"><i class="'+(v<0?"neg":"pos")+'" style="width:'+w+'%"></i></span><span class="deep-bar-v">'+html(String(v))+"</span></div>";
+      const thumb=b[2]?'<img class="card-thumb" alt="" src="'+html(b[2])+'">':"";
+      return '<div class="deep-bar"><span class="deep-bar-l">'+thumb+html(b[0])+'</span><span class="deep-bar-t"><i class="'+(v<0?"neg":"pos")+'" style="width:'+w+'%"></i></span><span class="deep-bar-v">'+html(String(v))+"</span></div>";
     }).join("");
     return '<figure class="deep-chart">'+rows+"<figcaption>"+html(chart.label||"")+"</figcaption></figure>";
   }
@@ -4431,7 +4435,13 @@ function deepEl(card){
   const el=document.createElement("article");
   el.className="feed-card deep-card";
   el.id="r-"+card.id;
-  const lines=(Array.isArray(card.lines)?card.lines:[]).slice(0,6).map(function(l){return "<li>"+html(l)+"</li>";}).join("");
+  const faces=Array.isArray(card.lineCards)?card.lineCards:[];
+  const lines=(Array.isArray(card.lines)?card.lines:[]).slice(0,6).map(function(l,i){
+    const row=faces[i]||{};
+    const pics=Array.isArray(row.cards)?row.cards:(row.image?[{image:row.image}]:[]);
+    const thumbs=pics.filter(function(c){return c&&c.image;}).map(function(c){return '<img class="card-thumb" alt="" src="'+html(c.image)+'">';}).join("");
+    return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
+  }).join("");
   const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(card.href)+'">Open it</a></p>':"";
   el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p><h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
