@@ -988,3 +988,4 @@ await import("./launch-fixes-2.test.mjs");
 await import("./launch-fixes.test.mjs");
 await import("./read-year.test.mjs");
 await import("./card-page.test.mjs");
+await import("./rip.test.mjs");

@@ -1,6 +1,6 @@
 import { withShareMeta } from "./seo.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -14,6 +14,7 @@ import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, n
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
+import { ripBody } from "./rip.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
@@ -88,6 +89,7 @@ export function pageKind(pathname) {
   if (path === "/ir-watchlist") return "ir-watchlist";
   if (path === "/indexes") return "indexes";
   if (path.startsWith("/indexes/")) return "index";
+  if (path === "/rip") return "rip";
   if (path === "/releases") return "releases";
   if (path === "/practice") return "practice";
   if (path === "/accuracy") return "accuracy";
@@ -720,6 +722,18 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "indexes") {
     const list = await loadJson("feed/rating/index-list.json", fetchImpl).catch(() => null);
     return html(pageChrome("", indexListBody(list), "Indexes", stamp, "", pageOpts.feed === true));
+  }
+  if (kind === "rip") {
+    const doc = await loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null);
+    const setsDoc = await loadJson("sets.json", fetchImpl).catch(() => null);
+    const eras = {};
+    const logos = {};
+    for (const set of setsDoc?.sets || []) {
+      if (!set || !set.slug) continue;
+      if (set.era) eras[set.slug] = set.era;
+      if (set.logo) logos[set.slug] = set.logo;
+    }
+    return html(pageChrome("Rip value", ripBody(doc, { eras, logos }), "Rip value", stamp, "", pageOpts.feed === true));
   }
   if (kind === "index") {
     const key = decodeURIComponent(path.slice("/indexes/".length));
