@@ -126,7 +126,15 @@ const sealed = renderCard({
     { date: day(0), listingCount: 30 },
   ],
 });
-t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-unit="count"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"'));
+t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-unit="count"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"') && sealed.includes("30 listings counted") && !sealed.includes("NM "));
+
+const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "stamp", {
+  fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },
+  rotationFact: '<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark G, Standard"><span class="rm">G</span> Regulation mark G · Standard</a></p>',
+});
+t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("1Y +50%") && yearCard.includes("18 listings counted, Oct 13, 2026") && yearCard.includes("G · Standard"));
+const bare = renderCard({ id: "tcgcsv-3", name: "No Price", kind: "single", set: "S" }, "stamp", {});
+t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/sum-chip[^>]*>1Y /.test(bare) && !bare.includes("listings counted"));
 
 if (fail) process.exit(1);
 console.log("card page ok");

@@ -722,7 +722,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "premium") return html(renderPremium(stamp, pageOpts));
   if (kind === "indexes") {
     const list = await loadJson("feed/rating/index-list.json", fetchImpl).catch(() => null);
-    return html(pageChrome("", indexListBody(list), "Indexes", stamp, "", pageOpts.feed === true));
+    const market = await loadJson("indexes.json", fetchImpl).catch(() => null);
+    return html(pageChrome("", indexListBody(list, market), "Indexes", stamp, "", pageOpts.feed === true));
   }
   if (kind === "rip") {
     const doc = await loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null);

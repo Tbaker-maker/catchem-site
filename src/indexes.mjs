@@ -35,12 +35,72 @@ function line(points, col, color) {
 
 const kindPill = (k) => (k === "similar" ? `<span class="ix-pill sim">Similar pull rates</span>` : `<span class="ix-pill">All pull rates</span>`);
 
-export function indexListBody(list) {
+function seriesPts(raw) {
+  if (!Array.isArray(raw)) return [];
+  const byDay = new Map();
+  for (const point of raw) {
+    const day = Array.isArray(point) ? String(point[0] || "") : String(point?.d || point?.date || "");
+    const val = Array.isArray(point) ? Number(point[1]) : Number(point?.v ?? point?.value);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !(val > 0)) continue;
+    byDay.set(day, val);
+  }
+  return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+}
+
+function fillSeries(doc) {
+  if (!doc || typeof doc !== "object") return { points: [], source: "" };
+  const packs = [doc.singlesFill, doc.fan, doc.fill, doc.singles?.fill, doc.singles?.fan];
+  for (const pack of packs) {
+    if (Array.isArray(pack)) return { points: seriesPts(pack), source: String(doc.fillSource || doc.fanSource || "") };
+    if (pack && Array.isArray(pack.points)) return { points: seriesPts(pack.points), source: String(pack.source || doc.fillSource || "") };
+  }
+  return { points: [], source: "" };
+}
+
+function linePath(pts, t0, t1, mn, mx, W, H, P) {
+  return pts.map(([day, val], i) => {
+    const x = ((Date.parse(day) - t0) / (t1 - t0 || 1)) * W;
+    const y = P + (1 - (val - mn) / (mx - mn || 1)) * (H - 2 * P);
+    return `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+// Sitewide singles index. Solid line is our own days. A faded line is drawn
+// only from an earlier series already on the file, and only before our first day.
+export function singlesIndexChart(doc) {
+  const own = seriesPts(doc?.singles);
+  if (own.length < 2) return "";
+  const fill = fillSeries(doc);
+  const first = own[0][0];
+  const faded = fill.points.filter(([day]) => day < first);
+  const all = faded.length >= 2 ? [...faded, ...own] : own;
+  const W = 600, H = 150, P = 8;
+  const t0 = Date.parse(all[0][0]);
+  const t1 = Date.parse(all.at(-1)[0]);
+  const vals = all.map((point) => point[1]);
+  let mn = Math.min(...vals);
+  let mx = Math.max(...vals);
+  const pad = (mx - mn) * 0.1 || mx * 0.05 || 1;
+  mn -= pad;
+  mx += pad;
+  const ownD = linePath(own, t0, t1, mn, mx, W, H, P);
+  const fadeD = faded.length >= 2 ? linePath(faded, t0, t1, mn, mx, W, H, P) : "";
+  const asOf = shortDate(doc?.asOf);
+  const source = String(doc?.source || "TCGplayer market").trim();
+  const note = fadeD
+    ? `The soft line is ${fill.source || "the earlier series on file"} and it stops before our first day, ${shortDate(first)}. The solid line is our own days.`
+    : "The solid line is our own days on file.";
+  const fade = fadeD ? `<path d="${fadeD}" fill="none" stroke="#d9b779" stroke-opacity="0.35" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : "";
+  return `<div class="ix-chart" id="singles-index"><h2>Singles index</h2><p>${esc(source)}${asOf ? `, as of ${esc(asOf)}` : ""}. ${esc(note)}</p><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Singles index from ${esc(shortDate(all[0][0]))} to ${esc(shortDate(all.at(-1)[0]))}">${fade}<path d="${ownD}" fill="none" stroke="#d9b779" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg><div class="ix-axis"><span>${esc(shortDate(all[0][0]))}</span><span>${esc(shortDate(all.at(-1)[0]))}</span></div></div>`;
+}
+
+export function indexListBody(list, market = null) {
   const rows = list?.indexes || [];
-  if (!rows.length) return `<main id="main" tabindex="-1" class="wrap"><h1>Indexes</h1><p class="muted">The indexes are being rebuilt. Check back after tonight's update.</p></main>`;
+  const chart = singlesIndexChart(market);
+  if (!rows.length && !chart) return `<main id="main" tabindex="-1" class="wrap"><h1>Indexes</h1><p class="muted">The indexes are being rebuilt. Check back after tonight's update.</p></main>`;
   const eras = [...new Set(rows.map((r) => r.era))];
   const card = (r) => `<a class="ix-card" href="${indexHref(r.key)}"><b>${esc(r.name.replace(/, similar pull rates.*$/, ""))}</b><span>${kindPill(r.kind)}${r.kind === "similar" ? `<span class="ix-sub">${esc((r.name.match(/\(([^)]*per pack)\)/) || [])[1] || "")}</span>` : ""}</span><span class="ix-nums"><span>Typical ${cash(r.last[2])}</span><span>Total ${cash0(r.last[1])}</span><span>${r.last[3]} cards priced</span></span><span class="ix-sub">${esc(shortDate(r.last[0]))}, TCGplayer market${r.smallGroup ? ". Small group" : ""}</span></a>`;
-  return `<main id="main" tabindex="-1" class="wrap"><style>${INDEX_CSS}</style><div class="ix-head"><h1>Indexes</h1><p class="ix-lede">Each index follows one TCGplayer rarity in one generation, with its real rarity name. "All pull rates" includes every set. "Similar pull rates" only includes sets whose published pull rate for that rarity is close, with the source linked on the index page. Prices are TCGplayer market, as of ${esc(shortDate(list.asOf))}. A factual record of prices on file, not advice.</p></div>${eras.map((e) => `<h2 class="ix-era">${esc(e)}</h2><div class="ix-list">${rows.filter((r) => r.era === e).map(card).join("")}</div>`).join("")}</main>`;
+  return `<main id="main" tabindex="-1" class="wrap"><style>${INDEX_CSS}</style><div class="ix-head"><h1>Indexes</h1><p class="ix-lede">Each index follows one TCGplayer rarity in one generation, with its real rarity name. "All pull rates" includes every set. "Similar pull rates" only includes sets whose published pull rate for that rarity is close, with the source linked on the index page. Prices are TCGplayer market, as of ${esc(shortDate(list?.asOf))}. A factual record of prices on file, not advice.</p></div>${chart}${eras.map((e) => `<h2 class="ix-era">${esc(e)}</h2><div class="ix-list">${rows.filter((r) => r.era === e).map(card).join("")}</div>`).join("")}</main>`;
 }
 
 export function indexPageBody(doc, { pic = () => "" } = {}) {

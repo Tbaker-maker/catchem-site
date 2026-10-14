@@ -1338,6 +1338,10 @@ a{color:var(--gold)}
 .win{font:600 16px/1.2 var(--sans)}
 .win.up{color:var(--green)}
 .win.down{color:var(--red)}
+.sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.sum-chip{display:inline-flex;align-items:center;min-height:36px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
+.sum-chip.up{color:var(--green)}
+.sum-chip.down{color:var(--red)}
 .means{background:#211e1a;border-radius:14px;padding:12px 14px}
 .means p{margin:0 0 8px}
 .means p:last-child{margin:0}
@@ -2044,7 +2048,7 @@ ${line ? `<p>${esc(line)}</p>` : ""}
 export function exactWindowPct(hist, days, endDate) {
   const endDay = String(endDate || "").slice(0, 10);
   const pts = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) && Number(point[1]) > 0);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDay) || (days !== 7 && days !== 30 && days !== 90)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDay) || (days !== 7 && days !== 30 && days !== 90 && days !== 365)) return null;
   const end = pts.find((point) => point[0] === endDay) || null;
   const startDay = new Date(Date.parse(`${endDay}T00:00:00Z`) - days * 86400000).toISOString().slice(0, 10);
   const start = pts.find((point) => point[0] === startDay) || null;
@@ -2146,6 +2150,41 @@ function exactChip(label, n) {
   const cls = n > 0 ? "up" : n < 0 ? "down" : "";
   const sign = n > 0 ? "+" : "";
   return `<span class="win ${cls}">${label} ${sign}${n}%</span>`;
+}
+
+function rotationChipLabel(html) {
+  const src = String(html || "");
+  const aria = src.match(/aria-label="Rotation: ([^"]+)"/);
+  if (aria) return aria[1].replace(/regulation mark /i, "").replace(/, /g, " · ");
+  const mark = src.match(/class="rm">([^<]+)</);
+  if (!mark) return "";
+  const status = src.match(/Regulation mark [^<·]*· ([^<]+)/);
+  return status ? `${mark[1]} · ${status[1]}` : `Mark ${mark[1]}`;
+}
+
+function countedListings(fact, series, endDay) {
+  const n = Number(fact?.listings);
+  const day = String(fact?.listingsAsOf || "").slice(0, 10);
+  if (Number.isFinite(n) && n >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(day)) return { n, day };
+  const pts = (series || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0);
+  const row = pts.find((point) => String(point.date).slice(0, 10) === endDay) || null;
+  if (!row) return null;
+  return { n: Number(row.listingCount), day: String(row.date).slice(0, 10) };
+}
+
+function summaryStrip({ nm = false, price = "", year = null, listings = null, rotation = "" } = {}) {
+  const bits = [];
+  if (price) bits.push(`<span class="sum-chip">${nm ? "NM " : ""}${esc(price)}</span>`);
+  if (typeof year === "number" && Number.isFinite(year)) {
+    const cls = year > 0 ? " up" : year < 0 ? " down" : "";
+    bits.push(`<span class="sum-chip${cls}">1Y ${year > 0 ? "+" : ""}${year}%</span>`);
+  }
+  if (listings && Number.isFinite(listings.n) && listings.day) {
+    const when = priceDay(listings.day);
+    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${when ? `, ${esc(when)}` : ""}</span>`);
+  }
+  if (rotation) bits.push(`<span class="sum-chip">${esc(rotation)}</span>`);
+  return bits.length ? `<p class="sum-strip">${bits.join("")}</p>` : "";
 }
 
 export function listingTrend(series, endDate) {
@@ -2411,6 +2450,13 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
     exactChip("7d", exactWindowPct(priceSeries.length ? priceSeries : hist, 7, endDay)),
     exactChip("30d", exactWindowPct(priceSeries.length ? priceSeries : hist, 30, endDay)),
   ].filter(Boolean).join("");
+  const strip = summaryStrip({
+    nm: true,
+    price,
+    year: exactWindowPct(priceSeries.length ? priceSeries : hist, 365, endDay),
+    listings: countedListings(opts.fact, opts.listingSeries, endDay),
+    rotation: rotationChipLabel(opts.rotationFact),
+  });
   const when = priceDay(endDay);
   const num = String(card.num || "").trim();
   const numBit = num ? ` · ${num.startsWith("#") ? num : `#${num}`}` : "";
@@ -2461,6 +2507,7 @@ ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
 ${chips ? `<p class="cp-wins">${chips}</p>` : ""}
+${strip}
 </div>
 </header>
 ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
@@ -2565,6 +2612,12 @@ export function renderCard(card, stamp, opts = {}) {
   const priceSeries = cardPriceSeries(card, hist, sealed);
   const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
+  const sealedStrip = sealed ? summaryStrip({
+    price,
+    year: exactWindowPct(priceSeries.length ? priceSeries : hist, 365, endDay),
+    listings: countedListings(fact, opts.listingSeries, endDay),
+    rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
+  }) : "";
   const listReal = (opts.listingSeries || [])
     .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
@@ -2619,6 +2672,7 @@ export function renderCard(card, stamp, opts = {}) {
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span></p>` : ""}
+${sealedStrip}
 ${chips ? `<p>${chips}</p>` : ""}
 ${priceChart}
 ${rangeRow}
@@ -3530,11 +3584,14 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .deep-more{margin:10px 0 4px;border:1px solid rgba(217,183,121,.35);border-radius:14px;padding:10px 14px;background:rgba(217,183,121,.05)}
   .deep-more summary{cursor:pointer;color:var(--gold);font-weight:600;list-style:none;min-height:28px}
   .deep-more summary::-webkit-details-marker{display:none}
-  .deep-lines{margin:8px 0;padding-left:18px;display:grid;gap:6px;line-height:1.45}
+  .deep-lines{margin:8px 0;padding-left:0;list-style:none;display:grid;gap:6px;line-height:1.45}
+  .deep-line{display:flex;align-items:center;gap:8px}
+  .card-thumb{width:28px;height:38px;object-fit:cover;border-radius:6px;flex:none;background:#1c1916}
   .deep-chart{margin:10px 0 4px}
   .deep-chart svg{width:100%;height:auto;display:block;border-radius:10px;background:rgba(255,255,255,.02)}
   .deep-chart figcaption{font-size:.8rem;opacity:.7;margin-top:4px}
-  .deep-bar{display:grid;grid-template-columns:9em 1fr 3em;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}
+  .deep-bar{display:grid;grid-template-columns:minmax(9em,18em) 1fr 3.5em;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}
+  .deep-bar-l{white-space:normal;display:flex;align-items:center;gap:6px}
   .deep-bar-t{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
   .deep-bar-t i{display:block;height:100%;border-radius:999px;background:#d9b779}
   .deep-bar-t i.neg{background:#c97a6a}
@@ -4422,7 +4479,8 @@ function deepChartSvg(chart){
     const rows=chart.bars.map(function(b){
       const v=Number(b[1]);
       const w=Math.max(2, Math.round((Math.abs(v)/max)*100));
-      return '<div class="deep-bar"><span class="deep-bar-l">'+html(b[0])+'</span><span class="deep-bar-t"><i class="'+(v<0?"neg":"pos")+'" style="width:'+w+'%"></i></span><span class="deep-bar-v">'+html(String(v))+"</span></div>";
+      const thumb=b[2]?'<img class="card-thumb" alt="" src="'+html(b[2])+'">':"";
+      return '<div class="deep-bar"><span class="deep-bar-l">'+thumb+html(b[0])+'</span><span class="deep-bar-t"><i class="'+(v<0?"neg":"pos")+'" style="width:'+w+'%"></i></span><span class="deep-bar-v">'+html(String(v))+"</span></div>";
     }).join("");
     return '<figure class="deep-chart">'+rows+"<figcaption>"+html(chart.label||"")+"</figcaption></figure>";
   }
@@ -4432,7 +4490,13 @@ function deepEl(card){
   const el=document.createElement("article");
   el.className="feed-card deep-card";
   el.id="r-"+card.id;
-  const lines=(Array.isArray(card.lines)?card.lines:[]).slice(0,6).map(function(l){return "<li>"+html(l)+"</li>";}).join("");
+  const faces=Array.isArray(card.lineCards)?card.lineCards:[];
+  const lines=(Array.isArray(card.lines)?card.lines:[]).slice(0,6).map(function(l,i){
+    const row=faces[i]||{};
+    const pics=Array.isArray(row.cards)?row.cards:(row.image?[{image:row.image}]:[]);
+    const thumbs=pics.filter(function(c){return c&&c.image;}).map(function(c){return '<img class="card-thumb" alt="" src="'+html(c.image)+'">';}).join("");
+    return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
+  }).join("");
   const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(card.href)+'">Open it</a></p>':"";
   el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p><h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
