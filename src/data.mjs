@@ -81,6 +81,10 @@ async function readCatalogue(rel, fetchImpl) {
   return res.json();
 }
 
+export async function loadCatalogue(rel, fetchImpl = fetch) {
+  return cached("cat:" + rel, async () => readCatalogue(rel, fetchImpl));
+}
+
 export async function loadPokemonBundle(fetchImpl = fetch) {
   if (pokemonBundle) return pokemonBundle;
   const [attrs, catalogue] = await Promise.all([
