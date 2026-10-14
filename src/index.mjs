@@ -185,27 +185,49 @@ function withCatalogue(list, images) {
   });
 }
 
-// Drops a price read when the card's nightly row moved on. Rows come one at a
-// time from bucket text (no whole-file parse), and the result is memoized per
-// reads.json object so /feed and /feed/lead.json share one pass.
-const staleMemo = new WeakMap();
-async function omitStalePriceReads(reads, fetchImpl) {
-  const list = Array.isArray(reads) ? reads : [];
-  // Hotfix: per-request bucket fetches hung /feed. Use the build-time
-  // stale flag on each read instead (read.stale), no fetches here.
-  return list.filter((read) => !read?.stale);
-  if (staleMemo.has(list)) return staleMemo.get(list);
-  const job = (async () => {
-    const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
-    const rows = await bucketRows(skus, fetchImpl).catch(() => new Map());
-    return list.filter((read) => {
-      const sku = String(read?.sku || "");
-      if (!/^tcgcsv-\d+$/.test(sku)) return true;
-      return !readStaleAgainstCard(read, rows.get(sku));
-    });
-  })();
-  staleMemo.set(list, job);
-  try { return await job; } catch (err) { staleMemo.delete(list); throw err; }
+// Drops a price read when the card's nightly row moved on. A read with a
+// build-time stale flag is dropped at once. The bucket comparison runs at most
+// once per reads.json version: the stale id list is kept in isolate memory and
+// the Cache API, and on a miss it is built in the background (waitUntil), so a
+// page never waits on the bucket fetches.
+const staleIds = new Map();
+const staleJobs = new Map();
+const STALE_CACHE = "https://catchem-internal.invalid/stale-ids/";
+async function computeStaleIds(list, fetchImpl) {
+  const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
+  const rows = await bucketRows(skus, fetchImpl).catch(() => new Map());
+  return list.filter((read) => /^tcgcsv-\d+$/.test(String(read?.sku || "")) && readStaleAgainstCard(read, rows.get(String(read.sku)))).map((r) => String(r.id));
+}
+function staleCache() {
+  try { return typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { return null; }
+}
+async function omitStalePriceReads(reads, fetchImpl, opts = {}) {
+  const list = (Array.isArray(reads) ? reads : []).filter((read) => !read?.stale);
+  const key = String(opts.version || "");
+  const apply = (ids) => { const drop = new Set(ids); return list.filter((r) => !drop.has(String(r?.id))); };
+  if (key && staleIds.has(key)) return apply(staleIds.get(key));
+  const cache = staleCache();
+  if (key && cache) {
+    try {
+      const hit = await cache.match(STALE_CACHE + encodeURIComponent(key));
+      if (hit) { const ids = await hit.json(); staleIds.set(key, ids); return apply(ids); }
+    } catch {}
+  }
+  const job = () => {
+    if (staleJobs.has(key)) return staleJobs.get(key);
+    const p = computeStaleIds(list, fetchImpl).then(async (ids) => {
+      if (key) {
+        if (staleIds.size > 4) staleIds.clear();
+        staleIds.set(key, ids);
+        if (cache) await cache.put(STALE_CACHE + encodeURIComponent(key), new Response(JSON.stringify(ids), { headers: { "content-type": "application/json", "cache-control": "max-age=86400" } })).catch(() => {});
+      }
+      return ids;
+    }).finally(() => staleJobs.delete(key));
+    staleJobs.set(key, p);
+    return p;
+  };
+  if (typeof opts.waitUntil === "function") { opts.waitUntil(job().catch(() => {})); return list; }
+  return apply(await job().catch(() => []));
 }
 
 async function readsFor(cardId, fetchImpl) {
@@ -437,7 +459,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     const readYearEarly = readId ? await readYearFor(readId, fetchImpl) : null;
     const bundle = await loadJson("reads.json", fetchImpl);
-    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
+    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl, { version: String(bundle?.asOf || bundle?.updatedAt || "") + ":" + (bundle?.reads?.length || 0), waitUntil: opts.waitUntil });
     const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     if (path === "/feed/lead.json") {
@@ -745,7 +767,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
@@ -919,14 +941,14 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }
       }
       if (kind === "data") {
-        try { return await renderPath(url.pathname, fetchImpl, { feed }); }
+        try { return await renderPath(url.pathname, fetchImpl, { feed, waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }); }
         catch { return new Response("Not found", { status: 404 }); }
       }
     }

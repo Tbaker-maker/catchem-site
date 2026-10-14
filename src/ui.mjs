@@ -1640,7 +1640,7 @@ ${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
 ${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>How this list works</summary>${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}</details>` : ""}
 ${eras.map((era, eraIdx) => `<details class="fold" data-era id="era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}" style="scroll-margin-top:72px"${eraIdx === 0 ? " open" : ""}><summary><span>${esc(era)}</span><span class="muted fold-n">${sets.filter((s) => s.era === era).length} sets</span></summary><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
     const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
-    const face = /^https:\/\//.test(String(s.logo || ""))
+    const face = /^(https:\/\/|\/img\/[a-z0-9.-]+\/logo\.png$)/i.test(String(s.logo || ""))
       ? `<img class="shot" alt="" width="160" height="64" loading="${load}" decoding="async" src="${esc(s.logo)}">`
       : brandedTile("logo", { kind: "set", name: s.name });
     const when = priceDay(s.release);
