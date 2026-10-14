@@ -191,6 +191,9 @@ function withCatalogue(list, images) {
 const staleMemo = new WeakMap();
 async function omitStalePriceReads(reads, fetchImpl) {
   const list = Array.isArray(reads) ? reads : [];
+  // Hotfix: per-request bucket fetches hung /feed. Use the build-time
+  // stale flag on each read instead (read.stale), no fetches here.
+  return list.filter((read) => !read?.stale);
   if (staleMemo.has(list)) return staleMemo.get(list);
   const job = (async () => {
     const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
