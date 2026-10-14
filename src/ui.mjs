@@ -1,4 +1,5 @@
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { readSheet } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
@@ -3882,9 +3883,18 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };
   const focusTitle = titles[String(opts.section || "")] || "";
   const page = opts.page === "read" ? "read" : "feed";
+  const pool = page === "read" ? (bundle?.reads || []).filter((row) => row && typeof row === "object").map((row) => ({
+    ...row,
+    ...(row.headline ? { headline: soldSafeText(row, row.headline) } : {}),
+    ...(row.path ? { path: soldSafeText(row, row.path) } : {}),
+    ...(row.why ? { why: soldSafeText(row, row.why) } : {}),
+  })) : reads;
+  const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
+  const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool }) : "";
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
+${sheet}
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <select id="f-loop" class="pill-native" aria-label="Filter">${feedFilterOptions(false).map(function(row){ return '<option value="'+row[0]+'">'+row[1]+'</option>'; }).join("")}</select>
   <div class="chip-scroller">
@@ -4807,9 +4817,10 @@ function cardEl(card, facts){
   const listed=listingsLine({listings: info.listings, listingsAsOf: info.listingsAsOf});
   if(listed) bits.push('<p class="muted">'+html(listed.replace("Active listings", "Listings for sale"))+"</p>");
   const flagged=flagLine(Object.assign({}, card, {flagged: info.flagged}));
-  if(flagged) bits.push("<p>"+flagged+"</p>");
   const checked=checkedLine(card.asOf);
-  if(checked) bits.push('<p class="muted">'+html(checked)+"</p>");
+  if(flagged && checked) bits.push("<p>"+flagged+" "+html(checked)+"</p>");
+  else if(flagged) bits.push("<p>"+flagged+"</p>");
+  else if(checked) bits.push('<p class="muted">'+html(checked)+"</p>");
   bits.push('<p class="muted">'+html(src)+"</p>");
   const extra=shortFor(card);
   const supplyBox=supply?'<label><input type="checkbox" data-opt="listings" checked> Listings move 20% either way, below '+supply.low+" or above "+supply.high+"</label>":"";

@@ -99,11 +99,33 @@ function draw(days){var end=ms(all[all.length-1][0]);view=days?all.filter(functi
 var vals=view.map(function(p){return p[1]}),mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),pad=(mx-mn)*.12||mx*.05||1;mn-=pad;mx+=pad;
 var t0=ms(view[0][0]),t1=ms(view[view.length-1][0])||t0+1;
 function X(d){return t1===t0?W/2:((ms(d)-t0)/(t1-t0))*W;}function Y(v){return PT+(1-(v-mn)/(mx-mn))*(H-PT-PB);}
-var segs=[view.map(function(p){return [X(p[0]),Y(p[1])];})],bridge="";
+var segs=[],run=null;
+view.forEach(function(p){
+  var fade=p[2]==="f";
+  var xy=[X(p[0]),Y(p[1])];
+  if(!run||run.fade!==fade){
+    if(run&&run.pts.length) run.pts.push(xy);
+    run={fade:fade,pts:[xy]};
+    segs.push(run);
+  }else run.pts.push(xy);
+});
+var body="";
+segs.forEach(function(seg){
+  var s=seg.pts,op=seg.fade?".35":"1";
+  if(s.length<2){body+='<circle cx="'+s[0][0].toFixed(1)+'" cy="'+s[0][1].toFixed(1)+'" r="2.5" fill="'+color+'" fill-opacity="'+op+'"/>';return;}
+  var d=smooth(s);
+  if(!seg.fade) body+='<path d="'+d+" L"+s[s.length-1][0].toFixed(1)+","+(H-PB)+" L"+s[0][0].toFixed(1)+","+(H-PB)+' Z" fill="url(#'+gid+')" stroke="none"/>';
+  body+='<path d="'+d+'" fill="none" stroke="'+color+'" stroke-opacity="'+op+'" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+});
+if(unit!=="count"){
+  var hiP=null,loP=null;
+  view.forEach(function(p){if(p[3])return;if(!hiP||p[1]>hiP[1])hiP=p;if(!loP||p[1]<loP[1])loP=p;});
+  if(hiP) body+='<circle cx="'+X(hiP[0]).toFixed(1)+'" cy="'+Y(hiP[1]).toFixed(1)+'" r="3.5" fill="none" stroke="#efe9de" stroke-width="1.5"/>';
+  if(loP&&loP!==hiP) body+='<circle cx="'+X(loP[0]).toFixed(1)+'" cy="'+Y(loP[1]).toFixed(1)+'" r="3.5" fill="#efe9de"/>';
+}
 var g="";for(var k=1;k<=3;k++){var y=(PT+(H-PT-PB)*k/4).toFixed(1);g+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="rgba(255,255,255,.07)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
-var body="";segs.forEach(function(s){if(s.length===1){body+='<circle cx="'+s[0][0].toFixed(1)+'" cy="'+s[0][1].toFixed(1)+'" r="2.5" fill="'+color+'"/>';return;}var d=smooth(s);body+='<path d="'+d+" L"+s[s.length-1][0].toFixed(1)+","+(H-PB)+" L"+s[0][0].toFixed(1)+","+(H-PB)+' Z" fill="url(#'+gid+')" stroke="none"/><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';});
 var lab="";var ax=fig.querySelector(".hc-axis");if(ax)ax.innerHTML="<span>"+nice(view[0][0])+"</span><span>"+nice(view[view.length-1][0])+"</span>";
-svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".28"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+g+bridge+body+lab+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+color+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
+svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".28"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+g+body+lab+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+color+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
 svg._X=X;svg._Y=Y;head(view[view.length-1]);}
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=view;if(snap==="real"){var reals=view.filter(function(p){return !p[3];});if(reals.length)pool=reals;}var best=pool[0],bd=1e9;pool.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
 function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+showVal(p[1])+(p[3]?(unit==="count"?" · last count on file "+nice(p[3]):" · last price on file "+nice(p[3])):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
