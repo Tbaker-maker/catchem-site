@@ -59,7 +59,7 @@ export function setValueBlock(doc, images = {}, slug = "") {
   const m = doc?.master || {};
   const total = cash(m.total);
   if (!doc || (!top.length && !total)) {
-    return `<section class="sv" aria-labelledby="sv-h"><h2 id="sv-h">${c.heading}</h2><p class="muted">${c.empty}</p>${pairLine}</section>`;
+    return "";
   }
   const rows = top.map((r, i) => {
     const nm = String(r.name || "").replace(new RegExp(" - " + String(r.number || "").replace(/[^0-9A-Za-z/]/g, "") + "$"), "");
@@ -75,7 +75,7 @@ export function setValueBlock(doc, images = {}, slug = "") {
 <p class="muted">${c.explainer}</p>
 ${total ? `<p class="sv-total">Master-set total <b>${total}</b></p>` : ""}
 ${counts ? `<p>${esc(counts)}</p>` : ""}
-${rows ? `<ol class="sv-list">${rows}</ol>` : `<p class="muted">${c.empty}</p>`}
+${rows ? `<ol class="sv-list">${rows}</ol>` : ""}
 <p class="muted">TCGplayer market, ${esc(day)}. File: ${esc(doc.source || "")}.</p>
 ${pairLine}</section>`;
 }

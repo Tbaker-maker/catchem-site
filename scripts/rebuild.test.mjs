@@ -28,7 +28,7 @@ const BANNED = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|p
 const LOCKED = "The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.";
 
 // Legal's required disclosure, word for word (2026-10-10). The only other exception.
-const PAID = "Paid link. We may earn a commission if you buy, at no extra cost to you.";
+const PAID = "Paid link. We may earn a commission from links on this page.";
 
 function clean(html) {
   let text = String(html).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID").replaceAll(TAKE_FOOTER, "FOOT");
@@ -713,7 +713,7 @@ const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-
 const hiddenNotes = hidePublishedNotes(shippingCard);
 t("a public page drops the correction log and the shipping card", !hiddenNotes.includes("Correction log") && !hiddenNotes.includes("AFFECTED A PUBLISHED NUMBER") && !/auto-fix/i.test(hiddenNotes) && hiddenNotes.includes("Kept"));
 const searchHtml = renderSearch();
-t("search stays capped at 40, highest stored value first, with the stored price and rarity", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40, codes)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && searchHtml.includes("No market price") && searchHtml.includes("set-logos.json") && searchHtml.includes("r[8]") && searchHtml.includes("r[9]"));
+t("search stays capped at 40, highest stored value first, with the stored price and rarity", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40, codes)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("No market price") && searchHtml.includes("set-logos.json") && searchHtml.includes("r[8]") && searchHtml.includes("r[9]"));
 
 const lagLine = "SV: Prismatic Evolutions: Prismatic Evolutions Booster Pack latest price rose from $8.00 on Sep 3 to $9.00 on Oct 3, up 12.5%. The booster box is $134.46 on Oct 3, the same price as $134.46 on Sep 3. Singles in the set with a price on both days: 4 up, 0 down, 1 unchanged.";
 const lag = {
@@ -968,4 +968,5 @@ await import("./track-record-hidden.test.mjs");
 await import("./data-cache.test.mjs");
 await import("./chart-no-gaps.test.mjs");
 await import("./year-range.test.mjs");
+await import("./launch-fixes.test.mjs");
 await import("./card-page.test.mjs");

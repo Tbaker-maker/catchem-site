@@ -326,7 +326,7 @@ export function affEbay(url, campid) {
   return url + "&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=" + campid + "&toolid=10001&mkevt=1";
 }
 export const PAID_NOTE = "Paid link";
-export const PAID_FOOTER = "Paid link. We may earn a commission if you buy, at no extra cost to you.";
+export const PAID_FOOTER = "Paid link. We may earn a commission from links on this page.";
 
 // eBay search link for this exact product: name + set (+ card number for a
 // single), minus obvious noise. A search, not a listing and not a sale.

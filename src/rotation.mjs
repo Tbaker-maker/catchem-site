@@ -6,7 +6,7 @@
 //
 // Rotated dates are the in-person dates from the two Play! Pokémon
 // announcements. F left Standard on April 11, 2025. G left on April 10, 2026.
-// No other letter has a date here. This file does not say a set was printed again.
+// No other letter has a date here. This file does not say a set was released again.
 
 export const PRINT_RUN_LINE = "Rotated sets historically stop getting new print runs. Older packs can still turn up in tins and collections.";
 

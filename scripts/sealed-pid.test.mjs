@@ -37,7 +37,7 @@ console.log("store links ok");
 // Paid-link disclosure + affiliate ids from config.
 assert.ok(!page.includes("Affiliate link") && !sr.includes("Affiliate link"));
 assert.ok(page.includes('<small class="paid-note">Paid link</small>'));
-assert.ok(page.includes("Paid link. We may earn a commission if you buy, at no extra cost to you."));
+assert.ok(page.includes("Paid link. We may earn a commission from links on this page."));
 assert.equal(affTcg("https://www.tcgplayer.com/product/1", ""), "https://www.tcgplayer.com/product/1", "empty: plain");
 assert.equal(affTcg("https://www.tcgplayer.com/product/1", "https://tcgplayer.pxf.io/c/1/2/3"), "https://tcgplayer.pxf.io/c/1/2/3?u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F1");
 assert.equal(affTcg("u", "javascript:alert(1)"), "u", "bad base: plain");
