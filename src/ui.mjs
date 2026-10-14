@@ -1,5 +1,5 @@
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
-import { readSheet } from "./read-sheet.mjs";
+import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
@@ -2411,6 +2411,15 @@ const SINGLE_CSS = `
 .cp-date{font:500 13px/1 var(--sans);color:var(--dim)}
 .cp-src{margin:0 0 8px;color:var(--dim);font:500 13px/1.3 var(--sans)}
 .cp-wins{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 0}
+.cp-prints{display:flex;gap:8px;overflow-x:auto;list-style:none;margin:10px 0 0;padding:0 0 4px}
+.cp-prints li{flex:none;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
+.cp-prints small{font:500 14px/1.2 var(--sans);color:var(--dim)}
+.cp-cond,.cp-gap{margin:6px 0 0;font:500 14px/1.35 var(--sans)}
+.cp-cond{color:var(--dim)}
+.cp-pattern{margin:12px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
+.cp-pattern p{margin:0;font:500 16px/1.4 var(--sans)}
+.cp-pattern .muted{margin-top:6px;font-size:14px}
+.cp-pattern .rd-era{display:inline-flex;align-items:center;min-height:32px;margin-top:8px;padding:0 10px;border-radius:999px;color:#d9b779;background:rgba(217,183,121,.12)}
 .card-page .win{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06)}
 .cp-charts{margin:8px 0 18px}
 .cp-sec{margin:18px 0;padding:18px 16px;border-radius:22px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
@@ -2448,6 +2457,42 @@ const SINGLE_CSS = `
   .cp-charts.has-counts{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:16px;align-items:start}
 }
 `;
+
+function printingsHtml(card) {
+  const rows = (Array.isArray(card?.printings) ? card.printings : []).filter((row) => {
+    const day = String(row?.asOf || "").slice(0, 10);
+    return row && String(row.name || "").trim() && Number(row.price) > 0 && priceDay(day);
+  });
+  if (rows.length < 2) return "";
+  return `<ul class="cp-prints" aria-label="Printings">${rows.map((row) => {
+    const when = priceDay(String(row.asOf).slice(0, 10));
+    return `<li><span>${esc(row.name)}</span><b>${money(row.price)}</b><small>${esc(when)}</small></li>`;
+  }).join("")}</ul>`;
+}
+
+function conditionLine(note) {
+  const text = String(note?.text || "").trim();
+  const when = priceDay(String(note?.asOf || "").slice(0, 10));
+  if (!text || !when) return "";
+  const src = String(note.source || "").trim();
+  const tail = [src, when].filter(Boolean).join(", ");
+  return `<p class="cp-cond">${esc(text)}${tail ? ` <span class="muted">${esc(tail)}</span>` : ""}</p>`;
+}
+
+function ebayBlock(read) {
+  if (!read) return "";
+  const bits = priceBits(read);
+  const ask = String(bits.line || "").split(". ").find((part) => part.startsWith("eBay ask"));
+  return [ask, bits.gap].filter(Boolean).map((part) => `<p class="cp-gap">${esc(part)}</p>`).join("");
+}
+
+function patternBlock(read) {
+  const hit = patternSentence(read);
+  if (!hit) return "";
+  const when = priceDay(hit.asOf);
+  const note = [hit.source, when].filter(Boolean).join(" · ");
+  return `<section class="cp-pattern"><p>${esc(hit.text)}</p>${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
+}
 
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
   const tags = printingTags(card);
@@ -2513,9 +2558,13 @@ ${storeLinksHtml(card, esc)}
 ${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
 ${chips ? `<p class="cp-wins">${chips}</p>` : ""}
 ${strip}
+${printingsHtml(card)}
+${conditionLine(opts.conditionNote)}
+${ebayBlock(opts.priceRead)}
 </div>
 </header>
 ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
+${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
 ${factBlock}
 ${panels ? `<div class="cp-panels">${panels}</div>` : ""}
