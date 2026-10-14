@@ -20,7 +20,7 @@ import { pageChrome } from "./ui.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
-  clockLabel, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
+  clockLabel, feedReads, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
 } from "./ui.mjs";
 
@@ -436,7 +436,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
     const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
-    const withDive = { ...pageOpts, diveMap };
+    if (path === "/feed/lead.json") {
+      return new Response(JSON.stringify(feedReads(freshBundle)), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
+    }
+    const soldOn = await soldFileExists(fetchImpl);
+    const withDive = { ...pageOpts, diveMap, soldOn };
     if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
     if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
@@ -768,6 +772,7 @@ export default {
         return new Response("The editor did not load.", { status: 503, headers: { "cache-control": "no-store" } });
       }
     }
+    if (request.method === "GET" && url.pathname.startsWith("/live/")) return handleLive(request, url.pathname, fetchImpl);
     if (request.method === "GET" && url.pathname === "/api/session") return handleSession(request, env);
     if (request.method === "GET" && url.pathname === "/signin") return handleSignIn(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord") return beginDiscord(request, env);
@@ -968,6 +973,30 @@ export async function handleSetLogo(request, pathname, fetchImpl = fetch) {
     return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
   }
   return miss();
+}
+
+// The sold-volume file is optional. The feed asks for it only when it exists.
+let soldCheck = { at: 0, ok: false };
+export async function soldFileExists(fetchImpl = fetch, now = Date.now()) {
+  if (now - soldCheck.at < 10 * 60 * 1000) return soldCheck.ok;
+  let ok = false;
+  try { ok = !!(await loadJson("derived/tcgplayer-volume.json", fetchImpl)); } catch { ok = false; }
+  soldCheck = { at: now, ok };
+  return ok;
+}
+export function resetSoldCheck() { soldCheck = { at: 0, ok: false }; }
+
+// Post Office editor asks /live/series/{id} and /live/sets/{id}. These are the
+// public TCGdex series and set files. Only short ids pass.
+export async function handleLive(request, pathname, fetchImpl = fetch) {
+  const m = pathname.match(/^\/live\/(series|sets)\/([a-z0-9.-]{1,24})$/i);
+  const miss = () => new Response("{}", { status: 404, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  if (!m) return miss();
+  try {
+    const res = await fetchImpl(`https://api.tcgdex.net/v2/en/${m[1]}/${encodeURIComponent(m[2])}`, { cf: { cacheTtl: 3600 } });
+    if (!res.ok) return miss();
+    return new Response(await res.text(), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600" } });
+  } catch { return miss(); }
 }
 
 export function vancouverDay(now = new Date()) {
