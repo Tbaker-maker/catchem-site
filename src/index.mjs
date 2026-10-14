@@ -10,17 +10,18 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
-import { setAffiliateConfig, speciesPageToken, pokemonSlug } from "./pokemon.mjs";
+import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
+import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -101,6 +102,7 @@ export function pageKind(pathname) {
   if (path === "/compare") return "compare";
   if (path === "/today") return "today";
   if (path === "/status") return "status";
+  if (path === "/terms" || path === "/privacy" || path === "/disclaimer") return "legal";
   if (path === "/sitemap.xml" || /^\/sitemap-\d+\.xml$/.test(path)) return "sitemap";
   if (path.startsWith("/data/")) return "data";
   return null;
@@ -123,6 +125,27 @@ const home302 = () => new Response(null, {
   status: 302,
   headers: { location: "/", "cache-control": "no-store" },
 });
+
+// Practice stays reachable but out of search until the pack overhaul ships.
+export async function noindex(res) {
+  const r = await res;
+  const body = String(await r.text()).replace(/<title>/i, '<meta name="robots" content="noindex"><title>');
+  const headers = new Headers(r.headers);
+  headers.set("x-robots-tag", "noindex");
+  return new Response(body, { status: r.status, headers });
+}
+
+export const FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#12100e"/><rect x="7" y="8" width="12" height="17" rx="2" fill="none" stroke="#d9b779" stroke-width="1.6" transform="rotate(-12 13 16.5)"/><rect x="10" y="7" width="12" height="17" rx="2" fill="none" stroke="#e0675b" stroke-width="1.6"/><rect x="13" y="8" width="12" height="17" rx="2" fill="none" stroke="#6f9be8" stroke-width="1.6" transform="rotate(12 19 16.5)"/></svg>';
+
+export function notFoundPage(feed = false) {
+  const res = new Response(ensureAffiliation(renderNotFound("", { feed })), {
+    status: 404,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+  });
+  return res;
+}
+
+const wantsHtml = (request, pathname) => request.method === "GET" && !/\.[a-z0-9]{2,5}$/i.test(pathname) && !pathname.startsWith("/api/") && !pathname.startsWith("/data/");
 
 const go = (loc) => new Response(null, { status: 301, headers: { location: loc, "cache-control": "no-store" } });
 
@@ -239,6 +262,43 @@ async function cardReadSplit(cardId, fetchImpl) {
   return { sitReads: sit, boardReads: board.slice(0, 5) };
 }
 
+async function nightlyQuotes(ids, fetchImpl) {
+  const wanted = [...new Set(ids.filter((id) => /^tcgcsv-\d+$/.test(id)))];
+  const byBucket = new Map();
+  for (const id of wanted) {
+    const n = Number(id.slice("tcgcsv-".length));
+    const bucket = String(n % 100).padStart(2, "0");
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(id);
+  }
+  const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
+  const quotes = {};
+  const sealed = new Set();
+  const entries = [...byBucket.entries()];
+  for (let i = 0; i < entries.length; i += 4) {
+    await Promise.all(entries.slice(i, i + 4).map(async ([bucket, list]) => {
+      const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []);
+      const need = new Set(list);
+      for (const row of Array.isArray(rows) ? rows : []) {
+        if (!row || !need.has(row.id)) continue;
+        if (row.kind === "sealed") { sealed.add(row.id); continue; }
+        const price = Number(row.price);
+        const date = String(row.asOf || "").slice(0, 10);
+        if (!(price > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        quotes[row.id] = { price, date };
+      }
+    }));
+  }
+  for (const id of wanted) {
+    if (sealed.has(id)) { delete quotes[id]; continue; }
+    const fact = facts && facts[id];
+    const price = Number(fact?.price);
+    const date = String(fact?.asOf || "").slice(0, 10);
+    if (price > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)) quotes[id] = { price, date };
+  }
+  return quotes;
+}
+
 async function pokemonStripFor(card, fetchImpl) {
   if (!card || card.kind === "sealed" || !card.name) return null;
   try {
@@ -249,15 +309,12 @@ async function pokemonStripFor(card, fetchImpl) {
     const page = slug ? bundle.bySlug?.[slug] : null;
     if (!page) return null;
     if (!direct && token && page.name !== token) return null;
-    const priced = (page.cards || []).filter((row) => Number(row.price) > 0);
-    if (!priced.length) return null;
-    let lo = priced[0];
-    let hi = priced[0];
-    for (const row of priced) {
-      if (row.price < lo.price || (row.price === lo.price && String(row.priceDate || "") > String(lo.priceDate || ""))) lo = row;
-      if (row.price > hi.price || (row.price === hi.price && String(row.priceDate || "") > String(hi.priceDate || ""))) hi = row;
-    }
-    return { name: page.name, slug: page.slug, count: priced.length, low: lo.price, lowDate: lo.priceDate || "", high: hi.price, highDate: hi.priceDate || "" };
+    const images = await catalogueMap(fetchImpl);
+    const lite = await loadJson("search-lite.json", fetchImpl).catch(() => []);
+    const ids = nightlyIdsForPage(page, images, lite);
+    if (!ids.length) return null;
+    const quotes = await nightlyQuotes(ids, fetchImpl);
+    return nightlySpeciesStrip(page, quotes, ids);
   } catch {
     return null;
   }
@@ -420,7 +477,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.sets?.[slug];
       if (dest) return go(dest);
-      return html(`<main class="wrap"><h1>Set not found</h1><p class="muted">That set slug is not in the catalog.</p><p><a href="/sets">All sets</a></p></main>`, 404);
+      return html(renderNotFound(stamp, pageOpts), 404);
     }
   }
   if (kind === "artists") return html(renderArtists(await loadJson("artists.json", fetchImpl), stamp, pageOpts));
@@ -456,13 +513,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "pokemon") {
     const slug = decodeURIComponent(path.slice("/pokemon/".length)).toLowerCase();
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, 404);
+      return html(renderNotFound(stamp, pageOpts), 404);
     }
     try {
       const bundle = await loadPokemonBundle(fetchImpl);
       const page = bundle.bySlug[slug];
       if (!page) {
-        return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That Pokémon is not in the catalog.</p><p><a href="/search">Search</a></p></main>`, 404);
+        return html(renderNotFound(stamp, pageOpts), 404);
       }
       const images = await catalogueMap(fetchImpl);
       const cards = page.cards.map((card) => { const pic = officialSrc({ id: card.id, kind: "single", tcgPlayerId: card.tcgPlayerId || "" }, images); return { ...card, image: pic.src, imageAlts: pic.alts }; });
@@ -501,7 +558,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
-      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">That product id is not in the TCGplayer catalog we publish.</p><p><a href="/search">Search</a></p></main>`, 404);
+      return html(renderNotFound(stamp, pageOpts), 404);
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
@@ -545,12 +602,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     let rotationHtml = "";
     let rotationFact = "";
+    let cycleHtml = "";
+    let ratingHtml = "";
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
       const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
       const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
-      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
+      const art = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm).replace(/<div class="rchips"><\/div>/g, "");
+      rotationHtml = art + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
+      if (card.kind !== "sealed" && (/Release cycle/.test(art) || /class="rchip(?:\s|")/.test(art))) cycleHtml = art;
     }
     if (card && card.kind !== "sealed" && cardId) {
       const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
@@ -564,7 +625,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
           panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
         }
-        rotationHtml = panels.join("") + rotationHtml;
+        ratingHtml = panels.join("");
+        rotationHtml = ratingHtml + rotationHtml;
       }
     }
     if (card && card.kind === "sealed" && cardId) {
@@ -583,8 +645,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       sitReads = split.sitReads;
       boardReads = split.boardReads;
       pokemon = await pokemonStripFor(card, fetchImpl);
+      const plainPanel = (html) => String(html || "").replace(/\u2014/g, ": ").replace(/\u2013/g, ": ");
+      ratingHtml = plainPanel(ratingHtml);
+      cycleHtml = plainPanel(cycleHtml);
     }
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -599,15 +664,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
+  if (kind === "legal") return html(renderLegal(LEGAL_PATHS[path], stamp, pageOpts));
   if (kind === "practice") {
     const setsDoc = await loadJson("sets.json", fetchImpl);
     const list = practiceSets(setsDoc, opts.today || vancouverDay());
     const want = String(opts.set || "");
     const pick = list.find((x) => x.slug === want) || list[0];
-    if (!pick) return html(renderPractice([], "", null, [], stamp, pageOpts));
+    if (!pick) return noindex(html(renderPractice([], "", null, [], stamp, pageOpts)));
     const setDoc = await loadJson(`sets/${pick.slug}.json`, fetchImpl);
     const images = await catalogueMap(fetchImpl);
-    return html(renderPractice(list, pick.slug, setDoc, practicePool(setDoc, images), stamp, { ...pageOpts, art: packArt(setDoc, images) }));
+    return noindex(html(renderPractice(list, pick.slug, setDoc, practicePool(setDoc, images), stamp, { ...pageOpts, art: packArt(setDoc, images) })));
   }
   if (kind === "releases") {
     const doc = await loadJson("releases.json", fetchImpl).catch(() => null);
@@ -649,7 +715,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "track") {
     const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored14: 0, scored28: 0, scored56: 0 }));
     // Hidden unless the data repo marks the track record public. No page, no score, no card line.
-    if (doc?.public !== true) return html(`<main class="wrap"><h1>Not found</h1><p class="muted">That page is not here.</p><p><a href="/feed">Feed</a></p></main>`, 404);
+    if (doc?.public !== true) return html(renderNotFound(stamp, pageOpts), 404);
     return html(renderTrackRecord(doc, stamp, pageOpts));
   }
   if (kind === "compare") {
@@ -675,6 +741,9 @@ export default {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/favicon.ico" || url.pathname === "/favicon.svg")) {
+      return new Response(request.method === "HEAD" ? null : FAVICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
+    }
     if (url.pathname === "/api/client-log" && request.method === "POST") {
       let body = {};
       try { body = await request.json(); } catch { body = {}; }
@@ -877,6 +946,7 @@ export default {
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
     const asset = await env.ASSETS.fetch(request);
+    if (asset.status === 404 && wantsHtml(request, url.pathname)) return notFoundPage(feedEnabled(env));
     const headers = new Headers(asset.headers);
     const type = headers.get("content-type") || "";
     if (type.includes("text/html")) {
