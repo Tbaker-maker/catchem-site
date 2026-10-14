@@ -106,17 +106,52 @@ export function upcomingReleases(doc, today) {
   return rows.filter((r) => r && isDay(r.date) && r.source && r.date >= today).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
-export function releasesBody(doc, today) {
+function releaseKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const RELEASE_PREFIX = /^(?:ex|xy|sm|sv|swsh|mee|me|sve|bw|dp|hgss|hs)\d*(?:pt\d+)?\s+/;
+
+function releaseLogo(name, sets) {
+  const hay = releaseKey(name);
+  let best = "";
+  let bestLen = 0;
+  for (const set of sets || []) {
+    const logo = String(set && set.logo || "");
+    if (!/^\/img\/[a-z0-9]+\/logo\.png$/i.test(logo)) continue;
+    const full = releaseKey(set.name);
+    const rest = full.replace(RELEASE_PREFIX, "").trim();
+    for (const token of [full, rest]) {
+      if (token.length < 8 || !hay.includes(token)) continue;
+      if (token.length > bestLen) {
+        best = logo;
+        bestLen = token.length;
+      }
+    }
+  }
+  return best;
+}
+
+export function releasesBody(doc, today, sets) {
   const c = COPY.releases;
   const rows = upcomingReleases(doc, today);
   const list = rows.map((r) => {
     const src = String(r.source || "");
     const href = /^https?:\/\//.test(src) ? src : `https://${src}`;
     const host = src.replace(/^https?:\/\//, "").split("/")[0].split(".").slice(-2).join(".");
+    const logo = releaseLogo(r.name, sets);
+    const face = logo ? `<img class="rel-logo" alt="" width="220" height="48" loading="lazy" decoding="async" src="${esc(logo)}">` : "";
     const mk = r.market && Number(r.market.price) > 0 && isDay(r.market.date)
       ? `<p>Market <b>${cash(r.market.price)}</b> on ${esc(longDay(r.market.date))}, <a href="/p/${esc(r.market.id)}">${esc(noDash(r.market.name))}</a>. TCGplayer market.</p>`
       : "";
-    return `<li class="rel"><p class="rel-date">${esc(longDay(r.date))}</p><h2>${esc(noDash(r.name))}</h2><p class="muted">${esc(TYPE_LABELS[r.type] || "Product")} · Source <a href="${esc(href)}" rel="noopener">${esc(host)}</a>${r.checked ? ` · checked ${esc(longDay(r.checked))}` : ""}</p>${mk}</li>`;
+    return `<li class="rel">${face}<p class="rel-date">${esc(longDay(r.date))}</p><h2>${esc(noDash(r.name))}</h2><p class="muted">${esc(TYPE_LABELS[r.type] || "Product")} · Source <a href="${esc(href)}" rel="noopener">${esc(host)}</a>${r.checked ? ` · checked ${esc(longDay(r.checked))}` : ""}</p>${mk}</li>`;
   }).join("");
   return `<main id="main" tabindex="-1" class="wrap releases"><h1>${c.heading}</h1>
 <p class="muted">${c.explainer}</p>
@@ -143,7 +178,7 @@ export function listingsBlock(entry) {
   return `<section class="lc" aria-labelledby="lc-h"><h2 id="lc-h">${COPY.listings.heading}</h2><p>${esc(line)}</p><p class="muted">${COPY.listings.explainer}</p></section>`;
 }
 
-export const FEATURE_CSS = `.sv-list{list-style:none;margin:8px 0;padding:0}.sv-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}.sv-row a{min-width:0;overflow-wrap:anywhere;color:inherit;text-decoration:none}.sv-row img,.sv-row .tile{width:64px;max-width:64px;height:auto}.sv-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.rot-badge a{display:inline-flex;align-items:center;gap:8px;min-height:44px}.rot-badge .rm{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--gold);border-radius:6px;font-weight:600;color:var(--gold)}.rel-list{list-style:none;margin:0;padding:0}.rel{border-bottom:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere}.rel h2{margin:4px 0;font-size:1.1rem}.rel-date{margin:0;color:var(--gold);font-weight:600}.pp-btn{min-height:44px;padding:0 20px;font-weight:600}.pp-grid{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pp-card{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}.pp-card img,.pp-card .tile{width:100%;max-width:100%;height:auto}.pp-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.practice select{max-width:100%}@media (min-width:768px){.pp-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}`;
+export const FEATURE_CSS = `.sv-list{list-style:none;margin:8px 0;padding:0}.sv-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}.sv-row a{min-width:0;overflow-wrap:anywhere;color:inherit;text-decoration:none}.sv-row img,.sv-row .tile{width:64px;max-width:64px;height:auto}.sv-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.rot-badge a{display:inline-flex;align-items:center;gap:8px;min-height:44px}.rot-badge .rm{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--gold);border-radius:6px;font-weight:600;color:var(--gold)}.rel-list{list-style:none;margin:0;padding:0}.rel{border-bottom:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere}.rel h2{margin:4px 0;font-size:1.1rem}.rel-date{margin:0;color:var(--gold);font-weight:600}.rel-logo{display:block;height:48px;width:min(220px,100%);object-fit:contain;border-radius:12px;background:#12100e;margin:8px 0}.pp-btn{min-height:44px;padding:0 20px;font-weight:600}.pp-grid{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pp-card{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}.pp-card img,.pp-card .tile{width:100%;max-width:100%;height:auto}.pp-total b{font:600 28px/1.1 var(--serif);color:var(--gold)}.practice select{max-width:100%}@media (min-width:768px){.pp-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}`;
 
 // Not moved yet: similar cards (same era, same rarity) or sealed items (same
 // era, same product type), matched by id in Catchem-data feed/not-moved.json,
