@@ -2291,6 +2291,10 @@ const SINGLE_CSS = `
 .cp-facts span{color:var(--dim);font:500 13px/1.2 var(--sans)}
 .cp-facts b{font-weight:600;text-align:right}
 .cp-mon{display:block;margin-top:12px;padding:14px 14px;border-radius:16px;background:rgba(217,183,121,.08);color:var(--txt);text-decoration:none;font:600 15px/1.35 var(--sans)}
+.cp-panels{display:grid;gap:16px;margin:18px 0}
+.card-page .crt,.card-page .ircy{border-radius:22px;max-width:100%;min-width:0}
+.card-page .crt ul.cw a{border-radius:16px;min-width:0}
+.card-page .rchip{border-radius:999px}
 .cp-reads{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .cp-reads li{padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.04)}
 .cp-reads p{margin:0}
@@ -2355,6 +2359,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const factBlock = (factList || rotation || mon || printRun)
     ? `<section class="cp-sec"><h2>Card facts</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
     : "";
+  const panels = [opts.ratingHtml, opts.cycleHtml].map((html) => String(html || "").trim()).filter(Boolean).join("");
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   const math = [];
   if (card.rank && card.of) math.push(`<p>Rank ${esc(card.rank)} of ${esc(card.of)} priced singles in this set.</p>`);
@@ -2376,6 +2381,7 @@ ${chips ? `<p class="cp-wins">${chips}</p>` : ""}
 ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
 ${factBlock}
+${panels ? `<div class="cp-panels">${panels}</div>` : ""}
 ${board.length ? `<section class="cp-sec"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : ""}
 <details><summary>See the math</summary>
 ${math.join("")}
@@ -2441,12 +2447,22 @@ export function renderCard(card, stamp, opts = {}) {
   const pricePts = (hist || []).filter((point) => Array.isArray(point)).map((point) => ({ date: point[0], ask: Number(point[1]) }));
   const chartFile = sealed ? "data/history/tcgplayer-market" : "data/history/tcgcsv-daily";
   void chartFile; void pricePts;
-  // Fan-site fill (sealed and singles) only charts days before our first own day. For singles the
-  // tcgcsv daily archive (longHist) wins on overlap, so fill only covers days after its last point.
+  // Fan-site fill (sealed and singles) only charts days before our first own day.
+  // A fill price on or after that day is not a card price and must not move the
+  // chart or the since range. For singles the tcgcsv daily archive (longHist)
+  // wins on overlap, so fill only covers days after its last point.
+  const ownDays = (hist || []).filter((point) => Array.isArray(point) && /^\d{4}-\d{2}-\d{2}$/.test(String(point[0]))).map((point) => String(point[0])).sort();
+  const firstOwn = ownDays[0] || "";
   const longLast = sealed ? "" : String(card.longHist || "").split(",").map((b) => Number(b.split(":")[0])).filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
   const longLastIso = longLast ? new Date(longLast * 86400000).toISOString().slice(0, 10) : "";
-  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((p) => Array.isArray(p) && (!longLastIso || String(p[0]) > longLastIso)) : [];
-  const priceSeries = mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? card.fillTo || (hist[0] && hist[0][0]) || "" : "");
+  const fillPts = Array.isArray(card.fillHist) ? card.fillHist.filter((point) => {
+    if (!Array.isArray(point) || !/^\d{4}-\d{2}-\d{2}$/.test(String(point[0])) || !(Number(point[1]) > 0)) return false;
+    const day = String(point[0]);
+    if (firstOwn && day >= firstOwn) return false;
+    if (longLastIso && day <= longLastIso) return false;
+    return true;
+  }) : [];
+  const priceSeries = mergeHistory(fillPts.length ? [...fillPts, ...hist] : hist, sealed ? "" : card.longHist, fillPts.length ? (card.fillTo || firstOwn) : "");
   const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const listReal = (opts.listingSeries || [])

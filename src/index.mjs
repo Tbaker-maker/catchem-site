@@ -10,7 +10,7 @@ import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
-import { setAffiliateConfig, speciesPageToken, pokemonSlug } from "./pokemon.mjs";
+import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
@@ -239,6 +239,43 @@ async function cardReadSplit(cardId, fetchImpl) {
   return { sitReads: sit, boardReads: board.slice(0, 5) };
 }
 
+async function nightlyQuotes(ids, fetchImpl) {
+  const wanted = [...new Set(ids.filter((id) => /^tcgcsv-\d+$/.test(id)))];
+  const byBucket = new Map();
+  for (const id of wanted) {
+    const n = Number(id.slice("tcgcsv-".length));
+    const bucket = String(n % 100).padStart(2, "0");
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(id);
+  }
+  const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
+  const quotes = {};
+  const sealed = new Set();
+  const entries = [...byBucket.entries()];
+  for (let i = 0; i < entries.length; i += 4) {
+    await Promise.all(entries.slice(i, i + 4).map(async ([bucket, list]) => {
+      const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []);
+      const need = new Set(list);
+      for (const row of Array.isArray(rows) ? rows : []) {
+        if (!row || !need.has(row.id)) continue;
+        if (row.kind === "sealed") { sealed.add(row.id); continue; }
+        const price = Number(row.price);
+        const date = String(row.asOf || "").slice(0, 10);
+        if (!(price > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        quotes[row.id] = { price, date };
+      }
+    }));
+  }
+  for (const id of wanted) {
+    if (sealed.has(id)) { delete quotes[id]; continue; }
+    const fact = facts && facts[id];
+    const price = Number(fact?.price);
+    const date = String(fact?.asOf || "").slice(0, 10);
+    if (price > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)) quotes[id] = { price, date };
+  }
+  return quotes;
+}
+
 async function pokemonStripFor(card, fetchImpl) {
   if (!card || card.kind === "sealed" || !card.name) return null;
   try {
@@ -249,15 +286,12 @@ async function pokemonStripFor(card, fetchImpl) {
     const page = slug ? bundle.bySlug?.[slug] : null;
     if (!page) return null;
     if (!direct && token && page.name !== token) return null;
-    const priced = (page.cards || []).filter((row) => Number(row.price) > 0);
-    if (!priced.length) return null;
-    let lo = priced[0];
-    let hi = priced[0];
-    for (const row of priced) {
-      if (row.price < lo.price || (row.price === lo.price && String(row.priceDate || "") > String(lo.priceDate || ""))) lo = row;
-      if (row.price > hi.price || (row.price === hi.price && String(row.priceDate || "") > String(hi.priceDate || ""))) hi = row;
-    }
-    return { name: page.name, slug: page.slug, count: priced.length, low: lo.price, lowDate: lo.priceDate || "", high: hi.price, highDate: hi.priceDate || "" };
+    const images = await catalogueMap(fetchImpl);
+    const lite = await loadJson("search-lite.json", fetchImpl).catch(() => []);
+    const ids = nightlyIdsForPage(page, images, lite);
+    if (!ids.length) return null;
+    const quotes = await nightlyQuotes(ids, fetchImpl);
+    return nightlySpeciesStrip(page, quotes, ids);
   } catch {
     return null;
   }
@@ -541,12 +575,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     let rotationHtml = "";
     let rotationFact = "";
+    let cycleHtml = "";
+    let ratingHtml = "";
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
       const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
       const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
-      rotationHtml = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm) + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
+      const art = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm).replace(/<div class="rchips"><\/div>/g, "");
+      rotationHtml = art + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
+      if (card.kind !== "sealed" && (/Release cycle/.test(art) || /class="rchip(?:\s|")/.test(art))) cycleHtml = art;
     }
     if (card && card.kind !== "sealed" && cardId) {
       const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
@@ -560,7 +598,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
           panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
         }
-        rotationHtml = panels.join("") + rotationHtml;
+        ratingHtml = panels.join("");
+        rotationHtml = ratingHtml + rotationHtml;
       }
     }
     if (card && card.kind === "sealed" && cardId) {
@@ -579,8 +618,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       sitReads = split.sitReads;
       boardReads = split.boardReads;
       pokemon = await pokemonStripFor(card, fetchImpl);
+      const plainPanel = (html) => String(html || "").replace(/\u2014/g, ": ").replace(/\u2013/g, ": ");
+      ratingHtml = plainPanel(ratingHtml);
+      cycleHtml = plainPanel(cycleHtml);
     }
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
