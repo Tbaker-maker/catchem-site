@@ -51,3 +51,11 @@ t("quick view and product page drop the no-reads line", !ui.includes("No reads o
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("launch fixes 2: all passed");
+
+{
+  const { renderSets: rs } = await import("../src/ui.mjs");
+  const h = rs({ sets: [{ slug: "me01", name: "ME01", era: "Mega Evolution", logo: "/img/me1/logo.png", single: 1, sealed: 0 }, { slug: "x", name: "X", era: "Mega Evolution", single: 1, sealed: 0 }] }, "2026-10-13");
+  const ok = h.includes('src="/img/me1/logo.png"') && (h.match(/tile-logo/g) || []).length >= 1;
+  console.log(ok ? "  ok  sets page shows published /img logos, placeholder only without one" : "  FAIL sets page shows published /img logos");
+  if (!ok) process.exitCode = 1;
+}
