@@ -23,7 +23,7 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -416,21 +416,30 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
   });
 }
 
-async function marketRow(id, fetchImpl) {
-  const raw = String(id || "").trim();
-  if (!raw.startsWith("tcgcsv-")) return null;
-  const bucket = String((Number((raw.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
-  const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []);
-  const card = (rows || []).find((row) => row.id === raw);
-  if (!card) return null;
-  const low = Number(card.low);
+async function compareItem(id, fetchImpl) {
+  const card = await bucketRow(id, fetchImpl).catch(() => null);
+  if (!card) return { id, missing: true };
+  if (card.kind !== "sealed") {
+    const packed = await longHistOf(id, fetchImpl).catch(() => "");
+    if (packed) card.longHist = packed;
+  }
+  const series = cardPriceSeries(card, Array.isArray(card.hist) ? card.hist : [], card.kind === "sealed");
+  const points = [];
+  for (const point of series) {
+    if (!Array.isArray(point) || !(Number(point[1]) > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(String(point[0]))) continue;
+    points.push([String(point[0]), Number(point[1])]);
+  }
   const day = String(card.asOf || "").slice(0, 10);
+  const low = Number(card.low);
   return {
+    id,
     name: card.name || "",
+    kind: card.kind === "sealed" ? "sealed" : "single",
     market: Number(card.price) > 0 ? Number(card.price) : null,
     low: low > 0 ? low : null,
     date: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "",
-    source: card.source || "",
+    source: typeof card.source === "string" ? card.source : "",
+    points,
   };
 }
 
@@ -776,9 +785,36 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderTrackRecord(doc, stamp, pageOpts));
   }
   if (kind === "compare") {
-    const left = await marketRow(opts.a, fetchImpl);
-    const right = await marketRow(opts.b, fetchImpl);
-    return html(renderCompare(left, right, stamp, { ...pageOpts, a: opts.a || "", b: opts.b || "" }));
+    const raw = ["a", "b", "c", "d"].map((key) => String(opts[key] || "").trim());
+    const seen = new Set();
+    const ids = raw.map((id) => {
+      if (!id.startsWith("tcgcsv-") || seen.has(id)) return "";
+      seen.add(id);
+      return id;
+    });
+    const loaded = await Promise.all(ids.filter(Boolean).map((id) => compareItem(id, fetchImpl)));
+    const byId = new Map(loaded.map((row) => [row.id, row]));
+    const images = loaded.some((row) => row && !row.missing && row.name) ? await catalogueMap(fetchImpl) : {};
+    const take = (id) => {
+      if (!id) return null;
+      const row = byId.get(id);
+      return row && !row.missing && row.name ? row : null;
+    };
+    const charts = ids.filter(Boolean).map((id) => take(id)).filter((row) => row && row.points.length >= 2).map((row) => {
+      const hit = officialSrc({ id: row.id, kind: row.kind }, images);
+      return { id: row.id, name: row.name, kind: row.kind, thumb: hit.src || "", points: row.points };
+    });
+    return html(renderCompare(take(ids[0]), take(ids[1]), stamp, {
+      ...pageOpts,
+      a: opts.a || "",
+      b: opts.b || "",
+      c: opts.c || "",
+      d: opts.d || "",
+      ids,
+      third: take(ids[2]),
+      fourth: take(ids[3]),
+      charts,
+    }));
   }
   if (kind === "today") {
     const doc = await loadJson("today.json", fetchImpl).catch(() => ({ asOf: "", supply: "off", lines: [] }));
@@ -971,7 +1007,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
