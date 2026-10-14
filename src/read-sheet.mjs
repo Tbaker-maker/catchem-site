@@ -63,7 +63,7 @@ export function patternSentence(read) {
   };
 }
 
-function priceBits(read) {
+export function priceBits(read) {
   const rows = Array.isArray(read?.prices) ? read.prices : [];
   const tcg = rows.find((row) => row && String(row.source || "").toLowerCase() === "tcgplayer" && Number(row.amount) > 0);
   const ebay = rows.find((row) => row && String(row.source || "").toLowerCase() === "ebay" && Number(row.amount) > 0);

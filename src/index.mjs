@@ -19,6 +19,7 @@ import { ripBody } from "./rip.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
+import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
@@ -270,6 +271,20 @@ function collectReadRows(doc) {
   return out;
 }
 
+async function conditionNoteFor(fetchImpl) {
+  try {
+    const doc = await loadCatalogue("derived/condition-prices.json", fetchImpl);
+    const asOf = String(doc?.asOf || "").slice(0, 10);
+    const text = String(doc?.note || "").trim();
+    const source = String(doc?.source || "").trim();
+    if (doc?.nmDefault !== true || !text || !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return null;
+    if (/[\u2014\u2013]/.test(text + source)) return null;
+    return { text, asOf, source };
+  } catch {
+    return null;
+  }
+}
+
 async function cardReadSplit(cardId, fetchImpl) {
   const rows = [];
   try { rows.push(...collectReadRows(await loadJson("reads.json", fetchImpl))); } catch { /* no reads file */ }
@@ -277,12 +292,16 @@ async function cardReadSplit(cardId, fetchImpl) {
   const sit = [];
   const board = [];
   const seen = new Set();
+  let patternRead = null;
+  let priceRead = null;
   for (const read of rows) {
     const href = String(read.href || "");
     if (href.startsWith("/p/") || href.startsWith("/dive/") || href.startsWith("/sets/")) continue;
     const sku = String(read.sku || "");
     const lead = String(read.cardId || read.leadId || "");
     if (sku !== cardId && lead !== cardId && href !== `/c/${cardId}`) continue;
+    if (!patternRead && patternSentence(read)) patternRead = read;
+    if (!priceRead && priceBits(read).gap) priceRead = read;
     const text = String(read.headline || read.path || "").trim();
     if (!text) continue;
     const key = String(read.id || text);
@@ -295,7 +314,7 @@ async function cardReadSplit(cardId, fetchImpl) {
   const byDate = (a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")) || String(a.id || "").localeCompare(String(b.id || ""));
   sit.sort(byDate);
   board.sort(byDate);
-  return { sitReads: sit, boardReads: board.slice(0, 5) };
+  return { sitReads: sit, boardReads: board.slice(0, 5), patternRead, priceRead };
 }
 
 async function nightlyQuotes(ids, fetchImpl) {
@@ -624,7 +643,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           };
           const pic = officialSrc({ id: hit.id, kind: "single" }, images);
           const reads = await cardReadSplit(hit.id, fetchImpl);
-          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, pokemon: await pokemonStripFor(row, fetchImpl) }));
+          const conditionNote = await conditionNoteFor(fetchImpl);
+          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
@@ -709,18 +729,24 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     let sitReads;
     let boardReads;
+    let patternRead = null;
+    let priceRead = null;
+    let conditionNote = null;
     let pokemon = null;
     if (card && card.kind !== "sealed") {
       const split = await cardReadSplit(card.id, fetchImpl);
       sitReads = split.sitReads;
       boardReads = split.boardReads;
+      patternRead = split.patternRead;
+      priceRead = split.priceRead;
+      conditionNote = await conditionNoteFor(fetchImpl);
       pokemon = await pokemonStripFor(card, fetchImpl);
       const plainPanel = (html) => String(html || "").replace(/\u2014/g, ": ").replace(/\u2013/g, ": ");
       ratingHtml = plainPanel(ratingHtml);
       cycleHtml = plainPanel(cycleHtml);
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon, setLogo }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
