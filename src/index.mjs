@@ -23,7 +23,7 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -169,6 +169,15 @@ export function addFeedEntry(html) {
   return out;
 }
 
+async function withToday(html, fetchImpl) {
+  try {
+    const block = todayStrip(await loadJson("today.json", fetchImpl));
+    if (!block || String(html).includes('class="today-strip"') || !String(html).includes("<footer>")) return html;
+    return String(html).replace("<footer>", block + "<footer>");
+  } catch {
+    return html;
+  }
+}
 
 async function catalogueMap(fetchImpl) {
   try {
@@ -992,7 +1001,7 @@ export default {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(addFeedEntry(await asset.text())), { status: asset.status, headers });
+        return new Response(ensureAffiliation(await withToday(addFeedEntry(await asset.text()), fetchImpl)), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -1003,7 +1012,9 @@ export default {
     if (type.includes("text/html")) {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
-      return new Response(ensureAffiliation(await asset.text()), { status: asset.status, statusText: asset.statusText, headers });
+      const raw = await asset.text();
+      const body = norm(url.pathname) === "/" ? await withToday(raw, fetchImpl) : raw;
+      return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
   },
