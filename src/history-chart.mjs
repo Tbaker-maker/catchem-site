@@ -111,5 +111,5 @@ function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.queryS
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
 draw(0);}
-function all(){document.querySelectorAll("figure.hc[data-pts]").forEach(mount);}
+function all(){document.querySelectorAll("figure.hc[data-pts]").forEach(mount);}window.catchemHistoryMount=all;
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",all);else all();})();`;

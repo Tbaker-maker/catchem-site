@@ -1,6 +1,6 @@
 import { withShareMeta } from "./seo.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { bucketRow, longHistOf, loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -20,7 +20,7 @@ import { pageChrome } from "./ui.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
-  clockLabel, feedReads, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
+  clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView,
 } from "./ui.mjs";
 
@@ -185,25 +185,27 @@ function withCatalogue(list, images) {
   });
 }
 
+// Drops a price read when the card's nightly row moved on. Rows come one at a
+// time from bucket text (no whole-file parse), and the result is memoized per
+// reads.json object so /feed and /feed/lead.json share one pass.
+const staleMemo = new WeakMap();
 async function omitStalePriceReads(reads, fetchImpl) {
   const list = Array.isArray(reads) ? reads : [];
-  const buckets = new Map();
-  const out = [];
-  for (const read of list) {
-    const sku = String(read?.sku || "");
-    if (!/^tcgcsv-\d+$/.test(sku)) {
-      out.push(read);
-      continue;
+  if (staleMemo.has(list)) return staleMemo.get(list);
+  const job = (async () => {
+    const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
+    const rows = new Map();
+    for (let i = 0; i < skus.length; i += 20) {
+      await Promise.all(skus.slice(i, i + 20).map(async (sku) => rows.set(sku, await bucketRow(sku, fetchImpl).catch(() => null))));
     }
-    const n = Number(sku.slice("tcgcsv-".length));
-    const bucket = String(n % 100).padStart(2, "0");
-    if (!buckets.has(bucket)) buckets.set(bucket, loadJson(`buckets/${bucket}.json`, fetchImpl).catch(() => []));
-    const rows = await buckets.get(bucket);
-    const card = Array.isArray(rows) ? rows.find((row) => row && row.id === sku) : null;
-    if (readStaleAgainstCard(read, card)) continue;
-    out.push(read);
-  }
-  return out;
+    return list.filter((read) => {
+      const sku = String(read?.sku || "");
+      if (!/^tcgcsv-\d+$/.test(sku)) return true;
+      return !readStaleAgainstCard(read, rows.get(sku));
+    });
+  })();
+  staleMemo.set(list, job);
+  try { return await job; } catch (err) { staleMemo.delete(list); throw err; }
 }
 
 async function readsFor(cardId, fetchImpl) {
@@ -448,7 +450,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return html(renderFeed(freshBundle, "", stamp, { ...withDive, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
-    if (id) return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read" }));
+    if (id) {
+      const readYear = await readYearFor(id, fetchImpl);
+      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear }));
+    }
     return html(renderFeed(freshBundle, "", stamp, withDive));
   }
   if (kind === "sets") {
@@ -561,11 +566,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return html(renderNotFound(stamp, pageOpts), 404);
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
-    const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
-    const card = (rows || []).find((row) => row.id === cardId);
+    void bucket;
+    const found = await bucketRow(cardId, fetchImpl).catch(() => null);
+    const card = found ? { ...found } : null;
     if (card && card.kind !== "sealed") {
-      const long = await loadJson(`hist-long/${bucket}.json`, fetchImpl).catch(() => null);
-      if (long && long.rows && long.rows[cardId]) card.longHist = long.rows[cardId];
+      const packed = await longHistOf(cardId, fetchImpl);
+      if (packed) card.longHist = packed;
     }
     const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
     const fact = facts && cardId ? facts[cardId] : null;
@@ -997,6 +1003,26 @@ export async function handleLive(request, pathname, fetchImpl = fetch) {
     if (!res.ok) return miss();
     return new Response(await res.text(), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600" } });
   } catch { return miss(); }
+}
+
+// Read page: the card's year chart (fill, archive, own days) for the opened read.
+// One bucket row and one hist-long entry, pulled from text; no whole-file parse.
+export async function readYearFor(id, fetchImpl = fetch) {
+  const m = String(id || "").match(/(?:^|-)(tcgcsv-\d+)(?:-|$)/);
+  if (!m) return null;
+  try {
+    const found = await bucketRow(m[1], fetchImpl);
+    if (!found) return null;
+    const card = { ...found };
+    if (card.kind !== "sealed") {
+      const packed = await longHistOf(m[1], fetchImpl);
+      if (packed) card.longHist = packed;
+    }
+    const chart = readYearChart(card, card.asOf || "");
+    return chart ? { id: String(id), html: chart } : null;
+  } catch {
+    return null;
+  }
 }
 
 export function vancouverDay(now = new Date()) {

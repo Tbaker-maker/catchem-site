@@ -24,6 +24,7 @@ async function cached(key, load) {
 
 export function resetJsonCache() {
   mem.clear();
+  rowMem.clear();
   pokemonBundle = null;
 }
 
@@ -89,3 +90,61 @@ export async function loadPokemonBundle(fetchImpl = fetch) {
   pokemonBundle = buildPokemonPages(attrs?.cards || {}, catalogue?.cards || {});
   return pokemonBundle;
 }
+
+// One row out of a big bucket file without parsing the whole file. Bucket files
+// are ~800 KB each (singles fill made them grow); parsing dozens per request ran
+// the worker out of CPU and memory (Error 1102). Text is fetched through the
+// Cloudflare cache; only the matching row is parsed. Results are memoized briefly.
+const rowMem = new Map();
+export function extractRow(text, id) {
+  const s = String(text || "");
+  const needle = `{"id":${JSON.stringify(String(id))}`;
+  // Nested "also" entries carry the same id with only a name; a real row has more.
+  for (let at = s.indexOf(needle); at >= 0; at = s.indexOf(needle, at + 1)) {
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = at; i < s.length; i++) {
+      const c = s[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === "{" || c === "[") depth++;
+      else if (c === "}" || c === "]") { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) return null;
+    try {
+      const row = JSON.parse(s.slice(at, end + 1));
+      if (row && typeof row === "object" && Object.keys(row).some((k) => k !== "id" && k !== "name")) return row;
+    } catch { /* keep looking */ }
+  }
+  return null;
+}
+export function extractPacked(text, id) {
+  const s = String(text || "");
+  const key = `${JSON.stringify(String(id))}:"`;
+  const at = s.indexOf(key);
+  if (at < 0) return "";
+  const end = s.indexOf('"', at + key.length);
+  return end < 0 ? "" : s.slice(at + key.length, end);
+}
+async function rawText(rel, fetchImpl) {
+  const res = await fetchImpl(BASE + rel, { cf: { cacheTtl: 300 } });
+  if (!res.ok) throw new Error(`${rel} ${res.status}`);
+  return res.text();
+}
+export function bucketOf(id) {
+  return String((Number((String(id).match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
+}
+async function memoRow(key, load) {
+  const hit = rowMem.get(key);
+  if (hit && nowFn() - hit.at < MEM_TTL_MS) return hit.data;
+  const data = await load();
+  if (rowMem.size > 2000) rowMem.clear();
+  rowMem.set(key, { data, at: nowFn() });
+  return data;
+}
+export async function bucketRow(id, fetchImpl = fetch) {
+  return memoRow(`b:${id}`, async () => extractRow(await rawText(`buckets/${bucketOf(id)}.json`, fetchImpl), id));
+}
+export async function longHistOf(id, fetchImpl = fetch) {
+  return memoRow(`l:${id}`, async () => { try { return extractPacked(await rawText(`hist-long/${bucketOf(id)}.json`, fetchImpl), id); } catch { return ""; } });
+}
+export function resetRowCache() { rowMem.clear(); }
