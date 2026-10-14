@@ -1,6 +1,6 @@
 import { withShareMeta } from "./seo.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { bucketRow, longHistOf, loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -194,10 +194,7 @@ async function omitStalePriceReads(reads, fetchImpl) {
   if (staleMemo.has(list)) return staleMemo.get(list);
   const job = (async () => {
     const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
-    const rows = new Map();
-    for (let i = 0; i < skus.length; i += 20) {
-      await Promise.all(skus.slice(i, i + 20).map(async (sku) => rows.set(sku, await bucketRow(sku, fetchImpl).catch(() => null))));
-    }
+    const rows = await bucketRows(skus, fetchImpl).catch(() => new Map());
     return list.filter((read) => {
       const sku = String(read?.sku || "");
       if (!/^tcgcsv-\d+$/.test(sku)) return true;
@@ -434,6 +431,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl));
   }
   if (kind === "feed") {
+    const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
+    const readYearEarly = readId ? await readYearFor(readId, fetchImpl) : null;
     const bundle = await loadJson("reads.json", fetchImpl);
     const reads = await omitStalePriceReads(bundle?.reads, fetchImpl);
     const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
@@ -451,7 +450,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     if (id) {
-      const readYear = await readYearFor(id, fetchImpl);
+      const readYear = readYearEarly;
       return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear }));
     }
     return html(renderFeed(freshBundle, "", stamp, withDive));

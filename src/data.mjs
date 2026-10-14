@@ -137,6 +137,7 @@ async function memoRow(key, load) {
   const hit = rowMem.get(key);
   if (hit && nowFn() - hit.at < MEM_TTL_MS) return hit.data;
   const data = await load();
+  if (data == null || data === "") return data; // a miss or a failed read is not remembered
   if (rowMem.size > 2000) rowMem.clear();
   rowMem.set(key, { data, at: nowFn() });
   return data;
@@ -148,3 +149,29 @@ export async function longHistOf(id, fetchImpl = fetch) {
   return memoRow(`l:${id}`, async () => { try { return extractPacked(await rawText(`hist-long/${bucketOf(id)}.json`, fetchImpl), id); } catch { return ""; } });
 }
 export function resetRowCache() { rowMem.clear(); }
+
+// Many rows at once: one fetch per bucket file (not per row), rows pulled from text.
+export async function bucketRows(ids, fetchImpl = fetch) {
+  const out = new Map();
+  const byBucket = new Map();
+  for (const id of new Set(ids)) {
+    const hit = rowMem.get(`b:${id}`);
+    if (hit && nowFn() - hit.at < MEM_TTL_MS) { out.set(id, hit.data); continue; }
+    const b = bucketOf(id);
+    if (!byBucket.has(b)) byBucket.set(b, []);
+    byBucket.get(b).push(id);
+  }
+  const jobs = [...byBucket.entries()];
+  for (let i = 0; i < jobs.length; i += 8) {
+    await Promise.all(jobs.slice(i, i + 8).map(async ([b, list]) => {
+      let text = "";
+      try { text = await rawText(`buckets/${b}.json`, fetchImpl); } catch { return; }
+      for (const id of list) {
+        const row = extractRow(text, id);
+        out.set(id, row);
+        if (row) { if (rowMem.size > 2000) rowMem.clear(); rowMem.set(`b:${id}`, { data: row, at: nowFn() }); }
+      }
+    }));
+  }
+  return out;
+}

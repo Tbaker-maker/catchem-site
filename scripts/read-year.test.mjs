@@ -34,5 +34,29 @@ const big = await (async () => { let calls = 0; const f = async (u) => { calls++
 t("year chart costs at most two small fetches", big <= 2);
 t("no em dashes in the chart", !/[\u2014\u2013]/.test(html.replace(/<[^>]+>/g, " ")));
 
+// A feed with many price reads must not starve the read chart of subrequests.
+{
+  const { renderPath } = await import("../src/index.mjs");
+  const many = Array.from({ length: 160 }, (_, i) => ({ id: `move-tcgcsv-${1000 + i}-7`, sku: `tcgcsv-${1000 + i}`, kind: "single", readKind: "price", headline: "x", price: 5, asOf: "2026-10-13", source: "TCGplayer market" }));
+  let calls = 0;
+  const capped = async (u) => {
+    calls++;
+    if (calls > 50) throw new Error("Too many subrequests");
+    const url = String(u);
+    if (url.endsWith("reads.json")) return new Response(JSON.stringify({ reads: [read, ...many] }));
+    return fetchImpl(u);
+  };
+  resetJsonCache();
+  const res = await renderPath(`/feed/r/${read.id}`, capped, { feed: true });
+  const body = await res.text();
+  const cfg = JSON.parse(body.match(/id="read-year">([\s\S]*?)<\/script>/)[1]);
+  t("read chart is built before the stale pass uses up subrequests", cfg && cfg.html.includes('class="hc"'));
+  let n = 0;
+  const counter = async (u) => { n++; const url = String(u); if (url.endsWith("reads.json")) return new Response(JSON.stringify({ reads: many })); return new Response("[]"); };
+  resetJsonCache();
+  await renderPath("/feed", counter, { feed: true });
+  t("stale pass fetches each bucket once (100 buckets, not 160 rows)", n <= 110);
+}
+
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("read year chart: all passed");
