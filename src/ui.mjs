@@ -2629,6 +2629,31 @@ export function readYearChart(card, asOf = "") {
   return `<div class="read-year"><style>${HISTORY_CSS}</style>${historyChart(series, { asOf: String(asOf || "").slice(0, 10), snap: "real" })}</div>`;
 }
 
+function ebayAskLine(ask) {
+  const amount = Number(ask?.amount);
+  const when = priceDay(String(ask?.asOf || "").slice(0, 10));
+  if (!(amount > 0) || !when) return "";
+  const src = String(ask?.source || "").trim();
+  return `<p class="sealed-ask">eBay ask ${money(amount)}, ${esc(when)}${src ? `. ${esc(src)}` : ""}</p>`;
+}
+
+function ripValueBlock(rip) {
+  if (!rip || typeof rip !== "object") return "";
+  const when = priceDay(String(rip.asOf || "").slice(0, 10));
+  if (!when) return "";
+  const roi = Number(rip.roiPct);
+  const beat = Number(rip.beatChance);
+  const bits = [];
+  const add = (label, value) => { if (value) bits.push(`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`); };
+  add("Average pull value", money(rip.contentsEV));
+  if (Number.isFinite(roi)) add("ROI", `${Math.round(roi * 10) / 10}%`);
+  if (Number.isFinite(beat)) add("Chance an opening beats the price", `${Math.round(beat * 10) / 10}%`);
+  add("Typical opening", money(rip.median));
+  if (!bits.length) return "";
+  const src = [String(rip.priceSource || "").trim(), when].filter(Boolean).join(", ");
+  return `<section class="sealed-rip"><h2>Rip value</h2><dl>${bits.join("")}</dl>${src ? `<p class="muted">${esc(src)}</p>` : ""}</section>`;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
@@ -2704,6 +2729,14 @@ export function renderCard(card, stamp, opts = {}) {
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
+.sealed-ask{margin:8px 0;font:600 16px/1.35 var(--sans)}
+.sealed-rip{margin:12px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
+.sealed-rip h2{margin:0 0 8px;font:600 16px/1.2 var(--sans)}
+.sealed-rip dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0}
+.sealed-rip div{padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.05)}
+.sealed-rip dt{font:500 14px/1.3 var(--sans);color:var(--dim)}
+.sealed-rip dd{margin:2px 0 0;font:650 16px/1.2 var(--sans)}
+.sealed-rip .muted{font-size:14px}
 @media (min-width:768px){
   .glance{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
   .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(200px,100%)}
@@ -2732,6 +2765,8 @@ ${priceChart}
 ${rangeRow}
 ${opts.rotationHtml || ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
+${ebayAskLine(opts.ebayAsk)}
+${ripValueBlock(opts.rip)}
 ${opts.listingsHtml || ""}
 ${opts.notMovedHtml || ""}
 <h2>Facts</h2>

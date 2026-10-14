@@ -666,10 +666,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const images = await catalogueMap(fetchImpl);
     const hit = card ? officialSrc(card, images) : { src: "", crop: false };
     let listingSeries = [];
+    let ebayAsk = null;
     if (sealedPage && sealedId) {
       try {
         const dive = await loadDive(sealedId, fetchImpl);
         listingSeries = Array.isArray(dive?.series) ? dive.series : [];
+        const latest = dive?.latest && typeof dive.latest === "object" ? dive.latest : null;
+        const amount = Number(latest?.priceMedian);
+        const asOf = String(latest?.lastSeen || "").slice(0, 10);
+        const source = String(latest?.source || "").trim();
+        if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = { amount, asOf, source };
       } catch { listingSeries = []; }
     }
     const productReads = card ? await readsFor(cardId, fetchImpl) : [];
@@ -727,6 +733,22 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         rotationHtml = sealedRatingPanel(row, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true }) + rotationHtml;
       }
     }
+    let rip = null;
+    if (card && card.kind === "sealed" && cardId) {
+      const doc = await loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null);
+      const row = (doc?.rows || []).find((item) => item && item.id === card.id);
+      const asOf = String(row?.priceAsOf || doc?.asOf || "").slice(0, 10);
+      if (row && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+        rip = {
+          contentsEV: row.contentsEV,
+          roiPct: row.roiPct,
+          beatChance: row.beatChance,
+          median: row.median,
+          priceSource: row.priceSource || "",
+          asOf,
+        };
+      }
+    }
     let sitReads;
     let boardReads;
     let patternRead = null;
@@ -746,7 +768,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       cycleHtml = plainPanel(cycleHtml);
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
