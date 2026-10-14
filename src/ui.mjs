@@ -1387,7 +1387,10 @@ h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .tile-card .ptype{font-size:13px}
 .tile-sealed,.tile-row{width:64px;height:88px;flex:none;aspect-ratio:auto}
 .tile-logo{width:min(220px,100%);height:72px;aspect-ratio:auto}
-.tile-logo .mark{font-size:18px}
+.tile-logo .mark{font-size:13px;color:#d9b779}
+.tile-logo .tname{font:600 14px/1.15 var(--sans);color:#efe9de;max-width:100%}
+img.set-logo,.grid .card>.tile-logo{width:100%;height:72px;max-width:none;object-fit:contain;border-radius:12px;background:#12100e;box-sizing:border-box}
+.set-mark{height:28px;width:auto;max-width:96px;object-fit:contain;vertical-align:middle;border-radius:8px;background:#12100e;margin:0 8px 0 0}
 .row .tile,.row .shot{flex:none;width:64px;height:88px}
 img.shot{object-fit:contain;background:#12100e;border-radius:8px;display:block}
 img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
@@ -1641,7 +1644,7 @@ ${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>H
 ${eras.map((era, eraIdx) => `<details class="fold" data-era id="era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}" style="scroll-margin-top:72px"${eraIdx === 0 ? " open" : ""}><summary><span>${esc(era)}</span><span class="muted fold-n">${sets.filter((s) => s.era === era).length} sets</span></summary><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
     const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
     const face = /^(https:\/\/|\/img\/[a-z0-9.-]+\/logo\.png$)/i.test(String(s.logo || ""))
-      ? `<img class="shot" alt="" width="160" height="64" loading="${load}" decoding="async" src="${esc(s.logo)}">`
+      ? `<img class="shot set-logo" alt="" width="220" height="72" loading="${load}" decoding="async" src="${esc(s.logo)}">`
       : brandedTile("logo", { kind: "set", name: s.name });
     const when = priceDay(s.release);
     const date = when ? ` · <span class="set-date">${esc(when)}</span>` : "";
@@ -1854,9 +1857,10 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a data-quick="'+html(row.id)+'" href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
   var logoSrc=catalogueUrl(cataloguePath(catImages, slug));
+  if(!logoSrc && typeof data.logo==="string" && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(data.logo)) logoSrc=data.logo;
   if(!logoSrc && typeof data.logo==="string" && data.logo.indexOf("https://")===0) logoSrc=data.logo;
   setLogo=logoSrc||"";
-  document.getElementById("lines").innerHTML=(logoSrc?'<img alt="" width="160" height="64" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:64px;width:auto;background:#12100e;border-radius:8px">':brandedTile("logo",{kind:"set",name:data.name}))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
+  document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
   document.getElementById("charts").innerHTML='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div><div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
   document.getElementById("single-chart").setAttribute("data-chart", JSON.stringify(data.singleIndex||[]));
   document.getElementById("sealed-chart").setAttribute("data-chart", JSON.stringify(data.sealedIndex||[]));
@@ -2574,9 +2578,12 @@ export function renderCard(card, stamp, opts = {}) {
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
-  const setBit = card.setSlug
+  const setMark = /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(opts.setLogo || ""))
+    ? `<img class="set-mark" alt="" width="96" height="28" loading="lazy" decoding="async" src="${esc(opts.setLogo)}">`
+    : "";
+  const setBit = setMark + (card.setSlug
     ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
-    : esc(card.set || "");
+    : esc(card.set || ""));
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   if (!sealed) {
@@ -3058,7 +3065,7 @@ function rowHtml(r){
   const face=hit.src?'<img alt="'+html(r[1])+'" width="64" height="89" loading="lazy" decoding="async" class="'+((r[5]!=="sealed")?'shot card-face thumb':'shot')+'" data-kind="'+html(r[5])+'" '+((r[5]!=="sealed")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" ')+'src="'+hit.src+'"'+altAttr(hit)+' onerror="miss(this)">':brandedTile("row",row);
   var mark=logos[r[7]||""];
   var logoSrc=mark && typeof mark.src==="string"?catalogueUrl(mark.src):"";
-  var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto" onerror="this.remove()">':"";
+  var logo=logoSrc?'<img alt="" width="72" height="28" loading="lazy" decoding="async" src="'+html(logoSrc)+'" style="height:28px;width:auto;max-width:72px;object-fit:contain;border-radius:6px;background:#12100e" onerror="this.remove()">':"";
   var chips="";
   if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
   var vt=(Array.isArray(r[9])?r[9]:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())});
@@ -6002,7 +6009,7 @@ ${reads.map((r) => {
 
 export function renderReleases(doc, stamp, opts = {}) {
   const today = opts.today || new Date().toISOString().slice(0, 10);
-  return chrome("Releases", releasesBody(doc, today), "Coming up", stamp, "", feedNav(opts));
+  return chrome("Releases", releasesBody(doc, today, opts.sets), "Coming up", stamp, "", feedNav(opts));
 }
 
 export function renderSetValuePage(slug, title, html, stamp, opts = {}) {

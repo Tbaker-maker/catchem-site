@@ -26,6 +26,8 @@ export function catalogueUrl(path) {
   const RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets";
   const src = String(path || "");
   if (!/^(?:\/img\/|\/cards\/|\/thumb\/)/.test(src) || src.includes("..")) return "";
+  const logo = src.match(/^\/img\/([A-Za-z0-9]+)\/logo\.png$/i);
+  if (logo) return "/img/" + logo[1].toLowerCase() + "/logo.png";
   const m = src.match(/^\/(?:img|thumb)\/([A-Za-z0-9]+)\/([A-Za-z0-9._-]+)$/);
   if (m) {
     const file = /\.[A-Za-z0-9]+$/.test(m[2]) ? m[2] : m[2] + "_hires.png";
@@ -133,10 +135,17 @@ export function brandedTile(kind, row) {
   const k = faceKind(kind);
   const info = row && typeof row === "object" ? row : {};
   const type = productTypeLabel({ ...info, kind: info.kind || (k === "logo" ? "set" : k === "sealed" ? "sealed" : "single") });
-  const logo = /^https:\/\//.test(String(info.logo || ""))
-    ? '<img alt="" width="44" height="22" loading="lazy" decoding="async" src="' + esc(info.logo) + '">'
+  const rawLogo = String(info.logo || "");
+  const showLogo = k !== "logo" && (/^https:\/\//.test(rawLogo) || /^\/img\/[a-z0-9]+\/logo\.png$/i.test(rawLogo));
+  const logo = showLogo
+    ? '<img alt="" width="44" height="22" loading="lazy" decoding="async" src="' + esc(rawLogo) + '">'
     : "";
-  return '<div class="tile tile-' + k + '" role="img" aria-label="Catch\'em ' + esc(type) + '"><span class="mark">Catch\'em<span class="dot">.</span></span>' + logo + '<span class="ptype">' + esc(type) + '</span></div>';
+  const named = k === "logo" ? String(info.name || "").trim() : "";
+  const plate = named
+    ? '<span class="tname">' + esc(named) + '</span>'
+    : '<span class="ptype">' + esc(type) + '</span>';
+  const label = named || type;
+  return '<div class="tile tile-' + k + '" role="img" aria-label="Catch\'em ' + esc(label) + '"><span class="mark">Catch\'em<span class="dot">.</span></span>' + logo + plate + '</div>';
 }
 
 export function newsVariant(id) {

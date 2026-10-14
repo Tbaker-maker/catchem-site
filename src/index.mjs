@@ -679,7 +679,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       ratingHtml = plainPanel(ratingHtml);
       cycleHtml = plainPanel(cycleHtml);
     }
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon }), card ? 200 : 404);
+    const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, pokemon, setLogo }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -707,7 +708,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "releases") {
     const doc = await loadJson("releases.json", fetchImpl).catch(() => null);
-    return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay() }));
+    const setsDoc = await loadJson("sets.json", fetchImpl).catch(() => null);
+    return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay(), sets: setsDoc?.sets || [] }));
   }
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
