@@ -1325,7 +1325,9 @@ const CSS = `.skip-link{position:absolute;left:8px;top:-60px;z-index:1000;backgr
 .paid-note,.paid-foot small{font:400 12px/1.4 var(--sans);color:#a39d93}
 .paid-note{margin-left:4px}
 :root{--r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:20px;--r-pill:999px;--r-card:4.8%/3.4%}
-img,svg,canvas,video,iframe{border-radius:var(--r-xs)}iframe,table{border-radius:var(--r-md)}table{border-collapse:separate;border-spacing:0;overflow:hidden}input,select,textarea,button{border-radius:var(--r-sm)}dialog{border-radius:var(--r-lg)}.chart svg{border-radius:var(--r-sm)}.dock{border-radius:var(--r-lg) var(--r-lg) 0 0}img.card-face,.card-face,.pp-front img,.pp-card img.card-face{border-radius:var(--r-card)!important}.tile{border-radius:var(--r-md)}
+img,svg,canvas,video,iframe{border-radius:var(--r-xs)}iframe,table{border-radius:var(--r-md)}table{border-collapse:separate;border-spacing:0;overflow:hidden}input,select,textarea,button{border-radius:var(--r-sm)}dialog{border-radius:var(--r-lg)}.chart svg{border-radius:var(--r-sm)}.chart:empty{border-radius:16px;min-height:120px;background:linear-gradient(90deg,rgba(255,255,255,.035),rgba(255,255,255,.08),rgba(255,255,255,.035))}
+.skel-row{height:72px;border-radius:16px;margin:8px 0;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.09),rgba(255,255,255,.04))}
+.dock{border-radius:var(--r-lg) var(--r-lg) 0 0}img.card-face,.card-face,.pp-front img,.pp-card img.card-face{border-radius:var(--r-card)!important}.tile{border-radius:var(--r-md)}
 :root{--bg:#12100e;--panel:#1a1815;--line:#2f2b26;--txt:#efe9de;--dim:#c4baab;--gold:#d9b779;--green:#7fc79a;--red:#e0675b;--serif:'Fraunces',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 var(--sans)}
 body{overflow-x:hidden;padding-bottom:88px}
@@ -1584,7 +1586,7 @@ ${body}
 ${dockNav(active, feed)}
 </nav>
 <footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
-<script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
+<script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});document.addEventListener("keydown",function(ev){if(ev.key!=="/"||ev.metaKey||ev.ctrlKey||ev.altKey||ev.defaultPrevented)return;var tag=ev.target&&ev.target.tagName;if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(ev.target&&ev.target.isContentEditable))return;var box=document.getElementById("q");if(box){ev.preventDefault();box.focus();return;}if(location.pathname!=="/search")location.href="/search";});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
   img.setAttribute("data-cropped","1");
@@ -2860,6 +2862,23 @@ fetch("/data/indexes.json").then(r=>r.json()).then(idx=>{
   return chrome("Movers", body, "Movers", stamp, "", feedNav(opts));
 }
 
+export function todayStrip(doc) {
+  const lines = Array.isArray(doc?.lines) ? doc.lines : [];
+  const take = (slot) => lines.find((row) => row && row.slot === slot && String(row.text || "").trim());
+  const cards = [
+    ["Biggest move", take("mover")],
+    ["Pattern", take("fact")],
+    doc?.supply === "on" ? ["Listings counted", take("supply")] : null,
+  ].filter((row) => row && row[1]);
+  if (!cards.length) return "";
+  const asOf = /^\d{4}-\d{2}-\d{2}$/.test(String(doc?.asOf || "")) ? String(doc.asOf) : "";
+  const items = cards.map(([label, row]) => {
+    const body = row.href ? `<a href="${esc(row.href)}">${esc(row.text)}</a>` : esc(row.text);
+    return `<article><b>${esc(label)}</b><p>${body}</p></article>`;
+  }).join("");
+  return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
+}
+
 export function renderToday(doc, stamp, opts = {}) {
   const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
   const lines = (doc?.lines || []).map((line) => {
@@ -3005,6 +3024,36 @@ ${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">
   return chrome("", body, "Receipts", stamp, "", feedNav(opts));
 }
 
+export function statusLights(status) {
+  const steps = Array.isArray(status?.steps) ? status.steps : [];
+  const pick = (name) => steps.find((row) => row && row.name === name && row.file);
+  const tone = (row) => {
+    const result = String(row?.result || "");
+    if (/file is present|failed is 0/.test(result)) return "ok";
+    if (!result) return "";
+    return "wait";
+  };
+  const when = (row) => {
+    const detail = String(row?.detail || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(detail)) return detail.replace("T", " ").slice(0, 16);
+    return detail;
+  };
+  const specs = [
+    ["Prices", pick("TCGCSV day")],
+    ["Listings counted", pick("eBay sealed prices")],
+    ["Reads", pick("Reads")],
+  ];
+  const bits = [];
+  for (const [label, row] of specs) {
+    if (!row) continue;
+    const state = tone(row);
+    if (!state) continue;
+    const day = when(row);
+    bits.push(`<li class="light ${state}"><b>${esc(label)}</b>${day ? `<span>${esc(day)}</span>` : ""}</li>`);
+  }
+  return bits.length ? `<ul class="lights" aria-label="Feed status">${bits.join("")}</ul>` : "";
+}
+
 export function renderStatus(doc, stamp, opts = {}) {
   const status = doc?.status;
   const sources = doc?.sources;
@@ -3027,7 +3076,9 @@ export function renderStatus(doc, stamp, opts = {}) {
     ? `<ol>${errors.map((row) => `<li>${esc(row.message)} <span class="muted">${Number(row.count) || 0}</span></li>`).join("")}</ol>`
     : `<p class="muted">No client errors stored on this server yet.</p>`;
   const body = `<main id="main" tabindex="-1" class="wrap">
+<style>.lights{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;padding:0}.lights li{display:flex;flex-direction:column;gap:2px;min-width:140px;min-height:44px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.04)}.lights .ok b{color:#7fc79a}.lights .wait b{color:#d9b779}.lights span{font-size:13px;opacity:.75}</style>
 <h1>Status</h1>
+${statusLights(status)}
 <p>${esc(status.note || "")}</p>
 <p>Last time in the files: ${status.lastFileTimePt ? esc(status.lastFileTimePt) : "not in the files"}${status.lastFile ? ` (${esc(status.lastFile)})` : ""}.</p>
 <p>Newest price day: ${status.newestPriceDay ? esc(status.newestPriceDay) : "not in the files"}.</p>
@@ -3176,6 +3227,7 @@ async function draw(){
   const vtag=document.getElementById("vtag").value;
   const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
   if(q.length<2 && !vtag){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant.";return}
+  document.getElementById("list").innerHTML='<div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div>';
   if(q.length<2 && vtag){
     try{ await ensureBags(); if(!usedLite){ rows=await (await fetch("/data/search-lite.json")).json(); usedLite=true; } }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
     if(n!==drawN) return;
