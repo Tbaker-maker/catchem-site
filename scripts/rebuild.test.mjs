@@ -927,7 +927,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("a read on a rotated set can say the print-run line", feed.includes("function printRunLine") && feed.includes("printRunLine(card)") && feed.includes(rot.PRINT_RUN_LINE) && feed.includes('"sv02-paldea-evolved":1') && feed.includes('"sv02: paldea evolved":1'));
   const product = paintCard({ id: "tcgcsv-1", name: "Booster Box", set: "SV02: Paldea Evolved", setSlug: "sv02-paldea-evolved", kind: "sealed", price: 90, source: "TCGplayer market" }, "");
   const other = paintCard({ id: "tcgcsv-2", name: "ETB", set: "SV: Prismatic Evolutions", setSlug: "sv-prismatic-evolutions", kind: "sealed", price: 80, source: "TCGplayer market" }, "");
-  t("a product on a rotated set gets the one-liner and prismatic does not", product.includes("<h2>Reads</h2>") && product.includes(line) && !product.includes("Regulation mark") && !other.includes(line) && !/reprint/i.test(product));
+  t("a product on a rotated set gets the one-liner and prismatic does not", !product.includes("No reads on file") && product.includes(line) && !product.includes("Regulation mark") && !other.includes(line) && !/reprint/i.test(product));
 }
 
 {
@@ -968,4 +968,5 @@ await import("./track-record-hidden.test.mjs");
 await import("./data-cache.test.mjs");
 await import("./chart-no-gaps.test.mjs");
 await import("./year-range.test.mjs");
+await import("./launch-fixes-2.test.mjs");
 await import("./card-page.test.mjs");
