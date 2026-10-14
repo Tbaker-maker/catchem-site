@@ -2972,19 +2972,199 @@ export function compareRows(left, right) {
   return rows;
 }
 
+const CMP_COLORS = ["#d9b779", "#7fc79a", "#8eb4e8", "#e09a7a"];
+const CMP_RANGES = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]];
+
+function cmpPoints(raw) {
+  const out = [];
+  for (const point of raw || []) {
+    const day = Array.isArray(point) ? String(point[0] || "") : "";
+    const price = Number(Array.isArray(point) ? point[1] : 0);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !(price > 0)) continue;
+    if (out.length && out[out.length - 1][0] === day) out[out.length - 1][1] = price;
+    else out.push([day, price]);
+  }
+  out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return out;
+}
+
+function cmpSafeSrc(src) {
+  const s = String(src || "");
+  if (/^\/(?!\/)/.test(s) && !/["'<>\s]/.test(s)) return s;
+  if (/^https:\/\//.test(s) && !/["'<>\s]/.test(s)) return s;
+  return "";
+}
+
+function cmpInWindow(points, days, endMs) {
+  let n = 0;
+  for (const point of points) {
+    if (!days || Date.parse(`${point[0]}T00:00:00Z`) >= endMs - days * 86400000) n += 1;
+  }
+  return n;
+}
+
+function compareChart(series) {
+  const rows = (series || []).map((row) => ({ ...row, points: cmpPoints(row?.points) })).filter((row) => row.points.length >= 2).slice(0, 4);
+  if (rows.length < 2) return "";
+  let endMs = 0;
+  for (const row of rows) {
+    const t = Date.parse(`${row.points[row.points.length - 1][0]}T00:00:00Z`);
+    if (t > endMs) endMs = t;
+  }
+  const pills = CMP_RANGES.filter(([, days]) => rows.some((row) => cmpInWindow(row.points, days, endMs) >= 2));
+  const buttons = pills.map(([label, days], i) => `<button type="button" data-cmp="${days}" aria-pressed="${i === pills.length - 1 ? "true" : "false"}">${label}</button>`).join("");
+  const legs = rows.map((row, i) => {
+    const href = /^tcgcsv-\d+$/.test(String(row.id || "")) ? (row.kind === "sealed" ? `/p/${row.id}` : `/c/${row.id}`) : "";
+    const thumb = cmpSafeSrc(row.thumb);
+    const img = thumb ? `<img alt="" width="28" height="36" src="${esc(thumb)}">` : "";
+    const name = esc(row.name || "Product");
+    const inner = `<i class="cmp-swatch" style="background:${CMP_COLORS[i]}"></i>${img}<span>${name}</span>`;
+    return href ? `<a class="cmp-leg" href="${href}">${inner}</a>` : `<span class="cmp-leg">${inner}</span>`;
+  }).join("");
+  const payload = JSON.stringify(rows.map((row) => row.points)).replace(/</g, "\\u003c");
+  return `<section class="cmp" aria-label="Price lines">
+<div class="cmp-legs">${legs}</div>
+<div class="chart cmp-plot" id="cmp-plot"></div>
+<div class="cmp-ranges">${buttons}</div>
+<script type="application/json" id="cmp-series">${payload}</script>
+<script>${CMP_JS}</script>
+</section>`;
+}
+
+const CMP_JS = `(function(){
+var host=document.getElementById("cmp-plot");
+var raw=document.getElementById("cmp-series");
+if(!host||!raw) return;
+var series=[];
+try{ series=JSON.parse(raw.textContent)||[]; }catch(e){ series=[]; }
+var colors=["#d9b779","#7fc79a","#8eb4e8","#e09a7a"];
+var DAY=86400000;
+function ms(d){return Date.parse(d+"T00:00:00Z");}
+function iso(t){return new Date(t).toISOString().slice(0,10);}
+function fill(pts){
+  var out=[];
+  for(var i=0;i<pts.length;i++){
+    var p=pts[i];
+    if(!p||!(Number(p[1])>0)) continue;
+    var last=out.length?out[out.length-1]:null;
+    if(last){
+      var real=last[3]||last[0];
+      for(var t=ms(last[0])+DAY;t<ms(p[0]);t+=DAY) out.push([iso(t),last[1],1,real]);
+    }
+    out.push([p[0],Number(p[1]),0,""]);
+  }
+  return out;
+}
+var lines=[];
+for(var i=0;i<series.length&&lines.length<4;i++){
+  var pts=fill(series[i]||[]);
+  if(pts.length>=2) lines.push({color:colors[lines.length],pts:pts});
+}
+if(lines.length<2) return;
+var latest=0;
+for(var j=0;j<lines.length;j++){ var end=ms(lines[j].pts[lines[j].pts.length-1][0]); if(end>latest) latest=end; }
+function draw(days){
+  var sets=lines.map(function(s){ return days?s.pts.filter(function(p){return ms(p[0])>=latest-days*DAY;}):s.pts; });
+  var flat=[];
+  for(var a=0;a<sets.length;a++) if(sets[a].length>=2) for(var b=0;b<sets[a].length;b++) flat.push(sets[a][b]);
+  if(flat.length<2){ host.textContent=""; return; }
+  var min=flat[0][1],max=flat[0][1],t0=ms(flat[0][0]),t1=t0;
+  for(var c=0;c<flat.length;c++){
+    if(flat[c][1]<min) min=flat[c][1];
+    if(flat[c][1]>max) max=flat[c][1];
+    var tt=ms(flat[c][0]);
+    if(tt<t0) t0=tt;
+    if(tt>t1) t1=tt;
+  }
+  var span=(max-min)||(max*0.04)||0.01;
+  var lo=min-span*0.08, hi=max+span*0.08, plot=(hi-lo)||1;
+  var w=640,h=220;
+  function x(t){ return t1===t0?48:48+((t-t0)/(t1-t0))*(w-64); }
+  function y(v){ return 18+((hi-v)/plot)*(h-40); }
+  function money(n){ return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  var paths="";
+  for(var s=0;s<sets.length;s++){
+    if(sets[s].length<2) continue;
+    var d="";
+    for(var k=0;k<sets[s].length;k++) d+=(k?"L":"M")+x(ms(sets[s][k][0])).toFixed(1)+","+y(sets[s][k][1]).toFixed(1);
+    paths+='<path d="'+d+'" fill="none" stroke="'+lines[s].color+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>';
+  }
+  host.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" role="img" aria-label="Price lines"><text x="8" y="16" fill="#efe9de" font-size="12">'+money(max)+'</text><text x="8" y="'+(h-10)+'" fill="#efe9de" font-size="12">'+money(min)+'</text>'+paths+'</svg>';
+}
+var buttons=document.querySelectorAll("[data-cmp]");
+for(var n=0;n<buttons.length;n++){
+  buttons[n].addEventListener("click",function(ev){
+    var btn=ev.currentTarget;
+    for(var m=0;m<buttons.length;m++) buttons[m].setAttribute("aria-pressed","false");
+    btn.setAttribute("aria-pressed","true");
+    draw(Number(btn.getAttribute("data-cmp"))||0);
+  });
+}
+draw(0);
+})();`;
+
 export function renderCompare(left, right, stamp, opts = {}) {
-  const rows = compareRows(left, right);
+  const ids = Array.isArray(opts.ids) ? opts.ids : [];
+  const packed = [left, right, opts.third || null, opts.fourth || null];
+  const slots = [];
+  for (let i = 0; i < packed.length; i++) {
+    const id = String(ids[i] || "");
+    if (!id) continue;
+    const row = packed[i];
+    slots.push(row && row.name ? row : { id, missing: true, name: "" });
+  }
+  const fields = [
+    ["Market", "market", "number"],
+    ["Low", "low", "number"],
+    ["Date", "date", "date"],
+    ["Source", "source", "text"],
+  ];
+  const has = (row, key, kind) => kind === "number" ? Number(row?.[key]) > 0 : kind === "date" ? /^\d{4}-\d{2}-\d{2}$/.test(String(row?.[key] || "")) : typeof row?.[key] === "string" && row[key].trim().length > 0;
+  const show = (row, key, kind) => has(row, key, kind) ? (kind === "number" ? (money(row[key]) || "") : String(row[key])) : "";
+  const bodyRows = fields.filter(([, key, kind]) => slots.filter((row) => has(row, key, kind)).length >= 2).map(([label, key, kind]) => `<tr><th>${label}</th>${slots.map((row) => `<td>${esc(show(row, key, kind))}</td>`).join("")}</tr>`).join("");
+  const heads = slots.map((row) => {
+    const href = !row.missing && /^tcgcsv-\d+$/.test(String(row.id || "")) ? (row.kind === "sealed" ? `/p/${row.id}` : `/c/${row.id}`) : "";
+    const name = esc(row.name || "Not in the catalog");
+    return `<th>${href ? `<a href="${href}">${name}</a>` : name}</th>`;
+  }).join("");
+  const table = slots.length >= 2 ? `<div class="cmp-table-wrap"><table class="cmp-table"><thead><tr><th></th>${heads}</tr></thead><tbody>${bodyRows}</tbody></table></div>` : `<p class="muted">Add two product ids.</p>`;
+  const chart = compareChart(opts.charts);
+  const field = (name, label) => `<label>${label} <input name="${name}" value="${esc(opts[name] || "")}" aria-label="${label} product"></label>`;
   const body = `<main id="main" tabindex="-1" class="wrap">
+<style>
+.cmp-form{display:grid;gap:8px;margin:12px 0}
+.cmp-form label{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.cmp-form input,.cmp-form button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:#1a1815;color:inherit;padding:0 12px;font:inherit}
+.cmp-form button{background:#d9b779;color:#1a1407;font-weight:650}
+.cmp-legs{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.cmp-leg{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px 4px 8px;border-radius:999px;background:rgba(255,255,255,.05);color:inherit;text-decoration:none;font:600 14px/1.2 var(--sans)}
+.cmp-swatch{width:10px;height:10px;border-radius:999px;flex:none}
+.cmp-leg img{width:28px;height:36px;object-fit:contain;border-radius:6px;background:#12100e}
+.cmp-ranges{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.cmp-ranges button{min-height:44px;min-width:44px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font:600 13px/1 var(--sans)}
+.cmp-ranges button[aria-pressed="true"]{background:rgba(217,183,121,.18);color:#d9b779}
+.cmp-plot{border-radius:16px}
+.cmp-table-wrap{overflow-x:auto;margin:12px 0}
+.cmp-table{width:100%;border-collapse:collapse}
+.cmp-table th,.cmp-table td{text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}
+@media(min-width:800px){
+  .cmp-form{grid-template-columns:1fr 1fr}
+  .cmp-legs{flex-direction:row;flex-wrap:wrap}
+}
+</style>
 <h1>Compare two products</h1>
-<form method="get" action="/compare">
-<label>First <input name="a" value="${esc(opts.a || "")}" aria-label="First product"></label>
-<label>Second <input name="b" value="${esc(opts.b || "")}" aria-label="Second product"></label>
+<form class="cmp-form" method="get" action="/compare">
+${field("a", "First")}
+${field("b", "Second")}
+${field("c", "Third")}
+${field("d", "Fourth")}
 <button type="submit">Show</button>
 </form>
-${left?.name || right?.name ? `<table><thead><tr><th></th><th>${esc(left?.name || "Not in the catalog")}</th><th>${esc(right?.name || "Not in the catalog")}</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.label)}</td><td>${esc(row.left)}</td><td>${esc(row.right)}</td></tr>`).join("") || `<tr><td colspan="3">No shared rows. A missing number is left off.</td></tr>`}</tbody></table>` : `<p class="muted">Add two product ids.</p>`}
+${chart}
+${table}
 <p class="muted">A missing number is left off.</p>
 </main>`;
-  return chrome("", body, "Compare", stamp, "", feedNav(opts));
+  return chrome("Compare", body, "Compare", stamp, "", feedNav(opts));
 }
 
 export function renderTrackRecord(doc, stamp, opts = {}) {
