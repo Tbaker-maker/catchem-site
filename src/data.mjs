@@ -179,3 +179,15 @@ export async function bucketRows(ids, fetchImpl = fetch) {
   }
   return out;
 }
+
+// Per-read facts file. Small and per id, so it skips the shared cache (keeps reads.json warm).
+export async function loadReadFacts(id, fetchImpl = fetch) {
+  const name = String(id || "").replace(/[^A-Za-z0-9._-]/g, "_");
+  if (!name) return null;
+  try {
+    const res = await fetchImpl(BASE + `feed/facts/${name}.json`, { cf: { cacheTtl: 300 } });
+    if (!res.ok) return null;
+    const doc = await res.json();
+    return doc && typeof doc === "object" && doc.id === String(id) ? doc : null;
+  } catch { return null; }
+}

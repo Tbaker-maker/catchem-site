@@ -49,7 +49,7 @@ const fig = page.match(/<figure class="hc" data-unit="count" data-snap="real" da
 if (!fig) { console.error("FAIL sealed page has no listings-counted chart"); fail++; }
 else {
   const about = fig[0];
-  if (!about.includes("eBay listings counted") || !about.includes("carry the last real count forward") || !about.includes("details class=\"hc-about\"") || !about.includes(">About this chart<")) { console.error("FAIL listings chart note is not in About"); fail++; }
+  if (!about.includes("eBay listings counted") || about.includes("hc-about") || about.includes("About this chart")) { console.error("FAIL listings chart label missing or About box still shown"); fail++; }
   if (/\u2014/.test(about)) { console.error("FAIL em dash in listings chart"); fail++; }
   if (/\bsupply\b/i.test(about)) { console.error("FAIL listings chart says supply"); fail++; }
   const counted = JSON.parse(fig[1].replace(/&quot;/g, '"'));

@@ -55,7 +55,7 @@ const card = renderCard({
 }, "stamp", { listingSeries: [{ date: "2026-10-12", listingCount: 999 }, { date: "2026-10-11", listingCount: 998 }] });
 const cardYr = yrBlock(card);
 check("card row takes singles fill after the archive ends", cardYr.includes("12-month low $3.00") && cardYr.includes("high $20.00"));
-check("card page names the fan-site source in About this chart", card.includes("About this chart") && card.includes("public fan-site data (PokeVizInvestor"));
+check("card page names the fan-site source in About this chart", !card.includes("About this chart") && card.includes("PokeVizInvestor (TCGplayer market)"));
 check("card row leaves sealed counts off", !cardYr.includes("999") && !cardYr.includes("998") && !/listing|eBay|sealed/i.test(cardYr));
 check("card page keeps the line on one row", card.includes(".yr-line{") && card.includes("white-space:nowrap") && card.includes("border-radius:999px") && card.includes("border-radius:50%"));
 

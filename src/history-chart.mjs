@@ -58,15 +58,11 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel, u
   const spanDays = (Date.parse(pts.at(-1)[0]) - Date.parse(pts[0][0])) / DAY;
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
-  const about = count
-    ? `eBay listings counted, ${esc(real[0][0])} to ${esc(real.at(-1)[0])}. The line starts at the first night with a count.${carried ? ` ${carried} nights with no new count carry the last real count forward. Hover lands on a night that has a count on file.` : ""} Listings are not sales.${asOf ? ` As of ${esc(asOf)}.` : ""}`
-    : `${historySources(real, ownLabel).map(esc).join(". ")}. The line starts at the first real price.${carried ? ` ${carried} days with no new price carry the last real price forward; tap a day to see its last real date.` : ""}${asOf ? ` As of ${esc(asOf)}.` : ""}`;
   const label = count ? "eBay listings counted" : "Price history";
   return `<figure class="hc" data-unit="${esc(unit)}" data-snap="${esc(count ? "real" : snap)}" data-pts="${esc(JSON.stringify(pts))}" data-color="${esc(color)}">
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<details class="hc-about"><summary>About this chart</summary><div class="hc-about-body"><p class="hc-src">${about}</p></div></details>
 </figure>`;
 }
 
@@ -79,8 +75,7 @@ export const HISTORY_CSS = `.hc{margin:16px 0;padding:16px 16px 12px;border-radi
 .hc-plot{position:relative;height:220px;touch-action:pan-y}.hc-svg{width:100%;height:100%;display:block;overflow:visible}
 .hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;padding:6px 10px;border-radius:12px;background:rgba(24,22,20,.92);border:1px solid rgba(255,255,255,.1);font-size:12px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .hc-axis{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
-.hc-about{margin-top:8px}.hc-about summary{display:inline-flex;align-items:center;gap:6px;list-style:none;cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.06);opacity:.75}.hc-about summary::-webkit-details-marker{display:none}.hc-about summary::before{content:"i";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-style:italic}.hc-about[open] summary{opacity:1}.hc-about-body{margin-top:8px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);font-size:12px;line-height:1.45}.hc-about-body p{margin:0 0 6px}.hc-gaps{}
-.hc-src{margin:8px 2px 0;font-size:12px;line-height:1.45}
+.hc-gaps{}
 @media(max-width:600px){.hc{padding:14px 12px 10px;border-radius:18px}.hc-plot{height:180px}.hc-pill{padding:6px 10px}}`;
 
 export const HISTORY_JS = `(function(){
@@ -128,7 +123,7 @@ var lab="";var ax=fig.querySelector(".hc-axis");if(ax)ax.innerHTML="<span>"+nice
 svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".28"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+g+body+lab+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+color+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
 svg._X=X;svg._Y=Y;head(view[view.length-1]);}
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=view;if(snap==="real"){var reals=view.filter(function(p){return !p[3];});if(reals.length)pool=reals;}var best=pool[0],bd=1e9;pool.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
-function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+showVal(p[1])+(p[3]?(unit==="count"?" · last count on file "+nice(p[3]):" · last price on file "+nice(p[3])):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
+function srcOf(p){return unit==="count"?"Listings counted, eBay":p[2]==="f"?"PokeVizInvestor (TCGplayer market)":p[2]==="a"?"TCGplayer market, tcgcsv archive":"TCGplayer market";}function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+showVal(p[1])+" · "+srcOf(p)+(p[3]?(unit==="count"?" · last count on file "+nice(p[3]):" · last price on file "+nice(p[3])):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
 function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");head(view[view.length-1]);}
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
