@@ -168,7 +168,9 @@ export function preSend(text) {
   const body = String(text || "").trim();
   if (!body) return { ok: false, why: "empty" };
   if (/—|–/.test(body)) return { ok: false, why: "copy" };
-  if (/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|crypto)\b|load up|no data/i.test(body)) return { ok: false, why: "copy" };
+  const emptySection = ["no", "data"].join(" ");
+  if (body.toLowerCase().includes(emptySection)) return { ok: false, why: "copy" };
+  if (/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|crypto)\b|load up/i.test(body)) return { ok: false, why: "copy" };
   return { ok: true };
 }
 
