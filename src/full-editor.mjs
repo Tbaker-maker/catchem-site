@@ -1,13 +1,13 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
+import { browserAssetUrl, fetchRepo } from "./data.mjs";
 
 // The Post Office editor (Catchem-data research/assets/play.html).
 // Card scans are proxied same-origin so the picture canvas can read them.
 
-const RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/";
-export const EDITOR_URL = RAW + "play.html";
-export const PAPER_URL = RAW + "paper-" + "rows.json";
-export const POCKET_URL = RAW + "pocket-" + "rows.json";
+export const EDITOR_URL = browserAssetUrl("research/assets/play.html");
+export const PAPER_URL = browserAssetUrl("research/assets/" + "paper-" + "rows.json");
+export const POCKET_URL = browserAssetUrl("research/assets/" + "pocket-" + "rows.json");
 export const PAPER_PATH = "/data/editor/" + "paper-" + "rows.json";
 export const POCKET_PATH = "/data/editor/" + "pocket-" + "rows.json";
 
@@ -497,7 +497,7 @@ function rewritePlayAssets(html) {
     "      if (p.charAt(0) === \"/\") p = p.slice(1);",
     "      var cut = p.indexOf(\"#\");",
     "      if (cut >= 0) p = p.slice(0, cut);",
-    "      return " + JSON.stringify(RAW) + " + p;",
+    "      return " + JSON.stringify(browserAssetUrl("research/assets/")) + " + p;",
     "    }",
   ].join("\n");
   if (out.includes(assetFn)) out = out.split(assetFn).join(assetNext);
@@ -779,21 +779,19 @@ export function editorCacheKey() {
   return String(BUILD_SHA || "dev").slice(0, 12) || "dev";
 }
 
-async function textOf(url, fetchImpl) {
-  if (htmlCache.has(url)) return htmlCache.get(url);
-  const res = await fetchImpl(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(url + " " + res.status);
-  const body = await res.text();
-  htmlCache.set(url, body);
-  return body;
-}
-
 export function resetEditorCache() {
   htmlCache.clear();
 }
 
 export async function editorDocument(asOf, fetchImpl = fetch, mark = "") {
-  const raw = await textOf(EDITOR_URL + "?v=" + editorCacheKey(), fetchImpl);
+  const key = "play.html?v=" + editorCacheKey();
+  let raw = htmlCache.get(key);
+  if (raw == null) {
+    const res = await fetchRepo("research/assets/play.html", fetchImpl, { cache: "no-store" });
+    if (!res.ok) throw new Error("play.html " + res.status);
+    raw = await res.text();
+    htmlCache.set(key, raw);
+  }
   return patchEditorHtml(raw, asOf, mark);
 }
 
@@ -801,7 +799,11 @@ export async function patchedPaper(fetchImpl = fetch) {
   const key = "patched-paper";
   if (htmlCache.has(key)) return htmlCache.get(key);
   const [paperRes, lite] = await Promise.all([
-    textOf(PAPER_URL, fetchImpl),
+    (async () => {
+      const res = await fetchRepo("research/assets/" + "paper-" + "rows.json", fetchImpl, { cache: "no-store" });
+      if (!res.ok) throw new Error("paper " + res.status);
+      return res.text();
+    })(),
     (async () => {
       const { loadJson } = await import("./data.mjs");
       return loadJson("search-lite.json", fetchImpl);
@@ -840,7 +842,13 @@ export function patchPocketRows(rows) {
 }
 
 async function pocketRowsRaw(fetchImpl) {
-  return JSON.parse(await textOf(POCKET_URL, fetchImpl));
+  const key = "pocket-raw";
+  if (htmlCache.has(key)) return JSON.parse(htmlCache.get(key));
+  const res = await fetchRepo("research/assets/" + "pocket-" + "rows.json", fetchImpl, { cache: "no-store" });
+  if (!res.ok) throw new Error("pocket " + res.status);
+  const text = await res.text();
+  htmlCache.set(key, text);
+  return JSON.parse(text);
 }
 
 export async function pocketDocument(fetchImpl = fetch) {
