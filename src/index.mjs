@@ -2,7 +2,7 @@ import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic, fetchRepo } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -1144,18 +1144,18 @@ export default {
 
 // /img/{setId}/logo.png: Post Office catalogue file in Catchem-data first,
 // then the same id on images.pokemontcg.io (already in IMAGE_HOSTS). Else 404.
-const LOGO_RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/img/";
 export async function handleSetLogo(request, pathname, fetchImpl = fetch) {
   const m = pathname.match(/^\/img\/([a-z0-9]+)\/logo\.png$/);
   const miss = () => new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
   if (!m) return miss();
-  for (const src of [LOGO_RAW + m[1] + "/logo.png", "https://images.pokemontcg.io/" + m[1] + "/logo.png"]) {
-    const res = await fetchImpl(src, { cf: { cacheTtl: 3600 } });
-    if (!res.ok) continue;
-    const headers = { "content-type": "image/png", "cache-control": "public, max-age=86400" };
-    return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
-  }
-  return miss();
+  const headers = { "content-type": "image/png", "cache-control": "public, max-age=86400" };
+  try {
+    const hit = await fetchRepo(`research/assets/img/${m[1]}/logo.png`, fetchImpl, { cf: { cacheTtl: 3600 } });
+    if (hit.ok) return new Response(request.method === "HEAD" ? null : hit.body, { status: 200, headers });
+  } catch { /* official logo next */ }
+  const res = await fetchImpl("https://images.pokemontcg.io/" + m[1] + "/logo.png", { cf: { cacheTtl: 3600 } });
+  if (!res.ok) return miss();
+  return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
 }
 
 // The sold-volume file is optional. The feed asks for it only when it exists.

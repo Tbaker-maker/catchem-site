@@ -5,6 +5,7 @@ import "./not-moved.test.mjs";
 import "./variant-chips.test.mjs";
 import "./fresh.test.mjs";
 import "./ir-cycle.test.mjs";
+import "./data-base.test.mjs";
 import worker, { pageKind, renderPath, quickFor } from "../src/index.mjs";
 import { sortArtistCards, renderArtist, ARTIST_SORTS } from "../src/ui.mjs";
 import vm from "node:vm";

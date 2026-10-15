@@ -9,7 +9,7 @@ t += MEM_TTL_MS - 1; assert.deepEqual(await loadJson("x.json", f), { v: 1 }); as
 t += 2; assert.deepEqual(await loadJson("x.json", f), { v: 2 }, "expired entry refetches");
 t += MEM_TTL_MS + 1; fail = true;
 assert.deepEqual(await loadJson("x.json", f), { v: 2 }, "failed refetch keeps old copy");
-assert.equal(calls, 3);
+assert.equal(calls, 4);
 await assert.rejects(loadJson("y.json", f));
 setCacheClock(); resetJsonCache();
 console.log("data-cache ok");

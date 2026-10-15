@@ -7,6 +7,7 @@ import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
+import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
@@ -1779,6 +1780,7 @@ function html(s){
 let rows=[], shown=48, setLogo="";
 let catImages={};
 ${cataloguePath.toString()}
+${browserAssetUrl.toString()}
 ${catalogueUrl.toString()}
 ${imageForId.toString()}
 ${tcgPid.toString()}
@@ -3481,6 +3483,7 @@ async function ensureSparks(list){
   }));
 }
 ${cataloguePath.toString()}
+${browserAssetUrl.toString()}
 ${catalogueUrl.toString()}
 ${imageForId.toString()}
 ${tcgPid.toString()}
@@ -4391,6 +4394,7 @@ function meansCopy(card){
 }
 let catalogueImages=null;
 ${cataloguePath.toString()}
+${browserAssetUrl.toString()}
 ${catalogueUrl.toString()}
 ${imageForId.toString()}
 ${tcgPid.toString()}

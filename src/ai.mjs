@@ -4,10 +4,7 @@
 import { editionLabel, priceLine } from "./post-copy.mjs";
 import { commit, ideasSignInLine, peek, readUser, usageOf } from "./quota.mjs";
 import { discordReady, INVITE_LINE, officeAllowed } from "./auth.mjs";
-
-const LITE = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/search-lite.json";
-const POCKET = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/pocket-catalogue.json";
-const COUNTS = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/public/counts.json";
+import { fetchRepo } from "./data.mjs";
 
 const BANNED = new RegExp(
   "\\b(buy|sell|sold|hold|floor|target|plays|picks|bullish|bearish|invest|roi|crypto|nft|web3)\\b|to the moon|"
@@ -69,7 +66,7 @@ export function resetCatalogCache() {
 
 async function loadLite(fetchImpl) {
   if (liteCache) return liteCache;
-  const res = await fetchImpl(LITE);
+  const res = await fetchRepo("research/assets/public/search-lite.json", fetchImpl);
   if (!res.ok) throw new Error("catalog");
   liteCache = await res.json();
   return liteCache;
@@ -77,7 +74,7 @@ async function loadLite(fetchImpl) {
 
 export async function pocketRows(fetchImpl) {
   if (pocketCache) return pocketCache;
-  const res = await fetchImpl(POCKET);
+  const res = await fetchRepo("data/pocket-catalogue.json", fetchImpl);
   if (!res.ok) return [];
   const data = await res.json();
   pocketCache = Object.entries(data.cards || {}).map(([id, c]) => [
@@ -98,7 +95,7 @@ export async function pocketRows(fetchImpl) {
 async function asOf(fetchImpl) {
   if (asOfCache) return asOfCache;
   try {
-    const res = await fetchImpl(COUNTS);
+    const res = await fetchRepo("research/assets/public/counts.json", fetchImpl);
     const data = await res.json();
     asOfCache = String(data.asOf || "").slice(0, 10);
   } catch {

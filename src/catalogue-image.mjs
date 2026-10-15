@@ -2,6 +2,8 @@
 // TCGplayer / pokemontcg image for that same id. A name is never a match.
 // A miss is a branded tile. News is always a Catch'em tile, never a source preview.
 
+import { browserAssetUrl } from "./data.mjs";
+
 function escapeAttr(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "\u0026amp;",
@@ -23,7 +25,6 @@ export function cataloguePath(map, id) {
 }
 
 export function catalogueUrl(path) {
-  const RAW = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets";
   const src = String(path || "");
   if (!/^(?:\/img\/|\/cards\/|\/thumb\/)/.test(src) || src.includes("..")) return "";
   const logo = src.match(/^\/img\/([A-Za-z0-9]+)\/logo\.png$/i);
@@ -33,7 +34,7 @@ export function catalogueUrl(path) {
     const file = /\.[A-Za-z0-9]+$/.test(m[2]) ? m[2] : m[2] + "_hires.png";
     return "/data/editor/tcg/" + m[1] + "/" + file;
   }
-  if (/^\/cards\/[A-Za-z0-9._/-]+$/.test(src)) return RAW + src;
+  if (/^\/cards\/[A-Za-z0-9._/-]+$/.test(src)) return browserAssetUrl("research/assets" + src);
   return "";
 }
 

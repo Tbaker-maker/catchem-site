@@ -1,8 +1,10 @@
 // The Feed on catchemtcg.com. The baked pulse.html is only a fallback.
 // The worker reads the latest run from Catchem-data and stamps its clock.
 
-export const PULSE_URL = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/research/assets/the-pulse.html";
-export const REPORT_URL = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/data/ppt/run-report.json";
+import { browserAssetUrl } from "./data.mjs";
+
+export const PULSE_URL = browserAssetUrl("research/assets/the-pulse.html");
+export const REPORT_URL = browserAssetUrl("data/ppt/run-report.json");
 const FRESH_HOURS = 48;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
