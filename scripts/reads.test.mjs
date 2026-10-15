@@ -20,6 +20,8 @@ const parsed = gatePlan(planFromFields(fields), { premium: true });
 t("discord stays on and email stays off", parsed.plan.channels.discord === true && parsed.plan.channels.email === false && parsed.plan.addons.news === true && parsed.plan.rarities[0] === "Illustration Rare");
 const page = renderReadsPage({ signedIn: false, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 t("the picker defaults Discord and does not force email", page.includes("Discord DM") && page.includes("checked") && page.includes("Email, optional") && page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads"));
+t("a signed-out picker does not ping clicks", !page.includes("/api/reads/click"));
+t("a signed-in picker pings clicks", renderReadsPage({ signedIn: true }).includes("/api/reads/click"));
 t("the picker copy is clean", preSend(page.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);
 t("an email letter hides when email is off", emailLetter({ channels: { email: false }, addons: { news: true } }, { news: [{ headline: "H", line: "L", url: "https://press.pokemon.com/en/x" }] }) === "");
 const letter = emailLetter(
