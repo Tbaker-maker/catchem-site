@@ -967,7 +967,7 @@ export default {
     if (request.method === "GET" && url.pathname === PAPER_PATH) {
       try {
         const body = await patchedPaper(fetchImpl);
-        return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
+        return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120" } });
       } catch {
         return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }

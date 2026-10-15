@@ -179,12 +179,38 @@ export function patchPaperRows(rows, lite) {
   return { rows: out, matched, total: out.length };
 }
 
+export function paperHasPrices(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  let seen = 0;
+  let priced = 0;
+  for (const row of list) {
+    if (!Array.isArray(row)) continue;
+    seen += 1;
+    if (Number(row[6]) > 0) priced += 1;
+    if (seen >= 200) break;
+  }
+  return seen >= 20 && priced / seen >= 0.5;
+}
+
+export function cleanOfficeCopy(html) {
+  let out = String(html || "");
+  out = out.replaceAll("Hold for the", "Press and keep for the");
+  out = out.replaceAll("Hold to jump", "Press and keep to jump");
+  out = out.replaceAll("Hold the card", "Look at the card");
+  out = out.replaceAll("Hold the last card", "Keep the last card up");
+  out = out.replaceAll(">Hold<", ">Stop<");
+  out = out.replaceAll("Hold. ", "Stop. ");
+  out = out.replaceAll("\u2014", ". ");
+  out = out.replaceAll("\u2013", ". ");
+  return out;
+}
+
 const SIZE_JS = `<script id="sizes-boot">
 (function(){
   var sizes = ${JSON.stringify(EXPORT_SIZES)};
   function boot(){
-    var dl = document.getElementById("dl");
-    if (!dl || document.getElementById("sizes")) return;
+    var dock = document.getElementById("compose-dock");
+    if (!dock || document.getElementById("sizes")) return;
     var row = document.createElement("div");
     row.id = "sizes";
     row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px";
@@ -196,11 +222,24 @@ const SIZE_JS = `<script id="sizes-boot">
       button.onclick = function(){ saveSize(spec[0], spec[1], spec[2]); };
       row.appendChild(button);
     });
-    dl.parentNode.insertBefore(row, dl.nextSibling);
+    var preview = document.getElementById("preview");
+    if (preview && preview.parentNode === dock) preview.insertAdjacentElement("afterend", row);
+    else dock.appendChild(row);
+    var next = document.createElement("p");
+    next.id = "next-step";
+    next.className = "note";
+    next.hidden = true;
+    next.textContent = "Save the picture, then Post.";
+    row.insertAdjacentElement("afterend", next);
+    if (preview) {
+      var showNext = function(){ if (preview.getAttribute("src") || preview.src) next.hidden = false; };
+      preview.addEventListener("load", showNext);
+      showNext();
+    }
   }
   function saveSize(label, w, h){
-    var shown = document.getElementById("outimg");
-    var stage = document.getElementById("cv");
+    var shown = document.getElementById("preview");
+    var stage = document.querySelector("#compose-dock canvas");
     function paint(im){
       var out = document.createElement("canvas");
       out.width = w; out.height = h;
@@ -241,13 +280,14 @@ const AI_JS = `<script id="ai-boot">
   var seat = null;
   var signInHref = "/auth/discord?next=/post-office";
   function boot(){
-    var dl = document.getElementById("dl");
-    if (!dl || document.getElementById("ai-panel")) return;
+    var dock = document.getElementById("compose-dock");
+    if (!dock || document.getElementById("ai-panel")) return;
     var panel = document.createElement("div");
     panel.id = "ai-panel";
     panel.style.cssText = "margin:12px 0 20px;padding:12px;border:1px solid #3a3428;border-radius:12px";
-    var anchor = document.getElementById("sizes") || dl;
-    anchor.parentNode.insertBefore(panel, anchor.nextSibling);
+    var anchor = document.getElementById("next-step") || document.getElementById("sizes");
+    if (anchor && anchor.parentNode === dock) anchor.insertAdjacentElement("afterend", panel);
+    else dock.appendChild(panel);
     load(panel);
   }
   function ids(){
@@ -267,14 +307,15 @@ const AI_JS = `<script id="ai-boot">
     var p = document.createElement("p");
     p.id = "ai-line";
     p.style.cssText = "margin:0;color:#d9c7a2";
-    if (href) {
+    var line = String(text || "");
+    if (href && line.indexOf("Sign in with Discord") === 0) {
       var a = document.createElement("a");
       a.href = href;
       a.textContent = "Sign in with Discord";
       p.appendChild(a);
-      p.appendChild(document.createTextNode(" to use Ideas. A free seat is 3 a day."));
+      p.appendChild(document.createTextNode(line.slice("Sign in with Discord".length)));
     } else {
-      p.textContent = text;
+      p.textContent = line;
     }
     panel.appendChild(p);
   }
@@ -385,8 +426,8 @@ const AI_JS = `<script id="ai-boot">
       return res.json().then(function(data){ return { status: res.status, data: data || {} }; });
     }).then(function(pack){
       var data = pack.data;
-      if (pack.status === 401) {
-        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", data.ready ? signInHref : "");
+      if (pack.status === 401 || pack.status === 403) {
+        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", pack.status === 401 && data.ready ? signInHref : "");
         return;
       }
       if (data.card && !data.ideas && !data.variations) {
@@ -412,8 +453,9 @@ const AI_JS = `<script id="ai-boot">
   }
   function load(panel){
     fetch("/api/session").then(function(r){ return r.json(); }).then(function(view){
-      if (!view || !view.signedIn) {
-        showLine(panel, (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", view && view.ready ? signInHref : "");
+      if (!view || !view.signedIn || view.open === false) {
+        var line = (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.";
+        showLine(panel, line, view && view.open !== false && view.ready ? signInHref : "");
       } else {
         controls(panel, view);
       }
@@ -751,13 +793,29 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.replace(/const PRICES_AS_OF = "[^"]*";/, 'const PRICES_AS_OF = "' + date + '";');
   out = out.split('dateNote = "priced " + PRICES_AS_OF;').join('dateNote = "TCGplayer market (" + PRICES_AS_OF + ")";');
   const stale = ["sells", "for", "about"].join(" ");
-  out = out.split(' + " ' + stale + ' " + ').join(' + " — TCGplayer market $" + ');
-  out = out.split(' + " for about " + ').join(' + " — TCGplayer market $" + ');
+  out = out.split(' + " ' + stale + ' " + ').join(' + ". TCGplayer market $" + ');
+  out = out.split(' + " for about " + ').join(' + ". TCGplayer market $" + ');
   out = out.split('? fname() : "catchem") + ".jpg"').join('? fname() : "catchem.png")');
   out = out.split('? fname() : "catchem") + (b.type.indexOf("jpeg") >= 0 ? ".jpg" : ".png")').join('? fname() : "catchem.png")');
   out = out.split("if (r[21]) o.mech = r[21];").join("if (r[21]) o.mech = r[21];\n  if (r[22]) o.cid = r[22];");
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
+  out = out.replace(
+    '<button type="button" data-view="replies">Replies</button>',
+    '<button type="button" class="lab-only" data-view="replies">Replies</button>',
+  );
+  out = out.replace(
+    '<button type="button" data-view="review">Review</button>',
+    '<button type="button" class="lab-only" data-view="review">Review</button>',
+  );
+  out = out.replace(
+    '<button type="button" data-view="desk">Desk</button>',
+    '<button type="button" class="lab-only" data-view="desk">Desk lab</button>',
+  );
+  if (!out.includes('id="office-dock"')) {
+    const dockCss = '<style id="office-dock">#compose-dock{position:sticky;bottom:0;z-index:5;background:#12100e;padding:8px 0 12px}@media(min-width:900px){#compose-dock{position:static;padding:0}}</style>';
+    out = out.includes("</head>") ? out.replace("</head>", dockCss + "</head>") : dockCss + out;
+  }
   out = rewritePlayAssets(out);
   out = rewriteFirstScreen(out);
   out = rewriteLoadedLines(out);
@@ -772,7 +830,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
     out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;
   }
-  return ensureAffiliation(out);
+  return ensureAffiliation(cleanOfficeCopy(out));
 }
 
 export function editorCacheKey() {
@@ -798,18 +856,17 @@ export async function editorDocument(asOf, fetchImpl = fetch, mark = "") {
 export async function patchedPaper(fetchImpl = fetch) {
   const key = "patched-paper";
   if (htmlCache.has(key)) return htmlCache.get(key);
-  const [paperRes, lite] = await Promise.all([
-    (async () => {
-      const res = await fetchRepo("research/assets/" + "paper-" + "rows.json", fetchImpl, { cache: "no-store" });
-      if (!res.ok) throw new Error("paper " + res.status);
-      return res.text();
-    })(),
-    (async () => {
-      const { loadJson } = await import("./data.mjs");
-      return loadJson("search-lite.json", fetchImpl);
-    })(),
-  ]);
+  const res = await fetchRepo("research/assets/" + "paper-" + "rows.json", fetchImpl, { cache: "no-store" });
+  if (!res.ok) throw new Error("paper " + res.status);
+  const paperRes = await res.text();
   const rows = JSON.parse(paperRes);
+  if (paperHasPrices(rows)) {
+    htmlCache.set(key, paperRes);
+    htmlCache.set("patched-paper-stats", { rows, matched: 0, total: rows.length, baked: true });
+    return paperRes;
+  }
+  const { loadJson } = await import("./data.mjs");
+  const lite = await loadJson("search-lite.json", fetchImpl);
   const patched = patchPaperRows(rows, lite);
   const body = JSON.stringify(patched.rows);
   htmlCache.set(key, body);
