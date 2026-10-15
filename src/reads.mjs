@@ -280,6 +280,9 @@ ${gatedSuggestion.plan.addons.all ? `<input type="hidden" name="all" value="1">`
 </form>` : "";
   const previewHtml = preview.length ? `<section class="rd-card">${preview.map((block) => `<h2>${esc(block.title)}</h2><p>${esc(block.text)}</p>`).join("")}</section>` : "";
   const sign = signedIn ? "" : `<p><a href="/auth/discord?next=/reads">Sign in with Discord</a> to save this read.</p>`;
+  const beacon = signedIn
+    ? `<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>`
+    : "";
   return `<main id="main" tabindex="-1" class="rd-wrap">
 <style>
 .rd-wrap{max-width:440px;margin:0 auto;padding:16px 14px 88px;background:#f2f2f7;color:#1c1c1e;border-radius:28px}
@@ -339,7 +342,7 @@ ${box("all", "All in one", draft.addons?.all === true)}
 <p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>
 <button type="submit">Save read</button>
 </form>
-<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>
+${beacon}
 </main>`;
 }
 
@@ -397,7 +400,7 @@ export async function handleReadsClick(request, env) {
   const user = await readUser(request, env);
   if (!user?.sub) return json({ ok: false, error: "Sign in with Discord." }, 401);
   const store = env?.FEED_KV;
-  if (!store) return json({ ok: false, error: "Reads are not open yet." }, 503);
+  if (!store) return json({ ok: false, stored: false });
   let body = {};
   try { body = await request.json(); } catch { return json({ ok: false, error: "Bad click." }, 400); }
   const kind = body.kind === "tap" ? "tap" : body.kind === "open" ? "open" : "";
