@@ -1,7 +1,8 @@
 // Branded 1200x630 share card. SVG, same-origin pictures only.
 import worker from "../src/index.mjs";
 import { handleShareCard, readShareUrl, safeImagePath, shareCardUrl, shareSvg } from "../src/share-card.mjs";
-import { renderFeed } from "../src/ui.mjs";
+import { renderFeed, shownRead } from "../src/ui.mjs";
+import { priceBits } from "../src/read-sheet.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
@@ -59,6 +60,17 @@ const readHtml = renderFeed(bundle, "year-snorlax", "stamp", { page: "read" });
 t("a read page uses the branded share image", readHtml.includes("property=\"og:image\" content=\"https://catchemtcg.com/og/card.svg?k=read\u0026amp;n=Snorlax"));
 const feedHtml = renderFeed(bundle, "", "stamp", {});
 t("the feed index stays on og.png", feedHtml.includes('property="og:image" content="https://catchemtcg.com/og.png"') && !feedHtml.includes("/og/card.svg"));
+
+// Guard: NM is a single-card condition. No sealed text may say NM or Near Mint.
+const NMX = /\bNM\b|Near Mint/i;
+const sealedLine = shownRead({ kind: "sealed", name: "First Partner Pack (Alola)", headline: "First Partner Pack (Alola) is up 5% this week: $23.54 NM \u2192 $24.71 NM." });
+t("a sealed feed line has no NM and no arrow", !NMX.test(sealedLine) && !sealedLine.includes("\u2192") && sealedLine.includes("from $23.54 to $24.71"));
+const singleLine = shownRead({ kind: "single", name: "Pikachu", headline: "Pikachu is up 5% this week, from $1.00 NM to $2.00 NM." });
+t("a single keeps NM", singleLine.includes("$1.00 NM"));
+const sealedPrice = priceBits({ kind: "sealed", prices: [{ amount: 24.71, date: "2026-10-14", source: "tcgplayer", condition: "NM", label: "Near Mint" }] });
+t("a sealed price chip has no NM", !NMX.test(JSON.stringify(sealedPrice)));
+const sealedSvg = shareSvg(new URL(shareCardUrl({ name: "Delta Reign Elite Trainer Box", price: "121.52", sealed: true })).search);
+t("a sealed share card has no NM", !NMX.test(sealedSvg) && sealedSvg.includes("TCGplayer market"));
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("share card: all passed");

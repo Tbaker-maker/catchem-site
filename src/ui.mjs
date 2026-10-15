@@ -181,6 +181,11 @@ export function shownRead(card) {
         : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales).";
     }
   }
+  if (card.kind === "sealed" || card.readKind === "sealed") {
+    // NM is a single-card condition. Sealed lines show plain prices.
+    line = line.replace(/\s*\((?:NM|Near Mint)\)/gi, "").replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1").replace(/,?\s*\bNear Mint\b/gi, "").replace(/\bNM\b\s*/g, "")
+      .replace(/:\s*(\$[\d,]+(?:\.\d{1,2})?)\s*(?:\u2192|->)\s*(\$[\d,]+(?:\.\d{1,2})?)/g, ", from $1 to $2").replace(/ {2,}/g, " ");
+  }
   line = line.replace(/^[,.\s]+/, "").trim();
   if (name && line && !line.includes(name)) line = name + ": " + line;
   if (!line) return "";

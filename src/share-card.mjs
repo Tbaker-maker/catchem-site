@@ -75,6 +75,7 @@ export function shareCardUrl(fields) {
   if (setName) q.set("set", setName);
   const era = clip(fields && fields.era, 32);
   if (era) q.set("era", era);
+  if (fields && fields.sealed) q.set("s", "1");
   return `${ORIGIN}/og/card.svg?${q.toString()}`;
 }
 
@@ -102,6 +103,7 @@ export function shareSvg(search) {
   const era = clip(q.get("era"), 32);
   const eraColor = ERA_COLOR[era.toLowerCase()] || "#d4af37";
   const up = change.startsWith("+");
+  const sealed = q.get("s") === "1";
   const changeColor = !change ? "#b7b1a6" : up ? "#7fc79a" : "#e07a6a";
   const photo = img
     ? `<image href="${xml(ORIGIN + img)}" x="56" y="78" width="280" height="392" preserveAspectRatio="xMidYMid meet" clip-path="url(#cardclip)"/>`
@@ -111,7 +113,7 @@ export function shareSvg(search) {
     : "";
   const numLine = num ? `<text x="390" y="250" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">${xml(num)}</text>` : "";
   const priceLine = price
-    ? `<text x="390" y="360" fill="#efe9de" font-family="Georgia, serif" font-size="72">${xml(price)}</text><text x="390" y="408" fill="#d4af37" font-family="system-ui, sans-serif" font-size="22">NM · TCGplayer market</text>`
+    ? `<text x="390" y="360" fill="#efe9de" font-family="Georgia, serif" font-size="72">${xml(price)}</text><text x="390" y="408" fill="#d4af37" font-family="system-ui, sans-serif" font-size="22">${sealed ? "" : "NM · "}TCGplayer market</text>`
     : `<text x="390" y="360" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">No market price on file</text>`;
   const changeLine = change
     ? `<text x="390" y="470" fill="${changeColor}" font-family="system-ui, sans-serif" font-size="36" font-weight="700">${xml(change)}</text>`
