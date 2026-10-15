@@ -72,6 +72,7 @@ function brandedShare(html, kind, name, pic) {
     change: changeM ? changeM[1] : "",
     img: pic,
     setName: setM ? unesc(setM[1]).trim() : "",
+    sealed: kind === "product",
   });
 }
 

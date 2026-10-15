@@ -75,7 +75,7 @@ export function priceBits(read) {
   const ebay = rows.find((row) => row && String(row.source || "").toLowerCase() === "ebay" && Number(row.amount) > 0);
   const out = [];
   if (tcg) {
-    const nm = /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
+    const nm = read?.kind !== "sealed" && read?.item?.kind !== "sealed" && /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
     const when = dayLabel(tcg.date);
     out.push(`${nm ? "NM " : ""}${money(tcg.amount)} TCGplayer${when ? `, ${when}` : ""}`);
   }
