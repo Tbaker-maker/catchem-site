@@ -51,3 +51,4 @@ const twice = addError(log, { message: "boom", at: "2026-10-11T00:00:00Z" });
 assert.equal(topErrors(twice)[0].count, 2);
 
 console.log("trust ok");
+await import("./read-facts.test.mjs");
