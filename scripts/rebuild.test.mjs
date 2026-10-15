@@ -822,7 +822,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("a set page writes the completion line from the file", shell.includes('id="completion"') && shell.includes(" cards · ") && shell.includes(" printings · ") && shell.includes(" sealed") && shell.includes("Number.isInteger(data.cards)") && shell.includes("Number.isInteger(data.printings)") && shell.includes("Number.isInteger(data.sealed)"));
   t("a set row names the printing", shell.includes("r.printing") && shell.includes('bits.push("Case")'));
   const dated = renderSets({ sets: [{ slug: "me-30th-celebration", name: "ME: 30th Celebration", era: "Mega Evolution", single: 191, sealed: 38, priced: 227, release: "2026-09-16" }] }, "");
-  t("a set tile writes Sep 16, 2026 and does not wrap the date", dated.includes("Sep 16, 2026") && dated.includes('class="set-date"') && !dated.includes(">2026-09-16<") && dated.includes("191 singles"));
+  t("a set card writes Sep 2026, an era pill and one quiet count line", dated.includes("<span>Sep 2026</span>") && dated.includes('class="sb-pill">ME<') && !dated.includes(">2026-09-16<") && dated.includes("191 cards · 38 sealed") && !dated.includes("priced"));
   t("an index chart is a level and a price chart keeps $", shell.includes("indexLevel=/index/i.test") && shell.includes("maximumFractionDigits:1") && shell.includes('"$"+Number(n)'));
   const linked = [
     factHtml,

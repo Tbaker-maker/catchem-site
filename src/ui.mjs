@@ -1640,29 +1640,95 @@ function spark(values) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="TCGplayer market"><path d="${d}" fill="none" stroke="${up ? "#7fc79a" : "#e0675b"}" stroke-width="2"/></svg>`;
 }
 
+const ERA_ORDER = ["Mega Evolution", "Scarlet & Violet", "Sword & Shield", "Sun & Moon", "XY", "Black & White", "HeartGold & SoulSilver", "Diamond & Pearl", "EX", "Original", "Neo", "Promos and extras", "Other"];
+const eraId = (era) => `era-${String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function monthYear(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${MONTHS[Number(m[2]) - 1]} ${m[1]}` : "";
+}
+const ERA_SHORT = { "Mega Evolution": "ME", "Scarlet & Violet": "SV", "Sword & Shield": "SWSH", "Sun & Moon": "SM", "XY": "XY", "Black & White": "BW", "HeartGold & SoulSilver": "HGSS", "Diamond & Pearl": "DP", "EX": "EX", "Original": "WOTC", "Neo": "Neo", "Promos and extras": "Promo", "Other": "More" };
+const BROWSE_CSS = `.sb-head{display:flex;flex-direction:column;gap:12px;margin:8px 0 4px}
+.sb-head h1{margin:0;font-size:30px;letter-spacing:-.02em}
+.sb-search{width:100%;box-sizing:border-box;min-height:44px;padding:10px 16px;border-radius:14px;border:1px solid #2f2b26;background:#16140f;color:inherit;font:inherit;font-size:16px;outline:none;transition:border-color .2s}
+.sb-search:focus{border-color:#d9b779}
+.sb-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0;-webkit-overflow-scrolling:touch}
+.sb-chips::-webkit-scrollbar{display:none}
+.sb-chip{flex:none;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #2f2b26;background:#16140f;color:#cfc7b8;font:inherit;font-size:14px;display:inline-flex;align-items:center;cursor:pointer;text-decoration:none;transition:background .2s,border-color .2s,color .2s}
+.sb-chip:hover{border-color:#5a4d36}
+.sb-chip[aria-pressed=true]{background:#d9b779;border-color:#d9b779;color:#14120f}
+.sb-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sb-label{font-size:12px;color:#8f877a;text-transform:uppercase;letter-spacing:.08em;margin-right:4px}
+.sb-jump{position:sticky;top:0;z-index:6;background:rgba(14,13,11,.86);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);margin:0 -16px;padding:8px 16px;border-bottom:1px solid #221f1a}
+.sb-jump .sb-chip{font-size:13px}
+select.sb-chip{appearance:none;-webkit-appearance:none;padding-right:16px;max-width:44vw}
+html{scroll-behavior:smooth}
+.sb-era{scroll-margin-top:64px;margin-top:20px}
+.sb-era h2{position:sticky;top:60px;z-index:5;margin:0 -16px 10px;padding:10px 16px;font-size:17px;font-weight:600;background:rgba(14,13,11,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;justify-content:space-between;align-items:baseline}
+.sb-era h2 span{font-size:13px;font-weight:400;color:#8f877a}
+.sb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(min-width:700px){.sb-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:980px){.sb-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1200px){.sb-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+a.sb-card{display:flex;flex-direction:column;gap:8px;min-height:44px;padding:12px;border-radius:18px;background:#16140f;border:1px solid #24211c;color:inherit;text-decoration:none;transition:transform .18s ease,border-color .18s ease,background .18s ease;-webkit-tap-highlight-color:transparent}
+a.sb-card:hover{transform:translateY(-2px);border-color:#4a3f2c;background:#1a1712}
+a.sb-card:active{transform:scale(.98)}
+a.sb-card:focus-visible{outline:2px solid #d9b779;outline-offset:2px}
+.sb-face{aspect-ratio:220/96;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(90deg,#1c1914 0%,#25211a 50%,#1c1914 100%);background-size:200% 100%;animation:sb-shim 1.4s ease-in-out infinite}
+.sb-face.ok{animation:none;background:#1c1914}
+.sb-face img.set-logo{width:86%;height:80%;object-fit:contain;opacity:0;transition:opacity .25s}
+.sb-face.ok img.set-logo{opacity:1}
+.sb-face .set-tile{width:100%;height:100%;aspect-ratio:auto;min-height:0;border-radius:12px}
+@keyframes sb-shim{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media(prefers-reduced-motion:reduce){.sb-face{animation:none}a.sb-card{transition:none}}
+.sb-name{font-size:14px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sb-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:#8f877a;flex-wrap:wrap}
+.sb-pill{font-size:11px;padding:2px 8px;border-radius:999px;background:#221e17;color:#d9b779;border:1px solid #3a3226}
+.sb-count{font-size:12px;color:#8f877a}
+.sb-none{text-align:center;color:#8f877a;padding:40px 0}`;
+const BROWSE_JS = `<script>(function(){var q=document.getElementById("q"),cards=[].slice.call(document.querySelectorAll("a.sb-card")),eras=[].slice.call(document.querySelectorAll("section.sb-era")),none=document.getElementById("sb-none"),sort="new",era="",sealed=false;
+document.querySelectorAll(".sb-face img").forEach(function(i){function ok(){i.parentNode.classList.add("ok")}if(i.complete&&i.naturalWidth)ok();else{i.addEventListener("load",ok);i.addEventListener("error",ok)}});
+function press(group,btn){document.querySelectorAll("[data-"+group+"]").forEach(function(b){b.setAttribute("aria-pressed",b===btn?"true":"false")})}
+function key(a){if(sort==="az")return a.getAttribute("data-name");if(sort==="value")return -Number(a.getAttribute("data-value")||0);return "~"+(9e15-Date.parse(a.getAttribute("data-release")||"1990-01-01"))}
+function apply(){var v=(q.value||"").trim().toLowerCase(),any=false;eras.forEach(function(sec){var grid=sec.querySelector(".sb-grid"),list=[].slice.call(grid.children),hit=0;list.sort(function(x,y){var a=key(x),b=key(y);return a<b?-1:a>b?1:0}).forEach(function(c){grid.appendChild(c);var ok=(!v||c.getAttribute("data-name").indexOf(v)>=0)&&(!era||sec.getAttribute("data-era")===era)&&(!sealed||Number(c.getAttribute("data-sealed"))>0);c.hidden=!ok;if(ok)hit++});sec.hidden=!hit;if(hit)any=true});none.hidden=any}
+q.addEventListener("input",apply);
+document.querySelectorAll("[data-sort]").forEach(function(b){b.addEventListener("click",function(){sort=b.getAttribute("data-sort");press("sort",b);apply()})});
+var ef=document.getElementById("era-filter");ef.addEventListener("change",function(){era=ef.value;ef.setAttribute("aria-pressed",era?"true":"false");apply()});
+var hs=document.getElementById("has-sealed");if(hs)hs.addEventListener("click",function(){sealed=!sealed;hs.setAttribute("aria-pressed",sealed?"true":"false");apply()});
+})();</script>`;
+
 export function renderSets(index, stamp, opts = {}) {
   const sets = index?.sets || [];
   const eras = [...new Set(sets.map((s) => s.era))].sort((a, b) => {
-    const order = ["Mega Evolution", "Scarlet & Violet", "Sword & Shield", "Sun & Moon", "XY", "Black & White", "HeartGold & SoulSilver", "Diamond & Pearl", "EX", "Original", "Neo", "Promos and extras", "Other"];
-    const ia = order.indexOf(a);
-    const ib = order.indexOf(b);
+    const ia = ERA_ORDER.indexOf(a);
+    const ib = ERA_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || String(a).localeCompare(String(b));
   });
-  const body = `<style>${SET_TILE_CSS}</style><main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart. <a href="/indexes">Rarity indexes</a></p>
-${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
-<div class="filters"><input id="q" aria-label="Find a set" placeholder="Find a set" autocomplete="off"></div>
-<nav class="filters sort-chips era-jump" aria-label="Jump to an era">${eras.map((era) => `<a class="sort-chip" href="#era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}">${esc(era)}</a>`).join("")}</nav>
-${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>How this list works</summary>${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}</details>` : ""}
-${eras.map((era, eraIdx) => `<details class="fold" data-era id="era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}" style="scroll-margin-top:72px"${eraIdx === 0 ? " open" : ""}><summary><span>${esc(era)}</span><span class="muted fold-n">${sets.filter((s) => s.era === era).length} sets</span></summary><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
-    const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
+  const hasValue = sets.some((s) => Number(s.value) > 0);
+  const hasSealed = sets.some((s) => Number(s.sealed) > 0);
+  const card = (s, eager) => {
     const face = !needsTile(s)
-      ? `<img class="shot set-logo" alt="" width="220" height="72" loading="${load}" decoding="async" src="${esc(s.logo)}">`
-      : setTile(s);
-    const when = priceDay(s.release);
-    const date = when ? ` · <span class="set-date">${esc(when)}</span>` : "";
-    return `<a class="card" data-name="${esc(String(s.name || "").toLowerCase())}" href="/sets/${esc(s.slug)}">${face}<b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${date}</p></a>`;
-  }).join("")}</div></details>`).join("")}
-<p class="muted" id="fold-none" hidden>Nothing matches.</p>${FOLD_JS}</main>`;
+      ? `<div class="sb-face"><img class="set-logo" alt="" width="220" height="96" loading="${eager ? "eager" : "lazy"}" decoding="async" src="${esc(s.logo)}"></div>`
+      : `<div class="sb-face ok">${setTile(s)}</div>`;
+    const when = monthYear(s.release);
+    const cards = Number(s.single) || 0;
+    const sealed = Number(s.sealed) || 0;
+    const count = [cards ? `${cards.toLocaleString("en-US")} cards` : "", sealed ? `${sealed} sealed` : ""].filter(Boolean).join(" · ");
+    return `<a class="sb-card" data-name="${esc(String(s.name || "").toLowerCase())}" data-release="${esc(s.release || "")}" data-sealed="${sealed}" data-value="${Number(s.value) > 0 ? Number(s.value) : 0}" href="/sets/${esc(s.slug)}">${face}<span class="sb-name">${esc(s.name)}</span><span class="sb-meta">${when ? `<span>${esc(when)}</span>` : ""}<span class="sb-pill">${esc(ERA_SHORT[s.era] || s.era)}</span></span>${count ? `<span class="sb-count">${esc(count)}</span>` : ""}</a>`;
+  };
+  const byNew = (a, b) => String(b.release || "").localeCompare(String(a.release || ""));
+  const body = `<style>${SET_TILE_CSS}${BROWSE_CSS}</style><main id="main" tabindex="-1" class="wrap">
+<div class="sb-head"><h1>Sets</h1>
+<input id="q" class="sb-search" type="search" aria-label="Find a set" placeholder="Search ${sets.length} sets" autocomplete="off">
+<div class="sb-row sb-chips" role="group" aria-label="Sort"><span class="sb-label">Sort</span><button type="button" class="sb-chip" data-sort="new" aria-pressed="true">Newest</button><button type="button" class="sb-chip" data-sort="az" aria-pressed="false">A-Z</button>${hasValue ? `<button type="button" class="sb-chip" data-sort="value" aria-pressed="false">Set value</button>` : ""}</div>
+<div class="sb-row sb-chips" role="group" aria-label="Filter"><span class="sb-label">Filter</span><select id="era-filter" class="sb-chip" aria-label="Era"><option value="">All eras</option>${eras.map((era) => `<option value="${esc(era)}">${esc(era)}</option>`).join("")}</select>${hasSealed ? `<button type="button" class="sb-chip" id="has-sealed" aria-pressed="false">Has sealed</button>` : ""}</div>
+</div>
+<nav class="sb-jump sb-chips" aria-label="Jump to an era">${eras.map((era) => `<a class="sb-chip" href="#${esc(eraId(era))}">${esc(era)}</a>`).join("")}</nav>
+${eras.map((era, eraIdx) => {
+    const list = sets.filter((s) => s.era === era).sort(byNew);
+    return `<section class="sb-era" data-era="${esc(era)}" id="${esc(eraId(era))}"><h2>${esc(era)}<span>${list.length} sets</span></h2><div class="sb-grid">${list.map((s, i) => card(s, eraIdx === 0 && i < 6)).join("")}</div></section>`;
+  }).join("")}
+<p class="sb-none" id="sb-none" hidden>No sets match that search.</p>${BROWSE_JS}</main>`;
   return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
 }
 

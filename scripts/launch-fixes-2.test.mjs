@@ -35,10 +35,12 @@ const sets = renderSets({ sets: [
   { era: "Mega Evolution", name: "Mega Evolution", slug: "me01", single: 1, sealed: 0, release: "2025-09-26" },
   { era: "XY", name: "XY", slug: "xy1", single: 1, sealed: 0, release: "2014-02-05" },
 ] }, "");
-const folds = sets.match(/<details class="fold"[^>]*>/g) || [];
-t("sets fold by era, newest era open, rest closed", folds.length === 3 && / open>$/.test(folds[0]) && folds[0].includes("era-mega-evolution") && !folds.slice(1).some((f) => / open>/.test(f)));
+const secs = sets.match(/<section class="sb-era"[^>]*>/g) || [];
+t("sets group by era with the newest era first and a jump bar", secs.length === 3 && secs[0].includes("era-mega-evolution") && sets.includes('class="sb-jump sb-chips"') && sets.includes('href="#era-xy"'));
 t("sets keep a search box", sets.includes('id="q"') && sets.includes('data-name="paldea evolved"'));
-t("folds are rounded", sets.includes(".fold{margin:12px 0;border:1px solid #2f2b26;border-radius:18px"));
+t("set cards are rounded with 44px targets", sets.includes("a.sb-card{display:flex") && sets.includes("border-radius:18px") && sets.includes("min-height:44px"));
+t("sort and filter chips are there", sets.includes('data-sort="new"') && sets.includes('data-sort="az"') && sets.includes('id="era-filter"'));
+t("no underlined link styling or long count line", !sets.includes(" singles · ") && !sets.includes(" priced") && sets.includes("text-decoration:none"));
 const artists = renderArtists({ artists: [{ name: "Ken Sugimori", slug: "ken", count: 3 }, { name: "Atsuko Nishida", slug: "atsuko", count: 2 }, { name: "5ban Graphics", slug: "5ban", count: 9 }] }, "");
 const af = artists.match(/<details class="fold"[^>]*>/g) || [];
 t("artists fold A to Z, other last", af.length === 3 && af[0].includes("artists-a") && af[2].includes("artists-other") && artists.includes('id="q"'));
