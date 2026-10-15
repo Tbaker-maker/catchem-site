@@ -61,6 +61,9 @@ export function signInDocument(env) {
 export async function sessionView(request, env) {
   const ready = discordReady(env);
   const user = await readUser(request, env);
+  if (officeAllowIds(env).length && !officeAllowed(user, env)) {
+    return { signedIn: !!user, ready, line: INVITE_LINE, open: false };
+  }
   if (!user) return { signedIn: false, ready, line: ideasSignInLine(ready) };
   return {
     signedIn: true,

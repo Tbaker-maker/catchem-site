@@ -3700,7 +3700,7 @@ export function renderPost(stamp, mark = "", opts = {}) {
   const line = typeof mark === "string" ? mark : "";
   const rev = encodeURIComponent(String(opts.editorRev || BUILD_SHA || "dev").slice(0, 12) || "dev");
   const body = `<iframe title="Post Office editor" src="/post-office/app?v=${rev}" style="display:block;width:100%;border:0;background:#12100e"></iframe>
-<style>iframe[title="Post Office editor"]{height:calc(100dvh - 128px)}@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 56px)}}</style>`;
+<style>iframe[title="Post Office editor"]{height:calc(100dvh - 188px)}@media(min-width:1024px){iframe[title="Post Office editor"]{height:calc(100dvh - 64px)}}</style>`;
   return chrome("Post Office", body, "Post Office", "", line, feedNav(opts));
 }
 
