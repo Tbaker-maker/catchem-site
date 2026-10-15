@@ -1,7 +1,7 @@
 import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -538,7 +538,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           rotation = { mark: row.mark || "", status: row.status || "", asOf, until: daysLeft != null && daysLeft >= 0 ? until : "", daysLeft: daysLeft != null && daysLeft >= 0 ? daysLeft : null };
         }
       }
-      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation }));
+      const facts = await loadReadFacts(id, fetchImpl);
+      if (!rotation && facts?.rotation && (facts.rotation.mark || facts.rotation.status)) rotation = { mark: facts.rotation.mark || "", status: facts.rotation.status || "", asOf: facts.rotation.asOf || "", until: "", daysLeft: null };
+      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation, facts }));
     }
     return html(renderFeed(freshBundle, "", stamp, withDive));
   }

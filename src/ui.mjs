@@ -3974,7 +3974,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     ...(row.why ? { why: soldSafeText(row, row.why) } : {}),
   })) : reads;
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
-  const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool }) : "";
+  const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
