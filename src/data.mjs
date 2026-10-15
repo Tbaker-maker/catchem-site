@@ -191,3 +191,24 @@ export async function loadReadFacts(id, fetchImpl = fetch) {
     return doc && typeof doc === "object" && doc.id === String(id) ? doc : null;
   } catch { return null; }
 }
+
+// One item's row from its set's item-read shard (feed/items/<setSlug>.json).
+// One item per line, so the row is sliced out of the text; the shard is never parsed whole.
+export async function loadItemRead(setSlug, id, fetchImpl = fetch) {
+  const slug = String(setSlug || "").replace(/[^A-Za-z0-9._-]/g, "_");
+  if (!slug || !id) return null;
+  try {
+    const text = await rawText(`feed/items/${slug}.json`, fetchImpl);
+    return itemLine(text, id);
+  } catch { return null; }
+}
+
+export function itemLine(text, id) {
+  const s = String(text || "");
+  const key = `\n${JSON.stringify(String(id))}:`;
+  const at = s.indexOf(key);
+  if (at < 0) return null;
+  const end = s.indexOf("\n", at + key.length);
+  const body = s.slice(at + key.length, end < 0 ? undefined : end).replace(/,\s*$/, "");
+  try { const doc = JSON.parse(body); return doc && typeof doc === "object" ? doc : null; } catch { return null; }
+}

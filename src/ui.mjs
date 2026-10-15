@@ -2564,6 +2564,7 @@ ${ebayBlock(opts.priceRead)}
 </div>
 </header>
 ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
+${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
 ${factBlock}
@@ -2763,6 +2764,7 @@ ${sealedStrip}
 ${chips ? `<p>${chips}</p>` : ""}
 ${priceChart}
 ${rangeRow}
+${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
 ${ebayAskLine(opts.ebayAsk)}

@@ -1,7 +1,8 @@
 import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
+import { itemReadBlock } from "./item-read.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -772,8 +773,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       ratingHtml = plainPanel(ratingHtml);
       cycleHtml = plainPanel(cycleHtml);
     }
+    let itemReadHtml = "";
+    if (card && card.setSlug) {
+      const itemRead = await loadItemRead(card.setSlug, card.id, fetchImpl);
+      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact });
+      if (block) itemReadHtml = block;
+    }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
