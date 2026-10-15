@@ -1,3 +1,5 @@
+import { splitName } from "./display-name.mjs";
+import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
@@ -1646,16 +1648,16 @@ export function renderSets(index, stamp, opts = {}) {
     const ib = order.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || String(a).localeCompare(String(b));
   });
-  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart. <a href="/indexes">Rarity indexes</a></p>
+  const body = `<style>${SET_TILE_CSS}</style><main id="main" tabindex="-1" class="wrap"><h1>Sets</h1><p class="muted">${sets.length} groups. Newest names sit with their era. Singles and sealed stay apart. <a href="/indexes">Rarity indexes</a></p>
 ${sets.length ? "" : `<p class="muted">No sets in the file.</p>`}
 <div class="filters"><input id="q" aria-label="Find a set" placeholder="Find a set" autocomplete="off"></div>
 <nav class="filters sort-chips era-jump" aria-label="Jump to an era">${eras.map((era) => `<a class="sort-chip" href="#era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}">${esc(era)}</a>`).join("")}</nav>
 ${index?.sealedNote || index?.soldNote ? `<details class="sets-notes"><summary>How this list works</summary>${index?.sealedNote ? `<p class="muted">${esc(index.sealedNote)}</p>` : ""}${index?.soldNote ? `<p class="muted">${esc(index.soldNote)}</p>` : ""}</details>` : ""}
 ${eras.map((era, eraIdx) => `<details class="fold" data-era id="era-${esc(String(era).toLowerCase().replace(/[^a-z0-9]+/g, "-"))}" style="scroll-margin-top:72px"${eraIdx === 0 ? " open" : ""}><summary><span>${esc(era)}</span><span class="muted fold-n">${sets.filter((s) => s.era === era).length} sets</span></summary><div class="grid">${sets.filter((s) => s.era === era).sort((a, b) => String(b.release || "").localeCompare(String(a.release || ""))).map((s, i) => {
     const load = eraIdx === 0 && i < 2 ? "eager" : "lazy";
-    const face = /^(https:\/\/|\/img\/[a-z0-9.-]+\/logo\.png$)/i.test(String(s.logo || ""))
+    const face = !needsTile(s)
       ? `<img class="shot set-logo" alt="" width="220" height="72" loading="${load}" decoding="async" src="${esc(s.logo)}">`
-      : brandedTile("logo", { kind: "set", name: s.name });
+      : setTile(s);
     const when = priceDay(s.release);
     const date = when ? ` · <span class="set-date">${esc(when)}</span>` : "";
     return `<a class="card" data-name="${esc(String(s.name || "").toLowerCase())}" href="/sets/${esc(s.slug)}">${face}<b>${esc(s.name)}</b><p class="muted">${s.single} singles · ${s.sealed} sealed${s.priced ? ` · ${s.priced} priced` : ""}${date}</p></a>`;
@@ -1691,6 +1693,8 @@ ${opts.setValueHtml || ""}
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
+${splitName.toString()}
+var rowDay="";
 const money=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function html(s){
   return String(s==null?"":s).replace(/[&<>"']/g,function(c){
@@ -1726,7 +1730,9 @@ function rowHtml(r){
   const src=pic.src||"";
   const img=src?'<img alt="'+html(r.name)+'" width="64" height="89" loading="lazy" decoding="async" '+((r.kind==="single")?'':'class="shot" ')+'data-kind="'+(r.kind==="sealed"?"sealed":"single")+'" '+((r.kind==="single")?'data-crop-card="1" onload="if(window.cropCardEdge)cropCardEdge(this)" ':'')+((r.kind==="single")?'class="shot card-face thumb" ':'style="width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e" ')+'src="'+String(src).replace(/"/g,"")+'"'+altAttr(pic)+' onerror="miss(this)">':brandedTile(r&&r.kind==="sealed"?"sealed":"row",{kind:r&&r.kind,name:r&&r.name,subtype:r&&r.subtype,logo:setLogo});
   const bits=[];
-  if(r.num) bits.push(html(r.num));
+  var sn=(${splitName.toString().replace(/\n\s*/g, " ")})(r.name,r.num);
+  if(sn.num) bits.push(html(sn.num));
+  sn.variants.forEach(function(v){ bits.push(html(v)); });
   if(r.rarity) bits.push(html(r.rarity));
   if(r.kind==="sealed" && r.subtype==="case") bits.push("Case");
   if(r.artist) bits.push(html(r.artist));
@@ -1736,7 +1742,7 @@ function rowHtml(r){
     var owned=readOwned();
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(r.name)+'</b>'+(bits.length?'<span class="muted">'+bits.join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a>'+(money(r.price)?'<b>'+money(r.price)+'</b>':'')+'</div>';
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(sn.title)+'</b>'+(bits.length?'<span class="muted">'+bits.concat(typeof rowDay==="string"&&rowDay?[rowDay]:[]).join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a>'+(money(r.price)?'<b>'+money(r.price)+'</b>':'')+'</div>';
 }
 function visTags(t){ return (Array.isArray(t)?t:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())}); }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
@@ -1878,6 +1884,7 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   document.getElementById("sealed-chart").setAttribute("data-release", data.release||"");
   if(typeof catchemMount==="function") catchemMount(document.getElementById("charts"));
   rows=(data.items||[]).filter(r=>r&&r.name);
+  rowDay=(function(d){d=String(d||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return "";return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][Number(d.slice(5,7))-1]+" "+Number(d.slice(8,10));})(data.asOf);
   draw();
 }).catch(function(){
   var title=document.getElementById("title");

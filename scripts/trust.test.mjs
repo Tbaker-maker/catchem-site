@@ -52,3 +52,4 @@ assert.equal(topErrors(twice)[0].count, 2);
 
 console.log("trust ok");
 await import("./read-facts.test.mjs");
+await import("./sets-polish.test.mjs");
