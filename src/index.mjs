@@ -6,7 +6,9 @@ import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRea
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
+import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
+import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage } from "./reads.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -95,6 +97,7 @@ export function pageKind(pathname) {
   if (path.startsWith("/indexes/")) return "index";
   if (path === "/rip") return "rip";
   if (path === "/weekly") return "weekly";
+  if (path === "/reads") return "reads";
   if (path === "/scanner") return "scanner";
   if (path === "/releases") return "releases";
   if (path === "/practice") return "practice";
@@ -822,6 +825,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const market = await loadJson("indexes.json", fetchImpl).catch(() => null);
     return html(pageChrome("Indexes", indexListBody(list, market), "Indexes", stamp, "", pageOpts.feed === true));
   }
+  if (kind === "reads") {
+    return html(pageChrome("Reads", renderReadsPage(opts.reads || {}), "Your reads", stamp, "", pageOpts.feed === true));
+  }
   if (kind === "weekly" || kind === "scanner") {
     const doc = await loadCatalogue("derived/weekly.json", fetchImpl).catch(() => null);
     if (kind === "scanner") return html(renderScanner(doc, stamp, pageOpts));
@@ -1059,6 +1065,8 @@ export default {
       if (url.pathname === "/api/vote") return handleVote(request, env);
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
       if (url.pathname === "/api/follow") return handleFollow(request, env);
+      if (url.pathname === "/api/reads") return handleReads(request, env);
+      if (url.pathname === "/api/reads/click") return handleReadsClick(request, env);
       if (url.pathname === "/api/report") {
         return new Response(JSON.stringify({
           ok: false,
@@ -1081,6 +1089,21 @@ export default {
       if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
+      let reads = null;
+      if (kind === "reads") {
+        let viewer = null;
+        try { viewer = await readUser(request, env); } catch { viewer = null; }
+        const stored = await loadStoredPlan(env?.FEED_KV, viewer?.sub);
+        reads = {
+          plan: stored,
+          signedIn: !!viewer?.sub,
+          premium: viewer?.premium === true,
+          saved: url.searchParams.get("saved") === "1",
+          line: url.searchParams.get("line") || "",
+          card: url.searchParams.get("card") || "",
+          sealed: url.searchParams.get("sealed") || "",
+        };
+      }
       let premium = false;
       if (feed && (kind === "feed" || kind === "card" || kind === "ir-watchlist")) {
         try {
@@ -1092,7 +1115,7 @@ export default {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

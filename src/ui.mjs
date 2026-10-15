@@ -1585,7 +1585,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/indexes", "Indexes")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/indexes", "Indexes")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -2574,6 +2574,13 @@ function patternBlock(read) {
   return `<section class="cp-pattern"><p>${esc(hit.text)}</p>${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
 }
 
+function readLink(card) {
+  const id = String(card?.id || "");
+  if (!id.startsWith("tcgcsv-")) return "";
+  const kind = card.kind === "sealed" ? "sealed" : "card";
+  return `<p class="muted"><a href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
+}
+
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
   const tags = printingTags(card);
   const chips = [
@@ -2633,6 +2640,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <div class="cp-id">
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
+${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
@@ -2837,6 +2845,7 @@ export function renderCard(card, stamp, opts = {}) {
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
+${readLink(card)}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span></p>` : ""}
