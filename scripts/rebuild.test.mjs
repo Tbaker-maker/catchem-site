@@ -769,7 +769,7 @@ t("a fact is not dropped as a stale price", readStaleAgainstCard(
 ) === false);
 const staleFiles = {
   ...files,
-  "reads.json": { asOf: "2026-10-03", reads: [
+  "reads.json": { asOf: "2026-10-03", priceStaleIds: ["move-tcgcsv-516693-7"], reads: [
     { id: "move-tcgcsv-684406-7", sku: "tcgcsv-684406", kind: "single", readKind: "price", name: "Talonflame - 091/088", headline: "Talonflame price.", path: "Talonflame - 091/088 latest price rose from $1.26 on Sep 26 to $1.92 on Oct 3, up 52.4%.", price: 1.92, asOf: "2026-10-03" },
     { id: "move-tcgcsv-516693-7", sku: "tcgcsv-516693", kind: "single", readKind: "price", name: "Gyarados", headline: "Gyarados price.", path: "Gyarados latest price fell from $1.57 on Sep 18 to $1.36 on Sep 25, down 13.4%.", price: 1.36, asOf: "2026-09-25" },
     { id: "pokemon-gyarados", sku: "pokemon-gyarados", readKind: "pokemon", kind: "pokemon", name: "Gyarados", headline: "Gyarados has 42 cards in the catalog, drawn by 22 artists, and the national dex number on those cards is 130.", path: "Gyarados has 42 cards in the catalog, drawn by 22 artists, and the national dex number on those cards is 130.", cardCount: 42, artistCount: 22, dex: 130, source: "pokemontcg.io" },
@@ -785,7 +785,7 @@ const staleFetch = async (url) => {
 resetJsonCache();
 const staleHtml = await (await renderPath("/feed", staleFetch, { feed: true })).text();
 const staleLead = JSON.parse(staleHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
-t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
+t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price from priceStaleIds", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
 t("the feed asks the card file before it shows that price", staleHtml.includes("function readStaleAgainstCard") && staleHtml.includes("function stalePrice"));
 
 // ── every inline client script must parse ──
@@ -997,3 +997,10 @@ await import("./indexes-fill.test.mjs");
 await import("./polish.test.mjs");
 await import("./read-sheet.test.mjs");
 await import("./compare.test.mjs");
+{
+  const { cacheKeyUrl } = await import("../src/edge-cache.mjs");
+  const ok = cacheKeyUrl("https://catchemtcg.com/feed?utm_source=x&fbclid=1&s=20&t=a&ref=y&twclid=z&gclid=g#top") === "https://catchemtcg.com/feed";
+  const keep = cacheKeyUrl("https://catchemtcg.com/sets?sort=new&utm_medium=x") === "https://catchemtcg.com/sets?sort=new";
+  console.log((ok && keep ? "  ok  " : "  FAIL ") + "cache key drops tracking params and keeps real ones");
+  if (!(ok && keep)) process.exitCode = 1;
+}
