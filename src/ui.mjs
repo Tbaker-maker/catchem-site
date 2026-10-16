@@ -1353,8 +1353,9 @@ a{color:var(--gold)}
 .stale-banner{margin:0;padding:10px 16px;background:#3a2a12;color:#f3e6c8;font:600 14px/1.4 var(--sans)}
 .status-list{list-style:none;padding:0;margin:0}
 .status-list li{padding:8px 0;border-bottom:1px solid var(--line)}
-.site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em}
+.site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em;min-height:44px;display:inline-flex;align-items:center}
 .site-bar .logo span{color:var(--gold)}
+a.tap,.site-foot a{min-height:44px;display:inline-flex;align-items:center}
 .menu-btn{display:none;min-height:44px}
 .site-bar nav{display:flex;flex-wrap:wrap;gap:8px 14px}
 .site-bar nav a{color:var(--dim);text-decoration:none;font:500 14px/1 var(--sans);min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px}
@@ -2511,7 +2512,7 @@ const SINGLE_CSS = `
 .cp-photo img,.cp-photo .tile{width:100%;height:auto;border-radius:22px;background:#1a1815}
 .cp-id{min-width:0;max-width:100%}
 .cp-set{margin:0 0 4px;color:var(--dim);font:500 14px/1.3 var(--sans)}
-.cp-set a{color:inherit;text-decoration:none}
+.cp-set a{color:inherit;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
 .card-page h1{margin:0;font:600 34px/1.05 var(--serif);letter-spacing:-.03em}
 .cp-price{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:12px 0 2px;white-space:nowrap}
 .cp-now{font:600 34px/1 var(--serif);color:var(--gold);letter-spacing:-.03em}
@@ -2605,7 +2606,7 @@ function readLink(card) {
   const id = String(card?.id || "");
   if (!id.startsWith("tcgcsv-")) return "";
   const kind = card.kind === "sealed" ? "sealed" : "card";
-  return `<p class="muted"><a href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
+  return `<p class="muted"><a class="tap" href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
 }
 
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
@@ -3946,7 +3947,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%;display:flex;align-items:center;gap:4px}
   .chip-scroller > .chip-row{flex:1 1 auto;padding-right:28px}
   .chip-scroller > .chip-more{position:static;transform:none;flex:0 0 44px;background:#12100e;border-radius:10px}
-  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:48px;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
+  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:48px;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 24%)}
   .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 48px 8px 0;margin:0;scrollbar-width:none}
   .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
@@ -3958,7 +3959,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .set-picker input{min-height:44px;width:100%;max-width:100%;box-sizing:border-box;border-radius:12px;border:1px solid var(--line);background:#1a1815;color:var(--txt,#efe9de);padding:0 14px;font:500 16px/1 var(--sans)}
   .set-picker input::placeholder{color:#8f877b}
   .set-quick{display:flex;flex-wrap:wrap;gap:6px}
-  .set-quick button{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:var(--txt,#efe9de);font:600 14px/1 var(--sans)}
+  .set-quick button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:var(--txt,#efe9de);font:600 14px/1 var(--sans)}
   .set-hits{display:flex;flex-direction:column;gap:4px;max-height:min(280px,50dvh);overflow:auto;background:#1a1815;border:1px solid var(--line);border-radius:12px;padding:4px}
   .set-hits[hidden]{display:none}
   .set-hits button{min-height:44px;text-align:left;width:100%;display:flex;align-items:center;gap:8px}
@@ -4122,7 +4123,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
-${focusTitle ? '<p><a href="/feed" id="feed-back">Back</a></p>' : '<p><a href="/feed/mine">My tracked reads</a></p>'}`}
+${focusTitle ? '<p><a class="tap" href="/feed" id="feed-back">Back</a></p>' : '<p><a class="tap" href="/feed/mine">My tracked reads</a></p>'}`}
 ${sheet}
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
   <select id="f-loop" class="pill-native" aria-label="Filter">${feedFilterOptions(false).map(function(row){ return '<option value="'+row[0]+'">'+row[1]+'</option>'; }).join("")}</select>
