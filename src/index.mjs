@@ -176,7 +176,7 @@ export function addFeedEntry(html) {
   );
   out = out.replace(
     '<div class="actions">\n      <a class="btn btn-primary" href="/sets">Browse sets</a>',
-    '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Open the Feed</a>\n      <a class="btn btn-ghost" href="/sets">Browse sets</a>',
+    '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Open the Feed</a>',
   );
   return out;
 }
