@@ -682,6 +682,8 @@ export function newsSlice(doc) {
       href,
       source: String(item.source || "").trim(),
     };
+    const image = String(item.image || "");
+    if (image.startsWith("/img/") || image.startsWith("/news-img/") || image.startsWith("/data/")) row.image = image;
     const original = String(item.originalTitle || "").trim();
     if (original) row.originalTitle = original;
     else if (nonEnglishTitle(item.title)) row.originalTitle = String(item.title || "").trim();
@@ -1426,9 +1428,10 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .news-tile .src{margin:0;font:600 26px/1.15 var(--serif);letter-spacing:-.02em}
 .news-tile .tag{margin:0;align-self:flex-start;font:600 12px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1a1407;background:#d9b779;border-radius:999px;padding:6px 10px}
 .news-tile .when{margin:0;font:500 14px/1.2 var(--sans);color:#c4baab}
-.news-tile.news-art{position:relative;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 20%,#2a2418 0%,#12100e 70%)}
-.news-tile.news-art img{max-width:78%;max-height:70%;object-fit:contain}
-.news-tile.news-art .tag{position:absolute;left:14px;top:14px}
+.news-tile.news-art{position:relative;align-items:center;justify-content:center;aspect-ratio:16/9;height:auto;padding:0;border-radius:16px;overflow:hidden;background:#12100e}
+.news-tile.news-art img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:16px}
+.news-tile.news-art.logo img{object-fit:contain;padding:16px;box-sizing:border-box}
+.news-tile.news-plain{aspect-ratio:16/9;height:auto;padding:0;border-radius:16px;background:#1a1815}
 .fl-news{display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#2a2418,#12100e);border:1px solid #d9b779;border-radius:10px;color:#d9b779;font:600 11px/1 var(--sans);letter-spacing:.04em;text-transform:uppercase}
 .news-tile.v1{background:linear-gradient(160deg,#2a2418 0%,#12100e 58%);border-color:#d9b779}
 .news-tile.v1 .src{color:#d9b779}
@@ -3976,7 +3979,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card>.tile{width:min(220px,100%);height:220px;margin:0 auto;aspect-ratio:auto}
   .feed-card>.news-tile{width:100%;height:220px;margin:0}
   .feed-card.news-card{flex:0 0 auto;gap:8px;margin:0;min-width:0}
-  .feed-card.news-card>.news-tile{height:112px;padding:12px 14px}
+  .feed-card.news-card>.news-tile{height:auto;aspect-ratio:16/9;padding:0}
   .feed-card.news-card>.news-tile .mark{font-size:18px}
   .feed-card.news-card>.news-tile .src{font-size:20px}
   .news-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
@@ -4510,10 +4513,19 @@ function newsArtSrc(card){
   }catch(e){ return ""; }
 }
 function safeNewsHtml(card){
-  const art=newsArtSrc(card);
-  if(art) return '<div class="news-tile news-art" role="img" aria-label="'+html(card&&card.name||"News")+'"><img alt="" loading="lazy" src="'+html(art)+'"><p class="tag">News</p></div>';
-  try{ return newsTile(card); }catch(e){}
-  return '<div class="news-tile" role="img" aria-label="Catch'+"'"+'em news"><p class="mark">Catch'+"'"+'em<span class="dot">.</span></p></div>';
+  const row=card&&typeof card==="object"?Object.assign({}, card):{};
+  if(!row.image){
+    const art=newsArtSrc(row);
+    if(art) row.logo=art;
+  }
+  if(!row.image && !row.logo){
+    try{
+      const hit=officialSrc(row, catalogueImages);
+      if(hit && hit.src && String(hit.src).charAt(0)==="/") row.logo=hit.src;
+    }catch(e){}
+  }
+  try{ return newsTile(row); }catch(e){}
+  return '<div class="news-tile news-plain" role="img" aria-label="News"></div>';
 }
 function safeBrandHtml(kind, row){
   try{ return brandedTile(kind, row); }catch(e){}
@@ -5423,7 +5435,7 @@ function flRow(row, i){
   const name=String(row.name||row.headline||"").trim();
   if(!name) return "";
   let thumb="";
-  if(String(row.readKind||row.kind||"")==="news"){ const art=newsArtSrc(row); thumb=art?'<img alt="" loading="lazy" src="'+html(art)+'" style="object-fit:contain;background:#12100e">':'<span class="fl-ph fl-news" aria-hidden="true"><b>News</b></span>'; }
+  if(String(row.readKind||row.kind||"")==="news"){ const art=(row.image&&String(row.image).charAt(0)==="/"?row.image:"")||newsArtSrc(row); thumb=art?'<img alt="" width="64" height="36" loading="lazy" decoding="async" src="'+html(art)+'" style="width:64px;height:36px;object-fit:cover;border-radius:10px;background:#12100e">':'<span class="fl-ph" aria-hidden="true"></span>'; }
   else try{ const ph=photoEl(row); const im=ph&&(ph.tagName==="IMG"?ph:ph.querySelector&&ph.querySelector("img")); if(im&&im.getAttribute("src")) thumb='<img alt="" loading="lazy" src="'+html(im.getAttribute("src"))+'">'; }catch(err){}
   const price=Number(row.price)>0?money(row.price):"";
   const ch=Number(row.change7);

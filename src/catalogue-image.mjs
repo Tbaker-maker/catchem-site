@@ -166,16 +166,17 @@ export function newsTile(card) {
       "'": "\u0026#39;",
     }[c]));
   }
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const row = card && typeof card === "object" ? card : {};
-  const n = newsVariant(row.id || row.href || row.source);
   const source = String(row.source || "News").trim() || "News";
-  const tag = String(row.place || "").trim();
-  const day = String(row.asOf || "").slice(0, 10);
-  let when = "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) when = months[Number(day.slice(5, 7)) - 1] + " " + Number(day.slice(8, 10)) + ", " + day.slice(0, 4);
-  const label = [source, tag, when].filter(Boolean).join(", ");
-  return '<div class="news-tile v' + n + '" role="img" aria-label="Catch\'em news, ' + esc(label) + '"><p class="mark">Catch\'em<span class="dot">.</span></p><p class="src">' + esc(source) + '</p>' + (tag ? '<p class="tag">' + esc(tag) + '</p>' : "") + (when ? '<p class="when">' + esc(when) + '</p>' : "") + '</div>';
+  const label = [source, row.place, row.asOf].filter(Boolean).join(", ");
+  const src = String(row.image || row.logo || "");
+  const local = src.startsWith("/img/") || src.startsWith("/news-img/") || src.startsWith("/data/") || src.startsWith("/api/card-img");
+  if (local) {
+    const fit = row.image ? "cover" : "contain";
+    const kind = row.image ? "news-art" : "news-art logo";
+    return '<div class="news-tile ' + kind + '" role="img" aria-label="' + esc(label) + '"><img alt="" width="640" height="360" loading="lazy" decoding="async" src="' + esc(src) + '" style="object-fit:' + fit + '"></div>';
+  }
+  return '<div class="news-tile news-plain" role="img" aria-label="' + esc(label) + '"></div>';
 }
 
 export function imageTag(src, kind, alt, row) {
