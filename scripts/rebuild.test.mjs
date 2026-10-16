@@ -13,6 +13,7 @@ import vm from "node:vm";
 import { esc, renderSets, renderMine, isVolumeRow, isShapeRow, soldSafeText, volumeReads, renderAll, renderDive, renderFeed, keepFeedRead, isFactRow, isLagRow, isSupplyRow, filesDisagree, readStaleAgainstCard, buildFeedLoop, renderSearch, pokemonFactLine, pricedMonCards, readUnderTitle, shownRead, isSealedProductRow, cardIdentity, countPublishedReads, newsSlice, newsLinkTarget, factCutout, tcgLink, withoutSoldClaim, isOutlierRow, isDiveRow, flaggedReads, diveReads, renderSetShell, renderMethod, renderPremium, renderPost, renderPokemon, renderSupply, gapChartSvg, splitDated, exactWindowPct, listingTrend, rangeMarker, renderTrackRecord, renderToday, renderSetValue, quickView, decodeSpark, sparkSvg, compareRows, renderFacts, renderCompare, TAKE_LABELS, TAKE_FOOTER, chartBox } from "../src/ui.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { imageForId, brandedTile, officialSrc, newsTile, visualGaps, imageTag as chainTag } from "../src/catalogue-image.mjs";
+import { ogImageFrom } from "../src/news-preview.mjs";
 import { isFeedPath, redirectPath } from "../src/feed.mjs";
 import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
@@ -148,10 +149,13 @@ const fetchImpl = async (url) => {
   t("a broken catalogue image falls back by id, then a tile", a.src.endsWith("/cards/seed/bw6-120.png") && a.alts.join() === "/data/editor/tcg/bw6/120_hires.png" && b.src === "/api/card-img?pid=42" && b.alts.length === 0 && c.src === "/api/card-img?pid=654136" && c.alts.length === 0 && chainTag(a.src, "card", "Mew-EX", { alts: a.alts }).includes('data-alts="/data/editor/tcg/bw6/120_hires.png"'));
 }
 t("catalogue image is the id hit only", imageForId({ "base1-1": "/img/base1/1" }, "base1-1") === "/data/editor/tcg/base1/1_hires.png" && imageForId({ a: "https://images.pokemontcg.io/base1/1.png" }, "a") === "" && imageForId({ "sv3pt5-200": "/cards/seed/sv3pt5-200.png" }, "sv3pt5-200").endsWith("/research/assets/cards/seed/sv3pt5-200.png") && imageForId({ "base1-1": "/img/base1/1" }, "tcgcsv-10") === "" && brandedTile("logo").includes("tile-logo") && brandedTile("card").includes("Catch'em"));
-const japanNews = newsTile({ id: "jp-news", source: "Pokémon Card (Japan)", place: "Japan news", asOf: "2026-10-02" });
+const japanNews = newsTile({ id: "jp-news", source: "Pokémon Card (Japan)", place: "Japan news", asOf: "2026-10-02", logo: "/img/sv3pt5/logo.png" });
 const enNews = newsTile({ id: "en-news", source: "Bulbagarden", place: "", asOf: "2026-10-01" });
-const newsLooks = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => (newsTile({ id, source: "S", asOf: "2026-10-02" }).match(/news-tile v(\d)/) || [])[1]));
-t("news is a Catch'em tile, never a source preview", japanNews.includes("news-tile") && japanNews.includes("Japan news") && japanNews.includes("Oct 2, 2026") && japanNews.includes("Pokémon Card (Japan)") && enNews.includes("Bulbagarden") && enNews.includes("Oct 1, 2026") && !enNews.includes("Japan news") && !japanNews.includes("og:image") && newsLooks.size >= 2);
+const preview = newsTile({ id: "press", source: "Pokémon press", image: "/news-img/press.jpg" });
+t("news uses a cached preview or a set logo, never a letter tile", japanNews.includes("news-art") && japanNews.includes("/img/sv3pt5/logo.png") && japanNews.includes('loading="lazy"') && !japanNews.includes("Catch'em") && enNews.includes("news-plain") && !enNews.includes("<p class=\"mark\"") && preview.includes("/news-img/press.jpg") && preview.includes("object-fit:cover") && !preview.includes("http"));
+const pressHtml = '<meta property="og:image" content="https://press.pokemon.com/en/media/logo.png">';
+const cdnHtml = '<meta property="og:image" content="https://imguscdn.gamespress.com/cdn/files/PokemonAmerica/logo.png">';
+t("a press preview is kept only on press.pokemon.com", ogImageFrom(pressHtml, "https://press.pokemon.com/en/releases/example") === "https://press.pokemon.com/en/media/logo.png" && ogImageFrom(cdnHtml, "https://press.pokemon.com/en/releases/example") === "" && ogImageFrom(pressHtml, "https://www.serebii.net/news/") === "");
 t("old product urls are catalog routes that redirect", pageKind("/p/sv3pt5-etb") === "product" && pageKind("/p/sv3pt5-etb.html") === "product");
 t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pageKind("/dive/sv3pt5-etb.html") === "dive");
 
