@@ -3,6 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { rmSync, cpSync, existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { writePublicRoutes } from "./public-routes.mjs";
+import { buildAndWrite as buildStripIndex } from "./build-strip-index.mjs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,6 +45,7 @@ run(process.execPath, [join(APP, "scripts/build-public-site.mjs")], {
 });
 cpSync(join(APP, "site-public"), OUT, { recursive: true });
 await writePublicRoutes(OUT);
+await buildStripIndex(OUT);
 const videoSrc = join(ROOT, "vendor/video");
 if (existsSync(videoSrc)) cpSync(videoSrc, join(OUT, "video"), { recursive: true });
 
