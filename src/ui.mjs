@@ -3609,6 +3609,7 @@ async function draw(){
 }
 document.getElementById("q").addEventListener("input",draw);
 document.getElementById("vtag").addEventListener("input",draw);
+(function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));

@@ -69,6 +69,7 @@ h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin
 .lede{color:var(--soft);font-size:19px;margin:0 0 30px;max-width:38ch}
 .lede strong{color:var(--text);font-weight:500}
 .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.hero-search{margin:22px 0 14px;max-width:520px}.hero-search input{width:100%;min-height:52px;padding:0 20px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:inherit;font:500 16px/1 inherit}.hero-search input:focus{outline:2px solid var(--gold);outline-offset:2px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;
   border-radius:10px;font:600 16px/1 var(--sans);text-decoration:none;cursor:pointer;border:1px solid transparent;
   transition:background .15s ease,border-color .15s ease,color .15s ease}
@@ -204,9 +205,11 @@ footer a{color:var(--gold)}
     <p class="kicker">Built with the community</p>
     <h1>Know what every card and pack is doing.</h1>
     <p class="lede">From Base Set to the latest drops.</p>
+    <form class="hero-search" action="/search" method="get" role="search">
+      <input name="q" type="search" aria-label="Search every card and product" placeholder="Search a card, set or product" autocomplete="off">
+    </form>
     <div class="actions">
       <a class="btn btn-primary" href="/sets">Browse sets</a>
-      <a class="btn btn-ghost" href="/post-office">Post Office</a>
     </div>
     <p class="beta" id="fresh"><b>Open</b><span id="fresh-line"></span></p>
   </div>
