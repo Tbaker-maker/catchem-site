@@ -1,3 +1,4 @@
+import { edgeFetch } from "./edge-cache.mjs";
 import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
@@ -920,8 +921,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   return null;
 }
 
-export default {
+const worker = {
   async fetch(request, env, ctx) {
+    return edgeFetch(worker.render, request, env, ctx);
+  },
+  async render(request, env, ctx) {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
@@ -1163,6 +1167,7 @@ export default {
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
   },
 };
+export default worker;
 
 
 // /img/{setId}/logo.png: Post Office catalogue file in Catchem-data first,
