@@ -222,6 +222,24 @@ async function omitStalePriceReads(reads, _fetchImpl, opts = {}) {
   return drop.size ? list.filter((r) => !drop.has(String(r?.id))) : list;
 }
 
+// Every read about one item, from the small per-item lookup (feed/item-reads).
+// Falls back to reads.json until the lookup exists.
+export async function allReadsFor(cardId, fetchImpl) {
+  if (!/^tcgcsv-\d+$/.test(String(cardId || ""))) return [];
+  const b = String((Number(String(cardId).match(/(\d+)/)[1]) || 0) % 100).padStart(2, "0");
+  try {
+    const doc = await loadJson(`feed/item-reads/${b}.json`, fetchImpl);
+    return Array.isArray(doc?.items?.[cardId]) ? doc.items[cardId] : [];
+  } catch {
+    try {
+      const bundle = await loadJson("reads.json", fetchImpl);
+      return (bundle?.reads || []).filter((r) => r && (r.sku === cardId || r.href === `/c/${cardId}` || r.href === `/p/${cardId}`))
+        .map((r) => ({ id: r.id, kind: String(r.readKind || r.kind || ""), headline: String(r.headline || r.path || ""), lines: Array.isArray(r.lines) ? r.lines.slice(0, 6) : [], asOf: String(r.asOf || "").slice(0, 10), source: String(r.source || "") }))
+        .sort((x, y) => y.asOf.localeCompare(x.asOf));
+    } catch { return []; }
+  }
+}
+
 async function readsFor(cardId, fetchImpl) {
   try {
     const bundle = await loadJson("reads.json", fetchImpl);
@@ -754,7 +772,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       if (block) itemReadHtml = block;
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
