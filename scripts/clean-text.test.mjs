@@ -26,4 +26,5 @@ assert.ok(out.includes('var a="2026-10-15 $-1"'));
 assert.ok(out.includes("<textarea>2026-10-15</textarea>"));
 assert.ok(out.includes("<p></p>"));
 assert.ok(ensureAffiliation("<main><h1>x $3.1</h1></main>").includes("$3.10"));
+assert.equal(cleanText("Prices labeled TCGplayer market come via TCGCSV, published the day before.", Y), "Prices labeled TCGplayer market come from TCGplayer, published the day before.");
 console.log("clean-text ok");

@@ -33,6 +33,7 @@ export function cleanText(t, nowYear) {
   // data file paths like data/enrichment-distilled.json, research/x.json
   s = s.replace(/(?:^|[\s(,])(?:[\w.-]+\/)*[\w.-]+\.json\b,?\s*/g, (m) => (/^[\s(,]/.test(m) ? m[0] : ""));
   s = s.replace(/[.,]?\s*\bebay-browse-api\b\.?/gi, (m) => (m.trim().startsWith(".") ? "." : ""));
+  s = s.replace(/\b(comes?|came)\s+via\s+TCGCSV\b/gi, "$1 from TCGplayer");
   s = s.replace(/\s+via\s+TCGCSV\b/gi, "");
   s = s.replace(/\bTCGCSV\b/gi, "TCGplayer");
   // ISO date (not inside a longer token)
