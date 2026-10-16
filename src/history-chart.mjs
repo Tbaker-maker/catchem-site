@@ -73,7 +73,7 @@ export const HISTORY_CSS = `.hc{margin:16px 0;padding:16px 16px 12px;border-radi
 .hc-pill{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;opacity:.7;transition:background .2s,opacity .2s}
 .hc-pill[aria-pressed="true"]{background:rgba(255,255,255,.14);opacity:1}.hc-pill:focus-visible{outline:2px solid #d9b779;outline-offset:2px}
 .hc-plot{position:relative;height:220px;touch-action:pan-y}.hc-svg{width:100%;height:100%;display:block;overflow:visible}
-.hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 12px;border-radius:14px;background:rgba(24,22,20,.94);border:1px solid rgba(255,255,255,.12);font-size:12px;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2}.hc-tip b{font-size:14px;font-weight:650}.hc-tip span{opacity:.7}
+.hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 12px;border-radius:14px;background:rgba(24,22,20,.94);border:1px solid rgba(255,255,255,.12);font-size:12px;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2}.hc-tip[hidden]{display:none}.hc-tip b{font-size:14px;font-weight:650}.hc-tip span{opacity:.7}
 .hc-gls{position:absolute;inset:0;pointer-events:none}.hc-gl{position:absolute;right:2px;transform:translateY(-120%);font-size:10px;opacity:.38}
 .hc-axis{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
 .hc-gaps{}
