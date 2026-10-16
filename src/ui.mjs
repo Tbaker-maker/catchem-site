@@ -3952,6 +3952,13 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .means p{margin:0 0 8px}
   .means p:last-child{margin:0}
   .open-data{min-height:44px;display:inline-flex;align-items:center;font-weight:600}
+  .feed-card .open-data{justify-content:center;padding:0 20px;border-radius:14px;background:var(--gold);color:#1a1407;text-decoration:none}
+  .feed-list{margin:18px 0 8px}.feed-list h3{margin:0 0 8px;font:600 16px/1.2 var(--sans);color:var(--dim)}
+  .fl-scroll{display:flex;flex-direction:column;gap:8px;max-height:min(560px,70dvh);overflow-y:auto;padding-right:2px;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}
+  .fl-row{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:inherit;text-align:left;font:inherit;cursor:pointer}
+  .fl-row img,.fl-ph{flex:0 0 44px;width:44px;height:44px;object-fit:contain;border-radius:10px;background:#12100e}
+  .fl-name{flex:1 1 auto;min-width:0;font:600 14px/1.3 var(--sans);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .fl-num{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;font:600 14px/1.2 var(--sans)}.fl-num .up{color:#7fc79a;font-size:12px}.fl-num .down{color:#e0877a;font-size:12px}
   .data-block{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
   .data-block h4{margin:0;font:600 16px/1.3 var(--sans)}
   .data-block p{margin:0}
@@ -5311,6 +5318,28 @@ async function rowAt(index){
   }
   return null;
 }
+async function fillList(list, index){
+  const total=totalReads();
+  const stop=Math.min(total||0, index+25);
+  let html2="";
+  for(let i=index+1;i<stop;i++){
+    let got=null;
+    try{ got=await rowAt(i); }catch(err){ got=null; }
+    const row=got&&got.row;
+    if(!row || row.skip || (row.claim && !row.headline)) continue;
+    const name=String(row.name||row.headline||"").trim();
+    if(!name) continue;
+    let thumb="";
+    try{ const ph=photoEl(row); const im=ph&&(ph.tagName==="IMG"?ph:ph.querySelector&&ph.querySelector("img")); if(im&&im.getAttribute("src")) thumb='<img alt="" loading="lazy" src="'+html(im.getAttribute("src"))+'">'; }catch(err){}
+    const price=Number(row.price)>0?money(row.price):"";
+    const ch=Number(row.change7);
+    const chg=Number.isFinite(ch)&&row.change7!==null&&row.change7!==""?'<span class="'+(ch>0?"up":ch<0?"down":"")+'">'+(ch>0?"+":"")+ch+'%</span>':"";
+    html2+='<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph"></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+'</b>'+chg+'</span></button>';
+  }
+  if(!html2) return;
+  list.innerHTML='<h3>Up next</h3><div class="fl-scroll">'+html2+'</div>';
+  list.querySelectorAll(".fl-row").forEach(function(b){ b.onclick=function(){ showSpot(Number(b.getAttribute("data-i"))); window.scrollTo({top:0,behavior:"smooth"}); }; });
+}
 async function showSpot(index){
   const total=totalReads();
   if(index<0) index=0;
@@ -5347,6 +5376,11 @@ async function showSpot(index){
   nav.appendChild(prev);
   nav.appendChild(next);
   stage.appendChild(nav);
+  const list=document.createElement("div");
+  list.className="feed-list";
+  list.setAttribute("aria-label","More reads");
+  stage.appendChild(list);
+  fillList(list, index);
   const card=stage.querySelector("article");
   if(card){
     let start=null;
@@ -5922,7 +5956,7 @@ async function showFlat(index, dir){
     pos.className="read-pos";
     stage.appendChild(pos);
   }
-  pos.textContent=placeLabel();
+  pos.textContent="";
   let slide=stage.querySelector(".feed-slide");
   if(!slide){
     slide=document.createElement("div");
