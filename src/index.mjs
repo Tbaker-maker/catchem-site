@@ -213,8 +213,11 @@ function withCatalogue(list, images) {
 // build-feed). The old per-request bucket scan fetched ~70 buckets on a cold
 // isolate and tripped Cloudflare error 1102, so it is gone. Without the list,
 // only the build-time stale flag applies.
+const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase"]);
 async function omitStalePriceReads(reads, _fetchImpl, opts = {}) {
-  const list = (Array.isArray(reads) ? reads : []).filter((read) => !read?.stale);
+  // The build-time stale flag is about prices. Dated facts (Pokemon, listings
+  // counted, news, releases, rotation, deep reads) stay true on their own date.
+  const list = (Array.isArray(reads) ? reads : []).filter((read) => !read?.stale || DATED_FACT_KINDS.has(String(read?.readKind || read?.kind || "")));
   const drop = new Set((Array.isArray(opts.staleIds) ? opts.staleIds : []).map(String));
   return drop.size ? list.filter((r) => !drop.has(String(r?.id))) : list;
 }
@@ -684,6 +687,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       rotationHtml = art + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
       if (card.kind !== "sealed" && (/Release cycle/.test(art) || /class="rchip(?:\s|")/.test(art))) cycleHtml = art;
     }
+    let priceCheck = false;
     if (card && card.kind !== "sealed" && cardId) {
       const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
       const rows = (shard?.rows || []).filter((r) => r.id === cardId);
@@ -697,6 +701,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
         }
         ratingHtml = panels.join("");
+        if (rows.some((r) => r.check)) priceCheck = true;
         rotationHtml = ratingHtml + rotationHtml;
       }
     }
@@ -749,7 +754,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       if (block) itemReadHtml = block;
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);

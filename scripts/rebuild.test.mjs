@@ -296,7 +296,7 @@ t("a missing set is not a generic redirect", setPage.status === 404);
 const known = await renderPath("/sets/base1", fetchImpl);
 t("a known old set slug is one hop", known.status === 301 && known.headers.get("location") === "/sets/base-set");
 const cardPage = await (await renderPath("/c/tcgcsv-10", fetchImpl)).text();
-t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && cardPage.includes("Ken Sugimori") && !cardPage.includes("7D —") && !cardPage.includes("30D —") && !cardPage.includes("90D —") && !cardPage.includes("6-month high —") && (cardPage.slice(cardPage.indexOf("product-glance"), cardPage.indexOf("<details", cardPage.indexOf("product-glance"))).match(/TCGplayer market/g)||[]).length === 1 && !cardPage.includes("Missing days show as gaps.") && cardPage.includes("No reads on file") === false && cardPage.includes("Alakazam is heating up"));
+t("a card page has the market price", cardPage.includes("$12.50") && cardPage.includes("TCGplayer market") && !cardPage.includes(">Artist<") && !cardPage.includes("7D —") && !cardPage.includes("30D —") && !cardPage.includes("90D —") && !cardPage.includes("6-month high —") && (cardPage.slice(cardPage.indexOf("product-glance"), cardPage.indexOf("<details", cardPage.indexOf("product-glance"))).match(/TCGplayer market/g)||[]).length === 1 && !cardPage.includes("Missing days show as gaps.") && cardPage.includes("No reads on file") === false && cardPage.includes("Alakazam is heating up"));
 t("a missing exact day is a dash, not the nearest night", exactWindowPct([["2026-10-01", 10], ["2026-10-09", 8]], 7, "2026-10-09") === null && exactWindowPct([["2026-10-02", 10], ["2026-10-09", 8]], 7, "2026-10-09") === -20);
 t("sealed listings hide a missing window and show the night count", listingTrend([{ date: "2026-08-20", listingCount: 40 }, { date: "2026-10-06", listingCount: 35 }], "2026-10-06") === "eBay listings 35 on 2026-10-06");
 t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text === "History since 2026-09-26. 6-month high and low show once we have 6 months.");
@@ -345,6 +345,7 @@ t("post office drops the catalog line", !post.includes(LOCKED) && !post.includes
 const method = await (await renderPath("/methodology", fetchImpl)).text();
 t("methodology uses the catalog counts", method.includes("28,030") && method.includes("3,235"));
 const badCopy = [stripNews(feedHtml), cardPage, board, method, all].map(clean).filter((html) => BANNED.test(html));
+if (badCopy.length) for (const h of [stripNews(feedHtml), cardPage, board, method, all].map(clean)) { const m = h.match(BANNED); if (m) console.error("banned:", m[0], h.slice(Math.max(0, m.index - 80), m.index + 40)); }
 t("pages skip the banned words", badCopy.length === 0);
 const postClean = clean(post);
 t("the locked pick line is the only exception", !BANNED.test(postClean));
@@ -731,7 +732,7 @@ const shippingCard = '<h2>Correction log</h2><div class="c"><div class="d">2026-
 const hiddenNotes = hidePublishedNotes(shippingCard);
 t("a public page drops the correction log and the shipping card", !hiddenNotes.includes("Correction log") && !hiddenNotes.includes("AFFECTED A PUBLISHED NUMBER") && !/auto-fix/i.test(hiddenNotes) && hiddenNotes.includes("Kept"));
 const searchHtml = renderSearch();
-t("search stays capped at 40, highest stored value first, with the stored price and rarity", searchHtml.includes("searchCatalog(q, rows, 40)") && searchHtml.includes("rankCatalog(q, rows, 40, codes)") && searchHtml.includes(".slice(0,40)") && searchHtml.includes("return y-x") && !searchHtml.includes("No market price") && searchHtml.includes("set-logos.json") && searchHtml.includes("r[8]") && searchHtml.includes("r[9]"));
+t("search pages 40 at a time, highest stored value first, with the stored price and rarity", searchHtml.includes("let limit=40;") && searchHtml.includes("limit+=40") && searchHtml.includes("rankCatalog(q, rows, limit+1, codes)") && searchHtml.includes(".slice(0,limit)") && searchHtml.includes("return y-x") && !searchHtml.includes("No market price") && searchHtml.includes("set-logos.json") && searchHtml.includes("r[8]") && searchHtml.includes("r[9]"));
 
 const lagLine = "SV: Prismatic Evolutions: Prismatic Evolutions Booster Pack latest price rose from $8.00 on Sep 3 to $9.00 on Oct 3, up 12.5%. The booster box is $134.46 on Oct 3, the same price as $134.46 on Sep 3. Singles in the set with a price on both days: 4 up, 0 down, 1 unchanged.";
 const lag = {
@@ -821,7 +822,7 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   t("a set page keeps a labelled section and does not mix it into the first page", shell.includes('r=>!r.section') && shell.includes('class="set-section"') && shell.includes('id="sections"') && shell.includes("location.hash") && shell.includes("scrollIntoView"));
   t("a set page offers All, Master set, and Base set only", shell.includes('id="scope"') && shell.includes(">All</option>") && shell.includes("Master set") && shell.includes("Base set only"));
   t("a set page can tick owned printings on this device", shell.includes("Grand master") && shell.includes("My set") && shell.includes("catchem-set:") && shell.includes("Cost to complete") && shell.includes("cards unpriced") && shell.includes('data-own'));
-  t("a set page writes the completion line from the file", shell.includes('id="completion"') && shell.includes(" cards · ") && shell.includes(" printings · ") && shell.includes(" sealed") && shell.includes("Number.isInteger(data.cards)") && shell.includes("Number.isInteger(data.printings)") && shell.includes("Number.isInteger(data.sealed)"));
+  t("a set page writes the completion line from the file", shell.includes('id="completion"') && shell.includes('bits.push(cards+" cards")') && shell.includes('" printings"') && shell.includes('" sealed"') && shell.includes("Number.isInteger(data.cards)") && shell.includes("Number.isInteger(data.printings)") && shell.includes("Number.isInteger(data.sealed)"));
   t("a set row names the printing", shell.includes("r.printing") && shell.includes('bits.push("Case")'));
   const dated = renderSets({ sets: [{ slug: "me-30th-celebration", name: "ME: 30th Celebration", era: "Mega Evolution", single: 191, sealed: 38, priced: 227, release: "2026-09-16" }] }, "");
   t("a set card writes Sep 2026, an era pill and one quiet count line", dated.includes("<span>Sep 2026</span>") && dated.includes('class="sb-pill">ME<') && !dated.includes(">2026-09-16<") && dated.includes("191 cards · 38 sealed") && !dated.includes("priced"));

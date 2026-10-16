@@ -725,7 +725,7 @@ function receiptBacked(row) {
 
 // Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
 // that carry their own source line and date. Behind reads.library in that repo.
-const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep"]);
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep", "rip", "release-cycle", "season", "pattern-forming", "pattern-ending", "year-ago", "year-range"]);
 export function isBoardV3Row(row) {
   if (!row || typeof row !== "object" || (row.board !== "v3" && !(row.board === "hist" && (row.readKind || row.kind) === "set"))) return false;
   if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
@@ -1426,6 +1426,10 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .news-tile .src{margin:0;font:600 26px/1.15 var(--serif);letter-spacing:-.02em}
 .news-tile .tag{margin:0;align-self:flex-start;font:600 12px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1a1407;background:#d9b779;border-radius:999px;padding:6px 10px}
 .news-tile .when{margin:0;font:500 14px/1.2 var(--sans);color:#c4baab}
+.news-tile.news-art{position:relative;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 20%,#2a2418 0%,#12100e 70%)}
+.news-tile.news-art img{max-width:78%;max-height:70%;object-fit:contain}
+.news-tile.news-art .tag{position:absolute;left:14px;top:14px}
+.fl-news{display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#2a2418,#12100e);border:1px solid #d9b779;border-radius:10px;color:#d9b779;font:600 11px/1 var(--sans);letter-spacing:.04em;text-transform:uppercase}
 .news-tile.v1{background:linear-gradient(160deg,#2a2418 0%,#12100e 58%);border-color:#d9b779}
 .news-tile.v1 .src{color:#d9b779}
 .news-tile.v2{background:#12100e;border-top:8px solid #d9b779}
@@ -1871,7 +1875,12 @@ function completionLine(data){
     const list=(r.printings||[]).filter(function(p){return p&&p.name});
     return n+(list.length||1);
   },0);
-  return cards+" cards · "+printings+" printings · "+sealed+" sealed";
+  const bits=[];
+  if(cards>0) bits.push(cards+" cards");
+  if(printings>0 && cards>0) bits.push(printings+" printings");
+  if(sealed>0) bits.push(sealed+" sealed");
+  if(!cards && sealed>0) return bits.join(" · ")+". Singles show here once they are priced.";
+  return bits.length?bits.join(" · "):"Prices show here once this set is priced.";
 }
 function draw(){
   const kind=document.getElementById("kind").value;
@@ -1953,11 +1962,13 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   if(!logoSrc && typeof data.logo==="string" && data.logo.indexOf("https://")===0) logoSrc=data.logo;
   setLogo=logoSrc||"";
   document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+setTiles(data);
-  document.getElementById("charts").innerHTML='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div><div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
-  document.getElementById("single-chart").setAttribute("data-chart", JSON.stringify(data.singleIndex||[]));
-  document.getElementById("sealed-chart").setAttribute("data-chart", JSON.stringify(data.sealedIndex||[]));
-  document.getElementById("single-chart").setAttribute("data-release", data.release||"");
-  document.getElementById("sealed-chart").setAttribute("data-release", data.release||"");
+  const hasIdx=function(a){ return Array.isArray(a) && a.filter(function(p){ return p && p.v!=null && Number(p.n)>0; }).length>=2; };
+  const boxSingle='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  const boxSealed='<div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  document.getElementById("charts").innerHTML=(hasIdx(data.singleIndex)?boxSingle:"")+(hasIdx(data.sealedIndex)?boxSealed:"");
+  const sc=document.getElementById("single-chart"), dc=document.getElementById("sealed-chart");
+  if(sc){ sc.setAttribute("data-chart", JSON.stringify(data.singleIndex||[])); sc.setAttribute("data-release", data.release||""); }
+  if(dc){ dc.setAttribute("data-chart", JSON.stringify(data.sealedIndex||[])); dc.setAttribute("data-release", data.release||""); }
   if(typeof catchemMount==="function") catchemMount(document.getElementById("charts"));
   rows=(data.items||[]).filter(r=>r&&r.name);
   rowDay=(function(d){d=String(d||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return "";return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][Number(d.slice(5,7))-1]+" "+Number(d.slice(8,10));})(data.asOf);
@@ -2621,16 +2632,19 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const board = readItems(boardSrc, card.id).filter((item) => !SIT_KINDS.has(item.kind)).slice(0, 5);
   const facts = [];
   if (card.rarity) facts.push(["Rarity", esc(card.rarity)]);
-  if (card.artist) {
-    const slug = artistSlug(card.artist);
-    const artist = slug ? `<a href="/artists/${esc(slug)}">${esc(card.artist)}</a>` : esc(card.artist);
-    facts.push(["Artist", artist]);
-  }
   if (card.set) facts.push(["Set", setBit || esc(card.set)]);
   const released = priceDay(String(card.release || "").slice(0, 10));
   if (released) facts.push(["Released", esc(released)]);
   const factList = facts.map(([label, value]) => `<li><span>${label}</span><b>${value}</b></li>`).join("");
-  const mon = pokemonStripHtml(opts.pokemon);
+  let monStrip = opts.pokemon;
+  // The range always includes the card on this page.
+  const own = Number(card.price);
+  if (monStrip && own > 0) {
+    const day = String(card.asOf || card.priceDate || monStrip.highDate || "").slice(0, 10);
+    if (Number(monStrip.high) > 0 && own > Number(monStrip.high)) monStrip = { ...monStrip, high: own, highDate: day || monStrip.highDate };
+    if (Number(monStrip.low) > 0 && own < Number(monStrip.low)) monStrip = { ...monStrip, low: own, lowDate: day || monStrip.lowDate };
+  }
+  const mon = pokemonStripHtml(monStrip);
   const rotation = String(opts.rotationFact || "");
   const printRun = isRotatedSet(card) ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>` : "";
   const factBlock = (factList || rotation || mon || printRun)
@@ -2652,7 +2666,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
+${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}${opts.priceCheck ? `<span class="cp-check" style="display:inline-block;margin-left:8px;padding:4px 10px;border-radius:999px;background:#3a2f1a;color:#d9b779;font:600 12px/1.2 var(--sans)">Unverified: far from similar cards</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
 ${chips}
 ${strip}
 ${printingsHtml(card)}
@@ -2729,7 +2743,10 @@ export function readYearChart(card, asOf = "") {
 
 function ebayAskLine(ask) {
   const amount = Number(ask?.amount);
-  const when = priceDay(String(ask?.asOf || "").slice(0, 10));
+  const day = String(ask?.asOf || "").slice(0, 10);
+  // A date after today is a bad stamp; never show a future day.
+  const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const when = day && day <= today ? priceDay(day) : "";
   if (!(amount > 0) || !when) return "";
   const src = String(ask?.source || "").trim();
   return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">eBay</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0"><div><dt>Ask</dt><dd>${money(amount)}</dd></div><div><dt>Date</dt><dd>${esc(when)}</dd></div></dl></section>`;
@@ -2820,6 +2837,8 @@ export function renderCard(card, stamp, opts = {}) {
 <style>
 .glance{display:block;max-width:100%}
 .glance-photo{max-width:100%}
+.glance-photo{display:flex;align-items:center;justify-content:center;width:min(320px,100%);aspect-ratio:1/1;padding:18px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
+.glance-photo img{border-radius:12px;max-height:100%}
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
@@ -3462,8 +3481,8 @@ ${err}
 }
 
 export function renderSearch(opts = {}) {
-  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, artists, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
-<div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Keiichiro Ito" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
+<div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
 <p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
@@ -3526,8 +3545,14 @@ function byValue(a,b){
   if(y==null) return -1;
   return y-x;
 }
+let limit=40;
+let twinMin={};
+function twinKey(r){ return String(r[1]||"").split(" - ")[0].trim().toLowerCase()+"|"+String(r[3]||"").trim(); }
+function buildTwins(list){ twinMin={}; (list||[]).forEach(function(r){ const p=stored(r); if(p==null||!r[3]) return; const k=twinKey(r); if(twinMin[k]==null||p<twinMin[k]) twinMin[k]=p; }); }
+// A price far above the same card number in another set is shown as unverified.
+function isOdd(r){ const p=stored(r); const m=twinMin[twinKey(r)]; return p!=null && m!=null && p>=m*8 && p-m>=50; }
 function take(list){
-  return (list||[]).slice(0,40).sort(byValue);
+  return (list||[]).slice(0,limit).sort(byValue);
 }
 function rowHtml(r){
   const href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
@@ -3545,7 +3570,7 @@ function rowHtml(r){
   var cash=price==null?"":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
   var spark=window.catchemSpark?catchemSpark(bag[r[0]]||"", sparkAsOf):"";
-  return '<div class="row srow" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+' '+html(r[4]||"")+'</span> '+chips+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
+  return '<div class="row srow" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+'</span> '+chips+((typeof isOdd==="function"&&isOdd(r))?'<span class="win" style="background:#3a2f1a;color:#d9b779">Unverified price</span>':"")+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
 }
 let drawN=0;
 let manifest=null;
@@ -3608,21 +3633,25 @@ async function draw(){
   const src=rows;
   var hits, found;
   { const rows=vtag?src.filter(hasTag):src;
-  hits=rankCatalog(q, rows, 40, codes);
-  found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, 40):{hits:rankCatalog(q, rows, 40),nearest:[]}); }
+  hits=rankCatalog(q, rows, limit+1, codes);
+  found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, limit+1):{hits:rankCatalog(q, rows, limit+1),nearest:[]}); }
+  buildTwins(found.hits);
+  const more=found.hits.length>limit;
   const shown=take(found.hits);
   const near=take(found.nearest);
   await ensureSparks(shown.concat(near));
   if(n!==drawN) return;
   if(!shown.length){
-    document.getElementById("meta").textContent="Not in the TCGplayer catalog.";
-    document.getElementById("list").innerHTML=(near.length?'<p class="muted">Nearest names</p>':"")+near.map(rowHtml).join("")||'<p class="muted">No nearby name.</p>';
+    document.getElementById("meta").textContent="No match in the TCGplayer catalog.";
+    const tips='<div class="s-empty" style="background:#1a1815;border:1px solid #2f2b26;border-radius:16px;padding:14px 16px;margin:8px 0"><p style="margin:0 0 8px">Try a card name, a card number like 215/203, or a set name. Japanese-only cards are not in the TCGplayer catalog yet, so search the English name.</p><p style="margin:0;display:flex;flex-wrap:wrap;gap:6px">'+["Charizard","Pikachu","Umbreon","Prismatic Evolutions","Evolving Skies","151"].map(function(t){return '<a class="win" href="/search?q='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</p></div>';
+    document.getElementById("list").innerHTML=tips+(near.length?'<p class="muted">Nearest names</p>'+near.map(rowHtml).join(""):"");
     return;
   }
-  document.getElementById("meta").textContent=shown.length+" shown";
-  document.getElementById("list").innerHTML=shown.map(rowHtml).join("");
+  document.getElementById("meta").textContent=shown.length.toLocaleString("en-US")+" shown";
+  document.getElementById("list").innerHTML=shown.map(rowHtml).join("")+(more?'<p><button type="button" id="s-more" class="win" style="min-height:44px;padding:0 18px;border-radius:12px">Show 40 more</button></p>':"");
+  const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
-document.getElementById("q").addEventListener("input",draw);
+document.getElementById("q").addEventListener("input",function(){ limit=40; draw(); });
 document.getElementById("vtag").addEventListener("input",draw);
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
@@ -3911,8 +3940,10 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start;position:relative}
   #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;width:100%}
-  .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%}
-  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:0;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
+  .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%;display:flex;align-items:center;gap:4px}
+  .chip-scroller > .chip-row{flex:1 1 auto;padding-right:28px}
+  .chip-scroller > .chip-more{position:static;transform:none;flex:0 0 44px;background:#12100e;border-radius:10px}
+  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:48px;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:linear-gradient(90deg,rgba(18,16,14,0),#12100e 78%)}
   .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 48px 8px 0;margin:0;scrollbar-width:none}
   .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
@@ -3921,7 +3952,10 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .pill-native{position:absolute;width:44px;height:44px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;pointer-events:none}
   .set-picker{display:flex;flex-direction:column;gap:8px;width:100%;max-width:100%;min-width:0;position:relative;z-index:6}
   .set-picker[hidden]{display:none}
-  .set-picker input{min-height:44px;width:100%;max-width:100%}
+  .set-picker input{min-height:44px;width:100%;max-width:100%;box-sizing:border-box;border-radius:12px;border:1px solid var(--line);background:#1a1815;color:var(--txt,#efe9de);padding:0 14px;font:500 16px/1 var(--sans)}
+  .set-picker input::placeholder{color:#8f877b}
+  .set-quick{display:flex;flex-wrap:wrap;gap:6px}
+  .set-quick button{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:var(--txt,#efe9de);font:600 14px/1 var(--sans)}
   .set-hits{display:flex;flex-direction:column;gap:4px;max-height:min(280px,50dvh);overflow:auto;background:#1a1815;border:1px solid var(--line);border-radius:12px;padding:4px}
   .set-hits[hidden]{display:none}
   .set-hits button{min-height:44px;text-align:left;width:100%;display:flex;align-items:center;gap:8px}
@@ -4131,7 +4165,7 @@ const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const shortFor=()=>'';
-function cents(t){return String(t).replace(/\\s+\u2014\\s+/g,", ").replace(/\u2014/g,": ").replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
+function cents(t){return String(t).replace(/,? on few sales\\b/gi,", on few price days").replace(/rarity report: ([^.]+?) cards did best over the year, down ([0-9.]+)%/g,"rarity report: every rarity fell over the year. $1 cards fell least, down $2%").replace(/\\s+\u2014\\s+/g,", ").replace(/\u2014/g,": ").replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
 function html(s){return cents(String(s==null?"":s)).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
@@ -4460,7 +4494,24 @@ function safeTile(kind, card){
   }catch(e){}
   return staticTile(kind);
 }
+// News art: the logo of the set the headline names (same-origin /img only).
+function newsArtSrc(card){
+  try{
+    if(!setBook || !card) return "";
+    const t=" "+String(card.name||card.headline||"").toLowerCase()+" ";
+    let best="", len=0;
+    Object.keys(setBook.bySlug).forEach(function(slug){
+      const tile=setBook.bySlug[slug];
+      const n=String(tile && tile.name || "").toLowerCase();
+      if(n.length<4 || n.length<=len || !tile.logo || String(tile.logo).charAt(0)!=="/") return;
+      if(t.indexOf(n)>=0){ best=String(tile.logo); len=n.length; }
+    });
+    return best;
+  }catch(e){ return ""; }
+}
 function safeNewsHtml(card){
+  const art=newsArtSrc(card);
+  if(art) return '<div class="news-tile news-art" role="img" aria-label="'+html(card&&card.name||"News")+'"><img alt="" loading="lazy" src="'+html(art)+'"><p class="tag">News</p></div>';
   try{ return newsTile(card); }catch(e){}
   return '<div class="news-tile" role="img" aria-label="Catch'+"'"+'em news"><p class="mark">Catch'+"'"+'em<span class="dot">.</span></p></div>';
 }
@@ -4470,6 +4521,17 @@ function safeBrandHtml(kind, row){
 }
 function photoEl(card){
   const kind=card&&card.kind==="sealed"?"sealed":"card";
+  // Deep reads about a whole set, era or rarity show that set's logo, never one stray card.
+  if(card && card.readKind==="deep" && !card.sku){
+    const logoSrc=(card.setSlug && setBook && setBook.bySlug[card.setSlug] && setBook.bySlug[card.setSlug].logo) || newsArtSrc(card);
+    if(logoSrc && String(logoSrc).charAt(0)==="/"){
+      const box=document.createElement("div");
+      box.className="news-tile news-art";
+      box.innerHTML='<img alt="" loading="lazy" src="'+html(logoSrc)+'">';
+      return box;
+    }
+    return safeTile(kind, card);
+  }
   try{
     const hit=officialSrc(card, catalogueImages);
     if(!hit || !hit.src) return safeTile(kind, card);
@@ -5353,7 +5415,7 @@ async function fillFlatList(list, from, gen){
     if(one){ html2+=one; n++; }
   }
   if(!html2) return;
-  list.innerHTML='<h3>Up next</h3><div class="fl-scroll">'+html2+'</div>';
+  list.innerHTML='<h3>Next reads</h3><div class="fl-scroll">'+html2+'</div>';
   list.querySelectorAll(".fl-row").forEach(function(b){ b.onclick=function(){ urlIntent="push"; showFlat(Number(b.getAttribute("data-i")), 1); window.scrollTo({top:0,behavior:"smooth"}); }; });
 }
 function flRow(row, i){
@@ -5361,11 +5423,12 @@ function flRow(row, i){
   const name=String(row.name||row.headline||"").trim();
   if(!name) return "";
   let thumb="";
-  try{ const ph=photoEl(row); const im=ph&&(ph.tagName==="IMG"?ph:ph.querySelector&&ph.querySelector("img")); if(im&&im.getAttribute("src")) thumb='<img alt="" loading="lazy" src="'+html(im.getAttribute("src"))+'">'; }catch(err){}
+  if(String(row.readKind||row.kind||"")==="news"){ const art=newsArtSrc(row); thumb=art?'<img alt="" loading="lazy" src="'+html(art)+'" style="object-fit:contain;background:#12100e">':'<span class="fl-ph fl-news" aria-hidden="true"><b>News</b></span>'; }
+  else try{ const ph=photoEl(row); const im=ph&&(ph.tagName==="IMG"?ph:ph.querySelector&&ph.querySelector("img")); if(im&&im.getAttribute("src")) thumb='<img alt="" loading="lazy" src="'+html(im.getAttribute("src"))+'">'; }catch(err){}
   const price=Number(row.price)>0?money(row.price):"";
   const ch=Number(row.change7);
   const chg=row.change7!=null&&row.change7!==""&&Number.isFinite(ch)?'<span class="'+(ch>0?"up":ch<0?"down":"")+'">7D '+(ch>0?"+":"")+ch+'%</span>':"";
-  return '<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph fl-brand" aria-hidden="true">'+(String(row.readKind||row.kind||"")==="news"?"N":"C")+'</span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+'</b>'+chg+'</span></button>';
+  return '<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph fl-brand" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M9 15l2-2 2 1.5 2-3"/></svg></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+'</b>'+chg+'</span></button>';
 }
 async function fillList(list, index){
   const total=totalReads();
@@ -5386,7 +5449,7 @@ async function fillList(list, index){
     html2+='<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph"></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+'</b>'+chg+'</span></button>';
   }
   if(!html2) return;
-  list.innerHTML='<h3>Up next</h3><div class="fl-scroll">'+html2+'</div>';
+  list.innerHTML='<h3>Next reads</h3><div class="fl-scroll">'+html2+'</div>';
   list.querySelectorAll(".fl-row").forEach(function(b){ b.onclick=function(){ showSpot(Number(b.getAttribute("data-i"))); window.scrollTo({top:0,behavior:"smooth"}); }; });
 }
 async function showSpot(index){
@@ -5539,9 +5602,9 @@ function readSlug(row){
 function resolveSet(raw){
   const s=String(raw||"").trim();
   if(!s || !setBook || !setIndex) return "";
-  if(setBook.bySlug[s] && setIndex[s] && setIndex[s].length) return s;
+  if(setBook.bySlug[s]) return s;
   const slug=setBook.byName[s];
-  if(slug && setIndex[slug] && setIndex[slug].length) return slug;
+  if(slug) return slug;
   return "";
 }
 function catalogueRows(){
@@ -5575,6 +5638,7 @@ function buildReadIndex(){
     (items||[]).forEach(add);
   });
   leadRows().forEach(add);
+  Object.keys(setItemsCache).forEach(function(slug){ mergeSetItems(slug); });
   Object.keys(setIndex).forEach(function(slug){
     setIndex[slug].sort(function(a,b){
       const aa=rankAt[a.id]==null?1e15:rankAt[a.id];
@@ -5636,9 +5700,9 @@ function accepts(card){
     return card.set===wantedSet || card.setSlug===wantedSet;
   }
   if(loopFilter==="news") return card.readKind==="news" || card.kind==="news";
-  if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave");
+  if(loopFilter==="wave") return !!(card.waveItem || card.reprint || card.readKind==="wave" || card.kind==="wave" || FQ_WAVE[card.readKind]);
   if(loopFilter==="flagged") return card.readKind==="outlier" || card.kind==="outlier" || !!(card.flagged && card.flagged.on);
-  if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive";
+  if(loopFilter==="dive") return card.readKind==="dive" || card.kind==="dive" || card.readKind==="deep";
   if(loopFilter==="volume") return isVolumeRow(card);
   if(loopFilter==="quiet"||loopFilter==="mix"||loopFilter==="conditions"||loopFilter==="soldflat"||loopFilter==="solddown"||loopFilter==="setshare"||loopFilter==="spread"||loopFilter==="askmove"||loopFilter==="mktmove"||loopFilter==="still") return isShapeRow(card) && (card.readKind===loopFilter || card.kind===loopFilter);
   return true;
@@ -5666,6 +5730,112 @@ async function cardById(id){
     if(rows[i] && (rows[i].id===id || rows[i].call_id===id)) return rows[i];
   }
   return null;
+}
+// Feed quality: one read per item in a set, varied phrasing from each item's own numbers.
+const FQ_MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fqDay(iso){ const m=/^(\\d{4})-(\\d{2})-(\\d{2})/.exec(String(iso||"")); return m?FQ_MON[Number(m[2])-1]+" "+Number(m[3]):""; }
+function fqUsd(n){ return "$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fqHash(s){ let h=0; s=String(s||""); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h); }
+function fqPts(hist){ return (Array.isArray(hist)?hist:[]).filter(function(p){ return p && /^\\d{4}-\\d{2}-\\d{2}/.test(String(p[0])) && Number(p[1])>0; }); }
+function fqLines(o){
+  // o: {id,label,nm,pts,price,rank,of,setName,kind}
+  const pts=o.pts, out=[], unit=o.nm?" NM":"";
+  const last=pts.length?pts[pts.length-1]:null;
+  const p=Number(o.price)>0?Number(o.price):(last?last[1]:0);
+  if(!(p>0)) return out;
+  const P=fqUsd(p)+unit;
+  if(pts.length>=3){
+    let hi=pts[0], lo=pts[0];
+    pts.forEach(function(q){ if(q[1]>hi[1]) hi=q; if(q[1]<lo[1]) lo=q; });
+    const first=pts[0];
+    if(hi[1]>p*1.02) out.push(o.label+" sits "+fqUsd(hi[1]-p)+" under its high of "+fqUsd(hi[1])+unit+" from "+fqDay(hi[0])+", at "+P+" now.");
+    if(lo[1]<p*0.98) out.push(o.label+" is "+fqUsd(p-lo[1])+" over its low of "+fqUsd(lo[1])+unit+" from "+fqDay(lo[0])+", at "+P+".");
+    let same=1; for(let i=pts.length-2;i>=0 && Math.abs(pts[i][1]-p)<0.005;i--) same++;
+    if(same>=4) out.push(o.label+" has held at "+P+" for "+same+" price days in a row, back to "+fqDay(pts[pts.length-same][0])+".");
+    let run=0, dir=0;
+    for(let i=pts.length-1;i>0;i--){ const d=Math.sign(pts[i][1]-pts[i-1][1]); if(!d) break; if(!dir) dir=d; if(d!==dir) break; run++; }
+    if(run>=3) out.push(o.label+" has "+(dir>0?"gone up":"gone down")+" "+run+" price days running, now "+P+".");
+    if(Math.abs(p-first[1])>=0.01 && first[0]!==last[0]){
+      const pct=Math.round((p-first[1])/first[1]*1000)/10;
+      const x=p/first[1];
+      const mult=x>=3.8?"nearly quadrupled":x>=2.9?"about tripled":x>=1.9?"about doubled":x<=0.55?"about halved":"";
+      if(mult) out.push(o.label+" "+mult+" since "+fqDay(first[0])+", from "+fqUsd(first[1])+unit+" to "+P+".");
+      else if(Math.abs(pct)>=3) out.push("Since "+fqDay(first[0])+", "+o.label+" went from "+fqUsd(first[1])+unit+" to "+P+", "+(pct>0?"up ":"down ")+Math.abs(pct)+"%.");
+      else out.push(o.label+" barely moved since "+fqDay(first[0])+": "+fqUsd(first[1])+unit+" then, "+P+" now.");
+    }
+  }
+  if(o.rank && o.of && o.setName) out.push(o.label+" is number "+o.rank+" of "+o.of+" by price in "+o.setName+", at "+P+".");
+  if(!out.length) out.push(o.label+" is at "+P+" on TCGplayer market"+(last?" as of "+fqDay(last[0]):"")+".");
+  return out;
+}
+function fqPick(lines, id){ return lines.length?lines[fqHash(id)%lines.length]:""; }
+const FQ_WAVE={release:1,"release-cycle":1,season:1};
+const FQ_PLAIN=/\\b(?:is|are) (?:up|down) [\\d.]+% (?:this week|this month|over 90 days)/;
+function varyMove(card){
+  if(!card || card.varied || card.fresh) return card;
+  if(!FQ_PLAIN.test(String(card.headline||""))) return card;
+  if(fqHash(card.id)%4===0) return card;
+  const nm=card.kind!=="sealed";
+  const label=String(card.headline).split(/ (?:is|are) (?:up|down) /)[0];
+  const lines=fqLines({id:card.id,label:label,nm:nm,pts:fqPts(card.hist),price:card.price});
+  const line=fqPick(lines, card.id);
+  if(!line) return card;
+  return Object.assign({}, card, {headline:line, varied:true});
+}
+function itemRead(item, doc, slug){
+  const sealed=item.kind==="sealed";
+  const label=String(item.name||"")+(item.num?" "+item.num:"");
+  const pts=fqPts(item.hist);
+  const last=pts.length?pts[pts.length-1]:null;
+  const lines=fqLines({id:item.id,label:label,nm:!sealed,pts:pts,price:item.price,rank:item.rank,of:item.of,setName:doc.name});
+  const head=fqPick(lines, item.id);
+  const why=lines.length>1?lines[(fqHash(item.id)+1)%lines.length]:"";
+  let ch7=null;
+  if(last){ const cut=new Date(Date.parse(last[0]+"T00:00:00Z")-7*864e5).toISOString().slice(0,10); const back=pts.filter(function(q){return q[0]<=cut;}).pop(); if(back) ch7=Math.round((last[1]-back[1])/back[1]*1000)/10; }
+  return {id:"item-"+item.id, sku:item.id, kind:sealed?"sealed":"single", readKind:"item", fresh:true, varied:true, set:doc.name, setSlug:slug, name:item.name, number:item.num||"", price:Number(item.price)||null, change7:ch7, hist:pts, headline:head, path:head, why:why===head?"":why, source:"TCGplayer market, "+(doc.asOf||""), asOf:doc.asOf||(last?last[0]:""), href:(sealed?"/p/":"/c/")+item.id, image:""};
+}
+const setItemsDone={};
+async function ensureSetItems(raw){
+  const want=String(raw||"").trim();
+  if(!want || !setBook) return;
+  const slug=setBook.bySlug[want]?want:(setBook.byName[want]||"");
+  if(!slug || setItemsDone[slug]) return;
+  setItemsDone[slug]=1;
+  let doc=null;
+  try{ const res=await fetch("/data/sets/"+encodeURIComponent(slug)+".json"); doc=res.ok?await res.json():null; }catch(e){ doc=null; }
+  if(!doc || !Array.isArray(doc.items)) return;
+  if(!setIndex) setIndex={};
+  if(!setIndex[slug]) setIndex[slug]=[];
+  const have={};
+  setIndex[slug].forEach(function(r){ if(r && r.sku) have[String(r.sku)]=1; });
+  setItemsCache[slug]=doc.items.filter(function(item){ return item && item.id && Number(item.price)>0; }).map(function(item){ return itemRead(item, doc, slug); });
+  mergeSetItems(slug);
+}
+const setItemsCache={};
+function mergeSetItems(slug){
+  const list=setItemsCache[slug];
+  if(!list || !setIndex) return;
+  if(!setIndex[slug]) setIndex[slug]=[];
+  const have={};
+  setIndex[slug].forEach(function(r){ if(r && r.sku) have[String(r.sku)]=1; });
+  list.forEach(function(r){ if(!have[r.sku]){ have[r.sku]=1; setIndex[slug].push(r); } });
+}
+function isPlainMoveRow(row){
+  if(!row) return false;
+  if(row.pending) return /^move-/.test(String(row.id||""));
+  return FQ_PLAIN.test(String(row.headline||"")) || /^move-/.test(String(row.id||""));
+}
+// At most 2 plain price moves in every 5 rows while other reads last.
+function capMoves(rows){
+  const moves=[], other=[];
+  rows.forEach(function(r){ (isPlainMoveRow(r)?moves:other).push(r); });
+  const out=[]; let m=0, o=0;
+  while(o<other.length || m<moves.length){
+    for(let k=0;k<3 && o<other.length;k++) out.push(other[o++]);
+    for(let k=0;k<2 && m<moves.length;k++) out.push(moves[m++]);
+    if(o>=other.length) while(m<moves.length) out.push(moves[m++]);
+  }
+  return out;
 }
 function buildFlat(){
   if(flat) return;
@@ -5701,6 +5871,7 @@ function buildFlat(){
       if(!item || (!item.title && !item.sentence)) return;
       add({id:"wave-"+n, waveItem:true, readKind:"wave", kind:"wave", name:item.title||"", headline:item.sentence||item.title||"", path:item.sentence||"", source:item.source||"", asOf:String(item.date||"").slice(0,10), href:item.url||"", reprint:item.reprint||""});
     });
+    leadRows().forEach(function(r){ if(r && FQ_WAVE[r.readKind]) add(r); });
     flat=rows;
     return;
   }
@@ -5715,6 +5886,7 @@ function buildFlat(){
     leadRows().forEach(function(r){
       if(r && (r.readKind==="outlier" || r.kind==="outlier" || (r.flagged && r.flagged.on))) add(r);
     });
+    catalogueRows().forEach(function(r){ if(r && r.flagged && r.flagged.on) add(r); });
     flat=rows;
     return;
   }
@@ -5722,7 +5894,7 @@ function buildFlat(){
     const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items;
     (items||[]).forEach(function(row){ add(row); });
     leadRows().forEach(function(r){
-      if(r && (r.readKind==="dive" || r.kind==="dive")) add(r);
+      if(r && (r.readKind==="dive" || r.kind==="dive" || r.readKind==="deep")) add(r);
     });
     flat=rows;
     return;
@@ -5798,6 +5970,7 @@ function buildFlat(){
       if(rows.length!==before && ei<extras.length) add(extras[ei++]);
     });
     while(ei<extras.length) add(extras[ei++]);
+    rows.splice(0, rows.length, ...capMoves(rows));
     // Unranked: a new seed on every visit or refresh, unseen reads first,
     // kinds and sets spread out, one file-built wording chosen.
     const visitSeed=freshSeed();
@@ -5814,6 +5987,18 @@ function buildFlat(){
   });
   flat=rows;
 }
+// QA hook: walks the current filter and returns what a reader would see. Read-only.
+window.__feedQA=async function(max){
+  const out=[]; let i=0; buildFlat();
+  while(flat && i<flat.length && out.length<(max||400)){
+    const g=await materialize(i,1);
+    if(!g.row || g.index<i) break;
+    const r=g.row;
+    out.push({id:String(r.id||""), kind:String(r.kind||""), readKind:String(r.readKind||""), headline:String(r.headline||r.name||""), set:String(r.setSlug||r.set||""), image:String(r.image||r.catalogueSrc||"")});
+    i=g.index+1;
+  }
+  return {total:flat?flat.length:0, rows:out};
+};
 async function materialize(index, dir){
   buildFlat();
   const step=dir<0?-1:1;
@@ -5829,7 +6014,8 @@ async function materialize(index, dir){
       row=flat[i];
     }
     if(accepts(row)){
-      if(await stalePrice(row)){
+      if(!row.varied && FQ_PLAIN.test(String(row.headline||""))){ row=varyMove(row); flat[i]=row; }
+      if(!row.fresh && await stalePrice(row)){
         flat[i]={id:row.id, skip:true};
         i+=step; guard++; continue;
       }
@@ -5935,8 +6121,10 @@ function bounceCard(card, dir){
   void card.offsetWidth;
   card.classList.add(dir>0?"is-bounce-next":"is-bounce-prev");
 }
+let pendingStep=0;
 async function stepRead(dir){
-  if(moveBusy || !dir) return;
+  if(!dir) return;
+  if(moveBusy){ pendingStep=dir; return; }
   if(!document.getElementById("feed-loop-form")) return;
   const host=document.getElementById("feed-one");
   const card=host && (host.querySelector("article.feed-card:not(.is-leave-next):not(.is-leave-prev)") || host.querySelector("article.feed-card"));
@@ -5946,16 +6134,23 @@ async function stepRead(dir){
   moveBusy=true;
   try{
     const gen=filterGen;
-    if(dir<0 && spot<=0){ bounceCard(card, dir); return; }
-    if(dir>0 && spot+1>=flat.length){ bounceCard(card, dir); return; }
-    const found=await materialize(dir<0?spot-1:spot+1, dir);
+    // Always advance: past either end it wraps around.
+    let goTo=dir<0?spot-1:spot+1;
+    if(goTo<0) goTo=flat.length-1;
+    if(goTo>=flat.length) goTo=0;
+    let found=await materialize(goTo, dir);
     if(gen!==filterGen) return;
+    if(!found.row || found.index===spot){
+      found=await materialize(dir>0?0:flat.length-1, dir);
+      if(gen!==filterGen) return;
+    }
     const live=host.querySelector("article.feed-card:not(.is-leave-next):not(.is-leave-prev)") || card;
     if(!found.row || found.index===spot){ bounceCard(live||card, dir); return; }
     urlIntent="push";
     await showFlat(found.index, dir);
   }finally{
     moveBusy=false;
+    if(pendingStep){ const d=pendingStep; pendingStep=0; setTimeout(function(){ stepRead(d); }, 0); }
   }
 }
 async function showFlat(index, dir){
@@ -6119,10 +6314,10 @@ async function boot(){
       if(!setSel) return;
       while(setSel.options.length>1) setSel.remove(1);
       const rows=[];
-      Object.keys(setIndex||{}).forEach(function(slug){
-        const tile=setBook && setBook.bySlug[slug];
-        if(!tile || !setIndex[slug] || !setIndex[slug].length) return;
-        rows.push(tile);
+      // Every set in the catalogue, not only sets that already have a read.
+      Object.keys(setBook && setBook.bySlug || {}).forEach(function(slug){
+        const tile=setBook.bySlug[slug];
+        if(tile && (Number(tile.priced)>0 || (setIndex && setIndex[slug] && setIndex[slug].length))) rows.push(tile);
       });
       rows.sort(function(a,b){
         const ar=String(a.release||"");
@@ -6224,6 +6419,20 @@ async function boot(){
       box.textContent="";
       box.hidden=!setHitsOpen;
       if(!setHitsOpen) return;
+      if(!query && setBook){
+        const quick=Object.keys(setBook.bySlug).map(function(k){ return setBook.bySlug[k]; }).filter(function(t){ return t && Number(t.value)>0; }).sort(function(a,b){ return Number(b.value)-Number(a.value); }).slice(0,6);
+        if(quick.length){
+          const row=document.createElement("div");
+          row.className="set-quick";
+          quick.forEach(function(t){
+            const b=document.createElement("button");
+            b.type="button"; b.textContent=t.name;
+            b.onclick=function(){ setHitsOpen=false; if(setQ) setQ.value=t.name; if(picker) picker.classList.remove("is-open"); applyFilter("set", t.slug, true); };
+            row.appendChild(b);
+          });
+          box.appendChild(row);
+        }
+      }
       let n=0;
       Array.prototype.forEach.call(setSel.options, function(opt){
         if(!opt.value) return;
@@ -6288,6 +6497,7 @@ async function boot(){
       }
       paintChips();
       if(loopFilter==="set") fillSetHits(setQ ? setQ.value : "");
+      if(loopFilter==="set" && wantedSet) await ensureSetItems(wantedSet);
       flat=null;
       const startId=openRead;
       openRead="";

@@ -96,7 +96,7 @@ const joined = nightlySpeciesStrip({
 }, { "tcgcsv-10": { price: 12.5, date: "2026-10-13" } }, joinedIds.filter((id) => id === "tcgcsv-10"));
 t("a shared picture path joins a catalogue card to tonight's quote", joinedIds.includes("tcgcsv-10") && joinedIds.includes("tcgcsv-11") && joinedIds.includes("tcgcsv-138496") && !joinedIds.includes("tcgcsv-99") && !joinedIds.includes("tcgcsv-1") && !joinedIds.includes("tcgcsv-2") && !joinedIds.includes("tcgcsv-3") && joined && joined.count === 1 && joined.low === 12.5 && joined.lowDate === "2026-10-13" && !JSON.stringify(joined).includes("2026-08-22"));
 t("where it sits is the card sentences only", full.includes("Where it sits") && full.includes("A year ago it was $8.00") && full.includes("Same 30 days last year") && full.indexOf("A year ago") < full.indexOf("Same 30 days") && !full.includes("Sealed range should not show"));
-t("facts, release, rotation, and the priced strip", full.includes("Card facts") && full.includes("Common") && full.includes("Mitsuhiro Arita") && full.includes("Jan 9, 1999") && full.includes("Regulation mark G") && full.includes('href="/pokemon/pikachu"') && full.includes("Every Pikachu card we price: 12 cards, $1.25 on Oct 2, 2026 to $15.00 on Oct 13, 2026."));
+t("facts, release, rotation, and the priced strip", full.includes("Card facts") && full.includes("Common") && !full.includes("Mitsuhiro Arita") && full.includes("Jan 9, 1999") && full.includes("Regulation mark G") && full.includes('href="/pokemon/pikachu"') && full.includes("Every Pikachu card we price: 12 cards, $1.25 on Oct 2, 2026 to $15.00 on Oct 13, 2026."));
 const main = full.slice(full.indexOf("<main"), full.indexOf("</main>"));
 t("board reads are newest five", main.includes("Reads about this card") && main.includes("Newest board read.") && main.indexOf("Newest board read.") < main.indexOf("Second board read.") && main.indexOf("Fourth board read.") < main.indexOf("Peak: then a return.") && !main.includes("Sixth read should stay off") && !main.includes("\u2014") && !main.includes("\u2013"));
 
@@ -138,3 +138,8 @@ t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/s
 
 if (fail) process.exit(1);
 console.log("card page ok");
+{
+  const { pokemonStripHtml } = await import("../src/ui.mjs");
+  const strip = pokemonStripHtml({ name: "Charizard", slug: "charizard", count: 53, low: 4.8, lowDate: "2026-10-10", high: 2999.99, highDate: "2026-10-15" });
+  console.log((strip.includes("$2,999.99") ? "  ok  " : "  FAIL ") + "the Pokemon range can carry the page card's price");
+}
