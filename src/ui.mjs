@@ -3766,7 +3766,7 @@ export function renderPremium(stamp, opts = {}) {
 <p class="prem-kicker">Discord Premium</p>
 <h1>Join the club.</h1>
 <p class="prem-lede">Premium members get a number and the Premium role.</p>
-<p class="prem-price">Discord Premium is $14.99/mo through Stripe.</p>
+<p class="prem-price">Discord Premium is $14.99 USD/mo through Stripe.</p>
 <p>Cancel whenever. ${REFUND_LINE}</p>
 <a class="prem-join" href="${DISCORD}">Join in Discord</a>
 <p class="prem-agree muted"><small>By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></p>
