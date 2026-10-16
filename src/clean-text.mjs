@@ -29,6 +29,8 @@ export function cleanText(t, nowYear) {
   if (!s.trim()) return s;
   if (BROKEN.test(s)) return "";
   s = s.replace(/\s+\u2014\s+/g, ", ").replace(/\u2014/g, ": ");
+  s = s.replace(/,? on few sales\b/gi, ", on few price days");
+  s = s.replace(/rarity report: ([^.]+?) cards did best over the year, down (\d+(?:\.\d+)?)%/g, "rarity report: every rarity fell over the year. $1 cards fell least, down $2%");
   // money with one decimal
   s = s.replace(/\$(\d{1,3}(?:,\d{3})*|\d+)\.(\d)(?!\d)/g, "$$$1.$20");
   // data file paths like data/enrichment-distilled.json, research/x.json
