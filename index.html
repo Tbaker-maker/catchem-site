@@ -320,7 +320,7 @@ footer a{color:var(--gold)}
 (function(){
   function text(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
   fetch("/data/counts.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(c){
-    var bits=[["items","items"],["single","singles"],["sealed","sealed"],["sets","sets"],["priced","priced"]];
+    var bits=[["single","singles"],["sealed","sealed"],["sets","sets"]];
     document.getElementById("counts").innerHTML=bits.map(function(b){
       var n=Number(c[b[0]]);
       if(!(n>0)) return "";
@@ -359,7 +359,7 @@ footer a{color:var(--gold)}
     var host=document.getElementById("counts");
     if(!host) return;
     var html="<b>"+reads.length.toLocaleString("en-US")+"<span>reads</span></b>";
-    if(latest && onDay>0) html+="<b>"+onDay.toLocaleString("en-US")+"<span>on "+when(latest)+"</span></b>";
+    if(latest && onDay>0 && onDay<reads.length) html+="<b>"+onDay.toLocaleString("en-US")+"<span>on "+when(latest)+"</span></b>";
     host.insertAdjacentHTML("beforeend", html);
   }).catch(function(){});
   function pts(raw){var rows=Array.isArray(raw)?raw:[];var out=[];rows.forEach(function(p){var d=p&&p.d;var v=Number(p&&p.v);if(d&&v>0)out.push({d:String(d).slice(0,10),v:v,n:Number(p.n)||0})});return out}
