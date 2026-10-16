@@ -1,3 +1,4 @@
+import { openDataHref, ITEM_SECTIONS } from "./open-data.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
@@ -2609,6 +2610,68 @@ function readLink(card) {
   return `<p class="muted"><a class="tap" href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
 }
 
+
+// Item page sections shared by singles and sealed: where it ranks, every read
+// about it, related items, and a jump row. A section is left out when its numbers are missing.
+const KIND_LABEL = { deep: "Deep read", listings: "Listings counted", breadth: "Listings counted", rotation: "Rotation", release: "Release", "release-cycle": "Release cycle", season: "Season", rip: "Rip value", high: "New high", low: "New low", year: "Year", "year-range": "Year range", "year-ago": "A year ago", backto: "Back to", "rarity-band": "Rarity band", "artist-band": "Artist band", set: "Set", streak: "Streak", "pattern-forming": "Pattern", "pattern-ending": "Pattern", "past-cases": "Past cases", mixed: "Mixed", plain: "Price move", mktmove: "Price move" };
+const ITEM_CSS = `.item-jump{display:flex;gap:8px;overflow-x:auto;margin:14px 0 4px;padding:2px 0 6px;scrollbar-width:none}.item-jump::-webkit-scrollbar{display:none}
+.item-jump a{flex:0 0 auto;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}
+.item-sec{margin:16px 0;padding:16px;border-radius:20px;background:#15130f;border:1px solid #2f2b26}.item-sec>h2{margin:0 0 10px;font-size:18px}
+[id]{scroll-margin-top:76px}
+.rank-big{margin:0;font:600 28px/1.1 var(--serif);color:var(--gold)}.rank-bar{position:relative;height:8px;margin:12px 0 6px;border-radius:999px;background:rgba(255,255,255,.08)}.rank-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,rgba(217,183,121,.3),#d9b779)}
+.all-reads{list-style:none;margin:0;padding:0;display:grid;gap:10px}.all-reads li{padding:14px 16px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26}
+.all-reads .rk{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;background:rgba(217,183,121,.12);color:var(--gold);font:600 12px/1 var(--sans);margin-right:8px}
+.all-reads h3{margin:8px 0 4px;font:600 16px/1.35 var(--sans)}.all-reads details summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font:600 14px/1 var(--sans);color:var(--gold)}.all-reads ul{margin:0 0 6px;padding-left:18px}
+.all-reads .rd-go{min-height:44px;display:inline-flex;align-items:center}
+.rel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.rel-grid a{min-height:44px;display:flex;flex-direction:column;justify-content:center;padding:12px 14px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}.rel-grid b{font:600 14px/1.3 var(--sans)}.rel-grid span{font:500 13px/1.3 var(--sans);color:var(--dim)}`;
+
+export function itemRankHtml(card) {
+  const rank = Number(card?.rank);
+  const of = Number(card?.of);
+  if (!(rank >= 1) || !(of >= rank)) return "";
+  const setName = card.setSlug ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "this set")}</a>` : esc(card.set || "this set");
+  const pctTop = Math.max(1, Math.round((rank / of) * 1000) / 10);
+  const fill = Math.max(4, Math.round((1 - (rank - 1) / of) * 100));
+  return `<section class="item-sec" id="rank"><h2>Where it ranks in its set</h2><p class="rank-big">#${rank} of ${of}</p><div class="rank-bar" aria-hidden="true"><i style="width:${fill}%"></i></div><p class="muted">By TCGplayer market price among priced ${card.kind === "sealed" ? "products" : "singles"} in ${setName}. Top ${pctTop}%.</p></section>`;
+}
+
+export function itemReadsHtml(reads, { feed = false } = {}) {
+  const list = (Array.isArray(reads) ? reads : []).filter((r) => r && String(r.headline || "").trim() && !/[\u2014\u2013]/.test(String(r.headline)));
+  if (!list.length) return "";
+  const items = list.map((r) => {
+    const when = priceDay(String(r.asOf || "").slice(0, 10));
+    const label = KIND_LABEL[r.kind] || "Read";
+    const lines = (r.lines || []).filter(Boolean);
+    const more = lines.length ? `<details><summary>Full read</summary><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${r.source ? `<p class="muted">${esc(r.source)}</p>` : ""}</details>` : "";
+    const go = feed && r.id ? `<a class="rd-go" href="/feed/r/${encodeURIComponent(r.id)}">Open this read</a>` : "";
+    return `<li id="read-${esc(r.id || "")}"><span class="rk">${esc(label)}</span>${when ? `<span class="muted">${esc(when)}</span>` : ""}<h3>${esc(r.headline)}</h3>${more}${go}</li>`;
+  }).join("");
+  return `<section class="item-sec" id="reads"><h2>All reads about this item <span class="muted">(${list.length})</span></h2><ul class="all-reads">${items}</ul></section>`;
+}
+
+export function itemRelatedHtml(card) {
+  const rows = (card?.also || []).filter((row) => row && /^tcgcsv-\d+$/.test(String(row.id || "")) && row.name);
+  if (!rows.length) return "";
+  const base = card.kind === "sealed" ? "/p/" : "/c/";
+  return `<section class="item-sec" id="related"><h2>Related items</h2><div class="rel-grid">${rows.slice(0, 12).map((row) => `<a href="${base}${esc(row.id)}"><b>${esc(row.name)}</b>${money(row.price) ? `<span>${money(row.price)}</span>` : ""}</a>`).join("")}</div></section>`;
+}
+
+export function itemJumpHtml(body) {
+  const have = ITEM_SECTIONS.filter(([id]) => body.includes(`id="${id}"`));
+  if (have.length < 2) return "";
+  return `<nav class="item-jump" aria-label="On this page">${have.map(([id, label]) => `<a href="#${id}">${label}</a>`).join("")}</nav>`;
+}
+
+// Puts the jump row right after the header block and the CSS once.
+export function withItemSections(mainHtml, marker) {
+  const jump = itemJumpHtml(mainHtml);
+  const i = mainHtml.indexOf(marker);
+  const css = `<style>${ITEM_CSS}</style>`;
+  if (i < 0) return css + mainHtml;
+  const at = i + marker.length;
+  return mainHtml.slice(0, at) + css + jump + mainHtml.slice(at);
+}
+
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
   const tags = printingTags(card);
   const chips = changeTable(priceSeries.length ? priceSeries : hist, endDay);
@@ -2628,7 +2691,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const listChart = listReal.length >= 2
-    ? `<section class="cp-sec cp-counts"><h2>eBay listings counted</h2>${historyChart(listReal, { asOf: endDay, color: "#7fc79a", unit: "count", snap: "real" })}</section>`
+    ? `<section class="cp-sec cp-counts" id="supply"><h2>eBay listings counted</h2>${historyChart(listReal, { asOf: endDay, color: "#7fc79a", unit: "count", snap: "real" })}</section>`
     : "";
   const chartOn = !!(priceChart || rangeRow || listChart);
   const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
@@ -2652,15 +2715,15 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const rotation = String(opts.rotationFact || "");
   const printRun = isRotatedSet(card) ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>` : "";
   const factBlock = (factList || rotation || mon || printRun)
-    ? `<section class="cp-sec"><h2>Card facts</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
+    ? `<section class="cp-sec" id="stats"><h2>Key stats</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
     : "";
   const panels = [opts.ratingHtml, opts.cycleHtml].map((html) => String(html || "").trim()).filter(Boolean).join("");
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
+  void also;
   const math = [];
-  if (card.rank && card.of) math.push(`<p>Rank ${esc(card.rank)} of ${esc(card.of)} priced singles in this set.</p>`);
-  if (also) math.push(`<p>Also in this set: ${also}</p>`);
+  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed });
   
-  return `<main id="main" tabindex="-1" class="wrap product-glance card-page">
+  return withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance card-page">
 <style>${SINGLE_CSS}</style>
 <header class="cp-head">
 <div class="cp-photo">${img}</div>
@@ -2678,13 +2741,15 @@ ${conditionLine(opts.conditionNote)}
 ${ebayBlock(opts.priceRead)}
 </div>
 </header>
-${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}"><div class="cp-price-col">${priceChart}${rangeRow}</div>${listChart}</div><script>${HISTORY_JS}</script>` : ""}
+${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}">${priceChart || rangeRow ? `<div class="cp-price-col" id="price">${priceChart}${rangeRow}</div>` : ""}${listChart}</div><script>${HISTORY_JS}</script>` : ""}
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
 ${factBlock}
 ${panels ? `<div class="cp-panels">${panels}</div>` : ""}
-${board.length ? `<section class="cp-sec"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : ""}
+${allReadsHtml || (board.length ? `<section class="cp-sec" id="reads"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : "")}
+${itemRankHtml(card)}
+${itemRelatedHtml(card)}
 <details><summary>See the math</summary>
 ${math.join("")}
 <p><button type="button" id="paid">Report a price I paid</button></p>
@@ -2711,7 +2776,7 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
     .catch(function(){status.textContent="Not stored. The server store is not on."});
 });
 </script>
-</main>`;
+</main>`, "</header>\n");
 }
 
 export function sourceLine(card) {
@@ -2837,7 +2902,10 @@ export function renderCard(card, stamp, opts = {}) {
   if (!sealed) {
     return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }), card.name, stamp, "", feedNav(opts));
   }
-  const body = `<main id="main" tabindex="-1" class="wrap product-glance">
+  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed });
+  const released = priceDay(String(card.release || "").slice(0, 10));
+  void also;
+  const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}
 .glance-photo{max-width:100%}
@@ -2878,19 +2946,21 @@ ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.ta
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span></p>` : ""}
 ${sealedStrip}
-${changeHtml}
+<!--jump-->
+<section id="price">${changeHtml}
 ${priceChart}
-${rangeRow}
+${rangeRow}</section>
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
-${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}
+${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}
 ${ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
-${opts.listingsHtml || ""}
 ${opts.notMovedHtml || ""}
-${KV_CSS}<h2>Facts</h2>
-${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
-${readHtml ? `<h2>Reads</h2>\n${readHtml}` : ""}
+${KV_CSS}<section id="stats"><h2>Key stats</h2>
+${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
+${allReadsHtml || (readHtml ? `<section id="reads"><h2>Reads</h2>\n${readHtml}</section>` : "")}
+${itemRankHtml(card)}
+${itemRelatedHtml(card)}
 ${supplyNote}
 </div>
 </div>
@@ -2898,11 +2968,8 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
 <details><summary>See the math</summary>
-<p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
-<p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p><button type="button" id="paid">Report a price I paid</button></p>
 <form id="paid-form" hidden>
@@ -2928,7 +2995,7 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
     .catch(function(){status.textContent="Not stored. The server store is not on."});
 });
 </script>
-</main>`;
+</main>`, "<!--jump-->\n");
   return chrome("", body, card.name, stamp, "", feedNav(opts));
 }
 
@@ -4162,6 +4229,7 @@ ${freshRandom.toString()}
 ${freshSeed.toString()}
 ${freshOrder.toString()}
 ${pickWording.toString()}
+${openDataHref.toString()}
 ${readSeen.toString()}
 ${markSeen.toString()}
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
@@ -5010,7 +5078,7 @@ function deepEl(card){
     const thumbs=pics.filter(function(c){return c&&c.image;}).map(function(c){return '<img class="card-thumb" alt="" src="'+html(c.image)+'">';}).join("");
     return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
   }).join("");
-  const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(card.href)+'">Open it</a></p>':"";
+  const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(openDataHref(card))+'">Open it</a></p>':"";
   el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p><h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
   return el;
@@ -5038,7 +5106,7 @@ function cardEl(card, facts){
   const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const pid=productIdOf(card);
   const h2=pageMode==="read"?"<h2>"+title+"</h2>":(pid?'<h2><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h2>":'<h2><a href="'+readHref+'">'+title+"</a></h2>");
-  const open='<p><a class="open-data" href="'+readHref+'">Open the data</a></p>';
+  const open='<p><a class="open-data" href="'+html(openDataHref(card))+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
