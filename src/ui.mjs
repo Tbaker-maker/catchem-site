@@ -1745,8 +1745,9 @@ export function renderSetShell(slug, stamp, opts = {}) {
 <p class="muted" id="completion"></p>
 ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(slug)}
 ${opts.setValueHtml || ""}
-<div id="lines"></div><div id="charts"></div>
-<div class="filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
+<style>.st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.st-tile{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none;min-width:0}.st-k{font:600 12px/1.2 var(--sans);color:var(--gold)}.st-tile b{font:650 20px/1.1 var(--sans)}.st-n{font:500 12px/1.3 var(--sans);opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:600px){.st-tiles{grid-template-columns:1fr 1fr}.st-tile:last-child{grid-column:1/-1}}.jump{position:sticky;top:56px;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:8px 0;margin:8px 0;background:#12100e;scrollbar-width:none}.jump a{flex:0 0 auto;padding:8px 16px;border-radius:999px;border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}</style>
+<div id="lines"></div><nav class="jump" aria-label="Jump to"><a href="#charts">Charts</a><a href="#set-filters">Cards</a><a href="#sections">Sections</a></nav><div id="charts"></div>
+<div class="filters" id="set-filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
@@ -1934,12 +1935,23 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   if(completion) completion.textContent=completionLine(data);
   setLogo="";
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const tile=(label,row,href,sub)=>row?'<a class="st-tile" '+(row.id?'data-quick="'+html(row.id)+'" ':'')+'href="'+href+'"><span class="st-k">'+label+'</span><b>'+moneyLine(row.price)+'</b><span class="st-n">'+html(sub)+'</span></a>':"";
+  const setTiles=function(d){
+    const singles=(Array.isArray(d.items)?d.items:[]).filter(function(r){return r&&r.kind!=="sealed"&&Number(r.price)>0;});
+    const master=singles.reduce(function(n,r){return n+Number(r.price);},0);
+    const t=[
+      d.sealedLine?tile(/booster pack/i.test(d.sealedLine.name)?"Booster Pack":"Sealed",d.sealedLine,"/p/"+encodeURIComponent(d.sealedLine.id),d.sealedLine.name):"",
+      d.chaseLine?tile("Chase card",d.chaseLine,"/c/"+encodeURIComponent(d.chaseLine.id),d.chaseLine.name):"",
+      master>0?tile("Master set",{price:master},"#list",singles.length+" priced cards"):""
+    ].join("");
+    return t?'<div class="st-tiles">'+t+'</div>':"";
+  };
   const link=(row,kind)=>row?'<p><b>'+(kind==="sealed"?"Sealed line":"Chase line")+'</b> <a data-quick="'+html(row.id)+'" href="'+(kind==="sealed"?"/p/":"/c/")+encodeURIComponent(row.id)+'">'+html(row.name)+'</a> '+moneyLine(row.price)+'</p>':"";
   var logoSrc=catalogueUrl(cataloguePath(catImages, slug));
   if(!logoSrc && typeof data.logo==="string" && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(data.logo)) logoSrc=data.logo;
   if(!logoSrc && typeof data.logo==="string" && data.logo.indexOf("https://")===0) logoSrc=data.logo;
   setLogo=logoSrc||"";
-  document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+link(data.sealedLine,"sealed")+link(data.chaseLine,"single");
+  document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+setTiles(data);
   document.getElementById("charts").innerHTML='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div><div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
   document.getElementById("single-chart").setAttribute("data-chart", JSON.stringify(data.singleIndex||[]));
   document.getElementById("sealed-chart").setAttribute("data-chart", JSON.stringify(data.sealedIndex||[]));
