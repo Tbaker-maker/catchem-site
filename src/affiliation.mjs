@@ -13,6 +13,7 @@ export function ensureAffiliation(html) {
   if (!s.includes(TCGPLAYER_ATTRIBUTION)) parts.push(TCGPLAYER_ATTRIBUTION);
   if (!parts.length) return s;
   const block = parts.map((line) => `<p class="affiliation">${line}</p>`).join("");
+  if (/<footer\b[^>]*>\s*<div class="wrap">/i.test(s)) return s.replace(/<footer\b[^>]*>\s*<div class="wrap">/i, (m) => m + block);
   if (/<footer\b[^>]*>/i.test(s)) return s.replace(/<footer\b[^>]*>/i, (m) => m + block);
   if (/<\/body>/i.test(s)) return s.replace(/<\/body>/i, `<footer>${block}</footer></body>`);
   if (/<!doctype html/i.test(s) || /<html\b/i.test(s) || /<main\b/i.test(s) || /<h1\b/i.test(s)) {
