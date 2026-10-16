@@ -1,5 +1,6 @@
 // /terms, /privacy, /disclaimer: rendered from LEGAL_TEXT in the site chrome.
 import { LEGAL_TEXT } from "./legal-text.mjs";
+import { REFUND_LINE } from "./policy.mjs";
 import { pageChrome } from "./ui.mjs";
 
 export const LEGAL_UPDATED = "Last updated: 13 October 2026";
@@ -10,7 +11,7 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 const inline = (s) => esc(s).replace(/support@catchemtcg\.com/g, '<a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a>');
 
 export function legalBody(key) {
-  const lines = String(LEGAL_TEXT[key] || "").split("\n");
+  const lines = String(LEGAL_TEXT[key] || "").replace("{{REFUND_LINE}}", REFUND_LINE).split("\n");
   const out = [];
   let list = false;
   const close = () => { if (list) { out.push("</ul>"); list = false; } };

@@ -1,3 +1,4 @@
+import { REFUND_LINE } from "../src/policy.mjs";
 import "./trust.test.mjs";
 import "./features.test.mjs";
 import "./practice.test.mjs";
@@ -975,7 +976,8 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   const many = chartBox(run, "TCGplayer market, daily");
   t("30D stays when that range has two or more prices", many.includes('data-range="30D"') && !many.includes('data-range="1Y"'));
   t("a missing calendar day is its own segment", splitDated([{ date: "2026-08-01", ask: 10 }, { date: "2026-08-03", ask: 12 }], "ask").length === 2);
-  t("premium copy strings from the old hero are absent", !renderPremium("").includes("Claim your First 222 number.") && !renderPremium("").includes("7-day refund on the first charge.") && !renderPremium("").includes("Card payments only."));
+  t("premium copy strings from the old hero are absent", !renderPremium("").includes("Claim your First 222 number.") && !renderPremium("").includes("Card payments only."));
+  t("premium refund line comes from policy.mjs only", renderPremium("").includes(REFUND_LINE));
 }
 
 if (fail) process.exit(1);
