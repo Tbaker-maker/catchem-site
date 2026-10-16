@@ -1,3 +1,4 @@
+import { cleanPage } from "./clean-text.mjs";
 export const AFFILIATION = "Not affiliated with Nintendo, The Pokémon Company, or Creatures.";
 // TCGplayer's required attribution. Every page with prices shows it.
 export const TCGPLAYER_ATTRIBUTION = "This product uses TCGplayer data but is not endorsed or certified by TCGplayer.";
@@ -5,7 +6,7 @@ export const TCGPLAYER_ATTRIBUTION = "This product uses TCGplayer data but is no
 // Every HTML page gets this sentence. A page that already has a footer keeps
 // it and gains the sentence. A page with no footer gets one.
 export function ensureAffiliation(html) {
-  const s = String(html ?? "");
+  const s = cleanPage(String(html ?? ""));
   if (!s) return s;
   const parts = [];
   if (!s.includes(AFFILIATION)) parts.push(AFFILIATION);

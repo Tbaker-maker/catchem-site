@@ -101,7 +101,7 @@ t("full editor keeps its tools", patchedHtml.includes("Compare both") && patched
 t("full editor uses live price words", patchedHtml.includes(PAPER_PATH) && patchedHtml.includes('PRICES_AS_OF = "2026-09-27"') && patchedHtml.includes("TCGplayer market") && !patchedHtml.includes("sells for") && patchedHtml.includes("Facebook") && patchedHtml.includes("YouTube") && patchedHtml.includes("Instagram") && patchedHtml.includes("catchem.png") && !patchedHtml.includes('".jpg"') && patchedHtml.includes("Write the post") && patchedHtml.includes("Ideas") && patchedHtml.includes("Copy all") && patchedHtml.includes("var INDEX = [], tray = []"));
 t("editor drops buy and sell prompts", !patchedHtml.includes("Selling") && !patchedHtml.includes("Would you still buy") && !patchedHtml.includes("For sale") && !patchedHtml.includes("sell image for singles") && !patchedHtml.includes("buyer needs") && patchedHtml.includes("Looking for") && patchedHtml.includes("Trade list") && patchedHtml.includes("Make the image"));
 const stamped = patchEditorHtml(shell, "2026-09-27", "Post Office build abc1234 · 2026-09-28");
-t("editor stamp sits in the footer", stamped.includes('id="post-build"') && stamped.includes("Post Office build abc1234 · 2026-09-28") && stamped.indexOf("post-build") < stamped.lastIndexOf("</body>"));
+t("editor stamp sits in the footer", stamped.includes('id="post-build"') && stamped.includes("Post Office build abc1234 · Sep 28") && stamped.indexOf("post-build") < stamped.lastIndexOf("</body>"));
 t("editor file is play", EDITOR_URL.endsWith("/play.html") && !EDITOR_URL.endsWith("/build.html"));
 const playRaw = await (await fetch(EDITOR_URL)).text();
 const playHtml = patchEditorHtml(playRaw, "2026-09-27", "Post Office build abc");

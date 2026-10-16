@@ -40,7 +40,7 @@ const page = async (p, opts = {}) => { resetJsonCache(); const r = await renderP
 
 const base = await page("/sets/base-set");
 t("set value heading and total", base.text.includes(">Set value<") && base.text.includes("$2,180.37") && base.text.includes("101 priced, 1 unpriced"));
-t("set value date and source", base.text.includes("TCGplayer market, Oct 12, 2026") && base.text.includes("data/history/tcgcsv-daily/2026-10-12.json"));
+t("set value date and source", base.text.includes("TCGplayer market, Oct 12, 2026") && !base.text.includes("tcgcsv-daily/2026-10-12.json"));
 t("top 10 rows", (base.text.match(/class="sv-row"/g) || []).length === 10 && base.text.includes("/c/tcgcsv-42382"));
 t("every row has an image or a branded tile", (base.text.match(/class="sv-row"><(img|div class="tile)/g) || []).length === 10);
 t("Base Set links to Shadowless", base.text.includes('href="/sets/base-set-shadowless"'));
