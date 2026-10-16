@@ -44,7 +44,7 @@ export async function stripPageFor(slug) {
   if (!slug) return null;
   const doc = await readShard("p", shardOf(slug));
   const row = doc && doc[slug];
-  return Array.isArray(row) ? { name: row[0], slug, ids: Array.isArray(row[1]) ? row[1] : [] } : null;
+  return Array.isArray(row) ? { name: row[0], slug, ids: Array.isArray(row[1]) ? row[1] : [], strip: row[2] && typeof row[2] === "object" ? row[2] : null } : null;
 }
 
 export function resetStripIndex() { shardMem.clear(); }
