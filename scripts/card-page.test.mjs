@@ -52,8 +52,8 @@ const full = renderCard(card, "stamp", {
   rotationFact: '<p class="rot-badge"><a href="/rotation"><span class="rm">G</span> Regulation mark G</a></p>',
 });
 
-const wins = (full.match(/<p class="cp-wins">[\s\S]*?<\/p>/) || [""])[0];
-t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("7d +25%") && wins.includes("30d +50%") && !/90/.test(wins) && !full.includes("7D —") && !full.includes("30D —"));
+const wins = (full.match(/<dl class="chg"[\s\S]*?<\/dl>/) || [""])[0];
+t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("<dt>7D</dt><dd class=\"up\">+25%</dd>") && wins.includes("<dt>30D</dt><dd class=\"up\">+50%</dd>") && !full.includes("7D —") && !full.includes("30D —"));
 t("price stays on one line", full.includes(".cp-price{") && /white-space:nowrap/.test(full.slice(full.indexOf(".cp-price{"), full.indexOf(".cp-price{") + 220)));
 t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
 t("chart and since range ignore the sealed fill", full.includes("class=\"hc\"") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
@@ -132,7 +132,7 @@ const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "st
   fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },
   rotationFact: '<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark G, Standard"><span class="rm">G</span> Regulation mark G · Standard</a></p>',
 });
-t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("1Y +50%") && yearCard.includes("18 listings counted, Oct 13, 2026") && yearCard.includes("G · Standard"));
+t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13, 2026") && yearCard.includes("G · Standard"));
 const bare = renderCard({ id: "tcgcsv-3", name: "No Price", kind: "single", set: "S" }, "stamp", {});
 t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/sum-chip[^>]*>1Y /.test(bare) && !bare.includes("listings counted"));
 

@@ -2257,6 +2257,16 @@ function countedListings(fact, series, endDay) {
   return { n: Number(row.listingCount), day: String(row.date).slice(0, 10) };
 }
 
+// One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
+// exact start day is left out. Nothing shows when no window has a number.
+export function changeTable(series, endDay) {
+  const cells = [["7D", 7], ["30D", 30], ["90D", 90], ["1Y", 365]]
+    .map(([label, days]) => [label, exactWindowPct(series, days, endDay)])
+    .filter(([, n]) => typeof n === "number" && Number.isFinite(n));
+  if (!cells.length) return "";
+  return `<style>.chg{display:grid;grid-template-columns:repeat(${cells.length},minmax(0,1fr));gap:6px;margin:10px 0 14px;padding:6px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid #2f2b26;max-width:420px}.chg div{padding:8px 6px;border-radius:12px;text-align:center}.chg dt{font:500 12px/1.2 var(--sans);color:var(--dim)}.chg dd{margin:3px 0 0;font:650 15px/1.2 var(--sans)}.chg .up{color:#7fc79a}.chg .down{color:#e0877a}</style><dl class="chg" aria-label="Price change">${cells.map(([label, n]) => `<div><dt>${label}</dt><dd class="${n > 0 ? "up" : n < 0 ? "down" : ""}">${n > 0 ? "+" : ""}${n}%</dd></div>`).join("")}</dl>`;
+}
+
 function summaryStrip({ nm = false, price = "", year = null, listings = null, rotation = "" } = {}) {
   const bits = [];
   if (price) bits.push(`<span class="sum-chip">${nm ? "NM " : ""}${esc(price)}</span>`);
@@ -2521,7 +2531,7 @@ const SINGLE_CSS = `
 .yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
 .yr-track{position:relative;height:6px;margin:0 9px;border-radius:999px;background:rgba(255,255,255,.10)}
 .yr-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,rgba(217,183,121,.28),#d9b779)}
-.yr-knob{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#f6f1e7;border:2px solid #1a1815;box-shadow:0 0 0 3px rgba(217,183,121,.45);transform:translate(-50%,-50%)}
+.yr-knob{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;background:#f6f1e7;transform:translate(-50%,-50%);pointer-events:none}
 @media(max-width:480px){
   .card-page h1{font-size:28px}
   .cp-now{font-size:28px}
@@ -2583,14 +2593,10 @@ function readLink(card) {
 
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
   const tags = printingTags(card);
-  const chips = [
-    exactChip("7d", exactWindowPct(priceSeries.length ? priceSeries : hist, 7, endDay)),
-    exactChip("30d", exactWindowPct(priceSeries.length ? priceSeries : hist, 30, endDay)),
-  ].filter(Boolean).join("");
+  const chips = changeTable(priceSeries.length ? priceSeries : hist, endDay);
   const strip = summaryStrip({
     nm: true,
     price,
-    year: exactWindowPct(priceSeries.length ? priceSeries : hist, 365, endDay),
     listings: countedListings(opts.fact, opts.listingSeries, endDay),
     rotation: rotationChipLabel(opts.rotationFact),
   });
@@ -2632,7 +2638,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const math = [];
   if (card.rank && card.of) math.push(`<p>Rank ${esc(card.rank)} of ${esc(card.of)} priced singles in this set.</p>`);
   if (also) math.push(`<p>Also in this set: ${also}</p>`);
-  if (card.sold && Number(card.sold.n) > 0) math.push(`<p>Recent sales: TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).</p>`);
+  
   return `<main id="main" tabindex="-1" class="wrap product-glance card-page">
 <style>${SINGLE_CSS}</style>
 <header class="cp-head">
@@ -2644,7 +2650,7 @@ ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}</p>` : ""}
-${chips ? `<p class="cp-wins">${chips}</p>` : ""}
+${chips}
 ${strip}
 ${printingsHtml(card)}
 ${conditionLine(opts.conditionNote)}
@@ -2660,7 +2666,7 @@ ${panels ? `<div class="cp-panels">${panels}</div>` : ""}
 ${board.length ? `<section class="cp-sec"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : ""}
 <details><summary>See the math</summary>
 ${math.join("")}
-<p><button type="button" id="paid">I paid or sold at a price</button></p>
+<p><button type="button" id="paid">Report a price I paid</button></p>
 <form id="paid-form" hidden>
 <label>Price <input name="price" inputmode="decimal" required></label>
 <label>Date <input name="date" type="date" required></label>
@@ -2751,18 +2757,14 @@ export function renderCard(card, stamp, opts = {}) {
   const asOf = fact?.asOf || card.asOf;
   const hist = histWithFact(card.hist || [], fact);
   const endDay = String(asOf || "").slice(0, 10);
-  const chips = [
-    exactChip("7D", exactWindowPct(hist, 7, endDay)),
-    exactChip("30D", exactWindowPct(hist, 30, endDay)),
-    exactChip("90D", exactWindowPct(hist, 90, endDay)),
-  ].join("");
+  const chips = "";
   const sealed = card.kind === "sealed";
   const listingsLine = sealed ? listingTrend(opts.listingSeries || [], endDay) : "";
   const reads = (opts.productReads || []).filter((read) => read && (read.headline || read.path)).slice(0, 3);
   const readHtml = reads.length
     ? `<ul class="glance-reads">${reads.map((read) => {
-      const when = esc(String(read.asOf || "").slice(0, 10));
-      const line = esc(read.headline || read.path || "");
+      const when = esc(priceDay(String(read.asOf || "").slice(0, 10)));
+      const line = esc(read.headline || "");
       const href = opts.feed && read.id ? `/feed/r/${encodeURIComponent(read.id)}` : "";
       return `<li>${href ? `<a href="${esc(href)}">${when} ${line}</a>` : `${when} ${line}`}</li>`;
     }).join("")}</ul>`
@@ -2780,9 +2782,9 @@ export function renderCard(card, stamp, opts = {}) {
   const priceSeries = cardPriceSeries(card, hist, sealed);
   const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
+  const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
   const sealedStrip = sealed ? summaryStrip({
-    price,
-    year: exactWindowPct(priceSeries.length ? priceSeries : hist, 365, endDay),
+    price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
     listings: countedListings(fact, opts.listingSeries, endDay),
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
@@ -2837,7 +2839,7 @@ export function renderCard(card, stamp, opts = {}) {
 .yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
 .yr-track{position:relative;height:6px;margin:0 9px;border-radius:999px;background:rgba(255,255,255,.10)}
 .yr-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,rgba(217,183,121,.28),#d9b779)}
-.yr-knob{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#f6f1e7;border:2px solid #1a1815;box-shadow:0 0 0 3px rgba(217,183,121,.45);transform:translate(-50%,-50%)}
+.yr-knob{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;background:#f6f1e7;transform:translate(-50%,-50%);pointer-events:none}
 @media(max-width:480px){.yr-line{font-size:11px;letter-spacing:-.03em}}
 </style>
 <div class="glance">
@@ -2850,7 +2852,7 @@ ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.ta
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span></p>` : ""}
 ${sealedStrip}
-${chips ? `<p>${chips}</p>` : ""}
+${changeHtml}
 ${priceChart}
 ${rangeRow}
 ${opts.itemReadHtml || ""}
@@ -2860,7 +2862,7 @@ ${ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.listingsHtml || ""}
 ${opts.notMovedHtml || ""}
-<h2>Facts</h2>
+${KV_CSS}<h2>Facts</h2>
 ${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}
 ${readHtml ? `<h2>Reads</h2>\n${readHtml}` : ""}
 ${supplyNote}
@@ -2868,7 +2870,7 @@ ${supplyNote}
 </div>
 ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
-<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>
+${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
 ${listChart}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
@@ -2876,8 +2878,7 @@ ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper l
 <p>${card.rank ? `Rank ${card.rank} of ${card.of} priced singles in this set.` : "No rank, because this row has no market price or it is sealed."}</p>
 <p>${also ? `Also in this set: ${also}` : "No related rows stored."}</p>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
-<p>Recent sold prices: ${card.sold && Number(card.sold.n) > 0 ? `TCGplayer recent sales (${esc(card.sold.n)}, ${esc(card.sold.dates || "")}).` : "No sold data yet."}</p>
-<p><button type="button" id="paid">I paid or sold at a price</button></p>
+<p><button type="button" id="paid">Report a price I paid</button></p>
 <form id="paid-form" hidden>
 <label>Price <input name="price" inputmode="decimal" required></label>
 <label>Date <input name="date" type="date" required></label>
@@ -3116,6 +3117,8 @@ document.getElementById("share-card").addEventListener("click", function(){
   return chrome("", body, "Today", stamp, "", feedNav(opts));
 }
 
+const KV_CSS = `<style>.kv{margin:8px 0 16px;padding:4px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.kv div{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}.kv div:last-child{border-bottom:0}.kv dt{color:var(--dim);font:500 14px/1.3 var(--sans)}.kv dd{margin:0;font:600 14px/1.3 var(--sans);text-align:right}.glance-reads{list-style:none;padding:0!important;display:grid;gap:8px}.glance-reads li{padding:12px 14px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26}</style>`;
+
 export function factsLines(row) {
   const lines = [];
   if (Number(row?.market) > 0) lines.push({ label: "Market", value: money(row.market) });
@@ -3127,8 +3130,8 @@ export function factsLines(row) {
 
 export function renderFacts(row) {
   const lines = factsLines(row);
-  if (!lines.length) return `<p class="muted">No market line in the price file.</p>`;
-  return lines.map((line) => `<p>${esc(line.label)}: ${esc(line.value)}</p>`).join("");
+  if (!lines.length) return "";
+  return `<dl class="kv">${lines.map((line) => `<div><dt>${esc(line.label)}</dt><dd>${esc(line.value)}</dd></div>`).join("")}</dl>`;
 }
 
 export function compareRows(left, right) {

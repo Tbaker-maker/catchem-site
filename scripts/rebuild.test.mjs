@@ -319,7 +319,7 @@ t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["
   const table = main.slice(main.lastIndexOf("<tbody>"));
   t("track record is newest first and hides a percent under 20", main.includes("Too early to score") && main.includes("0 scored so far") && main.includes("Newest first") && table.includes("Example") && table.indexOf("2026-10-10") < table.indexOf("2026-10-09") && !main.includes("%") && !page.includes("tcgcsv-"));
   const facts = renderFacts({ market: 12.5, low: 9, date: "2026-10-09", source: "TCGplayer market", listings: 40 });
-  t("facts panel is market, low, date, and source", facts.includes("Market:") && facts.includes("Low:") && facts.includes("Date:") && facts.includes("Source:") && !facts.includes("listings"));
+  t("facts panel is market, low, date, and source", facts.includes("<dt>Market</dt>") && facts.includes("<dt>Low</dt>") && facts.includes("<dt>Date</dt>") && facts.includes("<dt>Source</dt>") && !facts.includes("listings"));
   const compared = compareRows({ market: 10, date: "2026-10-09", source: "TCGplayer market" }, { market: 12, low: 8, source: "TCGplayer market" });
   t("compare leaves a missing row off", compared.map((row) => row.label).join() === "Market,Source" && !/winner|score|better|higher|lower/i.test(JSON.stringify(compared)));
   t("compare page has the form", renderCompare(null, null, "stamp").includes("Compare two products") && renderCompare(null, null, "stamp").includes("A missing number is left off."));
