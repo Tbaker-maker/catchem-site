@@ -1339,7 +1339,7 @@ a{color:var(--gold)}
 .win{font:600 16px/1.2 var(--sans)}
 .win.up{color:var(--green)}
 .win.down{color:var(--red)}
-.sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}@media(max-width:600px){.sum-strip{display:grid;grid-template-columns:1fr 1fr}.sum-strip .sum-chip{text-align:center;justify-content:center}}
 .sum-chip{display:inline-flex;align-items:center;min-height:36px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
 .sum-chip.up{color:var(--green)}
 .sum-chip.down{color:var(--red)}
@@ -3044,7 +3044,7 @@ export function todayStrip(doc) {
     const body = row.href ? `<a href="${esc(row.href)}">${esc(row.text)}</a>` : esc(row.text);
     return `<article><b>${esc(label)}</b><p>${body}</p></article>`;
   }).join("");
-  return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
+  return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
 }
 
 export function renderToday(doc, stamp, opts = {}) {
