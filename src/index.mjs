@@ -209,49 +209,14 @@ function withCatalogue(list, images) {
   });
 }
 
-// Drops a price read when the card's nightly row moved on. A read with a
-// build-time stale flag is dropped at once. The bucket comparison runs at most
-// once per reads.json version: the stale id list is kept in isolate memory and
-// the Cache API, and on a miss it is built in the background (waitUntil), so a
-// page never waits on the bucket fetches.
-const staleIds = new Map();
-const staleJobs = new Map();
-const STALE_CACHE = "https://catchem-internal.invalid/stale-ids/";
-async function computeStaleIds(list, fetchImpl) {
-  const skus = [...new Set(list.map((r) => String(r?.sku || "")).filter((s) => /^tcgcsv-\d+$/.test(s)))];
-  const rows = await bucketRows(skus, fetchImpl).catch(() => new Map());
-  return list.filter((read) => /^tcgcsv-\d+$/.test(String(read?.sku || "")) && readStaleAgainstCard(read, rows.get(String(read.sku)))).map((r) => String(r.id));
-}
-function staleCache() {
-  try { return typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { return null; }
-}
-async function omitStalePriceReads(reads, fetchImpl, opts = {}) {
+// Price stale ids come prebuilt in reads.json (priceStaleIds, Catchem-data
+// build-feed). The old per-request bucket scan fetched ~70 buckets on a cold
+// isolate and tripped Cloudflare error 1102, so it is gone. Without the list,
+// only the build-time stale flag applies.
+async function omitStalePriceReads(reads, _fetchImpl, opts = {}) {
   const list = (Array.isArray(reads) ? reads : []).filter((read) => !read?.stale);
-  const key = String(opts.version || "");
-  const apply = (ids) => { const drop = new Set(ids); return list.filter((r) => !drop.has(String(r?.id))); };
-  if (key && staleIds.has(key)) return apply(staleIds.get(key));
-  const cache = staleCache();
-  if (key && cache) {
-    try {
-      const hit = await cache.match(STALE_CACHE + encodeURIComponent(key));
-      if (hit) { const ids = await hit.json(); staleIds.set(key, ids); return apply(ids); }
-    } catch {}
-  }
-  const job = () => {
-    if (staleJobs.has(key)) return staleJobs.get(key);
-    const p = computeStaleIds(list, fetchImpl).then(async (ids) => {
-      if (key) {
-        if (staleIds.size > 4) staleIds.clear();
-        staleIds.set(key, ids);
-        if (cache) await cache.put(STALE_CACHE + encodeURIComponent(key), new Response(JSON.stringify(ids), { headers: { "content-type": "application/json", "cache-control": "max-age=86400" } })).catch(() => {});
-      }
-      return ids;
-    }).finally(() => staleJobs.delete(key));
-    staleJobs.set(key, p);
-    return p;
-  };
-  if (typeof opts.waitUntil === "function") { opts.waitUntil(job().catch(() => {})); return list; }
-  return apply(await job().catch(() => []));
+  const drop = new Set((Array.isArray(opts.staleIds) ? opts.staleIds : []).map(String));
+  return drop.size ? list.filter((r) => !drop.has(String(r?.id))) : list;
 }
 
 async function readsFor(cardId, fetchImpl) {
@@ -507,7 +472,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     const readYearEarly = readId ? await readYearFor(readId, fetchImpl) : null;
     const bundle = await loadJson("reads.json", fetchImpl);
-    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl, { version: String(bundle?.asOf || bundle?.updatedAt || "") + ":" + (bundle?.reads?.length || 0), waitUntil: opts.waitUntil });
+    const reads = await omitStalePriceReads(bundle?.reads, fetchImpl, { staleIds: bundle?.priceStaleIds });
     const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     if (path === "/feed/lead.json") {

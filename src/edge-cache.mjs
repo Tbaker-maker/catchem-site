@@ -27,9 +27,17 @@ export function cacheableRequest(request) {
   return true;
 }
 
-function cacheKey(request) {
-  const url = new URL(request.url);
+// Tracking params never change the page, so they never split the cache.
+const TRACKING = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|dclid|msclkid|twclid|ttclid|li_fat_id|mc_cid|mc_eid|igshid|yclid|_ga|_gl|ref|ref_src|ref_url|s|t|si|source)$/i;
+export function cacheKeyUrl(href) {
+  const url = new URL(href);
   url.hash = "";
+  for (const k of [...url.searchParams.keys()]) if (TRACKING.test(k)) url.searchParams.delete(k);
+  url.searchParams.sort();
+  return url.toString();
+}
+function cacheKey(request) {
+  const url = new URL(cacheKeyUrl(request.url));
   return new Request(url.toString(), { method: "GET" });
 }
 
