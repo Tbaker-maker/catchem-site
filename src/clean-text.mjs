@@ -28,6 +28,7 @@ export function cleanText(t, nowYear) {
   let s = String(t);
   if (!s.trim()) return s;
   if (BROKEN.test(s)) return "";
+  s = s.replace(/\s+\u2014\s+/g, ", ").replace(/\u2014/g, ": ");
   // money with one decimal
   s = s.replace(/\$(\d{1,3}(?:,\d{3})*|\d+)\.(\d)(?!\d)/g, "$$$1.$20");
   // data file paths like data/enrichment-distilled.json, research/x.json
