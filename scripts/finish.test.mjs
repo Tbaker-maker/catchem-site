@@ -26,7 +26,7 @@ const chart = grab("function catchemFilter(pts,range){", "function catchemDraw("
 const filt = new Function(chart + "return catchemFilter;")();
 const pts = [{ d: "2026-01-01", v: 1 }, { d: "2026-10-11", v: 2 }];
 ok(filt(pts, "30D").length < 2 && filt(pts, "All").length === 2, "sparse 30D has under two points");
-ok(src.includes('catchemFilter(all, r).length<2) btn.hidden=true'), "buttons hide without two points");
+ok(src.includes('span>r[1]*0.5'), "ranges need enough span");
 // skip link and focus ring
 ok(src.includes('<a class="skip-link" href="#main">Skip to content</a>'), "skip link");
 ok(src.includes(":focus-visible{outline:3px"), "focus ring");

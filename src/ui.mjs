@@ -1297,34 +1297,22 @@ function catchemMount(root){
     var raw=[]; try{ raw=JSON.parse(host.getAttribute("data-chart")||"[]"); }catch(e){ raw=[]; }
     var all=catchemPoints(raw);
     var caption=host.getAttribute("data-caption")||"TCGplayer market, daily";
-    var release=host.getAttribute("data-release")||"";
-    var box=host.parentElement;
-    var span=all.length<2?0:Math.round((Date.parse(all[all.length-1].d+"T00:00:00Z")-Date.parse(all[0].d+"T00:00:00Z"))/86400000)+1;
-    var allow=all.length>=2?["All"]:[];
-    if(span>=7) allow.unshift("7D");
-    if(span>=30) allow.splice(allow.indexOf("All"),0,"30D");
-    if(span>=90) allow.splice(allow.indexOf("All"),0,"90D");
-    if(span>=365) allow.splice(allow.indexOf("All"),0,"1Y");
-    allow=allow.filter(function(r){ return catchemFilter(all, r).length>=2; });
-    // An empty range never draws a notice: step out to the nearest range that has points.
-    var order=["7D","30D","90D","1Y","All"];
-    function paint(range){
-      var pts=catchemFilter(all, range);
-      for(var oi=order.indexOf(range)+1; pts.length<2 && oi>0 && oi<order.length; oi++) pts=catchemFilter(all, order[oi]);
-      catchemDraw(host, pts, release, caption);
-    }
-    paint("All");
-    if(!box) return;
-    var keep=box.getAttribute("data-keep-ranges")==="1";
-    box.querySelectorAll("[data-range]").forEach(function(btn){
-      var r=btn.getAttribute("data-range");
-      if((!keep && allow.indexOf(r)<0) || catchemFilter(all, r).length<2) btn.hidden=true;
-      btn.addEventListener("click", function(){
-        box.querySelectorAll("[data-range]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
-        btn.setAttribute("aria-pressed","true");
-        paint(btn.getAttribute("data-range"));
-      });
-    });
+    var unit=/index/i.test(caption)?"index":/listings/i.test(caption)?"count":"price";
+    var box=host.parentElement&&host.parentElement.classList.contains("chart-box")?host.parentElement:host;
+    if(all.length<2){ box.innerHTML='<p class="muted chart-note">'+(all.length?"The line starts here and grows each night.":"The line starts at the first price on file.")+'</p>'; return; }
+    var pts=all.map(function(p){ return p.f?[p.d,p.v,"n",p.f]:[p.d,p.v,"n"]; });
+    var span=(Date.parse(pts[pts.length-1][0])-Date.parse(pts[0][0]))/864e5;
+    var ranges=[["1M",31],["3M",92],["6M",183],["1Y",366],["All",0]].filter(function(r){ return r[1]===0||span>r[1]*0.5; });
+    var pills=ranges.map(function(r,i){ return '<button type="button" class="hc-pill" data-days="'+r[1]+'" aria-pressed="'+(i===ranges.length-1?"true":"false")+'">'+r[0]+'</button>'; }).join("");
+    var fig=document.createElement("figure");
+    fig.className="hc";
+    fig.setAttribute("data-unit",unit);
+    fig.setAttribute("data-snap","all");
+    fig.setAttribute("data-color",unit==="count"?"#7fc79a":"#d9b779");
+    fig.setAttribute("data-pts",JSON.stringify(pts));
+    fig.innerHTML='<div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="'+caption.replace(/"/g,"")+'"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div>';
+    box.replaceWith(fig);
+    if(window.catchemHistoryMount) window.catchemHistoryMount();
   });
 }
 `;
@@ -1583,7 +1571,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><script>${CHART_JS}\n${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/indexes", "Indexes")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
 </nav></header>
