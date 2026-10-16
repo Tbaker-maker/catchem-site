@@ -14,6 +14,8 @@ export function shardOf(id) { const n = Number(String(id || "").replace(/\D/g, "
 export const RATING_CSS = `.crt{margin:14px 0;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}.crt h2{margin:0 0 4px;font:600 18px/1.3 var(--serif)}.crt .grp{margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}.crt .verdict{margin:0 0 6px;font-weight:700;color:var(--gold);font-size:16px}.crt .peer{margin:0 0 12px;font-size:14px;opacity:.85}.crt ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}.crt li{display:grid;gap:4px}.crt .row{display:flex;justify-content:space-between;gap:10px;font-size:13px}.crt .row b{font-weight:600}.crt .bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.crt .bar i{display:block;height:100%;border-radius:999px;background:var(--gold)}.crt .fact{font-size:12px;opacity:.65;overflow-wrap:anywhere}.crt .gate{margin:12px 0 0;font-size:14px}.crt .gate a{color:var(--gold);font-weight:600}.crt details{margin-top:12px;font-size:12px;opacity:.75}.crt summary{cursor:pointer}.crt .verdict.none{color:inherit;opacity:.85}.crt .near{margin:0 0 8px;font-size:14px;font-weight:600;opacity:.9}.crt h3{margin:12px 0 8px;font:600 14px/1.3 var(--sans)}.crt ul.cw{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:8px}.crt ul.cw a{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;color:inherit;text-decoration:none;padding:6px;border-radius:12px;border:1px solid var(--line)}.crt .cw-pic img,.crt .cw-pic .tile{width:44px;max-width:44px;height:auto;border-radius:6px}.crt .cw-main{display:grid;gap:2px;font-size:13px;min-width:0}.crt .cw-main b{font-weight:600;overflow-wrap:anywhere}.crt .cw-main span{opacity:.65;font-size:12px}.crt .cw-price{text-align:right;font-weight:600;font-size:13px}.crt .cw-price small{display:block;font-weight:400;opacity:.6;font-size:11px}.crt .cw-more{margin:6px 0 0;opacity:1;font-size:13px}`;
 
 export const SHOW_FIRST = 5;
+// Page weight: at most 25 comparison rows render (each row is a picture).
+export const SHOW_MAX = 25;
 // Names without the TCGplayer number or variant suffix; the variant chip covers them.
 export const cleanName = (n) => String(n || "").replace(/\s+-\s+[A-Z]*\d+[a-z]?\/[A-Z]*\d+\s*$/, "").replace(/(\s*\((\d+[a-z]?|[A-Z]{1,3}\d+|Alternate[^)]*|Full Art|Secret|Delta Species)\))+\s*$/i, "").trim();
 
@@ -24,8 +26,9 @@ export function comparedWith(row, pool, pic = () => "") {
   if (!list.length) return "";
   const li = (p) => `<li><a href="/c/${esc(p[0])}"><span class="cw-pic">${pic({ id: p[0], name: p[1] })}</span><span class="cw-main"><b>${esc(cleanName(p[1]))}${p[6] ? " 1st Edition" : ""}</b><span>${esc(p[2])}${p[3] ? ` · ${esc(p[3])}` : ""}</span></span><span class="cw-price">${cash(p[4])}<small>${esc(shortDate(p[5]))}</small></span></a></li>`;
   const first = list.slice(0, SHOW_FIRST).map(li).join("");
-  const rest = list.slice(SHOW_FIRST);
-  const more = rest.length ? `<details class="cw-more"><summary>Show ${rest.length} more</summary><ul class="cw">${rest.map(li).join("")}</ul></details>` : "";
+  const rest = list.slice(SHOW_FIRST, SHOW_MAX);
+  const left = list.length - SHOW_FIRST - rest.length;
+  const more = rest.length ? `<details class="cw-more"><summary>Show ${rest.length} more</summary><ul class="cw">${rest.map(li).join("")}</ul>${left > 0 ? `<p class="muted">${left} more priced in the same group. <a href="/search">Search them</a>.</p>` : ""}</details>` : "";
   return `<div class="cw-wrap"><h3>Compared with ${list.length} ${esc(row.peers?.matched ? `${row.groupLabel} with similar pull rate and popularity` : row.groupLabel)}</h3><ul class="cw">${first}</ul>${more}</div>`;
 }
 

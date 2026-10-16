@@ -258,3 +258,20 @@ export function itemLine(text, id) {
   const body = s.slice(at + key.length, end < 0 ? undefined : end).replace(/,\s*$/, "");
   try { const doc = JSON.parse(body); return doc && typeof doc === "object" ? doc : null; } catch { return null; }
 }
+
+// Small per-item bucket files (feed/item-reads, feed/card/*). Own memo with
+// its own cap, so these never push the big shared files out of the main memo.
+// A 404 resolves to null; other failures throw so callers can fall back.
+const smallMem = new Map();
+export async function smallJson(rel, fetchImpl = fetch) {
+  const hit = smallMem.get(rel);
+  if (hit && nowFn() - hit.at < MEM_TTL_MS) return hit.data;
+  const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
+  if (res && res.status === 404) return null;
+  if (!res || !res.ok) throw new Error(`${rel} ${res && res.status}`);
+  const data = await res.json();
+  if (smallMem.size > 150) smallMem.clear();
+  smallMem.set(rel, { data, at: nowFn() });
+  return data;
+}
+export const idBucket = (id) => String((Number((String(id).match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");

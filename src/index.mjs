@@ -4,7 +4,7 @@ import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic, fetchRepo } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -222,27 +222,49 @@ async function omitStalePriceReads(reads, _fetchImpl, opts = {}) {
   return drop.size ? list.filter((r) => !drop.has(String(r?.id))) : list;
 }
 
-// Every read about one item, from the small per-item lookup (feed/item-reads).
-// Falls back to reads.json until the lookup exists.
-export async function allReadsFor(cardId, fetchImpl) {
+// Every read about one item, full rows, from the small per-item lookup
+// (feed/item-reads). Only a failed fetch (not a 404) falls back to reads.json.
+async function itemReadRows(cardId, fetchImpl) {
   if (!/^tcgcsv-\d+$/.test(String(cardId || ""))) return [];
-  const b = String((Number(String(cardId).match(/(\d+)/)[1]) || 0) % 100).padStart(2, "0");
   try {
-    // Straight fetch, not the shared memo: one more memo key per bucket would
-    // push the memo past its cap and drop the big files other pages reuse.
-    const res = await fetchRepo(`research/assets/public/feed/item-reads/${b}.json`, fetchImpl, { cf: { cacheTtl: 300 } });
-    if (res && res.status === 404) return [];
-    if (!res || !res.ok) throw new Error("item-reads " + (res && res.status));
-    const doc = await res.json();
+    const doc = await smallJson(`feed/item-reads/${idBucket(cardId)}.json`, fetchImpl);
     return Array.isArray(doc?.items?.[cardId]) ? doc.items[cardId] : [];
   } catch {
     try {
       const bundle = await loadJson("reads.json", fetchImpl);
-      return (bundle?.reads || []).filter((r) => r && (r.sku === cardId || r.href === `/c/${cardId}` || r.href === `/p/${cardId}`))
-        .map((r) => ({ id: r.id, kind: String(r.readKind || r.kind || ""), headline: String(r.headline || r.path || ""), lines: Array.isArray(r.lines) ? r.lines.slice(0, 6) : [], asOf: String(r.asOf || "").slice(0, 10), source: String(r.source || "") }))
-        .sort((x, y) => y.asOf.localeCompare(x.asOf));
+      return (bundle?.reads || []).filter((r) => r && (r.sku === cardId || r.href === `/c/${cardId}` || r.href === `/p/${cardId}`));
     } catch { return []; }
   }
+}
+
+export async function allReadsFor(cardId, fetchImpl) {
+  return (await itemReadRows(cardId, fetchImpl))
+    .filter((r) => r && r.id && (r.headline || r.path))
+    .map((r) => ({ id: r.id, kind: String(r.readKind || r.kind || ""), headline: String(r.headline || r.path || ""), lines: Array.isArray(r.lines) ? r.lines.slice(0, 6) : [], asOf: String(r.asOf || "").slice(0, 10), source: String(r.source || "") }))
+    .sort((x, y) => y.asOf.localeCompare(x.asOf));
+}
+
+async function itemReadsTop(cardId, fetchImpl) {
+  const rows = (await itemReadRows(cardId, fetchImpl)).slice();
+  rows.sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")));
+  return rows.slice(0, 3);
+}
+
+// Card pages: images for this id bucket plus set logos (feed/card/img).
+async function cardImages(cardId, fetchImpl) {
+  try {
+    const doc = await smallJson(`feed/card/img/${idBucket(cardId)}.json`, fetchImpl);
+    if (doc && doc.images && typeof doc.images === "object") return doc.images;
+  } catch { /* fall back */ }
+  return catalogueMap(fetchImpl);
+}
+
+async function cardIr(cardId, fetchImpl) {
+  try {
+    const doc = await smallJson(`feed/card/ir/${idBucket(cardId)}.json`, fetchImpl);
+    if (doc && Array.isArray(doc.rows)) return doc;
+  } catch { /* fall back */ }
+  return loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
 }
 
 async function readsFor(cardId, fetchImpl) {
@@ -275,7 +297,9 @@ function collectReadRows(doc) {
 
 async function conditionNoteFor(fetchImpl) {
   try {
-    const doc = await loadCatalogue("derived/condition-prices.json", fetchImpl);
+    let doc = null;
+    try { doc = await smallJson("feed/card/condition-note.json", fetchImpl); } catch { doc = null; }
+    if (!doc) doc = await loadCatalogue("derived/condition-prices.json", fetchImpl);
     const asOf = String(doc?.asOf || "").slice(0, 10);
     const text = String(doc?.note || "").trim();
     const source = String(doc?.source || "").trim();
@@ -289,7 +313,7 @@ async function conditionNoteFor(fetchImpl) {
 
 async function cardReadSplit(cardId, fetchImpl) {
   const rows = [];
-  try { rows.push(...collectReadRows(await loadJson("reads.json", fetchImpl))); } catch { /* no reads file */ }
+  rows.push(...await itemReadRows(cardId, fetchImpl));
   try { rows.push(...collectReadRows(await loadJson("feed/extra-reads.json", fetchImpl))); } catch { /* no extra file */ }
   const sit = [];
   const board = [];
@@ -664,7 +688,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
     const sealedPage = !!(card && card.kind === "sealed");
     const diveHref = sealedPage && sealedId ? `/dive/${sealedId}` : "";
-    const images = await catalogueMap(fetchImpl);
+    const images = await cardImages(cardId, fetchImpl);
     const hit = card ? officialSrc(card, images) : { src: "", crop: false };
     let listingSeries = [];
     let ebayAsk = null;
@@ -679,7 +703,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = { amount, asOf, source };
       } catch { listingSeries = []; }
     }
-    const productReads = card ? await readsFor(cardId, fetchImpl) : [];
+    const productReads = card ? await itemReadsTop(cardId, fetchImpl) : [];
     let listingsHtml = "";
     if (card && card.kind === "sealed" && sealedId) {
       const counted = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
@@ -704,7 +728,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
-      const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
+      const ir = await cardIr(cardId, fetchImpl);
       const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
       const art = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm).replace(/<div class="rchips"><\/div>/g, "");
       rotationHtml = art + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
@@ -716,12 +740,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const rows = (shard?.rows || []).filter((r) => r.id === cardId);
       if (rows.length) {
         const meta = await loadJson("feed/card-rating.json", fetchImpl).catch(() => null);
-        const imgs = await catalogueMap(fetchImpl).catch(() => null);
-        const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, imgs || {}); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
+        const imgs = await cardImages(cardId, fetchImpl).catch(() => null);
+        const pic = (r, pool) => { const hit = officialSrc({ id: r.id, kind: "single" }, { ...(imgs || {}), ...(pool?.imgs || {}) }); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
         const panels = [];
         for (const r of rows) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
-          panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic }));
+          panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic: (x) => pic(x, pool) }));
         }
         ratingHtml = panels.join("");
         if (rows.some((r) => r.check)) priceCheck = true;

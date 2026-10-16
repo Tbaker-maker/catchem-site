@@ -129,6 +129,14 @@ const diveFiles = {
   },
 };
 
+// Per-item read lookup, as Catchem-data write-item-reads builds it nightly.
+for (const r of files["reads.json"]?.reads || []) {
+  const id = /^tcgcsv-\d+$/.test(String(r.sku || "")) ? r.sku : (String(r.href || "").match(/^\/(?:c|p)\/(tcgcsv-\d+)$/) || [])[1];
+  if (!id) continue;
+  const b = String(Number(id.slice(7)) % 100).padStart(2, "0");
+  const doc = (files[`feed/item-reads/${b}.json`] ||= { items: {} });
+  (doc.items[id] ||= []).push(r);
+}
 const fetchImpl = async (url) => {
   const s = String(url);
   const diveRel = s.split("/research/pulse/dive/")[1];

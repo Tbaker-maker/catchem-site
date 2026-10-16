@@ -51,5 +51,9 @@ t("empty sections hidden on a bare card", !bare.includes('id="rank"') && !bare.i
 const full = renderCard({ ...single, rank: 1, of: 102, also: [{ id: "tcgcsv-78", name: "Raichu" }] }, "stamp", { allReads: reads });
 t("single shows rank and related", full.includes("#1 of 102") && full.includes('href="/c/tcgcsv-78"') && full.includes('id="reads"'));
 
+const order = (h) => ITEM_SECTIONS.map(([id]) => h.indexOf(`id="${id}"`)).filter((i) => i >= 0);
+const sorted = (a) => a.every((v, i) => i === 0 || a[i - 1] < v);
+t("sealed sections follow the jump row order", sorted(order(main)));
+t("single sections follow the jump row order", sorted(order(full)));
 if (fail) { console.error(`${fail} failed`); process.exit(1); }
 console.log("open data ok");
