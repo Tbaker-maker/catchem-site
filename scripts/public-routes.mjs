@@ -54,7 +54,7 @@ const FALLBACK = `<!doctype html>
 <main style="font:18px/1.5 system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem">
 <h1>The Feed</h1>
 <p>Sealed and singles, kept apart. Calls we track until they hit or miss.</p>
-<p><a href="https://discord.gg/fUSjxDX4Hy">Discord Premium is $14.99/mo. Join Discord.</a></p>
+<p><a href="https://discord.gg/fUSjxDX4Hy">Discord Premium is $14.99 USD/mo. Join Discord.</a></p>
 </main>
 `;
 

@@ -1,3 +1,4 @@
+import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
@@ -3765,8 +3766,8 @@ export function renderPremium(stamp, opts = {}) {
 <p class="prem-kicker">Discord Premium</p>
 <h1>Join the club.</h1>
 <p class="prem-lede">Premium members get a number and the Premium role.</p>
-<p class="prem-price">Discord Premium is $14.99/mo through Stripe.</p>
-<p>Cancel whenever.</p>
+<p class="prem-price">Discord Premium is $14.99 USD/mo through Stripe.</p>
+<p>Cancel whenever. ${REFUND_LINE}</p>
 <a class="prem-join" href="${DISCORD}">Join in Discord</a>
 <p class="prem-agree muted"><small>By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></p>
 </section>
@@ -3787,6 +3788,7 @@ ${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Premium role", "P
 <div class="prem-faq">
 <div class="prem-q"><b>Can I pause?</b><p>${PAUSE_STAY}</p></div>
 <div class="prem-q"><b>What happens if I cancel?</b><p>Cancel and the number is retired. If you come back, you pay the public rate then on the site.</p></div>
+<div class="prem-q"><b>Can I get a refund?</b><p>${REFUND_LINE}</p></div>
 <div class="prem-q"><b>How do I manage it?</b><p>Pause in Discord with /premium. Cancel in Discord with /premium.</p></div>
 </div>
 <p class="prem-manage">Already in?</p>

@@ -1,3 +1,4 @@
+import { REFUND_LINE } from "../src/policy.mjs";
 import "./trust.test.mjs";
 import "./features.test.mjs";
 import "./practice.test.mjs";
@@ -414,8 +415,8 @@ t("premium is a worker page", pageKind("/premium") === "premium" && premium.stat
 t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause in Discord with /premium</a>") && premiumHtml.includes(">Cancel in Discord with /premium</a>") && premiumHtml.includes('href="https://discord.gg/fUSjxDX4Hy"'));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
-t("premium sells the club", premiumHtml.includes("<h1>Join the club.</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join in Discord</a>") && premiumHtml.includes("Discord Premium is $14.99/mo through Stripe.") && premiumHtml.includes("Cancel whenever.") && premiumHtml.includes("Premium members get a number and the Premium role."));
-t("premium drops the blanket number claim, the refund line, and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("7-day refund on the first charge.") && !premiumHtml.includes("Card payments only."));
+t("premium sells the club", premiumHtml.includes("<h1>Join the club.</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join in Discord</a>") && premiumHtml.includes("Discord Premium is $14.99 USD/mo through Stripe.") && premiumHtml.includes("Cancel whenever.") && premiumHtml.includes("Premium members get a number and the Premium role."));
+t("premium drops the blanket number claim and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("Card payments only."));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));
 t("premium drops the internal notes", !premiumHtml.includes("does not take a payment") && !premiumHtml.includes("same weight"));
@@ -975,7 +976,8 @@ t("the feed asks the card file before it shows that price", staleHtml.includes("
   const many = chartBox(run, "TCGplayer market, daily");
   t("30D stays when that range has two or more prices", many.includes('data-range="30D"') && !many.includes('data-range="1Y"'));
   t("a missing calendar day is its own segment", splitDated([{ date: "2026-08-01", ask: 10 }, { date: "2026-08-03", ask: 12 }], "ask").length === 2);
-  t("premium copy strings from the old hero are absent", !renderPremium("").includes("Claim your First 222 number.") && !renderPremium("").includes("7-day refund on the first charge.") && !renderPremium("").includes("Card payments only."));
+  t("premium copy strings from the old hero are absent", !renderPremium("").includes("Claim your First 222 number.") && !renderPremium("").includes("Card payments only."));
+  t("premium refund line comes from policy.mjs only", renderPremium("").includes(REFUND_LINE));
 }
 
 if (fail) process.exit(1);
