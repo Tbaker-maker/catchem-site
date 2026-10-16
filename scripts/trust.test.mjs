@@ -20,7 +20,7 @@ assert.equal(priceBannerLine(stamp, at + 36 * 3600 * 1000), "");
 assert.equal(priceBannerLine(stamp, at + 36 * 3600 * 1000 + 1), "Prices last updated 2026-10-10.");
 assert.equal(priceBannerLine("", at), "");
 
-assert.ok(renderFacts({}).includes("No market line in the price file."));
+assert.equal(renderFacts({}), "");
 assert.ok(renderFacts({ market: 2.64, date: "2026-10-10", source: "TCGplayer market" }).includes("Market"));
 assert.ok(!renderFacts({ market: 2.64, date: "2026-10-10", source: "TCGplayer market" }).includes("No market line"));
 assert.ok(chartBox([], "TCGplayer market").includes("chart-faded") && !/no daily points/i.test(chartBox([], "TCGplayer market")));
