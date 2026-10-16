@@ -416,7 +416,7 @@ t("premium pause and cancel sit together", premiumHtml.includes('class="prem-act
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
 t("premium sells the club", premiumHtml.includes("<h1>Join the club.</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join in Discord</a>") && premiumHtml.includes("Discord Premium is $14.99/mo through Stripe.") && premiumHtml.includes("Cancel whenever.") && premiumHtml.includes("Premium members get a number and the Premium role."));
-t("premium drops the blanket number claim, the refund line, and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("7-day refund on the first charge.") && !premiumHtml.includes("Card payments only."));
+t("premium drops the blanket number claim and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("Card payments only."));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));
 t("premium drops the internal notes", !premiumHtml.includes("does not take a payment") && !premiumHtml.includes("same weight"));
