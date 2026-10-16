@@ -189,7 +189,7 @@ export function shownRead(card) {
       .replace(/:\s*(\$[\d,]+(?:\.\d{1,2})?)\s*(?:\u2192|->)\s*(\$[\d,]+(?:\.\d{1,2})?)/g, ", from $1 to $2").replace(/ {2,}/g, " ");
   }
   line = line.replace(/^[,.\s]+/, "").trim();
-  if (name && line && !line.includes(name)) line = name + ": " + line;
+  if (name && line && !line.includes(name) && !line.includes(String(name).split(" - ")[0].trim())) line = name + ": " + line;
   if (!line) return "";
   return line.charAt(0).toUpperCase() + line.slice(1);
 }
