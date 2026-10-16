@@ -23,7 +23,7 @@ const html = renderCard(card, "stamp", {
     { date: "2026-10-13", listingCount: 30 },
   ],
 });
-t("eBay ask keeps the median and the date", html.includes("eBay ask $159.99, Oct 13, 2026") && html.includes("ebay-browse-api"));
+t("eBay ask keeps the median and the date", html.includes("<dt>Ask</dt><dd>$159.99</dd>") && html.includes("Oct 13, 2026") && !html.includes("ebay-browse-api"));
 t("rip value uses the file fields", html.includes("Rip value") && html.includes("Average pull value") && html.includes("$20.03") && html.includes("ROI") && html.includes("36.3%") && html.includes("Chance an opening beats the price") && html.includes("100%") && html.includes("Typical opening") && html.includes("$17.05") && html.includes("TCGplayer market, Oct 13, 2026"));
 t("listings counted chart stays", html.includes("eBay listings counted") && html.includes("30 listings counted"));
 const bare = renderCard(card, "stamp", {});

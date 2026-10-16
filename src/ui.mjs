@@ -2717,7 +2717,7 @@ function ebayAskLine(ask) {
   const when = priceDay(String(ask?.asOf || "").slice(0, 10));
   if (!(amount > 0) || !when) return "";
   const src = String(ask?.source || "").trim();
-  return `<p class="sealed-ask">eBay ask ${money(amount)}, ${esc(when)}${src ? `. ${esc(src)}` : ""}</p>`;
+  return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">eBay</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0"><div><dt>Ask</dt><dd>${money(amount)}</dd></div><div><dt>Date</dt><dd>${esc(when)}</dd></div></dl></section>`;
 }
 
 function ripValueBlock(rip) {

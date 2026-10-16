@@ -30,7 +30,14 @@ export function sealedRatingPanel(row, doc, { premium = false } = {}) {
   const asOf = doc?.asOf || row.price?.date;
   const head = `<h2>Sealed Rating</h2><p class="grp">${esc(row.typeLabel || "")}</p>`;
   const verdict = row.verdict ? `<p class="verdict">${esc(row.verdict)}</p>` : `<p class="peer">Not enough same-type products with a top card on file to compare this one yet.</p>`;
-  const facts = sealedFacts(row).map((f) => `<li><div class="fact" style="opacity:.85;font-size:13px">${esc(f)}</div></li>`).join("");
+  const tiles = [];
+  if (row.chase && row.chase.ratio != null) tiles.push(["Top card", `${row.chase.ratio}x`]);
+  if (row.setValue && row.setValue.ratio != null) tiles.push(["Set value", `${row.setValue.ratio}x`]);
+  if (row.trend?.pct != null) tiles.push([`${row.trend.days} nights`, sign(row.trend.pct)]);
+  else if (row.perPack) tiles.push(["Per pack", cash(row.perPack)]);
+  const nums = tiles.length ? `<dl class="sr-nums">${tiles.slice(0, 3).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : "";
+  const factList = sealedFacts(row).map((f) => `<li><div class="fact" style="opacity:.85;font-size:13px">${esc(f)}</div></li>`).join("");
+  const facts = factList ? `<details class="sr-all"><summary>All facts</summary><ul>${factList}</ul></details>` : "";
   let bars = "";
   const have = ORDER.filter((k) => row.factors?.[k]);
   if (premium && have.length) {
@@ -41,5 +48,5 @@ export function sealedRatingPanel(row, doc, { premium = false } = {}) {
   }
   const waiting = (doc?.waiting || []).map((w) => `${w.label}: ${w.why}`).join(" ");
   const about = `<details><summary>About this rating</summary><p>Each bar is the share of ${esc(row.typeLabel || "same-type")} products on file that sit below this one, 0 to 100. "Low price next to its set's top card" means the highest 25% on the top-card bar, "high" the lowest 25%. The top card is the highest-priced single in the set that day; a card priced 4x or more over the next one is held for a check. Prices are TCGplayer market as of ${esc(shortDate(asOf))}. ${waiting ? `Coming when the data is ready: ${esc(waiting)}` : ""} A factual comparison, not advice.</p></details>`;
-  return `<style>${RATING_CSS}</style><section class="crt" aria-label="Sealed Rating">${head}${verdict}${bars}<ul>${facts}</ul>${about}</section>`;
+  return `<style>${RATING_CSS}.sr-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 12px}.sr-nums div{padding:10px;border-radius:14px;background:rgba(255,255,255,.05);text-align:center}.sr-nums dt{font:500 12px/1.2 var(--sans);opacity:.7}.sr-nums dd{margin:4px 0 0;font:650 18px/1.1 var(--sans)}.sr-all{margin:8px 0}.sr-all summary{cursor:pointer;font-weight:600}</style><section class="crt" aria-label="Sealed Rating">${head}${verdict}${nums}${bars}${facts}${about}</section>`;
 }

@@ -153,7 +153,7 @@ export function releasesBody(doc, today, sets) {
       : "";
     return `<li class="rel">${face}<p class="rel-date">${esc(longDay(r.date))}</p><h2>${esc(noDash(r.name))}</h2><p class="muted">${esc(TYPE_LABELS[r.type] || "Product")} · Source <a href="${esc(href)}" rel="noopener">${esc(host)}</a>${r.checked ? ` · checked ${esc(longDay(r.checked))}` : ""}</p>${mk}</li>`;
   }).join("");
-  return `<main id="main" tabindex="-1" class="wrap releases"><h1>${c.heading}</h1>
+  return `<main id="main" tabindex="-1" class="wrap releases"><style>.rel-list{list-style:none;margin:16px 0;padding:0;display:grid;gap:12px}.rel-list .rel{padding:16px 18px;border-radius:20px;background:#1a1815;border:1px solid #2f2b26}.rel-list .rel h2{margin:4px 0 6px;font-size:20px}.rel-list .rel p{margin:4px 0}.rel-list .rel-date{font:600 13px/1.2 var(--sans);color:var(--gold)}.rel-list .rel-logo{max-width:180px;height:auto;margin-bottom:6px}</style><h1>${c.heading}</h1>
 <p class="muted">${c.explainer}</p>
 ${list ? `<ol class="rel-list">${list}</ol>` : `<p class="muted">${c.empty}</p>`}
 ${doc?.checked ? `<p class="muted">Release file checked ${esc(longDay(doc.checked))}.</p>` : ""}
