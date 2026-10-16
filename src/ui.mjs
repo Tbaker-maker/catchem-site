@@ -4307,7 +4307,7 @@ function priceRow(card){
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
-  const src=String(card.source||"").trim();
+  const src=String(card.source||"").replace(/,?\s*[0-9]{4}-[0-9]{2}-[0-9]{2}/g,"").replace(/\s*via\s+tcgcsv/i,"").trim();
   const srcBit=src?'<span class="muted"> · '+html(src)+"</span>":"";
   return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+srcBit+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }
@@ -5333,6 +5333,36 @@ async function rowAt(index){
   }
   return null;
 }
+async function fillFlatList(list, from, gen){
+  list.innerHTML="";
+  if(!flat || !flat.length) return;
+  const seen={};
+  let html2="", n=0;
+  for(let j=from+1;j<flat.length && n<24;j++){
+    let got=null;
+    try{ got=await materialize(j,1); }catch(err){ got=null; }
+    if(gen!==filterGen) return;
+    if(!got || !got.row || seen[got.index] || got.index<=from) continue;
+    seen[got.index]=1;
+    j=Math.max(j, got.index);
+    const one=flRow(got.row, got.index);
+    if(one){ html2+=one; n++; }
+  }
+  if(!html2) return;
+  list.innerHTML='<h3>Up next</h3><div class="fl-scroll">'+html2+'</div>';
+  list.querySelectorAll(".fl-row").forEach(function(b){ b.onclick=function(){ urlIntent="push"; showFlat(Number(b.getAttribute("data-i")), 1); window.scrollTo({top:0,behavior:"smooth"}); }; });
+}
+function flRow(row, i){
+  if(!row || row.skip || (row.claim && !row.headline)) return "";
+  const name=String(row.name||row.headline||"").trim();
+  if(!name) return "";
+  let thumb="";
+  try{ const ph=photoEl(row); const im=ph&&(ph.tagName==="IMG"?ph:ph.querySelector&&ph.querySelector("img")); if(im&&im.getAttribute("src")) thumb='<img alt="" loading="lazy" src="'+html(im.getAttribute("src"))+'">'; }catch(err){}
+  const price=Number(row.price)>0?money(row.price):"";
+  const ch=Number(row.change7);
+  const chg=row.change7!=null&&row.change7!==""&&Number.isFinite(ch)?'<span class="'+(ch>0?"up":ch<0?"down":"")+'">7D '+(ch>0?"+":"")+ch+'%</span>':"";
+  return '<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph"></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+'</b>'+chg+'</span></button>';
+}
 async function fillList(list, index){
   const total=totalReads();
   const stop=Math.min(total||0, index+25);
@@ -5998,6 +6028,9 @@ async function showFlat(index, dir){
     else slide.appendChild(card);
   }
   if(typeof catchemMount==="function") catchemMount(stage);
+  let flList=stage.querySelector(".feed-list");
+  if(!flList){ flList=document.createElement("div"); flList.className="feed-list"; flList.setAttribute("aria-label","More reads"); stage.appendChild(flList); }
+  fillFlatList(flList, spot, gen);
   try{
     const ahead=flat && flat[spot+1];
     const aheadHit=ahead?officialSrc(ahead, catalogueImages):null;
