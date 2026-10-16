@@ -391,8 +391,9 @@ async function pokemonStripFor(card, fetchImpl) {
     if (!page) return null;
     if (!direct && token && page.name !== token) return null;
     if (!page.ids.length) return null;
-    const quotes = await nightlyQuotes(page.ids, fetchImpl);
-    return nightlySpeciesStrip(page, quotes, page.ids);
+    // Built at build time (scripts/build-strip-index.mjs). No per-request
+    // bucket fetches: that path parsed dozens of 900 KB files (error 1102).
+    return page.strip || null;
   } catch {
     return null;
   }
@@ -404,8 +405,9 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
   let card = null;
   if (/^tcgcsv-\d+$/.test(id)) {
     const bucket = String((Number((id.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
-    const rows = await loadJson(`buckets/${bucket}.json`, fetchImpl);
-    card = (Array.isArray(rows) ? rows : []).find((row) => row && row.id === id) || null;
+    void bucket;
+    // One row out of the bucket text; never parse the whole 900 KB file.
+    card = await bucketRow(id, fetchImpl).catch(() => null);
   }
   if (!card) {
     try {
@@ -741,7 +743,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       if (rows.length) {
         const meta = await loadJson("feed/card-rating.json", fetchImpl).catch(() => null);
         const imgs = await cardImages(cardId, fetchImpl).catch(() => null);
-        const pic = (r, pool) => { const hit = officialSrc({ id: r.id, kind: "single" }, { ...(imgs || {}), ...(pool?.imgs || {}) }); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
+        const pic = (r, pool) => { const hit = officialSrc({ id: r.id, kind: "single" }, { [r.id]: pool?.imgs?.[r.id] || imgs?.[r.id] }); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
         const panels = [];
         for (const r of rows) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
