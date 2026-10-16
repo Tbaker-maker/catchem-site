@@ -76,7 +76,7 @@ export function setValueBlock(doc, images = {}, slug = "") {
 ${total ? `<p class="sv-total">Master-set total <b>${total}</b></p>` : ""}
 ${counts ? `<p>${esc(counts)}</p>` : ""}
 ${rows ? `<ol class="sv-list">${rows}</ol>` : ""}
-<p class="muted">TCGplayer market, ${esc(day)}. File: ${esc(doc.source || "")}.</p>
+<p class="muted">Source: TCGplayer market, ${esc(day)}.</p>
 ${pairLine}</section>`;
 }
 
