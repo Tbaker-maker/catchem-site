@@ -14,6 +14,8 @@ import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage } from "
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
+import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+const withChartKit = (page) => String(page).replace("</head>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></head>`);
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip } from "./pokemon.mjs";
@@ -1148,7 +1150,7 @@ const worker = {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(await withToday(addFeedEntry(await asset.text()), fetchImpl)), { status: asset.status, headers });
+        return new Response(ensureAffiliation(withChartKit(await withToday(addFeedEntry(await asset.text()), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -1160,7 +1162,7 @@ const worker = {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
       const raw = await asset.text();
-      const body = norm(url.pathname) === "/" ? await withToday(raw, fetchImpl) : raw;
+      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(raw, fetchImpl)) : raw;
       return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });

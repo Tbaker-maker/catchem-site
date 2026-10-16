@@ -61,7 +61,7 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel, u
   const label = count ? "eBay listings counted" : "Price history";
   return `<figure class="hc" data-unit="${esc(unit)}" data-snap="${esc(count ? "real" : snap)}" data-pts="${esc(JSON.stringify(pts))}" data-color="${esc(color)}">
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
-<div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-tip" hidden></div></div>
+<div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
 </figure>`;
 }
@@ -73,7 +73,8 @@ export const HISTORY_CSS = `.hc{margin:16px 0;padding:16px 16px 12px;border-radi
 .hc-pill{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;opacity:.7;transition:background .2s,opacity .2s}
 .hc-pill[aria-pressed="true"]{background:rgba(255,255,255,.14);opacity:1}.hc-pill:focus-visible{outline:2px solid #d9b779;outline-offset:2px}
 .hc-plot{position:relative;height:220px;touch-action:pan-y}.hc-svg{width:100%;height:100%;display:block;overflow:visible}
-.hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;padding:6px 10px;border-radius:12px;background:rgba(24,22,20,.92);border:1px solid rgba(255,255,255,.1);font-size:12px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.hc-tip{position:absolute;top:6px;transform:translateX(-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 12px;border-radius:14px;background:rgba(24,22,20,.94);border:1px solid rgba(255,255,255,.12);font-size:12px;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.35);z-index:2}.hc-tip b{font-size:14px;font-weight:650}.hc-tip span{opacity:.7}
+.hc-gls{position:absolute;inset:0;pointer-events:none}.hc-gl{position:absolute;right:2px;transform:translateY(-120%);font-size:10px;opacity:.38}
 .hc-axis{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
 .hc-gaps{}
 @media(max-width:600px){.hc{padding:14px 12px 10px;border-radius:18px}.hc-plot{height:180px}.hc-pill{padding:6px 10px}}`;
@@ -82,14 +83,15 @@ export const HISTORY_JS = `(function(){
 function money(v){return "$"+Number(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function nice(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+", "+p[0];}
-function ms(d){return Date.parse(d+"T00:00:00Z");}function iso(t){return new Date(t).toISOString().slice(0,10);}function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2]);}
+function ms(d){return Date.parse(d+"T00:00:00Z");}function iso(t){return new Date(t).toISOString().slice(0,10);}function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+(+p[0]===new Date().getUTCFullYear()?"":", "+p[0]);}
 function smooth(xy){if(xy.length<2)return "M"+xy[0][0]+","+xy[0][1];var d="M"+xy[0][0].toFixed(1)+","+xy[0][1].toFixed(1);for(var i=0;i<xy.length-1;i++){var p0=xy[i-1]||xy[i],p1=xy[i],p2=xy[i+1],p3=xy[i+2]||p2;var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;var lo=Math.min(p1[1],p2[1]),hi=Math.max(p1[1],p2[1]);c1y=Math.max(lo,Math.min(hi,c1y));c2y=Math.max(lo,Math.min(hi,c2y));d+=" C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);}return d;}
 function mount(fig){if(fig.dataset.ready)return;fig.dataset.ready="1";
 var all=JSON.parse(fig.getAttribute("data-pts")||"[]"),color=fig.getAttribute("data-color")||"#d9b779",unit=fig.getAttribute("data-unit")||"price",snap=fig.getAttribute("data-snap")||"all";
 var svg=fig.querySelector(".hc-svg"),tip=fig.querySelector(".hc-tip"),plot=fig.querySelector(".hc-plot"),priceEl=fig.querySelector(".hc-price"),dateEl=fig.querySelector(".hc-date");
 var W=600,H=220,PT=14,PB=4,view=all,gid="g"+Math.random().toString(36).slice(2,8);
-function showVal(v){return unit==="count"?String(Math.round(Number(v))):money(v);}
-function head(p,a){priceEl.textContent=showVal(p[1]);dateEl.textContent=nice(p[0])+(a?"":" · latest");}
+function showVal(v){return unit==="count"?Math.round(Number(v)).toLocaleString("en-US"):unit==="index"?(Math.round(Number(v)*10)/10).toLocaleString("en-US",{maximumFractionDigits:1}):money(v);}
+function gridVal(v){if(unit!=="price")return showVal(v);var n=Number(v);return n>=100?"$"+Math.round(n).toLocaleString("en-US"):money(n);}
+function head(p){priceEl.textContent=showVal(p[1]);dateEl.textContent=short(p[0]);}
 function draw(days){var end=ms(all[all.length-1][0]);view=days?all.filter(function(p){return ms(p[0])>=end-days*864e5;}):all;if(view.length<2)view=all.slice(-2);
 var vals=view.map(function(p){return p[1]}),mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),pad=(mx-mn)*.12||mx*.05||1;mn-=pad;mx+=pad;
 var t0=ms(view[0][0]),t1=ms(view[view.length-1][0])||t0+1;
@@ -118,13 +120,14 @@ if(unit!=="count"){
   if(hiP) body+='<circle cx="'+X(hiP[0]).toFixed(1)+'" cy="'+Y(hiP[1]).toFixed(1)+'" r="3.5" fill="none" stroke="#efe9de" stroke-width="1.5"/>';
   if(loP&&loP!==hiP) body+='<circle cx="'+X(loP[0]).toFixed(1)+'" cy="'+Y(loP[1]).toFixed(1)+'" r="3.5" fill="#efe9de"/>';
 }
-var g="";for(var k=1;k<=3;k++){var y=(PT+(H-PT-PB)*k/4).toFixed(1);g+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="rgba(255,255,255,.07)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
-var lab="";var ax=fig.querySelector(".hc-axis");if(ax)ax.innerHTML="<span>"+nice(view[0][0])+"</span><span>"+nice(view[view.length-1][0])+"</span>";
+var g="",gl="";for(var k=1;k<=3;k++){var yy=PT+(H-PT-PB)*k/4,y=yy.toFixed(1);g+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="rgba(255,255,255,.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>';var gv=mn+(1-(yy-PT)/(H-PT-PB))*(mx-mn);gl+='<span class="hc-gl" style="top:'+(yy/H*100).toFixed(2)+'%">'+gridVal(gv)+'</span>';}
+var glBox=fig.querySelector(".hc-gls");if(glBox)glBox.innerHTML=gl;
+var lab="";var ax=fig.querySelector(".hc-axis");if(ax)ax.innerHTML="<span>"+short(view[0][0])+"</span><span>"+short(view[view.length-1][0])+"</span>";
 svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".28"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+g+body+lab+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+color+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
 svg._X=X;svg._Y=Y;head(view[view.length-1]);}
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=view;if(snap==="real"){var reals=view.filter(function(p){return !p[3];});if(reals.length)pool=reals;}var best=pool[0],bd=1e9;pool.forEach(function(p){var d=Math.abs(svg._X(p[0])-x);if(d<bd){bd=d;best=p;}});return best;}
-function srcOf(p){return unit==="count"?"Listings counted, eBay":p[2]==="f"?"PokeVizInvestor (TCGplayer market)":p[2]==="a"?"TCGplayer market, tcgcsv archive":"TCGplayer market";}function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.textContent=nice(p[0])+"  "+showVal(p[1])+" · "+srcOf(p)+(p[3]?(unit==="count"?" · last count on file "+nice(p[3]):" · last price on file "+nice(p[3])):"");var px=x/W*r.width;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";head(p,1);}
-function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");head(view[view.length-1]);}
+function srcOf(p){return unit==="count"?"Listings counted, eBay":p[2]==="f"?"PokeVizInvestor (TCGplayer market)":p[2]==="a"?"TCGplayer market, tcgcsv archive":"TCGplayer market";}function show(cx){var p=near(cx),x=svg._X(p[0]),y=svg._Y(p[1]),r=plot.getBoundingClientRect();var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");ln.setAttribute("x1",x);ln.setAttribute("x2",x);ln.setAttribute("visibility","visible");dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("visibility","visible");tip.hidden=false;tip.innerHTML="<b>"+showVal(p[1])+"</b><span>"+short(p[0])+(p[3]?" · last on file "+short(p[3]):"")+"</span>";var px=x/W*r.width,py=y/H*r.height;var hw=tip.offsetWidth/2+4;tip.style.left=Math.max(hw,Math.min(r.width-hw,px))+"px";var th=tip.offsetHeight+12;tip.style.top=(py-th<0?py+12:py-th)+"px";}
+function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");}
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
 draw(0);}

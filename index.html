@@ -406,21 +406,16 @@ footer a{color:var(--gold)}
         return span>=days;
       }).map(function(r){return '<button type="button" data-ix="'+which+'" data-range="'+r+'"'+(r==="All"?' aria-pressed="true"':"")+'>'+r+'</button>'}).join("");
     }
-    box.innerHTML='<div class="ix"><h2>Singles index</h2><p class="ix-read" id="ix-s-read"></p><div class="chart" id="ix-s"></div><div class="filters">'+buttons("s", singles)+'</div><p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div><div class="ix"><h2>Sealed index</h2><p class="ix-read" id="ix-b-read"></p><div class="chart" id="ix-b"></div><div class="filters">'+buttons("b", sealed)+'</div><p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div>';
-    function paint(which, range){
-      var rows=filterPts(which==="s"?singles:sealed, range);
-      var noun=which==="s"?"singles":"sealed";
-      draw(document.getElementById(which==="s"?"ix-s":"ix-b"), rows, which==="s"?"Singles index, chain-linked. TCGplayer market":"Sealed index, chain-linked. TCGplayer market");
-      var read=document.getElementById(which==="s"?"ix-s-read":"ix-b-read");
-      if(read) read.textContent=readout(rows, noun);
+    function fig(all){
+      if(all.length<2) return '<p class="ix-note">No daily points yet.</p>';
+      var pts=all.map(function(p){return [p.d,p.v,"n"]});
+      var span=spanOf(all);
+      var rs=[["1M",31],["3M",92],["6M",183],["1Y",366],["All",0]].filter(function(r){return r[1]===0||span>r[1]*0.5});
+      var pills=rs.map(function(r,i){return '<button type="button" class="hc-pill" data-days="'+r[1]+'" aria-pressed="'+(i===rs.length-1?"true":"false")+'">'+r[0]+'</button>'}).join("");
+      return '<figure class="hc" data-unit="index" data-snap="all" data-color="#d9b779" data-pts="'+text(JSON.stringify(pts))+'"><div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Index level"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div></figure>';
     }
-    paint("s","All"); paint("b","All");
-    box.querySelectorAll("[data-range]").forEach(function(btn){btn.addEventListener("click", function(){
-      var which=btn.getAttribute("data-ix");
-      box.querySelectorAll('[data-ix="'+which+'"]').forEach(function(x){x.setAttribute("aria-pressed","false")});
-      btn.setAttribute("aria-pressed","true");
-      paint(which, btn.getAttribute("data-range"));
-    })});
+    box.innerHTML='<div class="ix"><h2>Singles index</h2>'+fig(singles)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div><div class="ix"><h2>Sealed index</h2>'+fig(sealed)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div>';
+    if(window.catchemHistoryMount) window.catchemHistoryMount();
   }).catch(function(){});
   var menuBtn=document.querySelector(".menu-btn"), siteNav=document.getElementById("site-nav");
   if(menuBtn&&siteNav) menuBtn.addEventListener("click", function(){var open=siteNav.classList.toggle("open"); menuBtn.setAttribute("aria-expanded", open?"true":"false")});

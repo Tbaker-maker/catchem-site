@@ -43,7 +43,7 @@ const fetchImpl = async (url) => {
 resetJsonCache();
 const res = await renderPath("/indexes", fetchImpl);
 const html = await res.text();
-t("route kind and chart", pageKind("/indexes") === "indexes" && res.status === 200 && html.includes('id="singles-index"') && html.includes("Illustration Rare") && !html.includes("stroke-opacity"));
+t("route kind and chart", pageKind("/indexes") === "indexes" && res.status === 200 && html.includes('id="singles-index"') && html.includes("Illustration Rare") && !html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").includes("stroke-opacity"));
 
 if (fail) { console.log(`indexes-fill: ${fail} failed`); process.exit(1); }
 console.log("indexes-fill ok");
