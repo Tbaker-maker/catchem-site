@@ -228,7 +228,12 @@ export async function allReadsFor(cardId, fetchImpl) {
   if (!/^tcgcsv-\d+$/.test(String(cardId || ""))) return [];
   const b = String((Number(String(cardId).match(/(\d+)/)[1]) || 0) % 100).padStart(2, "0");
   try {
-    const doc = await loadJson(`feed/item-reads/${b}.json`, fetchImpl);
+    // Straight fetch, not the shared memo: one more memo key per bucket would
+    // push the memo past its cap and drop the big files other pages reuse.
+    const res = await fetchRepo(`research/assets/public/feed/item-reads/${b}.json`, fetchImpl, { cf: { cacheTtl: 300 } });
+    if (res && res.status === 404) return [];
+    if (!res || !res.ok) throw new Error("item-reads " + (res && res.status));
+    const doc = await res.json();
     return Array.isArray(doc?.items?.[cardId]) ? doc.items[cardId] : [];
   } catch {
     try {
