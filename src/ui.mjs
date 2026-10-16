@@ -4168,7 +4168,7 @@ const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const shortFor=()=>'';
-function cents(t){return String(t).replace(/,? on few sales\\b/gi,", on few price days").replace(/rarity report: ([^.]+?) cards did best over the year, down ([0-9.]+)%/g,"rarity report: every rarity fell over the year. $1 cards fell least, down $2%").replace(/\\s+\u2014\\s+/g,", ").replace(/\u2014/g,": ").replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
+function cents(t){return String(t).replace(/\\s+\u2014\\s+/g,", ").replace(/\u2014/g,": ").replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
 function html(s){return cents(String(s==null?"":s)).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
@@ -5780,7 +5780,87 @@ function fqLines(o){
   if(!out.length) out.push(o.label+" is at "+P+" on TCGplayer market"+(last?" as of "+fqDay(last[0]):"")+".");
   return out;
 }
-function fqPick(lines, id){ return lines.length?lines[fqHash(id)%lines.length]:""; }
+function withPriceSource(line){
+  const s=String(line||"").trim();
+  if(!s) return "";
+  if(/TCGplayer market price/i.test(s)) return s;
+  return s.replace(/\\.?\\s*$/, "")+". TCGplayer market price.";
+}
+function fqPick(lines, id){
+  if(!lines.length) return "";
+  return withPriceSource(lines[fqHash(id)%lines.length]);
+}
+function templateKey(line){
+  return String(line||"").toLowerCase().replace(/\\$[\\d,.]+/g,"$").replace(/\\b\\d+(?:\\.\\d+)?%?/g,"n").replace(/\\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+\\d{1,2}\\b/g,"date").replace(/[^a-z$ ]+/g," ").replace(/\\s+/g," ").trim();
+}
+function moveVariants(line){
+  let raw=String(line||"").trim();
+  const tail=". TCGplayer market price.";
+  if(raw.endsWith(tail)) raw=raw.slice(0, -tail.length).trim();
+  if(raw.endsWith(".")) raw=raw.slice(0, -1);
+  const up=raw.indexOf(" is up ");
+  const down=raw.indexOf(" is down ");
+  const at=up>=0?up:down;
+  if(at<0) return [];
+  const dir=up>=0?"up":"down";
+  const label=raw.slice(0, at);
+  const rest=raw.slice(at+(" is "+dir+" ").length);
+  const pctAt=rest.indexOf("% ");
+  const fromAt=rest.indexOf(", from ");
+  const toAt=rest.indexOf(" to ");
+  if(pctAt<0 || fromAt<0 || toAt<0 || toAt<=fromAt) return [];
+  const pct=rest.slice(0, pctAt);
+  const win=rest.slice(pctAt+2, fromAt);
+  const a=rest.slice(fromAt+7, toAt);
+  const b=rest.slice(toAt+4);
+  if(!pct || (win!=="this week" && win!=="this month" && win!=="over 90 days")) return [];
+  if(a.charAt(0)!=="$" || b.charAt(0)!=="$") return [];
+  const forms=[
+    win+", "+label+" went from "+a+" to "+b+", "+dir+" "+pct+"%.",
+    label+" went from "+a+" to "+b+" "+win+", "+dir+" "+pct+"%.",
+    dir.charAt(0).toUpperCase()+dir.slice(1)+" "+pct+"% "+win+": "+label+" went from "+a+" to "+b+".",
+    label+" changed "+win+" from "+a+" to "+b+", "+dir+" "+pct+"%.",
+    "From "+a+" to "+b+" "+win+", "+label+" is "+dir+" "+pct+"%.",
+    label+" now "+b+" after "+a+" "+win+", "+dir+" "+pct+"%.",
+    "A "+pct+"% move "+win+" puts "+label+" at "+b+", from "+a+".",
+    label+" finished "+win+" at "+b+", "+dir+" "+pct+"% from "+a+".",
+    win+" price path for "+label+": "+a+" to "+b+", "+dir+" "+pct+"%.",
+    label+" shows "+dir+" "+pct+"% "+win+", "+a+" then and "+b+" now.",
+    b+" is the "+win+" price for "+label+", "+dir+" "+pct+"% from "+a+".",
+    label+" left "+a+" and reached "+b+" "+win+", "+dir+" "+pct+"%.",
+    label+" is "+dir+" "+pct+"% "+win+", and the path is "+a+" to "+b+".",
+    label+" "+dir+" "+pct+"% "+win+" with a path from "+a+" to "+b+".",
+    "The "+win+" path on "+label+" runs from "+a+" to "+b+", "+dir+" "+pct+"%.",
+    label+" marked "+dir+" "+pct+"% "+win+", opening "+a+" and closing "+b+".",
+    "Closing "+win+" at "+b+", "+label+" is "+dir+" "+pct+"% from "+a+".",
+    label+" stands at "+b+" "+win+", "+dir+" "+pct+"% versus "+a+".",
+    "Versus "+a+", "+label+" is "+dir+" "+pct+"% "+win+" at "+b+".",
+    "Price path for "+label+" "+win+": "+a+" then, "+b+" now, "+dir+" "+pct+"%."
+  ];
+  return forms.map(withPriceSource);
+}
+function spreadTemplates(rows){
+  const out=[];
+  for(let i=0;i<rows.length;i++){
+    let row=rows[i];
+    const head=row && row.headline;
+    const alts=[];
+    if(head) alts.push(withPriceSource(head));
+    if(row && Array.isArray(row.alts)) row.alts.forEach(function(a){ if(a) alts.push(withPriceSource(a)); });
+    moveVariants(head).forEach(function(a){ alts.push(a); });
+    const start=Math.max(0, out.length-19);
+    const seen={};
+    for(let j=start;j<out.length;j++) seen[templateKey(out[j] && out[j].headline)]=1;
+    let chosen=head?withPriceSource(head):"";
+    for(let a=0;a<alts.length;a++){
+      const ak=templateKey(alts[a]);
+      if(alts[a] && ak && !seen[ak]){ chosen=alts[a]; break; }
+    }
+    if(row && chosen && chosen!==row.headline) row=Object.assign({}, row, {headline:chosen, path:chosen});
+    out.push(row);
+  }
+  return out;
+}
 const FQ_WAVE={release:1,"release-cycle":1,season:1};
 const FQ_PLAIN=/\\b(?:is|are) (?:up|down) [\\d.]+% (?:this week|this month|over 90 days)/;
 function varyMove(card){
@@ -5800,11 +5880,12 @@ function itemRead(item, doc, slug){
   const pts=fqPts(item.hist);
   const last=pts.length?pts[pts.length-1]:null;
   const lines=fqLines({id:item.id,label:label,nm:!sealed,pts:pts,price:item.price,rank:item.rank,of:item.of,setName:doc.name});
+  const alts=lines.map(withPriceSource).filter(Boolean);
   const head=fqPick(lines, item.id);
-  const why=lines.length>1?lines[(fqHash(item.id)+1)%lines.length]:"";
+  const whyRaw=lines.length>1?withPriceSource(lines[(fqHash(item.id)+1)%lines.length]):"";
   let ch7=null;
   if(last){ const cut=new Date(Date.parse(last[0]+"T00:00:00Z")-7*864e5).toISOString().slice(0,10); const back=pts.filter(function(q){return q[0]<=cut;}).pop(); if(back) ch7=Math.round((last[1]-back[1])/back[1]*1000)/10; }
-  return {id:"item-"+item.id, sku:item.id, kind:sealed?"sealed":"single", readKind:"item", fresh:true, varied:true, set:doc.name, setSlug:slug, name:item.name, number:item.num||"", price:Number(item.price)||null, change7:ch7, hist:pts, headline:head, path:head, why:why===head?"":why, source:"TCGplayer market, "+(doc.asOf||""), asOf:doc.asOf||(last?last[0]:""), href:(sealed?"/p/":"/c/")+item.id, image:""};
+  return {id:"item-"+item.id, sku:item.id, kind:sealed?"sealed":"single", readKind:"item", fresh:true, varied:true, set:doc.name, setSlug:slug, name:item.name, number:item.num||"", price:Number(item.price)||null, change7:ch7, hist:pts, headline:head, path:head, alts:alts, why:whyRaw===head?"":whyRaw, source:"TCGplayer market price, "+(doc.asOf||""), asOf:doc.asOf||(last?last[0]:""), href:(sealed?"/p/":"/c/")+item.id, image:""};
 }
 const setItemsDone={};
 async function ensureSetItems(raw){
@@ -5822,6 +5903,15 @@ async function ensureSetItems(raw){
   setIndex[slug].forEach(function(r){ if(r && r.sku) have[String(r.sku)]=1; });
   setItemsCache[slug]=doc.items.filter(function(item){ return item && item.id && Number(item.price)>0; }).map(function(item){ return itemRead(item, doc, slug); });
   mergeSetItems(slug);
+  (setIndex[slug]||[]).forEach(function(r){
+    if(!r || !r.headline) return;
+    if(String(r.headline).indexOf("TCGplayer market price")>=0) return;
+    if(String(r.headline).indexOf("$")<0) return;
+    const prev=r.headline;
+    const next=withPriceSource(prev);
+    r.headline=next;
+    if(!r.path || r.path===prev) r.path=next;
+  });
 }
 const setItemsCache={};
 function mergeSetItems(slug){
@@ -5837,16 +5927,16 @@ function isPlainMoveRow(row){
   if(row.pending) return /^move-/.test(String(row.id||""));
   return FQ_PLAIN.test(String(row.headline||"")) || /^move-/.test(String(row.id||""));
 }
-// At most 2 plain price moves in every 5 rows while other reads last.
+// At most 1 plain price move in every 4 rows while other reads last.
 function capMoves(rows){
   const moves=[], other=[];
   rows.forEach(function(r){ (isPlainMoveRow(r)?moves:other).push(r); });
   const out=[]; let m=0, o=0;
-  while(o<other.length || m<moves.length){
+  while(o<other.length){
     for(let k=0;k<3 && o<other.length;k++) out.push(other[o++]);
-    for(let k=0;k<2 && m<moves.length;k++) out.push(moves[m++]);
-    if(o>=other.length) while(m<moves.length) out.push(moves[m++]);
+    if(m<moves.length) out.push(moves[m++]);
   }
+  while(m<moves.length) out.push(moves[m++]);
   return out;
 }
 function buildFlat(){
@@ -5874,7 +5964,7 @@ function buildFlat(){
     if(!wantedSet){ flat=rows; return; }
     const slug=resolveSet(wantedSet);
     ((slug && setIndex && setIndex[slug]) || []).forEach(add);
-    flat=rows;
+    flat=capMoves(spreadTemplates(rows));
     return;
   }
   if(loopFilter==="wave"){
@@ -5982,7 +6072,7 @@ function buildFlat(){
       if(rows.length!==before && ei<extras.length) add(extras[ei++]);
     });
     while(ei<extras.length) add(extras[ei++]);
-    rows.splice(0, rows.length, ...capMoves(rows));
+    rows.splice(0, rows.length, ...capMoves(spreadTemplates(rows)));
     // Unranked: a new seed on every visit or refresh, unseen reads first,
     // kinds and sets spread out, one file-built wording chosen.
     const visitSeed=freshSeed();
@@ -6394,11 +6484,48 @@ async function boot(){
       }
       if(chipMore) chipMore.hidden=!overflow;
     }
+    function shapeCount(kind){
+      let n=0;
+      const block=browse && browse.filters && browse.filters[kind];
+      const items=block && block.items;
+      (items||[]).forEach(function(row){ if(isShapeRow(row)) n++; });
+      leadRows().forEach(function(r){ if(isShapeRow(r) && (r.readKind===kind || r.kind===kind)) n++; });
+      return n;
+    }
+    function filterReads(f){
+      if(f==="set"){
+        if(!setBook || !setBook.bySlug) return 0;
+        return Object.keys(setBook.bySlug).some(function(slug){
+          const tile=setBook.bySlug[slug];
+          return tile && (Number(tile.priced)>0 || (setIndex && setIndex[slug] && setIndex[slug].length));
+        }) ? 1 : 0;
+      }
+      if(f==="news") return (Array.isArray(newsRows)?newsRows:[]).length;
+      if(f==="sealed") return sealedList().length;
+      if(f==="prices") return (browse && browse.ranked || []).length;
+      if(f==="signals") return (readLibrary && readLibrary.signals || []).filter(function(r){ return r && (r.signal==="mover"||r.signal==="set"||r.signal==="high"||r.signal==="streak"); }).length;
+      if(f==="pokemon") return leadRows().filter(isFact).length;
+      if(f==="wave"){
+        const items=browse && browse.filters && browse.filters.wave && browse.filters.wave.items || [];
+        return items.filter(function(it){ return it && (it.title||it.sentence); }).length + leadRows().filter(function(r){ return r && FQ_WAVE[r.readKind]; }).length;
+      }
+      if(f==="flagged"){
+        const items=browse && browse.filters && browse.filters.flagged && browse.filters.flagged.items || [];
+        return items.length + leadRows().filter(function(r){ return r && (r.readKind==="outlier" || r.kind==="outlier" || (r.flagged && r.flagged.on)); }).length;
+      }
+      if(f==="dive"){
+        const items=browse && browse.filters && browse.filters.dive && browse.filters.dive.items || [];
+        return items.length + leadRows().filter(function(r){ return r && (r.readKind==="dive" || r.kind==="dive" || r.readKind==="deep"); }).length;
+      }
+      if(f==="volume") return (browse && browse.filters && browse.filters.volume && browse.filters.volume.items || []).filter(isVolumeRow).length + leadRows().filter(isVolumeRow).length;
+      if(f==="quiet"||f==="mix"||f==="conditions"||f==="soldflat"||f==="solddown"||f==="setshare"||f==="spread"||f==="askmove"||f==="mktmove"||f==="still") return shapeCount(f);
+      return 1;
+    }
     function paintChips(){
       if(!chipRow||!loop) return;
       chipRow.textContent="";
       Array.prototype.forEach.call(loop.options, function(opt){
-        if(opt.value==="sealed" && !sealedAvailable()) return;
+        if(opt.value!=="" && filterReads(opt.value)===0) return;
         const b=document.createElement("button");
         b.type="button";
         b.dataset.value=opt.value;
