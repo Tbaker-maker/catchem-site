@@ -4129,7 +4129,7 @@ const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const shortFor=()=>'';
-function cents(t){return String(t).replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
+function cents(t){return String(t).replace(/\\s+\u2014\\s+/g,", ").replace(/\u2014/g,": ").replace(/\\$([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(\\.[0-9]+)?(?![0-9KkMm])/g,function(m,i,d){if(d&&d.length===3)return m;return "$"+i+"."+(((d||".").slice(1))+"00").slice(0,2);});}
 function html(s){return cents(String(s==null?"":s)).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 function showPct(n){return typeof n==="number" && Number.isFinite(n)}
 function pct(n){const v=Number(n);return (v>0?"+":"")+v+"%"}
@@ -5621,6 +5621,7 @@ function leadRows(){
 }
 function accepts(card){
   if(!card || card.skip) return false;
+  if(/^deep-artist-/.test(String(card.id||"")) || /^Artist spotlight\b/i.test(String(card.headline||""))) return false;
   if(hideFacts && isFact(card)) return false;
   if(loopFilter==="pokemon") return isFact(card);
   if(loopFilter==="signals") return card.signal==="mover" || card.signal==="set" || card.signal==="high" || card.signal==="streak";
@@ -6561,7 +6562,7 @@ draw();
 }
 
 export function renderAll(bundle, stamp, opts = {}) {
-  const reads = bundle?.reads || [];
+  const reads = (bundle?.reads || []).filter((r) => !/^deep-artist-/.test(String(r?.id || "")) && !/^Artist spotlight\b/i.test(String(r?.headline || "")));
   const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(bundle?.asOf || "")}. The short list is <a href="/feed">one read at a time</a>.</p><h1>All reads</h1>
 ${reads.map((r) => {
     const line = soldSafeText(r, r.headline);
