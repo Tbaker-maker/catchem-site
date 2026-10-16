@@ -21,6 +21,7 @@ jobs:
       - run: node scripts/share-card.test.mjs
       - run: node scripts/finish.test.mjs
       - run: node scripts/edge-cache.test.mjs
+      - run: node scripts/strip-index.test.mjs
       - run: node scripts/long-read.test.mjs
       - run: node scripts/track-record-hidden.test.mjs
       - run: node scripts/trust.test.mjs

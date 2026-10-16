@@ -1,4 +1,5 @@
 import { edgeFetch } from "./edge-cache.mjs";
+import { setStripAssets, stripSlugFor, stripPageFor } from "./strip-index.mjs";
 import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
@@ -365,19 +366,16 @@ async function nightlyQuotes(ids, fetchImpl) {
 async function pokemonStripFor(card, fetchImpl) {
   if (!card || card.kind === "sealed" || !card.name) return null;
   try {
-    const bundle = await loadPokemonBundle(fetchImpl);
-    const direct = bundle.byId?.[card.id];
-    const token = direct?.species || speciesPageToken(card.name);
-    const slug = direct?.slug || (token ? pokemonSlug(token) : "");
-    const page = slug ? bundle.bySlug?.[slug] : null;
+    // Build-time shards (src/strip-index.mjs); no multi-MB catalogue parse per request.
+    const direct = await stripSlugFor(card.id);
+    const token = direct ? "" : speciesPageToken(card.name);
+    const slug = direct || (token ? pokemonSlug(token) : "");
+    const page = await stripPageFor(slug);
     if (!page) return null;
     if (!direct && token && page.name !== token) return null;
-    const images = await catalogueMap(fetchImpl);
-    const lite = await loadJson("search-lite.json", fetchImpl).catch(() => []);
-    const ids = nightlyIdsForPage(page, images, lite);
-    if (!ids.length) return null;
-    const quotes = await nightlyQuotes(ids, fetchImpl);
-    return nightlySpeciesStrip(page, quotes, ids);
+    if (!page.ids.length) return null;
+    const quotes = await nightlyQuotes(page.ids, fetchImpl);
+    return nightlySpeciesStrip(page, quotes, page.ids);
   } catch {
     return null;
   }
@@ -926,6 +924,7 @@ const worker = {
     return edgeFetch(worker.render, request, env, ctx);
   },
   async render(request, env, ctx) {
+    setStripAssets(env?.ASSETS);
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
