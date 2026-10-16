@@ -2745,10 +2745,10 @@ ${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " h
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
+${itemRankHtml(card)}
 ${factBlock}
 ${panels ? `<div class="cp-panels">${panels}</div>` : ""}
 ${allReadsHtml || (board.length ? `<section class="cp-sec" id="reads"><h2>Reads about this card</h2>${readListHtml(board)}</section>` : "")}
-${itemRankHtml(card)}
 ${itemRelatedHtml(card)}
 <details><summary>See the math</summary>
 ${math.join("")}
@@ -2956,10 +2956,10 @@ ${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listi
 ${ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
+${itemRankHtml(card)}
 ${KV_CSS}<section id="stats"><h2>Key stats</h2>
 ${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
 ${allReadsHtml || (readHtml ? `<section id="reads"><h2>Reads</h2>\n${readHtml}</section>` : "")}
-${itemRankHtml(card)}
 ${itemRelatedHtml(card)}
 ${supplyNote}
 </div>
