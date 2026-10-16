@@ -3947,7 +3947,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .chip-scroller{position:relative;min-width:0;max-width:100%;width:100%;display:flex;align-items:center;gap:4px}
   .chip-scroller > .chip-row{flex:1 1 auto;padding-right:28px}
   .chip-scroller > .chip-more{position:static;transform:none;flex:0 0 44px;background:#12100e;border-radius:10px}
-  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:48px;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:#12100e}
+  .chip-scroller.can-scroll::after{content:"";position:absolute;top:0;right:48px;bottom:0;width:var(--chip-fade,48px);pointer-events:none;background:#12100e;z-index:6}
   .chip-row{position:sticky;top:56px;z-index:4;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;width:100%;min-width:0;background:#12100e;padding:8px 48px 8px 0;margin:0;scrollbar-width:none}
   .chip-row button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 16px;border-radius:10px;border:1px solid var(--gold);background:transparent;color:var(--gold);font:600 16px/1 var(--sans)}
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
