@@ -185,6 +185,15 @@ export function isSealedProductRow(row) {
   return row.kind === "sealed" && String(row.id || "").length > 0;
 }
 
+// "$12.00 NM" is a condition only when the row says the price is NM.
+// A volume line keeps "Near Mint copies". Unknown condition drops the tag.
+export function dropInventedNm(text, row) {
+  const s = String(text || "");
+  if (!s) return s;
+  if (row && (row.condition === "NM" || row.nm === true || isVolumeRow(row))) return s;
+  return s.replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1");
+}
+
 // The line under the title keeps the product name. A spread already on the row
 // is said as an asking range. No price is rounded except that spread, and the
 // dollars come from the receipt. The first word is a capital.
@@ -209,6 +218,8 @@ export function shownRead(card) {
     // NM is a single-card condition. Sealed lines show plain prices.
     line = line.replace(/\s*\((?:NM|Near Mint)\)/gi, "").replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1").replace(/,?\s*\bNear Mint\b/gi, "").replace(/\bNM\b\s*/g, "")
       .replace(/:\s*(\$[\d,]+(?:\.\d{1,2})?)\s*(?:\u2192|->)\s*(\$[\d,]+(?:\.\d{1,2})?)/g, ", from $1 to $2").replace(/ {2,}/g, " ");
+  } else {
+    line = dropInventedNm(line, card);
   }
   line = line.replace(/^[,.\s]+/, "").trim();
   if (name && line && !line.includes(name) && !line.includes(String(name).split(" - ")[0].trim())) line = name + ": " + line;
@@ -3253,7 +3264,8 @@ export function todayStrip(doc) {
   if (!cards.length) return "";
   const asOf = /^\d{4}-\d{2}-\d{2}$/.test(String(doc?.asOf || "")) ? String(doc.asOf) : "";
   const items = cards.map(([label, row]) => {
-    const body = row.href ? `<a href="${esc(row.href)}">${esc(row.text)}</a>` : esc(row.text);
+    const text = dropInventedNm(row.text, row);
+    const body = row.href ? `<a href="${esc(row.href)}">${esc(text)}</a>` : esc(text);
     return `<article><b>${esc(label)}</b><p>${body}</p></article>`;
   }).join("");
   return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
@@ -3267,7 +3279,7 @@ export function heroToday(doc) {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(String(doc?.asOf || "")) ? String(doc.asOf) : "";
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const when = day ? `${months[Number(day.slice(5, 7)) - 1]} ${Number(day.slice(8, 10))}` : "";
-  const text = String(row?.text || "").trim();
+  const text = dropInventedNm(String(row?.text || "").trim(), row);
   if (/[\u2014\u2013]/.test(text)) return "";
   const live = row ? `<a class="hx-read" href="${esc(row.href)}"><span class="hx-tag">Latest read${when ? `, ${esc(when)}` : ""}</span><span class="hx-text">${esc(text)}</span><span class="hx-go">Open the data</span></a>` : "";
   return `<style>.hx{display:grid;gap:12px;margin:18px 0 0}.hx-get{list-style:none;margin:0;padding:0;display:grid;gap:6px;font:500 15px/1.4 var(--sans)}.hx-get li{display:flex;gap:10px;align-items:flex-start}.hx-get li::before{content:"";flex:0 0 8px;height:8px;margin-top:7px;border-radius:999px;background:var(--gold,#d9b779)}.hx-read{display:grid;gap:6px;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}.hx-tag{font:600 12px/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--gold,#d9b779)}.hx-text{font:500 15px/1.45 var(--sans)}.hx-go{min-height:44px;display:inline-flex;align-items:center;font:600 15px/1 var(--sans);color:var(--gold,#d9b779)}@media(max-width:700px){.hero{padding:20px 0 28px!important;gap:12px!important}.hero .mark{display:none}.hero .kicker{margin-top:0}}</style><div class="hx" id="hero-today"><ul class="hx-get" aria-label="What you get"><li>Daily reads on every card and sealed product</li><li>Price charts and listings counted, each with its date</li><li>Free to use, no account needed</li></ul>${live}</div>`;
@@ -3277,12 +3289,13 @@ export function renderToday(doc, stamp, opts = {}) {
   const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
   const lines = (doc?.lines || []).map((line) => {
     const label = labels[line.slot] || line.slot;
-    const body = line.href ? `<a href="${esc(line.href)}">${esc(line.text)}</a>` : esc(line.text);
+    const text = dropInventedNm(line.text, line);
+    const body = line.href ? `<a href="${esc(line.href)}">${esc(text)}</a>` : esc(text);
     const note = line.note ? `<p class="muted">${esc(line.note)}</p>` : "";
     return `<li><b>${esc(label)}</b><p>${body}</p>${note}</li>`;
   }).join("");
   const supply = doc?.supply === "on" ? "" : `<p>The listings line is off.</p>`;
-  const payload = JSON.stringify((doc?.lines || []).map((line) => ({ text: line.text }))).replace(/</g, "\\u003c");
+  const payload = JSON.stringify((doc?.lines || []).map((line) => ({ text: dropInventedNm(line.text, line) }))).replace(/</g, "\\u003c");
   const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Today</h1>
 <p class="muted">${esc(doc?.asOf || "")}</p>
@@ -4843,6 +4856,7 @@ ${shapeCash.toString()}
 const SHAPE_KINDS=${JSON.stringify(SHAPE_KINDS)};
 ${isShapeRow.toString()}
 ${isSealedProductRow.toString()}
+${dropInventedNm.toString()}
 ${shownRead.toString()}
 ${cardIdentity.toString()}
 function setLine(card){
