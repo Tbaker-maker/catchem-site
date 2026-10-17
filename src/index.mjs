@@ -1181,6 +1181,8 @@ const worker = {
         let viewer = null;
         try { viewer = await readUser(request, env); } catch { viewer = null; }
         const stored = await loadStoredPlan(env?.FEED_KV, viewer?.sub);
+        let preview = null;
+        try { preview = await loadJson("reads-preview.json", fetchImpl); } catch { preview = null; }
         reads = {
           plan: stored,
           signedIn: !!viewer?.sub,
@@ -1192,6 +1194,7 @@ const worker = {
           card: url.searchParams.get("card") || "",
           sealed: url.searchParams.get("sealed") || "",
           picker: readsPickerEnabled(env),
+          preview: preview && preview.lines ? { lines: preview.lines } : null,
         };
       }
       let premium = false;
