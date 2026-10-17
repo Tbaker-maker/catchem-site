@@ -1,0 +1,187 @@
+[
+ {
+  "keep": false,
+  "rule": "jp-source",
+  "row": {
+   "source": "Pokémon Card (Japan)",
+   "region": "jp",
+   "language": "ja",
+   "title": "Japan: Winner interview for \"Champions League 2027 Yokohama\"",
+   "url": "https://www.pokemon-card.com/info/009999.html"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "jp-source",
+  "row": {
+   "source": "Pokémon Card (Japan)",
+   "title": "拡張パック「30th CELEBRATION」の収録カード公開！",
+   "url": "https://www.30th.pokemon-card.com/product/m6a"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "jp-host",
+  "row": {
+   "source": "Somewhere",
+   "title": "Card list for Storm Emeralda",
+   "url": "https://www.pokemon-card.com/ex/storm/"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-event",
+  "row": {
+   "source": "PokeGuardian",
+   "title": "New 6th MEGA Pokemon Card Gym Promo Cards Revealed, Features Mega Heatran ex",
+   "url": "https://www.pokeguardian.com/1_gym-promos"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-event",
+  "row": {
+   "source": "PokeGuardian",
+   "title": "Mega Gallade ex SAR Get Battle Revealed, Win Limited Mega Gallade ex SAR Promo",
+   "url": "https://www.pokeguardian.com/2_get-battle"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-event",
+  "row": {
+   "source": "Limitless",
+   "title": "Champions League Osaka",
+   "url": "https://limitlesstcg.com/tournaments/1"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-word",
+  "row": {
+   "source": "Limitless",
+   "title": "Japan Championships 2026",
+   "url": "https://limitlesstcg.com/tournaments/2"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-word",
+  "row": {
+   "source": "Siliconera",
+   "title": "McDonald’s Japan Reveals New Pokemon Happy Meal Toys",
+   "url": "https://www.siliconera.com/mcdonalds-japan/"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japan-place",
+  "row": {
+   "source": "Limitless",
+   "title": "CL Aichi Open League",
+   "url": "https://limitlesstcg.com/tournaments/3"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "jp-region",
+  "row": {
+   "source": "PokeGuardian",
+   "region": "Japanese Sets",
+   "title": "MEGA Expansion Pack 30th CELEBRATION",
+   "url": "https://www.pokeguardian.com/3203041_x"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "japanese-text",
+  "row": {
+   "source": "Somewhere",
+   "title": "ポケカ 新弾の情報",
+   "url": "https://example.com/a"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "global",
+  "row": {
+   "source": "Pokémon Card (Japan)",
+   "region": "jp",
+   "title": "Japan: It has been decided that Pokémon Card Game 30th-anniversary products will go on sale worldwide",
+   "url": "https://www.pokemon-card.com/info/1.html"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "english",
+  "row": {
+   "source": "PokeBeach",
+   "title": "Japan's Mega Dream ex Coming to English as Ascended Heroes in January",
+   "url": "https://www.pokebeach.com/forums/threads/x.1/"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "north-america",
+  "row": {
+   "source": "PokeBeach",
+   "title": "Japanese Nihil Zero Reprint Confirmed for North America on March 6",
+   "url": "https://www.pokebeach.com/forums/threads/x.2/"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "na-url",
+  "row": {
+   "source": "Play! Pokémon",
+   "title": "Japanese Pokémon TCG Star Yoshiyuki Yamaguchi Shines Abroad",
+   "url": "https://www.pokemon.com/us/features/champions-spotlight-yoshiyuki-yamaguchi-shines-abroad"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "na-region",
+  "row": {
+   "source": "PokeGuardian",
+   "region": "US, CA",
+   "title": "Japanese-style Premium Collection hits stores",
+   "url": "https://www.pokeguardian.com/3_x"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "",
+  "row": {
+   "source": "Victory Road",
+   "title": "New Regional Championships have been confirmed in the United States!",
+   "url": "https://victoryroad.pro/2027-season-calendar/"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "",
+  "row": {
+   "source": "Pokémon press",
+   "title": "MEDIA ALERT: Pokémon Trading Card Game: 30th Celebration Expansion Launches Today, Commemorating 30 Years of Pokémon",
+   "url": "https://press.pokemon.com/en/releases/1"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "",
+  "row": {
+   "source": "Pokémon Card (Asia)",
+   "title": "Asia English expansion info",
+   "url": "https://asia.pokemon-card.com/sg/archives/1"
+  }
+ },
+ {
+  "keep": true,
+  "rule": "",
+  "row": {
+   "source": "Siliconera",
+   "title": "New Pokemon Crocs Clogs Will Appear Worldwide",
+   "url": "https://www.siliconera.com/crocs/"
+  }
+ }
+]
