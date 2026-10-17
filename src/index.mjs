@@ -801,6 +801,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const itemRead = await loadItemRead(card.setSlug, card.id, fetchImpl);
       const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true });
       if (block) itemReadHtml = block;
+      const l = itemRead?.listings;
+      if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date };
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
     return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
