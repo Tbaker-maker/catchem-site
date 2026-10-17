@@ -1344,7 +1344,7 @@ a{color:var(--gold)}
 .win.up{color:var(--green)}
 .win.down{color:var(--red)}
 .sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}@media(max-width:600px){.sum-strip{display:grid;grid-template-columns:1fr 1fr}.sum-strip .sum-chip{text-align:center;justify-content:center}}
-.sum-chip{display:inline-flex;align-items:center;min-height:36px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
+.sum-chip{display:inline-flex;align-items:center;min-height:44px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
 .sum-chip.up{color:var(--green)}
 .sum-chip.down{color:var(--red)}
 .means{background:#211e1a;border-radius:14px;padding:12px 14px}
@@ -1476,7 +1476,13 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
   .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
 }
+.nav-more{position:relative}
+.nav-more-list{display:flex;flex-direction:column}
+.nav-more>summary{list-style:none;cursor:pointer;color:var(--dim);font:500 14px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center;padding:0 8px;border-radius:12px}
+.nav-more>summary::-webkit-details-marker{display:none}
 @media (min-width:1024px){
+  .nav-more-list{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;min-width:180px;padding:8px;background:#1a1815;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .nav-more-list a{justify-content:flex-start!important}
   .menu-btn{display:none}
   .site-bar{height:auto;max-height:none}
   .site-bar nav{display:flex;position:static;flex-direction:row;background:transparent;border-bottom:0;padding:0}
@@ -1585,7 +1591,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/indexes", "Indexes")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/search", "Search")}${item("/compare", "Compare")}${item("/releases", "Releases")}${item("/post-office", "Post Office")}${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -2259,7 +2265,7 @@ function exactChip(label, n) {
 function rotationChipLabel(html) {
   const src = String(html || "");
   const aria = src.match(/aria-label="Rotation: ([^"]+)"/);
-  if (aria) return aria[1].replace(/regulation mark /i, "").replace(/, /g, " · ");
+  if (aria) return `Mark ${aria[1].replace(/regulation mark /i, "").replace(/, /g, " · ")}`;
   const mark = src.match(/class="rm">([^<]+)</);
   if (!mark) return "";
   const status = src.match(/Regulation mark [^<·]*· ([^<]+)/);

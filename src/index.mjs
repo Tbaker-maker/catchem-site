@@ -1272,7 +1272,7 @@ async function setFeatureHtml(slug, fetchImpl, valueDoc) {
   if (rot) {
     const ir = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
     const n = (ir?.rows || []).filter((r) => r.setSlug === slug).length;
-    rotationHtml = setChipHtml(slug, rot, vancouverDay(), n) + (rotationHtml || "");
+    rotationHtml = setChipHtml(slug, rot, vancouverDay(), n, { noRotation: !!rotationHtml }) + (rotationHtml || "");
   }
   return { setValueHtml: setValueBlock(doc, images, slug), rotationHtml };
 }
