@@ -331,20 +331,9 @@ function collectReadRows(doc) {
   return out;
 }
 
-async function conditionNoteFor(fetchImpl) {
-  try {
-    let doc = null;
-    try { doc = await smallJson("feed/card/condition-note.json", fetchImpl); } catch { doc = null; }
-    if (!doc) doc = await loadCatalogue("derived/condition-prices.json", fetchImpl);
-    const asOf = String(doc?.asOf || "").slice(0, 10);
-    const text = String(doc?.note || "").trim();
-    const source = String(doc?.source || "").trim();
-    if (doc?.nmDefault !== true || !text || !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return null;
-    if (/[\u2014\u2013]/.test(text + source)) return null;
-    return { text, asOf, source };
-  } catch {
-    return null;
-  }
+async function conditionNoteFor() {
+  // An older file said every price was Near Mint unless labeled. That is not true.
+  return null;
 }
 
 async function cardReadSplit(cardId, fetchImpl) {
