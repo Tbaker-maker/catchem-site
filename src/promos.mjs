@@ -5,6 +5,7 @@
 const ERAS = ["Mega", "Scarlet & Violet", "Sword & Shield", "Older"];
 const ARTS = ["Special Illustration Rare", "Illustration Rare", "Full Art", "Alt Art", "Trainer Gallery", "Textured or Etched", "Holo", "Reverse Holo", "Regular"];
 const SOURCES = ["Premium Collection", "UPC", "ETB", "Tin", "Box", "League", "Prerelease", "McDonald's", "Pokemon Center"];
+const MONS = ["Pikachu", "Charizard", "Mewtwo", "Mew", "Eevee", "Umbreon", "Rayquaza", "Gengar", "Gardevoir", "Lucario", "Greninja", "Miraidon", "Koraidon"];
 
 function chips(id, label, values, first) {
   const buttons = ['<button type="button" data-v="" aria-pressed="true">' + first + "</button>"].concat(
@@ -36,6 +37,41 @@ function html(s){
 function pressed(id){
   var b=document.querySelector("#"+id+" button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
   return b?String(b.getAttribute("data-v")||""):"";
+}
+function hasWord(name, word){
+  var raw=String(name||"").toLowerCase();
+  var want=String(word||"").toLowerCase();
+  if(!want) return true;
+  var i=raw.indexOf(want);
+  while(i>=0){
+    var before=i===0?" ":raw.charAt(i-1);
+    var after=raw.charAt(i+want.length)||" ";
+    var letter=function(c){return (c>="a"&&c<="z")||(c>="0"&&c<="9");};
+    if(!letter(before)&&!letter(after)) return true;
+    i=raw.indexOf(want, i+1);
+  }
+  return false;
+}
+function hideEmpty(id, rows, field){
+  var root=document.getElementById(id);
+  if(!root) return;
+  var counts={};
+  rows.forEach(function(r){
+    var v=field==="mon"?"":String(r[field]||"");
+    if(field==="mon") return;
+    if(v) counts[v]=(counts[v]||0)+1;
+  });
+  root.querySelectorAll("button").forEach(function(b){
+    var v=String(b.getAttribute("data-v")||"");
+    if(!v) return;
+    var n=field==="mon"?rows.filter(function(r){return hasWord(r.name,v);}).length:(counts[v]||0);
+    b.hidden=n<1;
+    if(b.hidden && b.getAttribute("aria-pressed")==="true"){
+      b.setAttribute("aria-pressed","false");
+      var all=root.querySelector("button[data-v='']");
+      if(all) all.setAttribute("aria-pressed","true");
+    }
+  });
 }
 function arrow(trend){
   if(!trend||!trend.label) return "";
@@ -72,6 +108,7 @@ function draw(){
   var era=pressed("promo-era");
   var art=pressed("promo-art");
   var source=pressed("promo-source");
+  var mon=pressed("promo-mon");
   var box=document.getElementById("promo-list");
   var note=document.getElementById("promo-note");
   var rows=tab==="sealed"?(doc.sealed||[]):(doc.cards||[]);
@@ -80,12 +117,20 @@ function draw(){
       if(era && r.era!==era) return false;
       if(art && r.art!==art) return false;
       if(source && r.source!==source) return false;
+      if(mon && !hasWord(r.name, mon)) return false;
       return true;
     });
   }
   document.getElementById("promo-art").hidden=tab==="sealed";
   document.getElementById("promo-source").hidden=tab==="sealed";
   document.getElementById("promo-era").hidden=tab==="sealed";
+  document.getElementById("promo-mon").hidden=tab==="sealed";
+  if(tab!=="sealed"){
+    hideEmpty("promo-source", doc.cards||[], "source");
+    hideEmpty("promo-art", doc.cards||[], "art");
+    hideEmpty("promo-era", doc.cards||[], "era");
+    hideEmpty("promo-mon", doc.cards||[], "mon");
+  }
   var more=document.getElementById("promo-more");
   if(!rows.length){ box.innerHTML=""; note.hidden=false; note.textContent=tab==="sealed"?"No sealed promo packs in this file.":"No promos match these filters."; more.hidden=true; return; }
   note.hidden=true;
@@ -116,17 +161,18 @@ fetch("/data/promos.json").then(function(r){ return r.ok?r.json():null; }).then(
   note.hidden=false;
   note.textContent="Promos did not load.";
 });
-["promo-tabs","promo-era","promo-art","promo-source"].forEach(bind);
+["promo-tabs","promo-era","promo-art","promo-source","promo-mon"].forEach(bind);
 document.getElementById("promo-more").addEventListener("click",function(){ shown+=48; draw(); });
 `;
 
 export function renderPromos() {
   const css = `<style>
-.promo-page{max-width:1100px}
+.promo-page{max-width:1100px;overflow-x:clip}
 .promo-page h1{font:600 34px/1.1 var(--serif);margin:8px 0}
 .promo-tabs{margin-top:12px}
 .promo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin:12px 0 28px}
-.promo-tile{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:10px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}
+.promo-tile{display:flex;gap:10px;align-items:flex-start;min-height:44px;min-width:0;padding:10px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}
+.promo-copy b{overflow-wrap:anywhere}
 .promo-tile img{width:64px;height:88px;object-fit:contain;border-radius:8px;background:#12100e;flex:0 0 auto}
 .promo-blank{width:64px;height:88px;border-radius:8px;background:#12100e;flex:0 0 auto}
 .promo-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -149,7 +195,8 @@ ${css}
 <p class="muted" id="promo-count">Promos tracked. TCGplayer market price.</p>
 ${chips("promo-tabs", "Promo list", ["Sealed promos"], "Cards")}
 ${chips("promo-era", "Era", ERAS, "All eras")}
-${chips("promo-art", "Art type", ARTS, "All art")}
+${chips("promo-mon", "Popular Pokemon", MONS, "All Pokemon")}
+${chips("promo-art", "Illustration style", ARTS, "All styles")}
 ${chips("promo-source", "Source product", SOURCES, "All sources")}
 <p class="muted" id="promo-note" hidden>No promos match these filters.</p>
 <div class="promo-grid" id="promo-list"></div>
