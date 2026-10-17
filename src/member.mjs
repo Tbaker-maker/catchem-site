@@ -1,4 +1,5 @@
 // Account pages. Sign-in is optional. FEED_KV holds the rows when it is bound.
+import { FOLLOWS_KEY, removeFollow } from "./reads-pipe.mjs";
 import { pageChrome as chrome } from "./ui.mjs";
 import { readUser, avatarUrl } from "./quota.mjs";
 import { WATCH_CAP } from "./watch-cap.mjs";
@@ -200,6 +201,9 @@ async function wipe(store, user) {
   await store.delete(`collection:${user.sub}`);
   await store.delete(`prefs:${user.sub}`);
   await store.delete(`member:${user.sub}`);
+  const reads = await store.get(FOLLOWS_KEY, "json");
+  if (reads) await store.put(FOLLOWS_KEY, JSON.stringify(removeFollow(reads, user.sub)));
+  await store.delete(`reads:${user.sub}`);
   const headers = { "set-cookie": "ce_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0" };
   return json({ ok: true, deleted: true }, 200, headers);
 }

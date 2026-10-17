@@ -1,6 +1,7 @@
 // Custom Reads picker. No network. Email is stored only when opted in and is never sent here.
 
 import { readUser } from "./quota.mjs";
+import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
@@ -297,8 +298,9 @@ export function planToFollow(discordId, plan) {
     eras: plan?.eras || [],
     frequency: plan?.frequency || "weekly",
     product,
-    news: plan?.addons?.news === true,
-    games: plan?.addons?.games === true,
+    news: plan?.addons?.news === true || plan?.addons?.all === true,
+    games: plan?.addons?.games === true || plan?.addons?.all === true,
+    savedAt: String(plan?.savedAt || ""),
   };
 }
 
@@ -306,7 +308,7 @@ export function upsertFollow(doc, follow) {
   const follows = (Array.isArray(doc?.follows) ? doc.follows : []).filter((row) => row && row.id !== follow.id);
   follows.push(follow);
   return {
-    rule: "Each follow is one Discord id. The nightly reads data/custom-reads/follows.json in this shape. A night with no match is skipped.",
+    rule: "Each follow is one Discord id. The nightly reads this list through /api/reads/export and never commits it. A night with no match is skipped.",
     follows,
   };
 }
@@ -321,6 +323,14 @@ function choice(name, value, label, on) {
 
 function radio(name, value, label, on, locked) {
   return `<label class="rd-chip"><input type="radio" name="${name}" value="${esc(value)}" data-label="${esc(label)}"${on ? " checked" : ""}${locked ? " disabled" : ""}><span>${esc(label)}</span></label>`;
+}
+
+// What Save says. It only promises a DM when the nightly can read the follow.
+export function saveLine(state = {}) {
+  if (state.note === "closed") return "Saving is not open yet, so nothing was stored.";
+  if (!state.saved) return "";
+  if (state.pipe === true) return "Saved. Your first read comes by Discord DM after the next nightly run.";
+  return "Saved. Reads by Discord DM are not switched on yet, so none will arrive for now.";
 }
 
 export function renderReadsPage(state = {}) {
@@ -345,7 +355,8 @@ export function renderReadsPage(state = {}) {
   shown = recommendedPlan(shown);
   if (!shown.product) shown.product = shown.sealed ? "sealed" : "singles";
   const notes = [];
-  if (state.saved) notes.push("Saved.");
+  const saveNote = saveLine(state);
+  if (saveNote) notes.push(saveNote);
   if (gatedSuggestion) notes.push(...gatedSuggestion.notes);
   const sample = sampleRead(shown);
   const keep = (shown.watch || []).map((row) => {
@@ -474,7 +485,7 @@ export async function handleReads(request, env) {
   if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
   if (!store) {
     if (form) {
-      back.searchParams.set("line", "Reads are not open yet.");
+      back.searchParams.set("note", "closed");
       return Response.redirect(back, 303);
     }
     return json({ ok: false, error: "Reads are not open yet." }, 503);
@@ -488,13 +499,13 @@ export async function handleReads(request, env) {
   plan.savedAt = new Date().toISOString();
   await store.put(`reads:${user.sub}`, JSON.stringify(plan));
   const follow = planToFollow(user.sub, plan);
-  const prev = await store.get("custom-reads:follows", "json");
-  await store.put("custom-reads:follows", JSON.stringify(upsertFollow(prev, follow)));
+  const prev = await store.get(FOLLOWS_KEY, "json");
+  await store.put(FOLLOWS_KEY, JSON.stringify(upsertFollow(prev, follow)));
   if (form) {
     back.searchParams.set("saved", "1");
     return Response.redirect(back, 303);
   }
-  return json({ ok: true, plan, notes, emailArmed: emailSendAllowed(env) });
+  return json({ ok: true, plan, notes, pipe: readsPipeReady(env), emailArmed: emailSendAllowed(env) });
 }
 
 export async function handleReadsClick(request, env) {
