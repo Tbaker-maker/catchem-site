@@ -86,6 +86,24 @@ export async function loadJson(rel, fetchImpl = fetch) {
   });
 }
 
+// Live Feed news. Catchem-data writes research/digests/feed-news.json on every
+// news run (nightly), already free of Japan-only items. It is not on public-data,
+// so it is read from main. Null on any miss; the Feed then uses the baked copy.
+export const FEED_NEWS_PATH = "research/digests/feed-news.json";
+export async function loadFeedNews(fetchImpl = fetch) {
+  try {
+    return await cached("feed-news", async () => {
+      const res = await fetchImpl(repoUrl("main", FEED_NEWS_PATH), { cf: { cacheTtl: 300 } });
+      if (!res.ok) throw new Error(`feed-news ${res.status}`);
+      const doc = await res.json();
+      if (!doc || !Array.isArray(doc.items) || !/^\d{4}-\d{2}-\d{2}$/.test(String(doc.asOf || ""))) throw new Error("feed-news shape");
+      return doc;
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function proxyPublic(rel, fetchImpl = fetch) {
   const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
   if (!res.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });

@@ -4,7 +4,7 @@ import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
@@ -543,7 +543,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       return new Response(JSON.stringify(feedReads(freshBundle)), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
     }
     const soldOn = await soldFileExists(fetchImpl);
-    const withDive = { ...pageOpts, diveMap, soldOn };
+    const liveNews = await loadFeedNews(fetchImpl);
+    const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews };
     if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
     if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
