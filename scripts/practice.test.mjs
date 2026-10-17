@@ -1,4 +1,7 @@
 // Practice pack. Imported by rebuild.test.mjs so CI runs it.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { renderPath, pageKind } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { drawPack, buildPack, packArt, practicePool, practiceSets, PRACTICE_NOTE, SLOTS, TIERS } from "../src/practice.mjs";
@@ -69,7 +72,7 @@ t("nav hides practice until the overhaul", !page.includes('href="/practice"'));
 const data = JSON.parse(page.match(/<script type="application\/json" id="pp-data">([\s\S]*?)<\/script>/)[1]);
 t("page pool is the default set file", data.slug === "new-set" && data.pool.length === 40 && data.pool.every((c) => ids.has(c.id)));
 const visible = page.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
-t("no em dash or banned words", !/\u2014/.test(visible.split("Not affiliated")[0]) && !/\b(buy|sell|hold|invest\w*|target|bottom|support|resistance|printed|crypto|supply)\b/i.test(visible.split("Not affiliated")[0]));
+t("no em dash or banned words", !/\u2014/.test(visible.split("Not affiliated")[0]) && !banGuard("practice", /\b(supply)\b/i, PAGE).test(visible.split("Not affiliated")[0]));
 const scripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 let parsed = true;
 for (const s of scripts) { try { new vm.Script(s); } catch (e) { parsed = false; console.log(e.message); } }

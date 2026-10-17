@@ -1,3 +1,4 @@
+import { banGuard } from "../src/advice-rules.mjs";
 import { sealedRatingPanel, sealedShard, sealedFacts } from "../src/sealed-rating.mjs";
 let fail = 0;
 const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
@@ -15,7 +16,7 @@ t("free has no bars", !/class="bar"/.test(free) && /Premium/.test(free));
 t("premium has bars", (paid.match(/class="bar"/g) || []).length === Object.keys(row.factors).length);
 t("waiting factors named in About", /Pack destruction range/.test(free));
 const strip = (h) => h.replace(/<style>[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
-const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|stack\w*|load up|undervalued|overvalued)\b|\u2014/i;
+const BANNED = banGuard("sealed-rating");
 t("copy clean", !BANNED.test(strip(paid)) && !BANNED.test(strip(free)));
 t("says not advice", /not advice/.test(free));
 t("no verdict row explains why", /Not enough same-type/.test(sealedRatingPanel({ ...row, verdict: null, factors: {} }, doc)));

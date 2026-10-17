@@ -1,4 +1,7 @@
 // Launch fixes: 404 page, favicon, practice out of nav, no-data text hidden, share meta.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import worker, { notFoundPage, FAVICON_SVG } from "../src/index.mjs";
 import { renderNotFound, renderRotation } from "../src/ui.mjs";
 import { setValueBlock } from "../src/features.mjs";
@@ -8,7 +11,7 @@ import fs from "node:fs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto)\b/i;
+const BANNED = banGuard("launch-fixes", null, PAGE);
 const visible = (h) => h.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ").replace(/support@catchemtcg\.com/g, "");
 
 const nf = renderNotFound("");

@@ -1,11 +1,13 @@
-import { withoutShopButtons } from "../src/pokemon.mjs";
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 // Card page deep bits: only figures already on the card or the read.
 import { renderCard } from "../src/ui.mjs";
 import { patternSentence } from "../src/read-sheet.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto|supply)\b/i;
+const BANNED = banGuard("card-deep", /\b(supply)\b/i, PAGE);
 
 const card = {
   id: "tcgcsv-99",
@@ -53,7 +55,7 @@ t("eBay ask and the gap stay dated", html.includes("eBay ask $18.00 (any conditi
 t("a thin card hides the deep bits", !renderCard({ id: "tcgcsv-1", name: "X", kind: "single" }, "stamp", {}).includes('<section class="cp-pattern"') && !renderCard({ id: "tcgcsv-1", name: "X", kind: "single" }, "stamp", {}).includes('<p class="cp-cond"'));
 t("sealed page does not grow a single pattern box", !renderCard({ id: "tcgcsv-2", name: "Box", kind: "sealed", price: 10, asOf: "2026-10-13", hist: [["2026-10-01", 10], ["2026-10-13", 11]] }, "stamp", { patternRead: pattern, conditionNote: { text: "nope", asOf: "2026-10-13", source: "x" } }).includes("cp-pattern"));
 const main = html.slice(html.indexOf("<main"), html.lastIndexOf("</main>"));
-const plain = withoutShopButtons(main).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
+const plain = main.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 t("card deep copy stays clean", !/[\u2014\u2013]/.test(main) && !BANNED.test(plain) && !/No data/i.test(plain));
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }

@@ -1,11 +1,14 @@
 // Weekly and scanner: passed patterns and dated movers. Empty lists stay off.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { pageKind, renderPath } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { parseWeeklyPattern, weeklyBody, scannerBody } from "../src/weekly.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto|supply)\b/i;
+const BANNED = banGuard("weekly", /\b(supply)\b/i, PAGE);
 const visible = (h) => String(h).replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
 
 const doc = {

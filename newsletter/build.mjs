@@ -9,10 +9,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { banGuard } from "../src/advice-rules.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
 
-const BANNED = /\b(crypto|nft|nfts|token|tokens|protocol|buyback|investment)\b/i;
+// Shared advice-phrase rules (Catchem-data rules/advice-phrases.json), plus the newsletter's
+// own crypto-adjacent words.
+const NEWS_HOUSE = /\b(token|tokens|protocol|buyback|investment)\b/i;
+const BANNED = banGuard("newsletter", NEWS_HOUSE);
 // "mint" is a card condition word (Near Mint, Gem Mint, Mint condition, PSA 10 Gem Mint).
 // Those phrases are allowed; any other "mint"/"minting"/"minted" is treated as crypto usage.
 const MINT_OK = /\b(?:near[\s-]+mint|gem[\s-]+mint|mint[\s-]+condition|mint\/near[\s-]+mint)\b/gi;

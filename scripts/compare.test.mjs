@@ -1,5 +1,7 @@
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import vm from "node:vm";
-import { withoutShopButtons } from "../src/pokemon.mjs";
 import { renderCompare, compareRows } from "../src/ui.mjs";
 import { renderPath } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
@@ -9,7 +11,7 @@ const t = (name, cond) => {
   console.log(`${cond ? "  ok " : "  FAIL"} ${name}`);
   if (!cond) fail++;
 };
-const BANNED = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|roi|invest(?:ing|ment|or)?s?|crypto|nfts?|web3|dsk|tickers?|tapes?)\b/i;
+const BANNED = banGuard("compare", null, PAGE);
 const day = (n) => new Date(Date.parse("2025-09-01T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 const line = (price) => Array.from({ length: 400 }, (_, i) => [day(i), price + i * 0.01]);
 
@@ -45,7 +47,7 @@ t("legend chips stack on a narrow screen and sit in a row when wide", page.inclu
 t("legend chips keep a real thumbnail and drop a bad one", legs.includes('src="/data/editor/tcg/base1/1_hires.png"') && !legs.includes("javascript") && (legs.match(/<img /g) || []).length === 1);
 t("legend links the product and a sealed row uses the product path", legs.includes('href="/c/tcgcsv-1"') && legs.includes('href="/c/tcgcsv-2"') && legs.includes('href="/p/tcgcsv-3"'));
 t("a missing catalog row stays a column and a one-sided low stays off", page.includes("Not in the catalog") && page.includes("$3.00") && page.includes("$40.00") && !page.includes(">Low<"));
-t("compare copy stays clean", !/[\u2014\u2013]/.test(page) && !/No data/i.test(page) && !BANNED.test(withoutShopButtons(page)) && !/winner|score|better|higher|lower/i.test(page.split("<footer")[0]));
+t("compare copy stays clean", !/[\u2014\u2013]/.test(page) && !/No data/i.test(page) && !BANNED.test(page) && !/winner|score|better|higher|lower/i.test(page.split("<footer")[0]));
 
 {
   const broken = [];

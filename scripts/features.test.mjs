@@ -1,5 +1,8 @@
 // Set value, rotation badge, /releases, and eBay listings counted.
 // Imported by rebuild.test.mjs so CI runs it without a workflow edit.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { renderPath, pageKind } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { PRINT_RUN_LINE } from "../src/rotation.mjs";
@@ -7,7 +10,7 @@ import { listingsCountedLine, rotationBadge, setValueBlock, upcomingReleases, no
 
 let fail = 0;
 const t = (name, cond) => { if (cond) console.log("  ok ", name); else { fail++; console.log("  FAIL", name); } };
-const BANNED = /\b(buy|sell|hold|invest\w*|target|play|bottom|support|resistance|printed|crypto|supply)\b/i;
+const BANNED = banGuard("features", /\b(supply)\b/i, PAGE);
 const visible = (h) => String(h).replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
 
 const top = (n) => Array.from({ length: n }, (_, i) => ({ id: `tcgcsv-${42300 + i}`, name: `Card ${i}`, number: `${i + 1}/102`, price: 100 - i, date: "2026-10-12" }));

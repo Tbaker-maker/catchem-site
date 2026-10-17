@@ -1,3 +1,6 @@
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +36,7 @@ const home = await readFile(join(root, "index.html"), "utf8");
 t("homepage h1 is the doing line", home.includes("<h1>Know what every card and pack is doing.</h1>"));
 t("homepage title dropped the old line", !home.includes("Know what to rip"));
 t("homepage drops crowd, rip, and tonight", !home.includes("card crowd") && !home.includes("still rip") && !home.includes("tonight"));
-t("homepage keeps the bans", !/rippers and flippers/i.test(home) && !home.includes("Request access") && !home.includes("Opening soon") && !home.includes("forever") && !home.includes("$14.99") && !/\b(buy|sell|invest)\b/i.test(home) && !home.includes("\u2014"));
+t("homepage keeps the bans", !/rippers and flippers/i.test(home) && !home.includes("Request access") && !home.includes("Opening soon") && !home.includes("forever") && !home.includes("$14.99") && !banGuard("post-office", null, PAGE).test(home) && !home.includes("\u2014"));
 const title = (home.match(/<title>([^<]*)<\/title>/) || [,""])[1];
 const desc = (home.match(/<meta name="description" content="([^"]*)"/) || [,""])[1];
 t("homepage title is under 60 and description under 160", title.length > 0 && title.length < 60 && desc.length > 0 && desc.length < 160);
@@ -215,7 +218,7 @@ const tonePosts = toneNames.map((tone) => factPost([sampleCard], tone));
 t("tones change the text", new Set(tonePosts.map((lines) => lines[0])).size === 4 && tonePosts.every((lines) => lines.length === 3));
 const pocketCard = { name: "Pikachu", printing: "094", edition: "Genetic Apex", artist: "", price: "No market price" };
 const samples = tonePosts.concat([factPost([pocketCard], "informative")]);
-const bannedPost = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|invest|roi|crypto|nfts?|web3)\b|to the moon|about 0/i;
+const bannedPost = banGuard("post-office", /about 0/i, PAGE);
 t("five sample posts stay inside the rules", samples.length === 5 && samples.every((lines) => lines.length === 3 && lines.every((line) => line.includes("Pokémon") && !line.includes("Pokemon") && !bannedPost.test(line) && line.length <= 280 && (line.includes("Pikachu") ? !line.includes("TCGplayer market:") : line.includes("TCGplayer market: $2,214.79 (2026-09-27)")))));
 const signPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), { PUBLIC_FETCH: fetchImpl });
 const signHtml = await signPage.text();

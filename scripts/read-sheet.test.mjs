@@ -1,3 +1,6 @@
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { readSheet, patternSentence } from "../src/read-sheet.mjs";
 import { renderFeed } from "../src/ui.mjs";
 import vm from "node:vm";
@@ -5,7 +8,7 @@ import { readFileSync } from "node:fs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto|supply)\b/i;
+const BANNED = banGuard("read-sheet", /\b(supply)\b/i, PAGE);
 
 const read = {
   id: "scan-pattern-forming-breakout-tcgcsv-86123",

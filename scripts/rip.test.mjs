@@ -1,11 +1,14 @@
 // Rip value page: numbers come only from the rip file, empty fields stay off.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { pageKind, renderPath } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { ripBody } from "../src/rip.mjs";
 
 let fail = 0;
 const t = (name, cond) => { if (cond) console.log("  ok ", name); else { fail++; console.log("  FAIL", name); } };
-const BANNED = /\b(buy|sell|hold|invest\w*|target|play|bottom|support|resistance|printed|crypto|supply)\b/i;
+const BANNED = banGuard("rip", /\b(supply)\b/i, PAGE);
 const visible = (h) => String(h).replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
 
 const doc = {

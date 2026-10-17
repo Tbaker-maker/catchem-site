@@ -1,10 +1,12 @@
-import { withoutShopButtons } from "../src/pokemon.mjs";
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 // Sealed page: eBay ask and Rip value only when the file has them.
 import { renderCard } from "../src/ui.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto|supply)\b/i;
+const BANNED = banGuard("sealed-deep", /\b(supply)\b/i, PAGE);
 
 const card = {
   id: "tcgcsv-2",
@@ -34,7 +36,7 @@ const single = renderCard({ ...card, kind: "single", hist: [["2026-10-01", 70], 
   rip: { contentsEV: 5, roiPct: 1, beatChance: 2, median: 4, asOf: "2026-10-13" },
 });
 t("a single does not take the sealed rip block", !single.includes("<h2>Rip value</h2>") && !single.includes("eBay ask $"));
-const main = withoutShopButtons(html.slice(html.indexOf("<main"), html.lastIndexOf("</main>"))).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
+const main = (html.slice(html.indexOf("<main"), html.lastIndexOf("</main>"))).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 t("sealed deep copy stays clean", !/[\u2014\u2013]/.test(html) && !BANNED.test(main) && !/No data/i.test(main));
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }

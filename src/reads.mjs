@@ -1,6 +1,9 @@
 // Custom Reads picker. No network. Email is stored only when opted in and is never sent here.
 
 import { readUser } from "./quota.mjs";
+import { banGuard } from "./advice-rules.mjs";
+// Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
+const READ_GUARD = banGuard("read");
 
 export const RARITIES = ["Illustration Rare", "Special Illustration Rare", "Ultra Rare"];
 export const ERAS = ["Scarlet and Violet", "Sword and Shield", "Sun and Moon", "Mega Evolution"];
@@ -170,7 +173,7 @@ export function preSend(text) {
   if (/—|–/.test(body)) return { ok: false, why: "copy" };
   const emptySection = ["no", "data"].join(" ");
   if (body.toLowerCase().includes(emptySection)) return { ok: false, why: "copy" };
-  if (/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|crypto)\b|load up/i.test(body)) return { ok: false, why: "copy" };
+  if (READ_GUARD.test(body)) return { ok: false, why: "copy" };
   return { ok: true };
 }
 

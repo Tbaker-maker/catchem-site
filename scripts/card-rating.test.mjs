@@ -1,3 +1,4 @@
+import { banGuard } from "../src/advice-rules.mjs";
 import { ratingPanel, shardOf } from "../src/card-rating.mjs";
 let fail = 0;
 const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
@@ -11,7 +12,7 @@ t("peer line dated", /\$54\.18 vs a typical/.test(free) && /Oct 12, 2026/.test(f
 t("free has no bars", !/class="bar"/.test(free) && /Premium/.test(free));
 t("premium has bars in order", (paid.match(/class="bar"/g) || []).length === 3 && paid.indexOf("Price vs similar cards") < paid.indexOf("Popularity"));
 t("held row shows no verdict", !/Priced/.test(ratingPanel({ ...row, check: true, verdict: null }, doc, { premium: true })));
-const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|stack\w*|load up)\b|\u2014/i;
+const BANNED = banGuard("card-rating");
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(free.replace(/<[^>]+>/g, " ")));
 t("says not advice", /not advice/.test(free));
 t("free line lists only the factors the card has", /Factor bars for price vs similar cards, popularity and artist are in/.test(free) && !/supply/i.test(free.replace(/Supply counted \d+/, "")));

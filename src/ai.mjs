@@ -5,14 +5,18 @@ import { editionLabel, priceLine } from "./post-copy.mjs";
 import { commit, ideasSignInLine, peek, readUser, usageOf } from "./quota.mjs";
 import { discordReady, INVITE_LINE, officeAllowed } from "./auth.mjs";
 import { fetchRepo } from "./data.mjs";
+import { banGuard } from "./advice-rules.mjs";
 
-const BANNED = new RegExp(
-  "\\b(buy|sell|sold|hold|floor|target|plays|picks|bullish|bearish|invest|roi|crypto|nft|web3)\\b|to the moon|"
+// Shared advice-phrase rules (Catchem-data rules/advice-phrases.json), plus post-text
+// house rules: no sold claims (listings only), no rounded-to-zero prices, one spelling of catalog.
+const POST_HOUSE = new RegExp(
+  "\\bsold\\b|"
   + ["sells", "for"].join(" ") + "|"
   + ["about", "0"].join(" ") + "|"
   + "catalog" + "ue",
   "i",
 );
+const BANNED = banGuard("post text", POST_HOUSE);
 const POST_MODEL = "grok-4.20-0309-non-reasoning";
 
 export const STYLE_PROMPT = `You write short social copy for Catch'em, a Pokémon TCG collector site. Write as a real collector talking to collectors, rippers, and flippers: warm, specific, conversational, and a little fun. Lead with a concrete fact when possible: artist, set, card number, pull rate, or current TCGplayer market price.
@@ -30,7 +34,7 @@ NON-NEGOTIABLE RULES:
 - Use only the facts in SOURCE OF TRUTH. Never invent or look up a card, product, price, date, pull rate, artist, set, number, or claim.
 - Always spell Pokémon with the accent.
 - If a price is supplied, write it as "TCGplayer market: [price] ([date])", using the supplied price and date. Never use a price without its supplied date. If either is missing, omit the price.
-- Never use investment language: buy, sell, hold, floor, target, plays, picks, bullish, bearish, invest, ROI, or "to the moon." Do not use crypto, NFT, or Web3 language.
+- Never tell people what to do with their money: no "buy now," "you should buy" or "sell," "load up," "guaranteed," "can't lose," or "to the moon." Do not use crypto, NFT, or Web3 language. Shopping words like Buy, Shop, and Sell your cards are fine.
 - Do not promise or guarantee a future price, pull, grade, value, or outcome.
 - Do not use generic hype without a concrete detail.
 - Do not browse or rely on outside knowledge.
