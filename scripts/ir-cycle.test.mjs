@@ -1,3 +1,4 @@
+import { banGuard } from "../src/advice-rules.mjs";
 import { cardMarkBadge, artKind, rotationChipData, chipsHtml, watchlistBody, cyclePanel, FREE_ROWS } from "../src/ir-cycle.mjs";
 let fail = 0;
 const t = (n, c) => { if (!c) { fail++; console.log("  FAIL", n); } };
@@ -25,7 +26,7 @@ const free = watchlistBody(doc, {});
 const paid = watchlistBody(doc, { premium: true });
 t("free shows a preview and a Premium button", (free.match(/class="wl-row"/g) || []).length === FREE_ROWS && /See it with Premium/.test(free));
 t("premium shows all", (paid.match(/class="wl-row"/g) || []).length === 6 && !/See it with Premium/.test(paid));
-const BANNED = /\b(buy|sell|hold|bottom|support|resistance|target|invest\w*|load up|best time)\b|\u2014/i;
+const BANNED = banGuard("ir-cycle");
 t("copy clean", !BANNED.test(paid.replace(/<[^>]+>/g, " ")) && !BANNED.test(cyclePanel(row, "2026-10-12").replace(/<[^>]+>/g, " ")));
 t("every price line carries a date", /\$3\.00 on Oct 12, 2026/.test(paid) && !/listings|sealed/i.test(paid.replace(/<[^>]+>/g, " ").replace(/Premium/g, "")));
 t("lift chips render", /rchip lift">Near its lowest on file/.test(paid) && /rchip lift/.test(cyclePanel(row, "2026-10-12")));

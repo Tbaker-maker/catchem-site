@@ -1,4 +1,7 @@
 // Read pages join the per-read facts file. Fixed fixture.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { readSheet, cleanTitle } from "../src/read-sheet.mjs";
 import { historyChart } from "../src/history-chart.mjs";
 let fail = 0;
@@ -30,7 +33,7 @@ t("pattern shows rate vs base and n", h.includes("right 25% of the time 7 days l
 t("bands, variants, similar with thumbnail", h.includes("Rarity band") && h.includes("Artist band") && h.includes("Reverse Holofoil $55.00") && h.includes('src="/img/sv10/240"'));
 t("rotation chip", h.includes("Mark I · Standard"));
 t("clean title", cleanTitle("Misty's Psyduck - 193/182") === "Misty's Psyduck" && cleanTitle("Mew ex") === "Mew ex");
-t("no em dash, no banned words in sheet text", !/[\u2014\u2013]/.test(h) && !/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up)\b/i.test(h.replace(/<[^>]+>/g, " ")));
+t("no em dash, no banned words in sheet text", !/[\u2014\u2013]/.test(h) && !banGuard("read-facts", null, PAGE).test(h.replace(/<[^>]+>/g, " ")));
 t("facts for another read are ignored", !readSheet(read, { facts: { ...facts, id: "other" }, reads: [] }).includes("High and low"));
 t("empty facts hide sections", !readSheet({ id: "x", name: "X" }, { facts: { id: "x" }, reads: [] }).includes('class="rd-card"'));
 const chart = historyChart([["2026-10-01", 5, "n"], ["2026-10-03", 6, "n"]]);

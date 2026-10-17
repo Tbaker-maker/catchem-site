@@ -1,3 +1,4 @@
+import { banGuard } from "./advice-rules.mjs";
 /**
  * Post Office Shorts — fact pack, scripts, language checks, limits.
  * Browser and Node. No network. No invented cards or prices.
@@ -15,8 +16,9 @@ export const HOOK_MAX_WORDS = 12;
 export const CAPTION_FG = "#ffffff";
 export const CAPTION_BG = "#141416";
 
-const BANNED =
-  /\b(buy|sell|sold|hold|floor|floors|targets?|plays|picks|bullish|bearish|invest|investing|investment|investor|roi|crypto|nft|web3)\b|to the moon/i;
+// Shared advice-phrase rules (Catchem-data rules/advice-phrases.json), plus the video house rule:
+// no sold or floor claims (listings only).
+const BANNED = banGuard("video", /\b(sold|floors?)\b/i);
 const SLOP = /amazing|check out|🔥|💯|🚀/i;
 const ASCII_POKEMON = /pokemon/i;
 

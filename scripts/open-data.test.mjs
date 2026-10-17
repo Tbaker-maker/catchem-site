@@ -1,4 +1,6 @@
-import { withoutShopButtons } from "../src/pokemon.mjs";
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 // Open data: every read with an item lands on that item's page at a real
 // section. Item pages show every read, rank and related, hide empty sections,
 // keep NM off sealed and skip banned words.
@@ -7,7 +9,7 @@ import { renderCard } from "../src/ui.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|crypto|sales)\b/i;
+const BANNED = banGuard("open-data", /\b(sales)\b/i, PAGE);
 const SECTIONS = new Set(ITEM_SECTIONS.map(([id]) => id));
 const resolves = (href) => {
   const m = href.match(/^\/(c|p)\/([a-z0-9-]+)#([a-z]+)$/i);
@@ -38,7 +40,7 @@ const reads = [
 const sealed = { id: "tcgcsv-500", name: "Test Booster Box", kind: "sealed", set: "Test Set", setSlug: "tst", price: 180, asOf: "2026-10-16", source: "TCGplayer market", hist: [["2026-10-01", 170], ["2026-10-16", 180]], rank: 2, of: 30, also: [{ id: "tcgcsv-501", name: "Test ETB", price: 60 }] };
 const page = renderCard(sealed, "stamp", { allReads: reads, feed: true, listingSeries: [{ date: "2026-10-01", listingCount: 50 }, { date: "2026-10-16", listingCount: 41 }] });
 const main = page.slice(page.indexOf("<main"), page.indexOf("</main>"));
-const visible = withoutShopButtons(main).replace(/<style>[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
+const visible = main.replace(/<style>[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 t("sealed page has every read", main.includes('id="read-r1"') && main.includes('id="read-r2"') && main.includes("(2)"));
 t("sealed page has price, supply, rank, stats, reads, related", ["price", "supply", "rank", "stats", "reads", "related"].every((id) => main.includes(`id="${id}"`)));
 t("jump row links each section", main.includes('class="item-jump"') && main.includes('href="#supply"') && main.includes('href="#related"'));

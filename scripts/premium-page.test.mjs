@@ -1,3 +1,6 @@
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { renderPremium } from "../src/ui.mjs";
 import { REFUND_LINE } from "../src/policy.mjs";
 let fail = 0; const t = (n, ok) => { if (!ok) { fail++; console.log("FAIL", n); } };
@@ -15,7 +18,7 @@ t("watch perk matches bot cap 25", vis.includes("up to 25") && !/up to 50|Free g
 t("no em dash", !/\u2014/.test(main));
 t("no lifetime claim", !/lifetime|forever/i.test(vis));
 t("no raffle words", !/raffle|prize|stadium|giveaway/i.test(vis));
-t("no banned words", !/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|sales|picks?|floors?)\b/i.test(vis));
+t("no banned words", !banGuard("premium-page", /\b(sales)\b/i, PAGE).test(vis));
 const sents = vis.split(/(?<=\.)\s/).map((x) => x.trim()).filter((x) => x.length > 30);
 t("no duplicate lines", new Set(sents).size === sents.length);
 t("tap targets 44px", /\.prem-join\{[^}]*min-height:48px/.test(main) && /\.prem-acts a\{[^}]*min-height:44px/.test(main));

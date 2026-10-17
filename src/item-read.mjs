@@ -1,9 +1,11 @@
 // "Our read" block on /c/* and /p/* pages, from the item's row in feed/items/<set>.json.
 // Every figure carries its date. Empty fields hide; no block when nothing is backed.
 import { factChips, factCards } from "./read-sheet.mjs";
+import { banGuard } from "./advice-rules.mjs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const BANNED = /\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|supply)\b/i;
+// Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). "supply" is a house rule: say listings counted.
+const BANNED = banGuard("item read", /\bsupply\b/i);
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const short = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(iso || "") ? `${months[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}` : "");
 const pp = (n) => (Number(n) > 0 ? "+" : "") + Math.round(Number(n) * 10) / 10 + "%";

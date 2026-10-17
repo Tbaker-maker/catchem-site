@@ -1,4 +1,7 @@
 // Launch fixes 2: lighter feed, no optional-file 404s, folded sets and artists, quiet quick view.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { renderFeed, feedReads, inlineFeedReads, FEED_INLINE, renderSets, renderArtists } from "../src/ui.mjs";
 import { handleLive, soldFileExists, resetSoldCheck, renderPath } from "../src/index.mjs";
 import fs from "node:fs";
@@ -6,7 +9,7 @@ import fs from "node:fs";
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
 const visible = (h) => h.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
-const BANNED = /\b(buy|sell|hold|resistance|bottom|printed|play|target|invest|stack|load up|crypto)\b/i;
+const BANNED = banGuard("launch-fixes-2", null, PAGE);
 
 const reads = Array.from({ length: 300 }, (_, i) => ({ id: `r-${i}`, headline: `Card ${i} moved.`, price: 10 + i, source: "TCGplayer market", asOf: "2026-10-13", kind: "single", href: `/c/tcgcsv-${i}` }));
 const page = renderFeed({ reads }, "", "", { feed: true });

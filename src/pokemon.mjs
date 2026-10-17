@@ -415,14 +415,9 @@ export function tcgStoreUrl(card, cfg = AFF) {
   return affTcg(productLink(card), cfg.tcg);
 }
 // Both store links as two shop buttons with the disclosure under them.
-// Hidden when neither exists. Affiliate buttons are the one place "Buy" is
-// allowed in site copy (approved label).
+// Hidden when neither exists. "Buy on TCGplayer" and "Buy on eBay" are on the
+// allowed list in Catchem-data rules/advice-phrases.json (src/advice-rules.mjs).
 export const SHOP_NOTE = "Catch'em may earn a small commission, at no extra cost to you.";
-// Banned-word checks run on copy with the approved affiliate buttons taken
-// out: "Buy on TCGplayer" and "Buy on eBay" are the only allowed use.
-export function withoutShopButtons(html) {
-  return String(html || "").replace(/<a class="shop-btn[^"]*"[^>]*>Buy on (?:TCGplayer|eBay)<\/a>/g, " ");
-}
 export function storeLinksHtml(card, esc) {
   const tcg = tcgStoreUrl(card);
   const ebay = ebaySearchUrl(card);

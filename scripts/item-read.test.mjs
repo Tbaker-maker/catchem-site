@@ -1,4 +1,7 @@
 // Item read block on /c and /p pages: one shard row, empty fields hidden.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { itemReadBlock } from "../src/item-read.mjs";
 import { itemLine } from "../src/data.mjs";
 import { renderCard } from "../src/ui.mjs";
@@ -23,9 +26,10 @@ t("pattern and set momentum", h.includes("vs 20.8% normally") && h.includes("sin
 t("what-we-see line", h.includes("44% under its high"));
 t("Near Mint label for singles", h.includes("(Near Mint)"));
 t("Rip and rotation skipped when the page already has them", !itemReadBlock(row, { skipRip: true, skipRotation: true }).includes("Rip value") && !itemReadBlock(row, { skipRotation: true }).includes("Mark I"));
-t("no banned words, no em dash", !/[\u2014\u2013]/.test(h) && !/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|supply)\b/i.test(h.replace(/<[^>]+>/g, " ")));
+t("no banned words, no em dash", !/[\u2014\u2013]/.test(h) && !banGuard("item-read", /\b(supply)\b/i, PAGE).test(h.replace(/<[^>]+>/g, " ")));
 t("empty row renders nothing", itemReadBlock({ item: {} }) === "" && itemReadBlock(null) === "");
-t("a line with a banned word is dropped", !itemReadBlock({ line: "Time to buy." }).includes("buy"));
+t("a line with an advice phrase is dropped", !itemReadBlock({ line: "Time to buy." }).includes("buy"));
+t("a line with a shop label is kept", itemReadBlock({ line: "Shop it: Buy on eBay." }).includes("Buy on eBay"));
 const page = renderCard({ id: "tcgcsv-1", name: "Psyduck", kind: "single", set: "S", num: "1", price: 47.36, asOf: "2026-10-14", source: "TCGplayer market", hist: [["2026-10-01", 50], ["2026-10-14", 47.36]] }, "stamp", { itemReadHtml: h });
 const sealedPage = renderCard({ id: "tcgcsv-2", name: "Box", kind: "sealed", set: "S", price: 70, asOf: "2026-10-14", source: "TCGplayer market", hist: [["2026-10-01", 69], ["2026-10-14", 70]] }, "stamp", { itemReadHtml: h });
 t("sealed page renders the block", sealedPage.includes('aria-label="Our read"'));

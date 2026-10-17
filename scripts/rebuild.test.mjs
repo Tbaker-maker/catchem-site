@@ -1,3 +1,6 @@
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import { REFUND_LINE } from "../src/policy.mjs";
 import "./trust.test.mjs";
 import "./features.test.mjs";
@@ -19,7 +22,7 @@ import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
-import { buildPokemonPages, productLink, withoutShopButtons } from "../src/pokemon.mjs";
+import { buildPokemonPages, productLink } from "../src/pokemon.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -27,14 +30,14 @@ const t = (name, cond) => {
   else { fail++; console.log("  FAIL", name); }
 };
 
-const BANNED = /\b(buys?|sells?|selling|holds?|holding|floors?|targets?|plays?|picks?|bullish|bearish|roi|invest(?:ing|ment|or)?s?|crypto|nfts?|web3|dsk|tickers?|tapes?)\b/i;
+const BANNED = banGuard("rebuild", null, PAGE);
 const LOCKED = "The full catalog: every card and every artist. Pick one and the post is ready for X or Facebook.";
 
 // Legal's required disclosure, word for word (2026-10-10). The only other exception.
 const PAID = "Paid link. We may earn a commission from links on this page.";
 
 function clean(html) {
-  let text = withoutShopButtons(String(html)).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID").replaceAll(TAKE_FOOTER, "FOOT");
+  let text = (String(html)).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID").replaceAll(TAKE_FOOTER, "FOOT");
   for (const label of Object.values(TAKE_LABELS)) text = text.replaceAll(label, "TAKE");
   return text;
 }

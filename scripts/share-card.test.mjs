@@ -1,4 +1,7 @@
 // Branded 1200x630 share card. SVG, same-origin pictures only.
+import { banGuard } from "../src/advice-rules.mjs";
+// Whole pages carry code comments, so dashes are checked by their own assertion here.
+const PAGE = { skipKinds: ["house"] };
 import worker from "../src/index.mjs";
 import { handleShareCard, readShareUrl, safeImagePath, shareCardUrl, shareSvg } from "../src/share-card.mjs";
 import { renderFeed, shownRead } from "../src/ui.mjs";
@@ -6,7 +9,7 @@ import { priceBits } from "../src/read-sheet.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
-const BANNED = /\b(buy|sell|hold|floor|target|plays|picks|bullish|bearish|invest|roi|crypto|nft|web3)\b/i;
+const BANNED = banGuard("share-card", null, PAGE);
 
 t("same-origin card path is kept", safeImagePath("/data/editor/tcg/base1/4_hires.png") === "/data/editor/tcg/base1/4_hires.png");
 t("origin prefix is stripped", safeImagePath("https://catchemtcg.com/data/editor/tcg/bw8/101_hires.png") === "/data/editor/tcg/bw8/101_hires.png");
