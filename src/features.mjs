@@ -30,7 +30,7 @@ export const COPY = {
   },
   rotation: {
     heading: "Rotation",
-    explainer: "A set page shows the regulation mark when at least 80% of that set's cards in the card file share one letter. A rotated date is shown only for a letter the two Pokémon announcements say left Standard: F on April 11, 2025, and G on April 10, 2026.",
+    explainer: "A set page shows the regulation mark from our card file, with its date. A rotated date is shown only for a letter the two Pokémon announcements say left Standard: F on April 11, 2025, and G on April 10, 2026.",
     empty: "No regulation mark on file for this set.",
   },
   releases: {

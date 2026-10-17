@@ -36,6 +36,13 @@ export const SOLD_FILTERS = [
   ["solddown", "Sold, price down"],
 ];
 
+// Method stays private: drop sentences that state thresholds, cutoffs or matching rules.
+export function scrubMethod(text) {
+  const parts = String(text || "").split(/(?<=[.!?])\s+/);
+  const METHOD = /\b(needs?|at least|or more|or less|under \d|over \d|threshold|cutoff|counted by|matched by|nearest|rule|weights?|weighted|scor(?:e|ed|es|ing)|must|only if|is set at)\b/i;
+  return parts.filter((x) => x && !METHOD.test(x)).join(" ").trim();
+}
+
 export function feedFilterOptions(hasSoldFile) {
   const rows = [
     ["", "All"],
@@ -3481,7 +3488,7 @@ const mark = (r) => {
 <p>${esc(doc?.note || "")}</p>
 <p class="muted">Scored calls: ${Number(doc?.scored) || 0}. Hit rate: ${doc?.hitRate == null ? "not shown until 20 calls are scored" : esc(String(doc.hitRate))}</p>
 ${chartBox(doc?.series || [], "TCGplayer market")}
-${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}<p class="muted">${esc(r.why || "")}</p></article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
+${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}</article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
 </main>`;
   return chrome("", body, "Receipts", stamp, "", feedNav(opts));
 }
@@ -3831,7 +3838,7 @@ export function renderRotation(stamp, opts = {}) {
 ${paras}
 <h2>Sources</h2>
 <ul class="sources">${sources}</ul>
-<p class="note">A set page shows a regulation mark when at least 80% of that set's cards in the card file share one letter. The card file is dated 2026-08-24. A rotated date is shown only for a letter these two announcements say left Standard: F on April 11, 2025, and G on April 10, 2026. This page does not say a set was released again after it rotated.</p>
+<p class="note">A set page shows the regulation mark from our card file. The card file is dated 2026-08-24. A rotated date is shown only for a letter these two announcements say left Standard: F on April 11, 2025, and G on April 10, 2026. This page does not say a set was released again after it rotated.</p>
 </main>`;
   return chrome("", body, "Rotation and print runs", stamp, "", feedNav(opts), {
     description: GUIDE_PARAS[0],
@@ -4046,7 +4053,7 @@ export function feedReads(bundle) {
     ...r,
     headline: soldSafeText(r, r.headline),
     ...(r.path ? { path: soldSafeText(r, r.path) } : {}),
-    ...(r.why ? { why: soldSafeText(r, r.why) } : {}),
+    ...(r.why ? { why: scrubMethod(soldSafeText(r, r.why)) } : {}),
   }));
   return reads;
 }
@@ -4256,7 +4263,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     ...row,
     ...(row.headline ? { headline: soldSafeText(row, row.headline) } : {}),
     ...(row.path ? { path: soldSafeText(row, row.path) } : {}),
-    ...(row.why ? { why: soldSafeText(row, row.why) } : {}),
+    ...(row.why ? { why: scrubMethod(soldSafeText(row, row.why)) } : {}),
   })) : reads;
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
@@ -4791,11 +4798,11 @@ function matterLines(card){
   const hasChange=isFinite(change);
   let why="", wrong="";
   if(days===7 && hasChange && Math.abs(change)>=8 && priceText && asOf){
-    why="A 7-day TCGplayer market move of "+Math.abs(change)+"% "+(change<0?"down":"up")+" on "+sku+" is at least 8%. Latest price "+priceText+" on "+asOf+".";
-    wrong="Wrong if this is not "+sku+", if a day is missing inside those 7 days, or if the move is under 8%. A listing is not a sale.";
+    why="TCGplayer market price, "+asOf+". Latest price "+priceText+".";
+    wrong="";
   }else if(head.indexOf("6-month high")>=0){
     why="The sentence on this card already calls the latest price a 6-month high"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
-    wrong="Wrong if the latest price on "+sku+" is not the highest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
+    wrong="";
   }else if(head.indexOf("6-month low")>=0){
     why="The sentence on this card already calls the latest price a 6-month low"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
     wrong="Wrong if the latest price on "+sku+" is not the lowest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
@@ -4918,6 +4925,9 @@ function readChartHtml(card){
   for(let i=0;i<pts.length;i++) payload.push([pts[i].d, pts[i].v]);
   return '<div class="chart-box chart-sm"><div class="chart" data-h="140" data-caption="'+attr(caption)+'" data-marks="'+attr(marks.join(","))+'" data-chart="'+attr(JSON.stringify(payload))+'" style="height:140px;min-height:140px"></div>'+(buttons?'<div class="filters" data-ranges>'+buttons+"</div>":"")+'<p class="chart-note muted"></p></div>';
 }
+function scrubMethodC(t){
+  return String(t||"").split(". ").filter(function(x){ return x && !/(need|at least|or more|or less|threshold|cutoff|counted by|matched by|nearest|rule|weight|scor|must |only if|is set at)/i.test(x); }).join(". ").trim();
+}
 function numbersBlock(card){
   if(!card || typeof card!=="object") return "";
   const rec=card.receipt&&typeof card.receipt==="object"?card.receipt:{};
@@ -4977,9 +4987,9 @@ function numbersBlock(card){
     if(date && cash) days.push({date:date, cash:cash});
   }
   const path=String(card.path||"").trim();
-  const whyRaw=String(card["whyItMatters"]||card["why"]||"").trim();
+  const whyRaw=scrubMethodC(String(card["whyItMatters"]||card["why"]||"").trim());
   const why=whyRaw && whyRaw!==path?whyRaw:"";
-  const wrong=String(card["whatWouldMakeThisWrong"]||"").trim();
+  const wrong=scrubMethodC(String(card["whatWouldMakeThisWrong"]||"").trim());
   const take=TAKE_WORDS[String(card.take||"")]||"";
   const line=String(card.sourceLine||"").trim();
   const chart=readChartHtml(card);
