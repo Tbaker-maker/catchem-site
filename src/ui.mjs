@@ -1714,7 +1714,7 @@ a.sb-card:focus-visible{outline:2px solid #d9b779;outline-offset:2px}
 .sb-face{aspect-ratio:220/96;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(90deg,#1c1914 0%,#25211a 50%,#1c1914 100%);background-size:200% 100%;animation:sb-shim 1.4s ease-in-out infinite}
 .sb-face.ok{animation:none;background:#1c1914}
 .sb-face img.set-logo{width:86%;height:80%;object-fit:contain;opacity:0;transition:opacity .25s}
-.sb-face.ok img.set-logo{opacity:1}
+.sb-face img.set-logo.is-lcp,.sb-face.ok img.set-logo{opacity:1}
 .sb-face .set-tile{width:100%;height:100%;aspect-ratio:auto;min-height:0;border-radius:12px}
 @keyframes sb-shim{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media(prefers-reduced-motion:reduce){.sb-face{animation:none}a.sb-card{transition:none}}
@@ -1745,7 +1745,7 @@ export function renderSets(index, stamp, opts = {}) {
   const hasSealed = sets.some((s) => Number(s.sealed) > 0);
   const card = (s, eager) => {
     const face = !needsTile(s)
-      ? `<div class="sb-face"><img class="set-logo" alt="" width="220" height="96" loading="${eager ? "eager" : "lazy"}" decoding="async" src="${esc(s.logo)}"></div>`
+      ? `<div class="sb-face"><img class="set-logo${eager ? " is-lcp" : ""}" alt="" width="220" height="96" loading="${eager ? "eager" : "lazy"}"${eager ? ' fetchpriority="high"' : ""} decoding="async" src="${esc(s.logo)}"></div>`
       : `<div class="sb-face ok">${setTile(s)}</div>`;
     const when = monthYear(s.release);
     const cards = Number(s.single) || 0;
@@ -1763,7 +1763,7 @@ export function renderSets(index, stamp, opts = {}) {
 <nav class="sb-jump sb-chips" aria-label="Jump to an era">${eras.map((era) => `<a class="sb-chip" href="#${esc(eraId(era))}">${esc(era)}</a>`).join("")}</nav>
 ${eras.map((era, eraIdx) => {
     const list = sets.filter((s) => s.era === era).sort(byNew);
-    return `<section class="sb-era" data-era="${esc(era)}" id="${esc(eraId(era))}"><h2>${esc(era)}<span>${list.length} sets</span></h2><div class="sb-grid">${list.map((s, i) => card(s, eraIdx === 0 && i < 6)).join("")}</div></section>`;
+    return `<section class="sb-era" data-era="${esc(era)}" id="${esc(eraId(era))}"><h2>${esc(era)}<span>${list.length} sets</span></h2><div class="sb-grid">${list.map((s, i) => card(s, eraIdx === 0 && i === 0)).join("")}</div></section>`;
   }).join("")}
 <p class="sb-none" id="sb-none" hidden>No sets match that search.</p>${BROWSE_JS}</main>`;
   return chrome("Sets", body, "Sets", stamp, "", feedNav(opts));
