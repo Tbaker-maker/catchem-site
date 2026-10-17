@@ -18,6 +18,7 @@ import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
+import { SIGNAL_CSS, SIGNAL_CLIENT, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -4338,6 +4339,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const newsLead = JSON.stringify(opts.news ? newsSlice(opts.news) : newsSlice(feedNews)).replace(/</g, "\\u003c");
   const diveLead = JSON.stringify(opts.diveMap || { ids: [], byTcgcsv: {} }).replace(/</g, "\u003c");
   const css = `
+  ${SIGNAL_CSS}
   .feed-page{padding-top:8px}
   .feed-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;align-items:flex-start;position:relative}
   #feed-loop-form{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;width:100%}
@@ -4521,10 +4523,11 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   })) : reads;
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
+  const signalHead = opened ? signalRowHtml(opened, { href: "" }) : "";
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 <link rel="preload" href="/data/feed/meta.json" as="fetch" crossorigin>
 <link rel="preload" href="/data/feed/browse.json" as="fetch" crossorigin>
-${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
+${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' + signalHead : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a class="tap" href="/feed" id="feed-back">Back</a></p>' : '<p><a class="tap" href="/feed/mine">My tracked reads</a></p>'}`}
 ${sheet}
 ${!focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-loop-form">
@@ -4548,6 +4551,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
+${page !== "read" ? feedToolsHtml() : ""}
 <div id="feed-one"><div class="skel-card" aria-hidden="true"></div></div>
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
@@ -5452,10 +5456,11 @@ function deepEl(card){
     return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
   }).join("");
   const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(openDataHref(card))+'">Open it</a></p>':"";
-  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p><h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
+  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p>'+signalBits(card)+'<h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
   return el;
 }
+${SIGNAL_CLIENT}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
   if(card && (card.readKind==="deep" || card.kind==="deep")) return deepEl(card);
@@ -5484,7 +5489,7 @@ function cardEl(card, facts){
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
   const vchips=(card.tags||[]).length?'<div class="vchips sm" aria-label="Variant">'+card.tags.map(function(t){return '<a class="vchip" href="/search?tag='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</div>':"";
-  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
+  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+signalBits(card)+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){
@@ -6848,6 +6853,7 @@ function mergeLocalWatch(){
   }).catch(function(){});
 }
 async function boot(){
+  mountSignalTools();
   const pack=await feedPack;
   mergeLocalWatch();
   const back=document.getElementById("feed-back");

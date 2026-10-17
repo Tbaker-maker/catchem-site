@@ -15,6 +15,7 @@ jobs:
       - run: node scripts/feed-news-live.test.mjs
       - run: node scripts/rebuild.test.mjs
       - run: node scripts/reads.test.mjs
+      - run: node scripts/signal-chips.test.mjs
       - run: node scripts/reads-pipe.test.mjs
       - run: node scripts/item-read.test.mjs
       - run: node scripts/price-hold.test.mjs

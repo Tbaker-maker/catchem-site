@@ -33,6 +33,7 @@ import { renderScanner, renderWeekly } from "./weekly.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
+import { attachSignals } from "./signal-chips.mjs";
 import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
@@ -568,7 +569,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const readYearEarly = readId ? await readYearFor(readId, fetchImpl) : null;
     const bundle = await loadJson("reads.json", fetchImpl);
     const reads = await omitStalePriceReads(bundle?.reads, fetchImpl, { staleIds: bundle?.priceStaleIds });
-    const freshBundle = bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads };
+    let chipDoc = null;
+    try { chipDoc = await loadJson("signal-chips.json", fetchImpl); } catch { chipDoc = null; }
+    const freshBundle = attachSignals(bundle && typeof bundle === "object" ? { ...bundle, reads } : { reads }, chipDoc);
     const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     if (path === "/feed/lead.json") {
       return new Response(JSON.stringify(feedReads(freshBundle)), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
@@ -1218,6 +1221,8 @@ const worker = {
         const stored = await loadStoredPlan(env?.FEED_KV, viewer?.sub);
         let preview = null;
         try { preview = await loadJson("reads-preview.json", fetchImpl); } catch { preview = null; }
+        let chipDoc = null;
+        try { chipDoc = await loadJson("signal-chips.json", fetchImpl); } catch { chipDoc = null; }
         reads = {
           plan: stored,
           signedIn: !!viewer?.sub,
@@ -1229,7 +1234,7 @@ const worker = {
           card: url.searchParams.get("card") || "",
           sealed: url.searchParams.get("sealed") || "",
           picker: readsPickerEnabled(env),
-          preview: preview && preview.lines ? { lines: preview.lines } : null,
+          preview: preview && preview.lines ? { lines: preview.lines, chip: chipDoc?.preview || null } : null,
         };
       }
       let premium = false;

@@ -3,6 +3,7 @@
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
+import { SIGNAL_CSS, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -400,6 +401,9 @@ ${sign}
 <section class="rd-card" id="rd-preview">
 <h2>Sample read</h2>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
+<style>${SIGNAL_CSS}</style>
+${state.preview?.chip ? signalRowHtml(state.preview.chip, { href: "", light: true }) : ""}
+${iconKeyHtml()}
 <script type="application/json" id="rd-lines">${lineJson}</script>
 </section>
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
