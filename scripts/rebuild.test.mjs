@@ -425,23 +425,23 @@ const premium = await worker.fetch(new Request("https://catchemtcg.com/premium")
 const premiumHtml = await premium.text();
 const lock = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
 t("premium is a worker page", pageKind("/premium") === "premium" && premium.status === 200);
-t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Pause in Discord with /premium</a>") && premiumHtml.includes(">Cancel in Discord with /premium</a>") && premiumHtml.includes('href="https://discord.gg/fUSjxDX4Hy"'));
+t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Manage in Discord with /premium</a>") && premiumHtml.includes("Pause or cancel in Discord with /premium.") && premiumHtml.includes('href="https://discord.gg/fUSjxDX4Hy"'));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
-t("premium sells the club", premiumHtml.includes("<h1>Join the club.</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join in Discord</a>") && premiumHtml.includes("Discord Premium is $14.99 USD/mo through Stripe.") && premiumHtml.includes("Cancel whenever.") && premiumHtml.includes("Premium members get a number and the Premium role."));
+t("premium sells the club", premiumHtml.includes("<h1>Catch'em Premium · $14.99 USD a month</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join Premium</a>") && premiumHtml.includes("7-day refund on your first charge. Cancel anytime."));
 t("premium drops the blanket number claim and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("Card payments only."));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));
 t("premium drops the internal notes", !premiumHtml.includes("does not take a payment") && !premiumHtml.includes("same weight"));
-t("premium has the joining card and the faq", premiumHtml.includes("What you're joining") && premiumHtml.includes("Premium role") && !premiumHtml.includes("Early beta access") && !premiumHtml.includes("Private member channels") && !premiumHtml.includes("Bigger tool limits") && !premiumHtml.includes("50 AI Ideas") && premiumHtml.includes("Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.") && premiumHtml.includes("Pause in Discord with /premium"));
+t("premium has the joining card and the faq", premiumHtml.includes("Everything free, plus:") && premiumHtml.includes("First 222") && !premiumHtml.includes("Early beta access") && !premiumHtml.includes("Private member channels") && !premiumHtml.includes("Bigger tool limits") && !premiumHtml.includes("50 AI Ideas") && premiumHtml.includes("Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.") && premiumHtml.includes("Pause or cancel in Discord with /premium."));
 const paid = await (await worker.fetch(new Request("https://catchemtcg.com/?premium=success"), env)).text();
 const stopped = await (await worker.fetch(new Request("https://catchemtcg.com/premium?premium=cancel"), env)).text();
 t("a paid return names the role and the number", paid.includes("Payment sent.") && paid.includes("Discord Premium turns on when the payment lands. You get the Premium role and a First 222 number in Discord. Then run /pull week."));
 t("a canceled checkout says nothing was charged", stopped.includes("No charge.") && stopped.includes("Checkout was canceled. Nothing was charged. Run /premium in Discord when you want to try again."));
 
 t("premium does not claim free entry or AMOE", !/free entry|AMOE|no purchase necessary|mail-?in/i.test(premiumHtml));
-t("premium does not invent ungated perks", !premiumHtml.includes("Vault votes") && !premiumHtml.includes("member-only drops") && !premiumHtml.includes("Premium votes"));
-t("premium does not promise a Stadium giveaway auto-entry", !premiumHtml.includes("monthly Stadium giveaway auto-entry") && !premiumHtml.includes("giveaway auto-entry") && premiumHtml.includes("Premium gets a Discord note on up to 25 saved products:"));
+t("premium marks not-yet-live perks coming soon", premiumHtml.includes('Vault Votes <span class="prem-soon">Coming soon</span>') && premiumHtml.includes('Member drops <span class="prem-soon">Coming soon</span>') && !premiumHtml.includes("member-only drops") && !premiumHtml.includes("Premium votes"));
+t("premium does not promise a Stadium giveaway auto-entry", !premiumHtml.includes("monthly Stadium giveaway auto-entry") && !premiumHtml.includes("giveaway auto-entry") && premiumHtml.includes("Watch up to 25 cards or products."));
 t("join premium uses the discord flow", premiumHtml.includes('class="prem-join" href="https://discord.gg/fUSjxDX4Hy"') && !premiumHtml.includes("checkout.stripe.com") && !/href="\/(feed|board|receipts|accuracy)/.test(premiumHtml));
 t("the chart readout sits above the buttons", feedHtml.includes("chart-readout") && feedHtml.includes("pointerdown") && !feedHtml.includes("chart-hover"));
 

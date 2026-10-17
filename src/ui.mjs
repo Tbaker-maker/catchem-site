@@ -3902,6 +3902,7 @@ export function renderPremium(stamp, opts = {}) {
 .prem-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
 .prem-card h3{margin:10px 0 6px;font:600 16px/1.3 var(--sans)}
 .prem-card p{margin:0;color:var(--dim);font-size:15px;line-height:1.45}
+.prem-soon{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#241f18;color:var(--gold);font:600 11px/1.5 var(--sans);vertical-align:2px}
 .prem-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#241f18;color:var(--gold)}
 .prem-lock{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:16px;padding:16px}
 .prem-lock p{margin:8px 0 0}
@@ -3931,11 +3932,11 @@ export function renderPremium(stamp, opts = {}) {
 </section>
 <h2>Everything free, plus:</h2>
 <div class="prem-grid">
-${card('<path d="M4 6h16M4 12h16M4 18h10"/>', "Premium reads in Discord", "The deeper reads land in our members-only #reads channel first, every night.")}
+${card('<path d="M4 6h16M4 12h16M4 18h10"/>', "Premium reads in Discord", "The deeper reads land in our members-only #reads channel first, every morning.")}
 ${card('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>', "Watchlist pings", WATCH_PERK)}
-${card('<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>', "Member drops", "Monthly below-market drops of sealed and singles, for members only.")}
-${card('<path d="M5 12l4 4 10-10"/>', "Vault Votes", "Every Friday, members vote on what Catch'em picks up next.")}
-${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "First 222", "The first 222 members get a numbered lifetime role. If your membership ends, that number is retired for good.")}
+${card('<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>', "Member drops <span class=\"prem-soon\">Coming soon</span>", "Monthly below-market drops of sealed and singles, with early access for members.")}
+${card('<path d="M5 12l4 4 10-10"/>', "Vault Votes <span class=\"prem-soon\">Coming soon</span>", "Every Friday, members vote on what Catch'em adds to the vault next.")}
+${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "First 222", "The first 222 Premium members get a numbered role that stays yours while you stay. If your membership ends, that number is retired for good.")}
 ${card('<path d="M5 5h14v10H9l-4 4z"/>', "Members-only Discord", "Premium channels, the weekly recap and the leaderboard.")}
 </div>
 <h2>Your price stays locked</h2>
