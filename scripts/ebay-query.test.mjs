@@ -17,6 +17,7 @@ const cases = [
   [["Eevee", "SWSH: Sword & Shield Promo Cards", "SWSH190"], "Pokemon Eevee SWSH190 Promo -proxy -custom"],
   [["Melmetal - SM181 (Prerelease)", "SM Promos", "SM181"], "Pokemon Melmetal Prerelease SM181 Promo -proxy -custom"],
   [["Desert Ruins - 2005 (Michael Gonzalez)", "World Championship Decks", "88/101"], "Pokemon Desert Ruins 2005 World Championship -proxy -custom"],
+  [["Crobat", "HS\u2014Unleashed", "84"], "Pokemon Crobat 84 Unleashed -proxy -custom"],
   [["Staryu", "Base Set (Shadowless)", "065/102"], "Pokemon Staryu 65/102 Base Set Shadowless -proxy -custom"],
   [["Battle Styles Booster Box", "SWSH05: Battle Styles", "", "sealed"], "Pokemon Battle Styles Booster Box"],
   [["Elite Trainer Box [Groudon]", "XY - Primal Clash", "", "sealed"], "Pokemon Primal Clash Elite Trainer Box Groudon"],

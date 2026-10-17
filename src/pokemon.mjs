@@ -344,6 +344,7 @@ export function ebayQuery(card) {
   let set = sp(card.set)
     .replace(/^(?:SWSH|SV|SM|ME|MEE|SVE|XY)\d*\s*:\s*/i, "")
     .replace(/^(?:SM|XY)\s+-\s+/i, "")
+    .replace(/^HS\s+/i, "")
     .replace(/^(?:Sword & Shield|Scarlet & Violet):\s*/i, "")
     .replace(/\s*\((Shadowless)\)/i, " $1")
     .replace(/\s*\([^)]*\)/g, "")
