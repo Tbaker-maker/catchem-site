@@ -54,7 +54,11 @@ const full = renderCard(card, "stamp", {
 
 const wins = (full.match(/<dl class="chg"[\s\S]*?<\/dl>/) || [""])[0];
 t("header price, date, and windows", full.includes("$15.00") && full.includes("Oct 13, 2026") && wins.includes("<dt>7D</dt><dd class=\"up\">+25%</dd>") && wins.includes("<dt>30D</dt><dd class=\"up\">+50%</dd>") && !full.includes("7D —") && !full.includes("30D —"));
-t("price stays on one line", full.includes(".cp-price{") && /white-space:nowrap/.test(full.slice(full.indexOf(".cp-price{"), full.indexOf(".cp-price{") + 220)));
+t("price row wraps inside the page", (() => {
+  const priceCss = (full.match(/\.cp-price\{[^}]+\}/) || [""])[0];
+  const pageCss = (full.match(/\.card-page\{[^}]+\}/) || [""])[0];
+  return priceCss.includes("flex-wrap:wrap") && priceCss.includes("white-space:normal") && !priceCss.includes("nowrap") && pageCss.includes("overflow-x:clip");
+})());
 t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
 t("chart and since range ignore the sealed fill", full.includes("class=\"hc\"") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
 t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-unit="count"') && full.includes('data-snap="real"') && full.includes("has-counts"));
@@ -132,7 +136,7 @@ const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "st
   fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },
   rotationFact: '<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark G, Standard"><span class="rm">G</span> Regulation mark G · Standard</a></p>',
 });
-t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13") && yearCard.includes("G · Standard"));
+t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("$15.00") && !yearCard.includes("NM $") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13") && yearCard.includes("G · Standard"));
 const bare = renderCard({ id: "tcgcsv-3", name: "No Price", kind: "single", set: "S" }, "stamp", {});
 t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/sum-chip[^>]*>1Y /.test(bare) && !bare.includes("listings counted"));
 

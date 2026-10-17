@@ -21,7 +21,9 @@ const url = shareCardUrl({ kind: "card", name: "Charizard", price: 968.91, img: 
 t("card share url is the branded svg", url === "https://catchemtcg.com/og/card.svg?k=card&n=Charizard&p=968.91&img=%2Fdata%2Feditor%2Ftcg%2Fbase1%2F4_hires.png");
 
 const svg = shareSvg(new URL(url).searchParams);
-t("svg is 1200 by 630 and rounded", svg.includes('width="1200"') && svg.includes('height="630"') && svg.includes('rx="36"') && svg.includes("Catch'em") && svg.includes("$968.91") && svg.includes("NM"));
+t("svg is 1200 by 630 and rounded", svg.includes('width="1200"') && svg.includes('height="630"') && svg.includes('rx="36"') && svg.includes("Catch'em") && svg.includes("$968.91") && !svg.includes("NM"));
+const nmSvg = shareSvg(new URLSearchParams("n=Charizard&p=968.91&cond=NM"));
+t("NM is on the share card only when the price is NM", nmSvg.includes("NM · TCGplayer market") && !shareSvg(new URLSearchParams("n=Box&p=10&s=1")).includes("NM"));
 t("svg has no em dash and no banned words", !/[\u2014\u2013]/.test(svg) && !BANNED.test(svg));
 t("svg escapes a name", shareSvg(new URLSearchParams("n=A%26B")).includes("A\u0026amp;B"));
 

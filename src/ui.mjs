@@ -1869,7 +1869,7 @@ function rowHtml(r){
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
   var artLabel=r.kind==="sealed"||typeof artType!="function"?"":artType(r);
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(sn.title)+'</b>'+(bits.length?'<span class="muted">'+bits.concat(typeof rowDay==="string"&&rowDay?[rowDay]:[]).join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+(artLabel?' <span class="artchip">'+html(artLabel)+'</span>':'')+'</a>'+(money(r.price)?'<b>'+money(r.price)+'</b>':'')+'</div>';
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(sn.title)+'</b>'+(bits.length?'<span class="muted">'+bits.concat(typeof rowDay==="string"&&rowDay?[rowDay]:[]).join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+(artLabel?' <span class="artchip">'+html(artLabel)+'</span>':'')+'</a>'+(r.priceStatus==="checking"?'<b>Price being checked</b>':(money(r.price)?'<b>'+money(r.price)+'</b>':''))+'</div>';
 }
 function visTags(t){ return (Array.isArray(t)?t:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())}); }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
@@ -2001,12 +2001,29 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
     var doc=cres.ok?await cres.json():{};
     catImages=(doc&&doc.images)||{};
   }catch(e){ catImages={}; }
+  var hold={};
+  try { var hres=await fetch("/data/price-hold.json"); var hdoc=hres.ok?await hres.json():{}; hold=(hdoc&&hdoc.ids)||{}; } catch(e) { hold={}; }
+  function blankHeld(r){
+    if(!r || r.kind==="sealed" || !hold[r.id]) return r;
+    var copy={};
+    for(var k in r) copy[k]=r[k];
+    copy.price=null;
+    copy.priceStatus="checking";
+    if(Array.isArray(r.printings)) copy.printings=r.printings.map(function(p){ var q={}; for(var k2 in p) q[k2]=p[k2]; q.price=null; q.status="checking"; return q; });
+    return copy;
+  }
+  if(Array.isArray(data.items)) data.items=data.items.map(blankHeld);
+  if(data.chaseLine && hold[data.chaseLine.id]) data.chaseLine=blankHeld(Object.assign({kind:"single"}, data.chaseLine));
   document.getElementById("title").textContent=data.name;
   const completion=document.getElementById("completion");
   if(completion) completion.textContent=completionLine(data);
   setLogo="";
   const moneyLine=n=>!(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const tile=(label,row,href,sub)=>row?'<a class="st-tile" '+(row.id?'data-quick="'+html(row.id)+'" ':'')+'href="'+href+'"><span class="st-k">'+label+'</span><b>'+moneyLine(row.price)+'</b><span class="st-n">'+html(sub)+'</span></a>':"";
+  const tile=(label,row,href,sub)=>{
+    if(!row) return "";
+    var amt=row.priceStatus==="checking"?"Price being checked":moneyLine(row.price);
+    return '<a class="st-tile" '+(row.id?'data-quick="'+html(row.id)+'" ':'')+'href="'+href+'"><span class="st-k">'+label+'</span><b>'+html(amt)+'</b><span class="st-n">'+html(sub)+'</span></a>';
+  };
   const setTiles=function(d){
     const singles=(Array.isArray(d.items)?d.items:[]).filter(function(r){return r&&r.kind!=="sealed"&&Number(r.price)>0;});
     const master=singles.reduce(function(n,r){return n+Number(r.price);},0);
@@ -2348,9 +2365,10 @@ export function changeTable(series, endDay) {
   return `<style>.chg{display:grid;grid-template-columns:repeat(${cells.length},minmax(0,1fr));gap:6px;margin:10px 0 14px;padding:6px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid #2f2b26;max-width:420px}.chg div{padding:8px 6px;border-radius:12px;text-align:center}.chg dt{font:500 12px/1.2 var(--sans);color:var(--dim)}.chg dd{margin:3px 0 0;font:650 15px/1.2 var(--sans)}.chg .up{color:#7fc79a}.chg .down{color:#e0877a}</style><dl class="chg" aria-label="Price change">${cells.map(([label, n]) => `<div><dt>${label}</dt><dd class="${n > 0 ? "up" : n < 0 ? "down" : ""}">${n > 0 ? "+" : ""}${n}%</dd></div>`).join("")}</dl><p class="chg-src muted" style="margin:-8px 0 12px;font-size:13px">Change in TCGplayer market price${priceDay(endDay) ? ` to ${esc(priceDay(endDay).replace(/, \d{4}$/, ""))}` : ""}${infoTap(`TCGplayer market price, our dated nightly files${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`;
 }
 
-function summaryStrip({ nm = false, price = "", year = null, listings = null, rotation = "" } = {}) {
+function summaryStrip({ nm = false, prefix = "", price = "", year = null, listings = null, rotation = "" } = {}) {
   const bits = [];
-  if (price) bits.push(`<span class="sum-chip">${nm ? "NM " : ""}${esc(price)}</span>`);
+  const tag = String(prefix || (nm ? "NM" : "")).trim();
+  if (price) bits.push(`<span class="sum-chip">${tag ? `${esc(tag)} ` : ""}${esc(price)}</span>`);
   if (typeof year === "number" && Number.isFinite(year)) {
     const cls = year > 0 ? " up" : year < 0 ? " down" : "";
     bits.push(`<span class="sum-chip${cls}">1Y ${year > 0 ? "+" : ""}${year}%</span>`);
@@ -2572,16 +2590,16 @@ export function pokemonStripHtml(strip) {
 }
 
 const SINGLE_CSS = `
-.card-page{padding-bottom:48px}
-.cp-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;margin:0 0 8px}
+.card-page{padding-bottom:48px;overflow-x:clip;max-width:100%}
+.cp-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;margin:0 0 8px;min-width:0;max-width:100%}
 .cp-photo{width:min(240px,72%)}
 .cp-photo img,.cp-photo .tile{width:100%;height:auto;border-radius:22px;background:#1a1815}
 .cp-id{min-width:0;max-width:100%}
 .cp-set{margin:0 0 4px;color:var(--dim);font:500 14px/1.3 var(--sans)}
 .cp-set a{color:inherit;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
-.card-page h1{margin:0;font:600 34px/1.05 var(--serif);letter-spacing:-.03em}
-.cp-price{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:12px 0 2px;white-space:nowrap}
-.cp-now{font:600 34px/1 var(--serif);color:var(--gold);letter-spacing:-.03em}
+.card-page h1{margin:0;font:600 34px/1.05 var(--serif);letter-spacing:-.03em;overflow-wrap:anywhere}
+.cp-price{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:8px;margin:12px 0 2px;max-width:100%;min-width:0;white-space:normal}
+.cp-now{font:600 34px/1.1 var(--serif);color:var(--gold);letter-spacing:-.03em;min-width:0;overflow-wrap:anywhere}
 .cp-date{font:500 13px/1 var(--sans);color:var(--dim)}
 .cp-src{margin:0 0 8px;color:var(--dim);font:500 13px/1.3 var(--sans)}
 .cp-wins{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 0}
@@ -2632,16 +2650,24 @@ const SINGLE_CSS = `
 }
 `;
 
-function printingsHtml(card) {
+function printingsHtml(card, held = false) {
   const rows = (Array.isArray(card?.printings) ? card.printings : []).filter((row) => {
     const day = String(row?.asOf || "").slice(0, 10);
-    return row && String(row.name || "").trim() && Number(row.price) > 0 && priceDay(day);
+    return row && String(row.name || "").trim() && (held || Number(row.price) > 0) && priceDay(day);
   });
-  if (rows.length < 2) return "";
+  if (rows.length < 2 && !held) return "";
+  if (!rows.length) return "";
   return `<ul class="cp-prints" aria-label="Printings">${rows.map((row) => {
     const when = priceDay(String(row.asOf).slice(0, 10));
-    return `<li><span>${esc(row.name)}</span><b>${money(row.price)}</b><small>${esc(when)}</small></li>`;
+    const amount = held || !(Number(row.price) > 0) ? "Price being checked" : money(row.price);
+    return `<li><span>${esc(row.name)}</span><b>${amount.startsWith("Price") ? esc(amount) : amount}</b><small>${esc(when)}</small></li>`;
   }).join("")}</ul>`;
+}
+
+function conditionPrefix(card, held) {
+  if (held || !card || card.kind === "sealed") return "";
+  const c = String(card.condition || "");
+  return c === "NM" || c === "LP" || c === "MP" || c === "HP" || c === "DMG" ? c : "";
 }
 
 function conditionLine(note) {
@@ -2700,7 +2726,7 @@ export function itemRankHtml(card) {
   return `<section class="item-sec" id="rank"><h2>Where it ranks in its set</h2><p class="rank-big">#${rank} of ${of}</p><div class="rank-bar" aria-hidden="true"><i style="width:${fill}%"></i></div><p class="muted">By TCGplayer market price among priced ${card.kind === "sealed" ? "products" : "singles"} in ${setName}. Top ${pctTop}%.</p></section>`;
 }
 
-export function itemReadsHtml(reads, { feed = false, sealed = false } = {}) {
+export function itemReadsHtml(reads, { feed = false, sealed = false, held = false } = {}) {
   const stripNm = (text) => String(text || "")
     .replace(/\s*\((?:NM|Near Mint)\)/gi, "")
     .replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1")
@@ -2709,7 +2735,11 @@ export function itemReadsHtml(reads, { feed = false, sealed = false } = {}) {
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([.,])/g, "$1")
     .trim();
-  const list = (Array.isArray(reads) ? reads : []).filter((r) => r && String(r.headline || "").trim() && !/[\u2014\u2013]/.test(String(r.headline)));
+  const list = (Array.isArray(reads) ? reads : []).filter((r) => {
+    if (!r || !String(r.headline || "").trim() || /[\u2014\u2013]/.test(String(r.headline))) return false;
+    if (held && /\$\d/.test(String(r.headline || "") + " " + (r.lines || []).join(" "))) return false;
+    return true;
+  });
   if (!list.length) return "";
   const items = list.map((r) => {
     const when = priceDay(String(r.asOf || "").slice(0, 10));
@@ -2746,12 +2776,12 @@ export function withItemSections(mainHtml, marker) {
   return mainHtml.slice(0, at) + css + jump + mainHtml.slice(at);
 }
 
-function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }) {
+function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit, held = false }) {
   const tags = printingTags(card);
   const chips = changeTable(priceSeries.length ? priceSeries : hist, endDay);
   const strip = summaryStrip({
-    nm: true,
-    price,
+    prefix: conditionPrefix(card, held),
+    price: held ? "" : price,
     listings: countedListings(opts.fact, opts.listingSeries, endDay),
     rotation: rotationChipLabel(opts.rotationFact),
   });
@@ -2795,7 +2825,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   void also;
   const math = [];
-  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed });
+  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, held });
   
   return withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance card-page">
 <style>${SINGLE_CSS}</style>
@@ -2810,10 +2840,10 @@ ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " +
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}${opts.priceCheck ? `<span class="cp-check" style="display:inline-block;margin-left:8px;padding:4px 10px;border-radius:999px;background:#3a2f1a;color:#d9b779;font:600 12px/1.2 var(--sans)">Unverified: far from similar cards</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}${infoTap(`${sourceLine(card) || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price"))}</p>` : ""}
-${chips}
+${held ? `<p class="cp-price"><span class="cp-now">Price being checked</span></p>` : (price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}${infoTap(`${sourceLine(card) || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price"))}</p>` : "")}
+${held ? "" : chips}
 ${strip}
-${printingsHtml(card)}
+${printingsHtml(card, held)}
 ${conditionLine(opts.conditionNote)}
 ${ebayBlock(opts.priceRead)}
 </div>
@@ -2918,7 +2948,8 @@ function ripValueBlock(rip) {
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
-  const shown = fact?.price > 0 ? fact.price : card.price;
+  const held = opts.priceHeld === true || card.priceStatus === "checking";
+  const shown = held ? null : (fact?.price > 0 ? fact.price : card.price);
   const price = money(shown);
   const asOf = fact?.asOf || card.asOf;
   const hist = histWithFact(card.hist || [], fact);
@@ -2977,7 +3008,7 @@ export function renderCard(card, stamp, opts = {}) {
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   if (!sealed) {
-    return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }), card.name, stamp, "", feedNav(opts));
+    return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries: held ? [] : priceSeries, rangeRow: held ? "" : rangeRow, img, setBit, held }), card.name, stamp, "", feedNav(opts));
   }
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
@@ -3794,6 +3825,7 @@ function byValue(a,b){
   if(y==null) return -1;
   return y-x;
 }
+let holdIds={};
 let limit=40;
 let twinMin={};
 function twinKey(r){ return String(r[1]||"").split(" - ")[0].trim().toLowerCase()+"|"+String(r[3]||"").trim(); }
@@ -3817,10 +3849,11 @@ function rowHtml(r){
   if(vt.length) chips+='<span class="vchips sm">'+vt.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
   if(r[5]!=="sealed"&&typeof artType==="function"){var artName=artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:vt}); if(artName) chips+=' <span class="artchip">'+html(artName)+'</span>';}
   var price=stored(r);
-  var cash=price==null?"":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  var checking=r[5]!=="sealed" && !!(holdIds[r[0]] || isOdd(r));
+  var cash=checking?"Price being checked":(price==null?"":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}));
   var bag=sparkBags[bucketOf(r[0])]||{};
   var spark=window.catchemSpark?catchemSpark(bag[r[0]]||"", sparkAsOf):"";
-  return '<div class="row srow" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+'</span> '+chips+((typeof isOdd==="function"&&isOdd(r))?'<span class="win" style="background:#3a2f1a;color:#d9b779">Unverified price</span>':"")+'</a>'+storeLinks(r)+spark+'<b>'+cash+'</b></div>';
+  return '<div class="row srow" data-quick="'+html(r[0])+'">'+face+logo+'<a href="'+href+'" data-quick="'+html(r[0])+'"><b>'+html(r[1])+'</b><br><span class="muted">'+html(r[2]||"")+' '+html(r[3]||"")+'</span> '+chips+'</a>'+storeLinks(r)+spark+'<b>'+html(cash)+'</b></div>';
 }
 let drawN=0;
 let manifest=null;
@@ -3829,6 +3862,7 @@ const shardCache={};
 async function ensureBags(){
   if(ensureBags.done) return;
   try{ var doc=await (await fetch("/data/catalogue-images.json")).json(); catImages=(doc&&doc.images)||{}; }catch(e){ catImages={}; }
+  try { var hres=await fetch("/data/price-hold.json"); var hdoc=hres.ok?await hres.json():{}; holdIds=(hdoc&&hdoc.ids)||{}; } catch(e) { holdIds={}; }
   try{
     var marks=await (await fetch("/data/set-logos.json")).json();
     logos=(marks&&marks.logos)||{};
@@ -6262,7 +6296,7 @@ function varyMove(card){
   if(!card || card.varied || card.fresh) return card;
   if(!FQ_PLAIN.test(String(card.headline||""))) return card;
   if(fqHash(card.id)%4===0) return card;
-  const nm=card.kind!=="sealed";
+  const nm=false;
   const label=String(card.headline).split(/ (?:is|are) (?:up|down) /)[0];
   const lines=fqLines({id:card.id,label:label,nm:nm,pts:fqPts(card.hist),price:card.price});
   const line=fqPick(lines, card.id);
@@ -6274,7 +6308,7 @@ function itemRead(item, doc, slug){
   const label=String(item.name||"")+(item.num?" "+item.num:"");
   const pts=fqPts(item.hist);
   const last=pts.length?pts[pts.length-1]:null;
-  const lines=fqLines({id:item.id,label:label,nm:!sealed,pts:pts,price:item.price,rank:item.rank,of:item.of,setName:doc.name});
+  const lines=fqLines({id:item.id,label:label,nm:false,pts:pts,price:item.price,rank:item.rank,of:item.of,setName:doc.name});
   const alts=lines.map(withPriceSource).filter(Boolean);
   const head=fqPick(lines, item.id);
   const whyRaw=lines.length>1?withPriceSource(lines[(fqHash(item.id)+1)%lines.length]):"";

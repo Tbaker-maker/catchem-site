@@ -113,7 +113,7 @@ export function shareSvg(search) {
     : "";
   const numLine = num ? `<text x="390" y="250" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">${xml(num)}</text>` : "";
   const priceLine = price
-    ? `<text x="390" y="360" fill="#efe9de" font-family="Georgia, serif" font-size="72">${xml(price)}</text><text x="390" y="408" fill="#d4af37" font-family="system-ui, sans-serif" font-size="22">${sealed ? "" : "NM · "}TCGplayer market</text>`
+    ? `<text x="390" y="360" fill="#efe9de" font-family="Georgia, serif" font-size="72">${xml(price)}</text><text x="390" y="408" fill="#d4af37" font-family="system-ui, sans-serif" font-size="22">${sealed ? "" : (q.get("cond") === "NM" ? "NM · " : "")}TCGplayer market</text>`
     : `<text x="390" y="360" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">No market price on file</text>`;
   const changeLine = change
     ? `<text x="390" y="470" fill="${changeColor}" font-family="system-ui, sans-serif" font-size="36" font-weight="700">${xml(change)}</text>`

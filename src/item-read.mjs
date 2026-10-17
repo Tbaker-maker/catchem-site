@@ -25,7 +25,7 @@ export function itemReadBlock(f, { skipRip = false, skipRotation = false, skipWi
   const all = [...(skipWindows ? [] : windows), ...chips];
   const body = `${lineHtml}${all.length ? `<ul class="rd-chips">${all.join("")}</ul>` : ""}${fc.pattern}${fc.range || fc.cards.length ? `<div class="rd-cards">${fc.range}${fc.cards.join("")}</div>` : ""}`;
   if (!body) return "";
-  return `<section class="item-read" aria-label="Our read"><style>${CSS}</style><h2>Our read</h2>${body}<p class="muted ir-src">${esc(`From our dated files. TCGplayer market${doc.item?.kind === "sealed" ? "" : " (Near Mint)"}, eBay asks and listings counted. As of ${short(doc.asOf)}.`)}</p></section>`;
+  return `<section class="item-read" aria-label="Our read"><style>${CSS}</style><h2>Our read</h2>${body}<p class="muted ir-src">${esc(`From our dated files. TCGplayer market, eBay asks and listings counted. As of ${short(doc.asOf)}.`)}</p></section>`;
 }
 
 const CSS = `.item-read{display:grid;gap:12px;margin:16px 0;padding:16px;border-radius:20px;background:#15130f;border:1px solid #2f2b26}
