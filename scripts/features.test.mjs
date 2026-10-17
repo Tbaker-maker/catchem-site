@@ -49,6 +49,7 @@ const shadow = await page("/sets/base-set-shadowless");
 t("Shadowless page renders", shadow.status === 200 && shadow.text.includes("$9,525.05") && shadow.text.includes('href="/sets/base-set"'));
 const pe = await page("/sets/sv02-paldea-evolved");
 t("rotation badge with status links /rotation", pe.text.includes('class="rm">G<') && pe.text.includes("Rotated April 10, 2026") && pe.text.includes('href="/rotation"'));
+t("rotation shows once on a set page", pe.text.includes('class="rot-badge"') && !/class="rchip[^"]*" href="\/rotation"/.test(pe.text));
 t("empty set value hides", !pe.text.includes(COPY.setValue.empty) && !pe.text.includes("No market price"));
 t("badge null mark", rotationBadge({ mark: null }, {}) === "");
 t("pageKind releases", pageKind("/releases") === "releases");

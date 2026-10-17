@@ -56,8 +56,8 @@ export function chipsHtml(card, rot, today, cardMark) {
   return `<div class="rchips">${kindChip}<a class="${cls}" href="/rotation"${title}><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a></div>`;
 }
 
-export function setChipHtml(slug, rot, today, irCount) {
-  const r = rotationChipData(rot, slug, today);
+export function setChipHtml(slug, rot, today, irCount, { noRotation = false } = {}) {
+  const r = noRotation ? null : rotationChipData(rot, slug, today);
   if (!r && !irCount) return "";
   const cls = r ? (r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est") : "";
   const chip = r ? `<a class="${cls}" href="/rotation"><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a>` : "";
