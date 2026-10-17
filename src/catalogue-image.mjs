@@ -38,6 +38,19 @@ export function catalogueUrl(path) {
   return "";
 }
 
+// A hires miss falls through to the plain file, then the classic "_A" low-res
+// file (cel25c/17_hires.png is not published; cel25c/17_A.png is).
+export function editorImageFallbacks(rest) {
+  const clean = String(rest || "");
+  const out = [];
+  const add = (p) => { if (p && out.indexOf(p) < 0) out.push(p); };
+  add(clean);
+  if (clean.endsWith("_hires.png")) add(clean.slice(0, -"_hires.png".length) + ".png");
+  const stem = clean.replace(/_hires\.png$/, "").replace(/\.png$/, "");
+  if (stem && !/_A$/i.test(stem)) add(stem + "_A.png");
+  return out;
+}
+
 export function imageForId(map, id) {
   return catalogueUrl(cataloguePath(map, id));
 }
