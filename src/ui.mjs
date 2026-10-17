@@ -3563,7 +3563,7 @@ ${err}
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
 <div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
-<p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
+<style>.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
@@ -3727,7 +3727,18 @@ async function draw(){
     document.getElementById("list").innerHTML=tips+(near.length?'<p class="muted">Nearest names</p>'+near.map(rowHtml).join(""):"");
     return;
   }
-  document.getElementById("meta").textContent=shown.length.toLocaleString("en-US")+" shown";
+  const nameWords=(String(shown[0]&&shown[0][1]||"")+" "+String(shown[0]&&shown[0][2]||"")).toLowerCase().replace(/[^a-z0-9]+/g," ").split(" ").filter(Boolean);
+  function editDist(x,y){ const d=[]; for(let i=0;i<=x.length;i++){ d[i]=[i]; } for(let j=1;j<=y.length;j++) d[0][j]=j; for(let i=1;i<=x.length;i++) for(let j=1;j<=y.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(x[i-1]===y[j-1]?0:1)); return d[x.length][y.length]; }
+  let fixed=false;
+  const fixedQ=String(q||"").toLowerCase().split(" ").filter(Boolean).map(function(w){
+    if(w.length<4 || !/^[a-z]+$/.test(w) || nameWords.some(function(n){ return n.indexOf(w)===0; })) return w;
+    let best="", bd=3;
+    nameWords.forEach(function(n){ const dd=editDist(w,n); if(dd<bd){ bd=dd; best=n; } });
+    if(best){ fixed=true; return best; }
+    return w;
+  }).join(" ");
+  const lead=fixed ? fixedQ : "";
+  document.getElementById("meta").textContent=shown.length.toLocaleString("en-US")+" shown"+(lead?". Showing matches for \u201c"+lead+"\u201d.":"");
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("")+(more?'<p><button type="button" id="s-more" class="win" style="min-height:44px;padding:0 18px;border-radius:12px">Show 40 more</button></p>':"");
   const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
@@ -3735,6 +3746,46 @@ document.getElementById("q").addEventListener("input",function(){ limit=40; draw
 document.getElementById("vtag").addEventListener("input",draw);
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
+(function(){
+  var KEY="catchem-recent-q";
+  var box=document.getElementById("sugg");
+  var qi=document.getElementById("q");
+  if(!box||!qi) return;
+  var SUG=["Charizard","Moonbreon","Pikachu","151 ETB","Evolving Skies booster box","Prismatic Evolutions","Mew ex","Gengar"];
+  function recent(){ try{ return (JSON.parse(localStorage.getItem(KEY)||"[]")||[]).filter(function(x){ return typeof x==="string" && x.length>1; }).slice(0,6); }catch(e){ return []; } }
+  function save(v){
+    v=String(v||"").trim().slice(0,60);
+    if(v.length<2) return;
+    var r=recent().filter(function(x){ return x.toLowerCase()!==v.toLowerCase(); });
+    r.unshift(v);
+    try{ localStorage.setItem(KEY, JSON.stringify(r.slice(0,6))); }catch(e){}
+  }
+  function chip(t){ return '<button type="button" class="sg-chip" data-q="'+html(t)+'">'+html(t)+'</button>'; }
+  function paint(){
+    var show=qi.value.trim().length<2;
+    box.hidden=!show;
+    if(!show) return;
+    var r=recent();
+    box.innerHTML=(r.length?'<p class="sg-h">Recent</p><div class="sg-row">'+r.map(chip).join("")+'<button type="button" class="sg-clear">Clear</button></div>':"")+'<p class="sg-h">Popular</p><div class="sg-row">'+SUG.map(chip).join("")+'</div>';
+  }
+  box.addEventListener("click", function(e){
+    var b=e.target.closest("button");
+    if(!b) return;
+    if(b.classList.contains("sg-clear")){ try{ localStorage.removeItem(KEY); }catch(x){} paint(); return; }
+    qi.value=b.dataset.q;
+    qi.dispatchEvent(new Event("input"));
+    save(b.dataset.q);
+  });
+  var idle=0;
+  qi.addEventListener("input", function(){
+    paint();
+    clearTimeout(idle);
+    idle=setTimeout(function(){ if(document.querySelectorAll("#list img").length) save(qi.value); }, 2500);
+  });
+  qi.addEventListener("keydown", function(e){ if(e.key==="Enter") save(qi.value); });
+  document.getElementById("list").addEventListener("click", function(e){ if(e.target.closest("a")) save(qi.value); });
+  paint();
+})();
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));
 }
