@@ -2674,16 +2674,25 @@ export function itemRankHtml(card) {
   return `<section class="item-sec" id="rank"><h2>Where it ranks in its set</h2><p class="rank-big">#${rank} of ${of}</p><div class="rank-bar" aria-hidden="true"><i style="width:${fill}%"></i></div><p class="muted">By TCGplayer market price among priced ${card.kind === "sealed" ? "products" : "singles"} in ${setName}. Top ${pctTop}%.</p></section>`;
 }
 
-export function itemReadsHtml(reads, { feed = false } = {}) {
+export function itemReadsHtml(reads, { feed = false, sealed = false } = {}) {
+  const stripNm = (text) => String(text || "")
+    .replace(/\s*\((?:NM|Near Mint)\)/gi, "")
+    .replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1")
+    .replace(/,?\s*\bNear Mint\b/gi, "")
+    .replace(/\bNM\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,])/g, "$1")
+    .trim();
   const list = (Array.isArray(reads) ? reads : []).filter((r) => r && String(r.headline || "").trim() && !/[\u2014\u2013]/.test(String(r.headline)));
   if (!list.length) return "";
   const items = list.map((r) => {
     const when = priceDay(String(r.asOf || "").slice(0, 10));
     const label = KIND_LABEL[r.kind] || "Read";
-    const lines = (r.lines || []).filter(Boolean);
+    const headline = sealed ? stripNm(r.headline) : String(r.headline || "");
+    const lines = (r.lines || []).filter(Boolean).map((l) => (sealed ? stripNm(l) : l)).filter(Boolean);
     const more = lines.length ? `<details><summary>Full read</summary><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${r.source ? `<p class="muted">${esc(r.source)}</p>` : ""}</details>` : "";
     const go = feed && r.id ? `<a class="rd-go" href="/feed/r/${encodeURIComponent(r.id)}">Open this read</a>` : "";
-    return `<li id="read-${esc(r.id || "")}"><span class="rk">${esc(label)}</span>${when ? `<span class="muted">${esc(when)}</span>` : ""}<h3>${esc(r.headline)}</h3>${more}${go}</li>`;
+    return `<li id="read-${esc(r.id || "")}"><span class="rk">${esc(label)}</span>${when ? `<span class="muted">${esc(when)}</span>` : ""}<h3>${esc(headline)}</h3>${more}${go}</li>`;
   }).join("");
   return `<section class="item-sec" id="reads"><h2>All reads about this item <span class="muted">(${list.length})</span></h2><ul class="all-reads">${items}</ul></section>`;
 }
@@ -2941,7 +2950,7 @@ export function renderCard(card, stamp, opts = {}) {
   if (!sealed) {
     return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit }), card.name, stamp, "", feedNav(opts));
   }
-  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed });
+  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
@@ -5830,6 +5839,7 @@ async function showSpot(index){
   stage.appendChild(nav);
   const list=document.createElement("div");
   list.className="feed-list";
+  list.setAttribute("role", "region");
   list.setAttribute("aria-label","More reads");
   stage.appendChild(list);
   fillList(list, index);
@@ -6680,7 +6690,7 @@ async function showFlat(index, dir){
   }
   if(typeof catchemMount==="function") catchemMount(stage);
   let flList=stage.querySelector(".feed-list");
-  if(!flList){ flList=document.createElement("div"); flList.className="feed-list"; flList.setAttribute("aria-label","More reads"); stage.appendChild(flList); }
+  if(!flList){ flList=document.createElement("div"); flList.className="feed-list"; flList.setAttribute("role","region"); flList.setAttribute("aria-label","More reads"); stage.appendChild(flList); }
   fillFlatList(flList, spot, gen);
   try{
     const ahead=flat && flat[spot+1];

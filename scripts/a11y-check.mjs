@@ -25,12 +25,13 @@ const { createRequire } = await import("node:module");
 const require = createRequire("/workspace/package.json");
 const { AxeBuilder } = require("@axe-core/playwright");
 const base = process.argv[2] || "https://catchemtcg.com";
-const routes = ["/", "/feed", "/sets", "/search", "/indexes", "/premium", "/track-record", "/c/tcgcsv-517045", "/p/tcgcsv-180459"];
+const routes = ["/", "/feed", "/sets", "/sets/sv-scarlet-and-violet-151", "/search", "/indexes", "/premium", "/track-record", "/c/tcgcsv-517045", "/p/tcgcsv-180459"];
 const browser = await chromium.launch();
 let bad = 0;
 const totals = { critical: 0, serious: 0 };
 for (const width of [390, 1280]) {
-  const page = await browser.newPage({ viewport: { width, height: 844 } });
+  const context = await browser.newContext({ viewport: { width, height: 844 } });
+  const page = await context.newPage();
   for (const route of routes) {
     try { await page.goto(base + route, { waitUntil: "domcontentloaded", timeout: 45000 }); } catch { console.log("SKIP", width, route); continue; }
     await page.waitForTimeout(500);
@@ -43,7 +44,7 @@ for (const width of [390, 1280]) {
       console.log("FAIL", width, route, row.impact, row.id, row.help, "x" + row.nodes.length);
     }
   }
-  await page.close();
+  await context.close();
 }
 await browser.close();
 console.log(`a11y-check serious=${totals.serious || 0} critical=${totals.critical || 0}`);
