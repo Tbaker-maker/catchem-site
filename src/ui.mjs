@@ -1,4 +1,5 @@
 import { openDataHref, ITEM_SECTIONS } from "./open-data.mjs";
+import { artType } from "./art-type.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
@@ -1404,6 +1405,7 @@ a.tap,.site-foot a{min-height:44px;display:inline-flex;align-items:center}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
+.art-chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;max-width:100%}.art-chips button{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #2f2b26;background:#1a1815;color:inherit;font:600 13px/1 var(--sans);cursor:pointer}.art-chips button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}.artchip{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:999px;background:#3a3a3e;color:#aeaeb2;font:600 12px/1 var(--sans);letter-spacing:.02em}
 .na{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 8px;border-radius:999px;background:#3a3a3e;color:#aeaeb2;font:600 12px/1 var(--sans);letter-spacing:.02em}
 .vchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.vchip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--gold);background:rgba(212,175,55,.10);border:1px solid rgba(212,175,55,.35);text-decoration:none}a.vchip:hover{background:rgba(212,175,55,.18)}.vchips.sm{margin:4px 0 0}@media(max-width:480px){.srow{flex-wrap:wrap;align-items:flex-start;row-gap:6px}.srow>svg.spark30,.srow>img[height="28"]{display:none}.srow>a{flex:1 1 0;min-width:0}.srow>a b,.srow>a .muted{overflow-wrap:break-word;word-break:normal}.srow>b{align-self:flex-start;padding-top:2px}.srow>.store-links{order:9;flex-basis:100%;padding-left:76px}}.feed-card .vchips{margin:2px 0 6px}.row a:has(.vchips){flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;overflow-wrap:normal}.row a:has(.vchips) br{display:none}.row a:has(.vchips) b,.row a:has(.vchips) .muted{overflow-wrap:break-word;word-break:normal}.vchips.sm .vchip{padding:2px 9px;font-size:11px}
 .chart-note{font-size:15px;line-height:1.45;margin:8px 0 0}
@@ -1806,7 +1808,7 @@ ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(s
 ${opts.setValueHtml || ""}
 <style>.st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.st-tile{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none;min-width:0}.st-k{font:600 12px/1.2 var(--sans);color:var(--gold)}.st-tile b{font:650 20px/1.1 var(--sans)}.st-n{font:500 12px/1.3 var(--sans);opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:600px){.st-tiles{grid-template-columns:1fr 1fr}.st-tile:last-child{grid-column:1/-1}}.jump{position:sticky;top:56px;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:8px 0;margin:8px 0;background:#12100e;scrollbar-width:none}.jump a{flex:0 0 auto;padding:8px 16px;border-radius:999px;border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}</style>
 <div id="lines"></div><nav class="jump" aria-label="Jump to"><a href="#charts">Charts</a><a href="#set-filters">Cards</a><a href="#sections">Sections</a></nav><div id="charts"></div>
-<div class="filters" id="set-filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
+<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters" id="set-filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
@@ -1828,6 +1830,7 @@ function html(s){
   });
 }
 let rows=[], shown=48, setLogo="";
+${artType.toString()}
 let catImages={};
 ${cataloguePath.toString()}
 ${browserAssetUrl.toString()}
@@ -1865,7 +1868,8 @@ function rowHtml(r){
     var owned=readOwned();
     tick='<label class="own"><input type="checkbox" data-own="'+html(key)+'"'+(owned[key]===1?" checked":"")+'> Owned</label>';
   }
-  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(sn.title)+'</b>'+(bits.length?'<span class="muted">'+bits.concat(typeof rowDay==="string"&&rowDay?[rowDay]:[]).join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+'</a>'+(money(r.price)?'<b>'+money(r.price)+'</b>':'')+'</div>';
+  var artLabel=r.kind==="sealed"||typeof artType!="function"?"":artType(r);
+  return '<div class="row" data-quick="'+html(r.id)+'">'+tick+img+'<a href="'+href+'" data-quick="'+html(r.id)+'"><b>'+html(sn.title)+'</b>'+(bits.length?'<span class="muted">'+bits.concat(typeof rowDay==="string"&&rowDay?[rowDay]:[]).join(" · ")+'</span>':'')+(r.kind!=="sealed"&&r.printing&&!/^normal$/i.test(String(r.printing).trim())?'<span class="vpill">'+html(r.printing)+'</span>':'')+(visTags(r.tags).length?'<span class="vchips sm">'+visTags(r.tags).map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>':'')+(artLabel?' <span class="artchip">'+html(artLabel)+'</span>':'')+'</a>'+(money(r.price)?'<b>'+money(r.price)+'</b>':'')+'</div>';
 }
 function visTags(t){ return (Array.isArray(t)?t:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())}); }
 function ownKey(r){ return String(r.id||"")+"|"+String(r.printing||""); }
@@ -1947,6 +1951,9 @@ function draw(){
   const vsel=document.getElementById("vtag");
   if(vsel && vsel.options.length===1){var seenT={};rows.forEach(function(r){(r.tags||[]).forEach(function(t){seenT[t]=(seenT[t]||0)+1;});});Object.keys(seenT).sort().forEach(function(t){var o=document.createElement("option");o.value=t;o.textContent=t+" ("+seenT[t]+")";vsel.appendChild(o);});}
   const vtag=vsel?vsel.value:"";
+  var artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
+  var artWant=artOn?String(artOn.getAttribute("data-art")||""):"";
+  if(artWant) list=list.filter(function(r){return r.kind==="sealed"||artType(r)===artWant;});
   if(vtag) list=list.filter(r=>(r.tags||[]).indexOf(vtag)>=0);
   if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")+" "+(r.tags||[]).join(" ")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
@@ -2032,6 +2039,7 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   if(title && title.textContent==="Set") title.textContent="This set did not load.";
 });
 ["kind","q","sort","scope","vtag"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
+document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});shown=48;draw();});
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 document.getElementById("mine-toggle").addEventListener("click", function(){
   var on=this.getAttribute("aria-pressed")==="true";
@@ -2796,6 +2804,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <div class="cp-id">
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
+${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
@@ -3718,7 +3727,7 @@ ${err}
 
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
-<div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
+<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
 <style>.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
@@ -3730,6 +3739,7 @@ const affEbay=${affEbay.toString()};
 const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
 const searchCatalog=search.searchCatalog;
+${artType.toString()}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
 let catImages={};
@@ -3802,6 +3812,7 @@ function rowHtml(r){
   if(r[8]) chips+='<span class="win">'+html(r[8])+'</span>';
   var vt=(Array.isArray(r[9])?r[9]:[]).filter(function(x){return x&&!/^normal$/i.test(String(x).trim())});
   if(vt.length) chips+='<span class="vchips sm">'+vt.map(function(t){return '<span class="vchip">'+html(t)+'</span>';}).join("")+'</span>';
+  if(r[5]!=="sealed"&&typeof artType==="function"){var artName=artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:vt}); if(artName) chips+=' <span class="artchip">'+html(artName)+'</span>';}
   var price=stored(r);
   var cash=price==null?"":"$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   var bag=sparkBags[bucketOf(r[0])]||{};
@@ -3850,17 +3861,20 @@ async function draw(){
   const n=++drawN;
   const q=document.getElementById("q").value.trim();
   const vtag=document.getElementById("vtag").value;
+  const artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
+  const art=artOn?String(artOn.getAttribute("data-art")||""):"";
   const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
-  if(q.length<2 && !vtag){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant.";return}
+  const hasArt=function(r){return !art || (r[5]!=="sealed" && artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:Array.isArray(r[9])?r[9]:[]})===art);};
+  if(q.length<2 && !vtag && !art){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant or an art type.";return}
   document.getElementById("list").innerHTML='<div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div>';
-  if(q.length<2 && vtag){
+  if(q.length<2 && (vtag || art)){
     try{ await ensureBags(); if(!usedLite){ rows=await (await fetch("/data/search-lite.json")).json(); usedLite=true; } }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
     if(n!==drawN) return;
-    var all=rows.filter(hasTag);
+    var all=rows.filter(function(r){return (!vtag || hasTag(r)) && hasArt(r);});
     var top=all.slice().sort(function(a,b){return (b[6]||0)-(a[6]||0);}).slice(0,40);
     await ensureSparks(top);
     if(n!==drawN) return;
-    document.getElementById("meta").textContent=all.length.toLocaleString("en-US")+" "+vtag+" cards. Top 40 by TCGplayer market price.";
+    document.getElementById("meta").textContent=all.length.toLocaleString("en-US")+" "+(art||vtag)+" cards. Top 40 by TCGplayer market price.";
     document.getElementById("list").innerHTML=top.map(rowHtml).join("");
     return;
   }
@@ -3868,7 +3882,7 @@ async function draw(){
   if(n!==drawN) return;
   const src=rows;
   var hits, found;
-  { const rows=vtag?src.filter(hasTag):src;
+  { const rows=(vtag||art)?src.filter(function(r){return (!vtag||hasTag(r))&&hasArt(r);}):src;
   hits=rankCatalog(q, rows, limit+1, codes);
   found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, limit+1):{hits:rankCatalog(q, rows, limit+1),nearest:[]}); }
   buildTwins(found.hits);
@@ -3904,6 +3918,7 @@ document.getElementById("q").addEventListener("focus",function(){
   fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
 });
 document.getElementById("vtag").addEventListener("input",draw);
+document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});limit=40;draw();});
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
 (function(){
