@@ -13,7 +13,7 @@ const BANNED = banGuard("open-data", /\b(sales)\b/i, PAGE);
 const SECTIONS = new Set(ITEM_SECTIONS.map(([id]) => id));
 const resolves = (href) => {
   const m = href.match(/^\/(c|p)\/([a-z0-9-]+)#([a-z]+)$/i);
-  return m ? SECTIONS.has(m[3]) : /^\/(feed\/r\/|feed(\?|$)|sets(\/|$)|rotation$|releases$|pokemon\/|search\?|movers$)/.test(href);
+  return m ? SECTIONS.has(m[3]) : /^\/(feed\/r\/|feed(\?|$)|sets(\/|$)|dive\/|rotation$|releases$|pokemon\/|search\?|movers$)/.test(href);
 };
 
 t("deep read lands on price", openDataHref({ id: "a", readKind: "deep", sku: "tcgcsv-1", href: "/c/tcgcsv-1" }) === "/c/tcgcsv-1#price");
@@ -23,6 +23,7 @@ t("set read keeps its set page", openDataHref({ id: "d", readKind: "set", href: 
 t("no item, no href: read page", openDataHref({ id: "e f", readKind: "pokemon" }) === "/feed/r/e%20f");
 t("sealed slug keeps its redirect and section", openDataHref({ id: "h", readKind: "mktmove", href: "/p/sv3pt5-bb" }) === "/p/sv3pt5-bb#price");
 t("outside links never used", openDataHref({ id: "g", href: "https://x.com/c/tcgcsv-1" }) === "/feed/r/g");
+t("dive page counts as resolved", resolves("/dive/cel25-etb"));
 
 // Every live read resolves (skipped offline).
 try {

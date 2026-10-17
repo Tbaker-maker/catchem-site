@@ -3998,7 +3998,7 @@ export function renderPremium(stamp, opts = {}) {
   const count = Number(proof?.reads30);
   const examples = week.length ? week.map((row) => {
     const name = member ? esc(row.name || "") : `<span class="prem-blur" aria-hidden="true">${esc(row.name || "")}</span><span class="sr">Name hidden until Premium</span>`;
-    return `<li>${name}<span class="muted">${esc(String(row.asOf || ""))}</span></li>`;
+    return `<li>${name}<span class="muted">${esc(String(row.asOf || "").slice(0, 10))}</span></li>`;
   }).join("") : `<li class="muted">More history added nightly</li>`;
   const countLine = count > 0 ? `<p class="prem-count"><b>${count.toLocaleString("en-US")}</b> reads in the last 30 days.</p>` : "";
   const ico = (paths) => `<span class="prem-ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></span>`;
@@ -4035,6 +4035,7 @@ export function renderPremium(stamp, opts = {}) {
 .prem-count{margin:0 0 8px;font-size:16px}
 .prem-week{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .prem-week li{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:44px;border-radius:12px;background:#12100e;padding:8px 12px}
+.prem-week li .muted{white-space:nowrap;flex:none}
 .prem-blur{filter:blur(6px);user-select:none}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 .prem-proof a{min-height:44px;display:inline-flex;align-items:center}
