@@ -2805,6 +2805,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
 ${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
+${opts.comesFrom ? `<p class="comes-from">Comes from <a href="/p/${esc(opts.comesFrom.id)}">${esc(opts.comesFrom.name)}</a></p>` : ""}
 ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " + String(card.setSlug || "")) ? `<p><a href="/promos">All promos</a></p>` : ""}
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
@@ -3018,6 +3019,7 @@ export function renderCard(card, stamp, opts = {}) {
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
 ${readLink(card)}
+${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<section class="cp-sec" id="promos-inside"><h2>Promos inside</h2><ul class="cp-facts">${opts.promosInside.map((row) => `<li><a href="/c/${esc(row.id)}">${esc(row.name)}${row.num ? ` #${esc(row.num)}` : ""}</a></li>`).join("")}</ul></section>` : ""}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>` : ""}

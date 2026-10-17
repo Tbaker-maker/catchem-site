@@ -19,6 +19,7 @@ jobs:
       - run: node scripts/item-read.test.mjs
       - run: node scripts/art-type.test.mjs
       - run: node scripts/promos-page.test.mjs
+      - run: node scripts/promo-links.test.mjs
       - run: node scripts/public-routes.test.mjs
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/feed-groups.test.mjs
