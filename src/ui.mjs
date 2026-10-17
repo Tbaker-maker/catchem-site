@@ -36,6 +36,7 @@ export const SOLD_FILTERS = [
   ["solddown", "Sold, price down"],
 ];
 
+<<<<<<< HEAD
 // "Where this number comes from": source and date only, never the method.
 export function infoTap(text) {
   const t = String(text || "").trim();
@@ -43,6 +44,14 @@ export function infoTap(text) {
   return `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(t)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(t)}</span></span>`;
 }
 export const ITAP_CSS = `.itap{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;min-width:44px;min-height:44px;margin:-10px -6px -10px 0;border-radius:999px;cursor:pointer;outline:none;color:var(--dim,#a8a091)}.itap-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;opacity:.75}.itap:focus-visible .itap-i{outline:2px solid var(--gold,#d9b779);outline-offset:2px}.itap-pop{display:none;position:absolute;z-index:30;left:0;top:100%;width:max-content;max-width:260px;padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;box-shadow:0 10px 24px rgba(0,0,0,.45);font:500 13px/1.4 var(--sans);font-style:normal;color:var(--txt,#efe9de);white-space:normal;text-align:left}.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}@media(max-width:700px){.itap-pop{position:fixed;left:16px;right:16px;top:auto;bottom:96px;width:auto;max-width:none}}`;
+=======
+// Method stays private: drop sentences that state thresholds, cutoffs or matching rules.
+export function scrubMethod(text) {
+  const parts = String(text || "").split(/(?<=[.!?])\s+/);
+  const METHOD = /\b(needs?|at least|or more|or less|under \d|over \d|threshold|cutoff|counted by|matched by|nearest|rule|weights?|weighted|scor(?:e|ed|es|ing)|must|only if|is set at)\b/i;
+  return parts.filter((x) => x && !METHOD.test(x)).join(" ").trim();
+}
+>>>>>>> origin/main
 
 export function feedFilterOptions(hasSoldFile) {
   const rows = [
@@ -3172,6 +3181,20 @@ export function todayStrip(doc) {
   return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
 }
 
+// Phone-first hero add-on: three short "what you get" lines and tonight's live read.
+export function heroToday(doc) {
+  const lines = Array.isArray(doc?.lines) ? doc.lines : [];
+  const row = lines.find((r) => r && r.slot === "mover" && String(r.text || "").trim() && /^\/(c|p)\//.test(String(r.href || "")))
+    || lines.find((r) => r && r.slot === "fact" && String(r.text || "").trim() && /^\//.test(String(r.href || "")));
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(doc?.asOf || "")) ? String(doc.asOf) : "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const when = day ? `${months[Number(day.slice(5, 7)) - 1]} ${Number(day.slice(8, 10))}` : "";
+  const text = String(row?.text || "").trim();
+  if (/[\u2014\u2013]/.test(text)) return "";
+  const live = row ? `<a class="hx-read" href="${esc(row.href)}"><span class="hx-tag">Latest read${when ? `, ${esc(when)}` : ""}</span><span class="hx-text">${esc(text)}</span><span class="hx-go">Open the data</span></a>` : "";
+  return `<style>.hx{display:grid;gap:12px;margin:18px 0 0}.hx-get{list-style:none;margin:0;padding:0;display:grid;gap:6px;font:500 15px/1.4 var(--sans)}.hx-get li{display:flex;gap:10px;align-items:flex-start}.hx-get li::before{content:"";flex:0 0 8px;height:8px;margin-top:7px;border-radius:999px;background:var(--gold,#d9b779)}.hx-read{display:grid;gap:6px;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}.hx-tag{font:600 12px/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--gold,#d9b779)}.hx-text{font:500 15px/1.45 var(--sans)}.hx-go{min-height:44px;display:inline-flex;align-items:center;font:600 15px/1 var(--sans);color:var(--gold,#d9b779)}@media(max-width:700px){.hero{padding:20px 0 28px!important;gap:12px!important}.hero .mark{display:none}.hero .kicker{margin-top:0}}</style><div class="hx" id="hero-today"><ul class="hx-get" aria-label="What you get"><li>Daily reads on every card and sealed product</li><li>Price charts and listings counted, each with its date</li><li>Free to use, no account needed</li></ul>${live}</div>`;
+}
+
 export function renderToday(doc, stamp, opts = {}) {
   const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
   const lines = (doc?.lines || []).map((line) => {
@@ -3494,7 +3517,7 @@ const mark = (r) => {
 <p>${esc(doc?.note || "")}</p>
 <p class="muted">Scored calls: ${Number(doc?.scored) || 0}. Hit rate: ${doc?.hitRate == null ? "not shown until 20 calls are scored" : esc(String(doc.hitRate))}</p>
 ${chartBox(doc?.series || [], "TCGplayer market")}
-${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}<p class="muted">${esc(r.why || "")}</p></article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
+${rows.map((r) => `<article class="card" style="margin:10px 0"><p class="muted">${mark(r)}</p><h2>${esc(r.headline)}</h2><p>${money(r.price) || "No price"} · ${esc(r.source || "")}</p>${chartBox(r.hist || [], r.source || "TCGplayer market")}</article>`).join("") || `<p class="muted">No scored calls yet.</p>`}
 </main>`;
   return chrome("", body, "Receipts", stamp, "", feedNav(opts));
 }
@@ -3844,7 +3867,7 @@ export function renderRotation(stamp, opts = {}) {
 ${paras}
 <h2>Sources</h2>
 <ul class="sources">${sources}</ul>
-<p class="note">A set page shows a regulation mark when at least 80% of that set's cards in the card file share one letter. The card file is dated 2026-08-24. A rotated date is shown only for a letter these two announcements say left Standard: F on April 11, 2025, and G on April 10, 2026. This page does not say a set was released again after it rotated.</p>
+<p class="note">A set page shows the regulation mark from our card file. The card file is dated 2026-08-24. A rotated date is shown only for a letter these two announcements say left Standard: F on April 11, 2025, and G on April 10, 2026. This page does not say a set was released again after it rotated.</p>
 </main>`;
   return chrome("", body, "Rotation and print runs", stamp, "", feedNav(opts), {
     description: GUIDE_PARAS[0],
@@ -4058,7 +4081,7 @@ export function feedReads(bundle) {
     ...r,
     headline: soldSafeText(r, r.headline),
     ...(r.path ? { path: soldSafeText(r, r.path) } : {}),
-    ...(r.why ? { why: soldSafeText(r, r.why) } : {}),
+    ...(r.why ? { why: scrubMethod(soldSafeText(r, r.why)) } : {}),
   }));
   return reads;
 }
@@ -4268,7 +4291,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
     ...row,
     ...(row.headline ? { headline: soldSafeText(row, row.headline) } : {}),
     ...(row.path ? { path: soldSafeText(row, row.path) } : {}),
-    ...(row.why ? { why: soldSafeText(row, row.why) } : {}),
+    ...(row.why ? { why: scrubMethod(soldSafeText(row, row.why)) } : {}),
   })) : reads;
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
@@ -4803,11 +4826,11 @@ function matterLines(card){
   const hasChange=isFinite(change);
   let why="", wrong="";
   if(days===7 && hasChange && Math.abs(change)>=8 && priceText && asOf){
-    why="A 7-day TCGplayer market move of "+Math.abs(change)+"% "+(change<0?"down":"up")+" on "+sku+" is at least 8%. Latest price "+priceText+" on "+asOf+".";
-    wrong="Wrong if this is not "+sku+", if a day is missing inside those 7 days, or if the move is under 8%. A listing is not a sale.";
+    why="TCGplayer market price, "+asOf+". Latest price "+priceText+".";
+    wrong="";
   }else if(head.indexOf("6-month high")>=0){
     why="The sentence on this card already calls the latest price a 6-month high"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
-    wrong="Wrong if the latest price on "+sku+" is not the highest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
+    wrong="";
   }else if(head.indexOf("6-month low")>=0){
     why="The sentence on this card already calls the latest price a 6-month low"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
     wrong="Wrong if the latest price on "+sku+" is not the lowest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
@@ -4930,6 +4953,9 @@ function readChartHtml(card){
   for(let i=0;i<pts.length;i++) payload.push([pts[i].d, pts[i].v]);
   return '<div class="chart-box chart-sm"><div class="chart" data-h="140" data-caption="'+attr(caption)+'" data-marks="'+attr(marks.join(","))+'" data-chart="'+attr(JSON.stringify(payload))+'" style="height:140px;min-height:140px"></div>'+(buttons?'<div class="filters" data-ranges>'+buttons+"</div>":"")+'<p class="chart-note muted"></p></div>';
 }
+function scrubMethodC(t){
+  return String(t||"").split(". ").filter(function(x){ return x && !/(need|at least|or more|or less|threshold|cutoff|counted by|matched by|nearest|rule|weight|scor|must |only if|is set at)/i.test(x); }).join(". ").trim();
+}
 function numbersBlock(card){
   if(!card || typeof card!=="object") return "";
   const rec=card.receipt&&typeof card.receipt==="object"?card.receipt:{};
@@ -4989,9 +5015,9 @@ function numbersBlock(card){
     if(date && cash) days.push({date:date, cash:cash});
   }
   const path=String(card.path||"").trim();
-  const whyRaw=String(card["whyItMatters"]||card["why"]||"").trim();
+  const whyRaw=scrubMethodC(String(card["whyItMatters"]||card["why"]||"").trim());
   const why=whyRaw && whyRaw!==path?whyRaw:"";
-  const wrong=String(card["whatWouldMakeThisWrong"]||"").trim();
+  const wrong=scrubMethodC(String(card["whatWouldMakeThisWrong"]||"").trim());
   const take=TAKE_WORDS[String(card.take||"")]||"";
   const line=String(card.sourceLine||"").trim();
   const chart=readChartHtml(card);

@@ -233,7 +233,7 @@ export function factCards(f) {
   const p = f.pattern;
   if (p && p.rate > 0 && p.base > 0 && p.n > 0 && p.horizon > 0) {
     const when = (p.keys || []).map((k) => KEY_WORDS[k]).filter(Boolean).join(", ");
-    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p>${esc(`Items matching this pattern were right ${p.rate}% of the time ${p.horizon} days later, vs ${p.base}% for all items. Based on ${Number(p.n).toLocaleString("en-US")} past cases.`)}</p>${when ? `<p>${esc(`Why it matches: ${when}.`)}</p>` : ""}<p class="muted">${esc(`Tested only on our own nightly files, on later dates than it was built from. ${dayLabel(p.asOf)}`)}</p></section>`;
+    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p>${esc(`Items matching this pattern were right ${p.rate}% of the time ${p.horizon} days later, vs ${p.base}% for all items. Based on ${Number(p.n).toLocaleString("en-US")} past cases.`)}</p>${when ? `<p>${esc(`Why it matches: ${when}.`)}</p>` : ""}<p class="muted">${esc(`Our nightly files, ${dayLabel(p.asOf)}`)}</p></section>`;
   }
   const cards = [];
   const m = f.setMomentum;
