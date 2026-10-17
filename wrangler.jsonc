@@ -19,6 +19,12 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-08-01",
   "build": { "command": "node scripts/build.mjs" },
+  // FEED_KV holds account rows, votes, alerts, follows and Custom Reads
+  // (custom-reads:follows and custom-reads:outbox). Namespace "catchem-feed".
+  // It lives here so every Workers Builds deploy keeps the binding.
+  "kv_namespaces": [
+    { "binding": "FEED_KV", "id": "390cb142f21947d4af9f4d10df12f61d" }
+  ],
   "assets": {
     "directory": "./site-public",
     "binding": "ASSETS",
