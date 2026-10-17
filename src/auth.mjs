@@ -1,7 +1,7 @@
 // Discord sign-in for the AI seat. No session is minted without SESSION_SECRET.
 // If Discord is not configured, the page is one line and has no button.
 
-import { ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
+import { avatarUrl, ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
 
 export const DISCORD_INVITE = "https://discord.gg/fUSjxDX4Hy";
 export const INVITE_LINE = "Post Office is invite-only for now. Join Discord to get on the list.";
@@ -69,6 +69,8 @@ export async function sessionView(request, env) {
     signedIn: true,
     ready: true,
     premium: user.premium === true,
+    name: user.name || "",
+    avatar: avatarUrl(user),
     ideas: usageOf(user, "ideas"),
     post: usageOf(user, "post-text"),
   };
@@ -137,28 +139,43 @@ export async function finishDiscord(request, env, fetchImpl = fetch) {
   if (!meRes.ok) return html(`<p>Discord did not finish. <a href="/signin">Back</a></p>`);
   const me = await meRes.json();
   if (!me || !me.id) return html(`<p>Discord did not finish. <a href="/signin">Back</a></p>`);
+  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/post-office";
+  const office = dest === "/post-office" || dest.startsWith("/post-office/");
   let premium = false;
   if (env.ACCESS_API_URL && env.ACCESS_API_SECRET) {
-    const check = await fetchImpl(env.ACCESS_API_URL.replace(/\/$/, "") + "/access/check?discord_id=" + encodeURIComponent(me.id), {
-      headers: { "x-access-secret": env.ACCESS_API_SECRET },
-    });
-    if (!check.ok) return html(`<p>The seat check did not answer. Try again in a minute.</p>`);
-    const access = await check.json();
-    if (!access || access.approved !== true) {
-      return html(`<p>You're on the list. We'll let you in soon.</p>`);
+    let access = null;
+    try {
+      const check = await fetchImpl(env.ACCESS_API_URL.replace(/\/$/, "") + "/access/check?discord_id=" + encodeURIComponent(me.id), {
+        headers: { "x-access-secret": env.ACCESS_API_SECRET },
+      });
+      if (check.ok) access = await check.json();
+    } catch {
+      access = null;
     }
-    premium = access.premium === true;
+    if (office) {
+      if (!access) return html(`<p>The seat check did not answer. Try again in a minute.</p>`);
+      if (access.approved !== true) return html(`<p>You're on the list. We'll let you in soon.</p>`);
+      premium = access.premium === true;
+    } else if (access && access.approved === true) {
+      premium = access.premium === true;
+    }
   }
-  const session = await signSession({ sub: "d:" + me.id, premium }, env.SESSION_SECRET);
-  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/post-office";
+  const name = String(me.global_name || me.username || "").slice(0, 32);
+  const avatar = typeof me.avatar === "string" ? me.avatar : "";
+  const session = await signSession({ sub: "d:" + me.id, premium, name, avatar }, env.SESSION_SECRET);
   const headers = new Headers({ location: dest, "cache-control": "no-store" });
   headers.append("set-cookie", `ce_session=${encodeURIComponent(session)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`);
   headers.append("set-cookie", "ce_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
   return new Response(null, { status: 302, headers });
 }
 
-export function logout() {
-  const headers = new Headers({ location: "/post-office", "cache-control": "no-store" });
+export function logout(request) {
+  let dest = "/post-office";
+  try {
+    const next = new URL(request?.url || "https://catchemtcg.com/auth/logout").searchParams.get("next") || "";
+    if (next.startsWith("/") && !next.startsWith("//")) dest = next;
+  } catch { /* keep the Post Office return */ }
+  const headers = new Headers({ location: dest, "cache-control": "no-store" });
   headers.append("set-cookie", "ce_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
   return new Response(null, { status: 302, headers });
 }

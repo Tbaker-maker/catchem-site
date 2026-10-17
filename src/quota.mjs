@@ -49,8 +49,20 @@ export async function signSession(user, secret, now = Date.now()) {
     premium: user.premium === true,
     exp: now + 30 * 86400000,
   };
+  const name = String(user.name || "").trim().slice(0, 32);
+  const avatar = String(user.avatar || "").trim().slice(0, 64);
+  if (name) payload.name = name;
+  if (avatar && /^[A-Za-z0-9_]+$/.test(avatar)) payload.avatar = avatar;
   const body = b64url(JSON.stringify(payload));
   return body + "." + await hmac(secret, body);
+}
+
+export function avatarUrl(user) {
+  const sub = String(user?.sub || "");
+  const id = sub.startsWith("d:") ? sub.slice(2) : "";
+  const hash = String(user?.avatar || "");
+  if (!/^\d+$/.test(id) || !/^[A-Za-z0-9_]+$/.test(hash)) return "";
+  return `https://cdn.discordapp.com/avatars/${id}/${hash}.png`;
 }
 
 export async function readUser(request, env) {
@@ -76,7 +88,12 @@ export async function readUser(request, env) {
     return null;
   }
   if (!payload || !payload.sub || Number(payload.exp) < Date.now()) return null;
-  return { sub: String(payload.sub), premium: payload.premium === true };
+  return {
+    sub: String(payload.sub),
+    premium: payload.premium === true,
+    name: typeof payload.name === "string" ? payload.name.slice(0, 32) : "",
+    avatar: typeof payload.avatar === "string" ? payload.avatar.slice(0, 64) : "",
+  };
 }
 
 function bucket(sub, feature) {

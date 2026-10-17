@@ -14,6 +14,6 @@ if (fail) process.exit(1);
   const cr = fs.readFileSync(new URL("../src/card-rating.mjs", import.meta.url), "utf8");
   const ui = fs.readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
   for (const bad of ["at least 5 such", "0.8x", "1.25x", "Weights:"]) if (cr.includes(bad)) { console.error("FAIL rating reveals", bad); process.exit(1); }
-  for (const bad of ["8% mover line", "spans at least 150 days", "Looks like a buy"]) if (ui.includes(bad)) { console.error("FAIL ui reveals", bad); process.exit(1); }
+  for (const bad of ["8% mover line", "spans at least 150 days", "Looks like a buy", "at least 15%", "Under 15%, so it is not a read"]) if (ui.includes(bad)) { console.error("FAIL ui reveals", bad); process.exit(1); }
   console.log("ok rating and receipts keep method private");
 }

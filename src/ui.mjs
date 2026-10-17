@@ -1153,7 +1153,7 @@ export function renderSupply(doc, stamp, opts = {}) {
   const reads = on ? (doc?.reads || []) : [];
   const w7 = doc?.windows?.["7"] || {};
   const w30 = doc?.windows?.["30"] || {};
-  const below = (doc?.belowGate || []).map((row) => `<li>${esc(row.name)} eBay listings ${row.pct > 0 ? "+" : ""}${esc(row.pct)}% (${esc(row.from)} → ${esc(row.to)}) from ${esc(row.fromDate)} to ${esc(row.toDate)}. Under 15%, so it is not a read.</li>`).join("");
+  const below = (doc?.belowGate || []).map((row) => `<li>${esc(row.name)} eBay listings ${row.pct > 0 ? "+" : ""}${esc(row.pct)}% (${esc(row.from)} → ${esc(row.to)}) from ${esc(row.fromDate)} to ${esc(row.toDate)}. Checked, and left off the feed.</li>`).join("");
   const cards = reads.map((read) => {
     const askSeg = splitDated((read.series || []).map((point) => ({ date: point.date, ask: point.ask })), "ask");
     const listSeg = splitDated((read.series || []).map((point) => ({ date: point.date, listings: point.listings })), "listings");
@@ -1162,7 +1162,7 @@ export function renderSupply(doc, stamp, opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Listing supply</h1>
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
-<p>Counts are active eBay listings, not sales. Both exact nights have to be on file, and the change has to be at least 15%.</p>
+<p>Counts are active eBay listings, not sales. Both exact nights have to be on file.</p>
 <p>Nights on file: ${Number(doc?.nightCount) || 0}. Products: ${Number(doc?.products) || 0}. Products on ${esc(doc?.asOf || "the latest night")}: ${Number(doc?.productsOnLatest) || 0}.</p>
 <p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${esc(w7.exactStart || "—")} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
 <p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${esc(w30.exactStart || "—")} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
@@ -1182,7 +1182,7 @@ export function renderSetValue(doc, stamp, opts = {}) {
 <h1>Set value</h1>
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>The sum is TCGplayer market for singles priced on both exact days. A missing day drops the set. The card count is how many singles had a price on both days.</p>
-<p>Sets on file: ${Number(doc?.sets) || 0}. Window: ${Number(doc?.windowDays) || 30} days. A set is a read only at ${Number(doc?.minPct) || 8}% or more.</p>
+<p>Sets on file: ${Number(doc?.sets) || 0}. Window: ${Number(doc?.windowDays) || 30} days.</p>
 <p>Exact start ${esc(doc?.exactStart || "—")} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
 <p>Would qualify: ${Number(doc?.wouldQualify) || 0}. Published reads: ${reads.length}.</p>
 ${days ? `<p class="muted">Price days on file: ${esc(days)}.</p>` : ""}
@@ -1607,7 +1607,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -4097,12 +4097,19 @@ export function inlineFeedReads(reads, startId = "", n = FEED_INLINE) {
 const PLAIN_PRICE = new Set(["single", "sealed", "streak", "mover", "price", "askmove", "mktmove"]);
 export function leadWithStory(reads) {
   const list = Array.isArray(reads) ? reads : [];
-  if (!list.length || !PLAIN_PRICE.has(String(list[0]?.readKind || list[0]?.kind || ""))) return list;
+  if (!list.length) return list;
   const kindOf = (r) => String(r?.readKind || r?.kind || "");
   const isFact = (r) => /^pokemon/.test(kindOf(r)) || /^pokemon-/.test(String(r?.id || ""));
-  const isNews = (r) => ["news", "newsline", "wave"].includes(kindOf(r));
-  let i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)) && !isFact(r) && !isNews(r));
-  if (i < 0) i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)));
+  const isNews = (r) => ["news", "newsline", "wave"].includes(kindOf(r)) || !!r?.waveItem;
+  const isPlain = (r) => PLAIN_PRICE.has(kindOf(r));
+  const isStory = (r) => r && !isPlain(r) && !isFact(r) && !isNews(r);
+  if (isStory(list[0])) return list;
+  let i = -1;
+  if (isPlain(list[0]) || isNews(list[0])) {
+    i = list.findIndex((r, n) => n > 0 && n < 12 && isStory(r));
+    if (i < 0) i = list.findIndex((r, n) => n > 0 && n < 12 && !isPlain(r) && !isNews(r));
+  }
+  if (i < 0 && isNews(list[0])) i = list.findIndex((r, n) => n > 0 && !isNews(r));
   if (i <= 0) return list;
   return [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
 }
@@ -4342,6 +4349,17 @@ ${readSeen.toString()}
 ${markSeen.toString()}
 const lead=JSON.parse(document.getElementById("feed-lead").textContent);
 const newsRows=JSON.parse(document.getElementById("feed-news").textContent);
+function grabJson(url){
+  return fetch(url).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; });
+}
+const feedPack=Promise.all([
+  grabJson("/data/feed/meta.json"),
+  grabJson("/data/feed/browse.json"),
+  grabJson("/data/feed/catalogue.json"),
+  grabJson("/data/feed/read-library.json"),
+  grabJson("/data/sets.json")
+]);
+const imagePack=grabJson("/data/catalogue-images.json");
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const shortFor=()=>'';
@@ -5336,7 +5354,7 @@ function cardEl(card, facts){
       var id=body.sku||body.id;
       cur=cur.filter(function(row){return (row.sku||row.id)!==id && row.id!==body.id});
       cur.unshift(body);
-      localStorage.setItem(key, JSON.stringify(cur.slice(0,100)));
+      localStorage.setItem(key, JSON.stringify(cur.slice(0,25)));
       note.textContent="Saved on this device.";
     } catch (err) {
       note.textContent="This browser did not store the save.";
@@ -6289,10 +6307,15 @@ function buildFlat(){
     const PLAIN_KIND={single:1,sealed:1,streak:1,mover:1,price:1,askmove:1,mktmove:1};
     const plainish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return !r || r.pending || PLAIN_KIND[k] || k.indexOf("pokemon")===0; };
     const newsish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return k==="news" || k==="newsline" || k==="wave" || !!(r && r.waveItem); };
-    if(flat.length && (plainish(flat[0]) || newsish(flat[0]))){
+    if(flat.length && newsish(flat[0])){
+      let k=-1;
+      for(let n=1;n<flat.length;n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
+      if(k<0){ for(let n=1;n<flat.length;n++){ if(!newsish(flat[n])){ k=n; break; } } }
+      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
+    } else if(flat.length && plainish(flat[0])){
       let k=-1;
       for(let n=1;n<Math.min(flat.length,60);n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
-      if(k<0 && plainish(flat[0])){ for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } } }
+      if(k<0){ for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } } }
       if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
     }
     markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
@@ -6592,22 +6615,34 @@ async function showFlat(index, dir){
   bindSwipe(card);
   commitReadUrl(row);
 }
+function mergeLocalWatch(){
+  var flag="catchem-watch-merged";
+  fetch("/api/session").then(function(res){ return res.ok ? res.json() : null; }).then(function(view){
+    if(!view || !view.signedIn) return;
+    try { if(localStorage.getItem(flag)==="1") return; } catch(err) { return; }
+    var cur=[];
+    try { cur=JSON.parse(localStorage.getItem("catchem-watch")||"[]"); } catch(err) { cur=[]; }
+    if(!Array.isArray(cur)) cur=[];
+    fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({merge:true,rows:cur.slice(0,25)})})
+      .then(function(res){ if(res.ok){ try { localStorage.setItem(flag,"1"); } catch(err) {} } })
+      .catch(function(){});
+  }).catch(function(){});
+}
 async function boot(){
-  try{
-    const doc=await (await fetch("/data/catalogue-images.json")).json();
-    catalogueImages=doc&&doc.images||null;
-  }catch(e){ catalogueImages=null; }
+  const pack=await feedPack;
+  imagePack.then(function(doc){ catalogueImages=doc&&doc.images||null; });
+  mergeLocalWatch();
   const back=document.getElementById("feed-back");
   if(back) back.onclick=function(ev){
     if(sessionStorage.getItem("feed-spot") && history.length>1){ ev.preventDefault(); history.back(); }
   };
   if(pageMode==="read"){
-    try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
-    try{ readLibrary=await (await fetch("/data/feed/read-library.json")).json(); }catch(e){ readLibrary=null; }
+    meta=pack[0];
+    readLibrary=pack[3];
     await showRead();
     return;
   }
-  try{ meta=await (await fetch("/data/feed/meta.json")).json(); }catch(e){ meta=null; }
+  meta=pack[0];
   const sel=document.getElementById("f-set");
   if(sel){
     (meta&&meta.sets||[]).forEach(function(set){
@@ -6618,12 +6653,11 @@ async function boot(){
   }
   const only=focusGroup();
   if(!only){
-    try{ browse=await (await fetch("/data/feed/browse.json")).json(); }catch(e){ browse=null; }
-    try{ catalogue=await (await fetch("/data/feed/catalogue.json")).json(); }catch(e){ catalogue=null; }
-    try{ readLibrary=await (await fetch("/data/feed/read-library.json")).json(); }catch(e){ readLibrary=null; }
-    try{
-      const doc=await (await fetch("/data/sets.json")).json();
-      const bySlug={};
+    browse=pack[1];
+    catalogue=pack[2];
+    readLibrary=pack[3];
+    const doc=pack[4];
+    const bySlug={};
       const byName={};
       (doc && Array.isArray(doc.sets) ? doc.sets : []).forEach(function(tile){
         if(!tile || !tile.slug || !tile.name) return;
@@ -6631,7 +6665,6 @@ async function boot(){
         if(!byName[tile.name]) byName[tile.name]=tile.slug;
       });
       setBook={bySlug:bySlug, byName:byName};
-    }catch(e){ setBook={bySlug:{}, byName:{}}; }
     buildReadIndex();
     const setSel=document.getElementById("f-loop-set");
     function fillSetOptions(){
@@ -7096,8 +7129,8 @@ function draw(){
     const li=document.createElement("li");
     li.className="mine-row";
     li.draggable=true;
-    const seven=Number.isFinite(Number(row.change7)) ? "7D "+(Number(row.change7)>0?"+":"")+row.change7+"%" : "7D —";
-    const listed=Number(row.listings)>=0 && row.listingsAsOf ? "eBay listings "+row.listings+" as of "+row.listingsAsOf : "eBay listings —";
+    const seven=Number.isFinite(Number(row.change7)) ? "7D "+(Number(row.change7)>0?"+":"")+row.change7+"%" : "7D not on file";
+    const listed=Number(row.listings)>=0 && row.listingsAsOf ? "Listings counted "+row.listings+" as of "+row.listingsAsOf : "Listings counted not on file";
     const href=row.href||("/feed/r/"+encodeURIComponent(row.id));
     const sku=String(row.sku||"");
     const quick=/^tcgcsv-[0-9]+$/.test(sku)?sku:(/^tcgcsv-[0-9]+$/.test(String(row.id||""))?String(row.id):"");
