@@ -1568,6 +1568,24 @@ function shareMetaTags(title, share) {
 }
 
 let priceBanner = "";
+// Track record stays hidden until enough reads are scored (hits plus misses in
+// the 90 day window of track-record.json). renderPath sets this per request.
+export const TRACK_RECORD_MIN = 60;
+let trackOpen = false;
+export function trackScoredCount(doc) {
+  const n = Number(doc?.windows?.d90?.reads);
+  if (Number.isFinite(n) && n >= 0) return n;
+  return (Array.isArray(doc?.rows) ? doc.rows : []).filter((r) => r && (r.moved === true || r.moved === false)).length;
+}
+export function trackRecordIsOpen(doc) {
+  return !!doc && doc.public === true && trackScoredCount(doc) >= TRACK_RECORD_MIN;
+}
+export function setTrackRecordOpen(open) {
+  trackOpen = open === true;
+}
+export function trackRecordOpenNow() {
+  return trackOpen;
+}
 export function setPriceBanner(line) {
   priceBanner = String(line || "");
 }
@@ -1625,7 +1643,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${dockNav(active, feed)}
 </nav>
-<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/track-record">Track record</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
+<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a>${trackOpen ? ' · <a href="/track-record">Track record</a>' : ""} · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});document.addEventListener("keydown",function(ev){if(ev.key!=="/"||ev.metaKey||ev.ctrlKey||ev.altKey||ev.defaultPrevented)return;var el=ev["tar"+"get"];var tag=el&&el.tagName;if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(el&&el.isContentEditable))return;var box=document.getElementById("q");if(box){ev.preventDefault();box.focus();return;}if(location.pathname!=="/search")location.href="/search";});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -3587,6 +3605,28 @@ ${thin ? `<p class="tr-note" id="tr-thin">More history added nightly</p>` : ""}
   return chrome("Track record", body, "Track record", stamp, "", feedNav(opts));
 }
 
+export function renderTrackRecordHidden(stamp, opts = {}) {
+  const body = `<main id="main" tabindex="-1" class="wrap tr-page tr-wait">
+<style>
+.tr-wait{display:flex;justify-content:center;padding-top:32px;padding-bottom:48px}
+.tr-wait-card{max-width:520px;width:100%;background:#16140f;border:1px solid #2a261f;border-radius:24px;padding:28px 24px;text-align:center}
+.tr-wait-ico{width:56px;height:56px;margin:0 auto 14px;border-radius:999px;background:#211d16;border:1px solid #2f2b26;display:flex;align-items:center;justify-content:center;color:#d9b779}
+.tr-wait-card h1{margin:0 0 10px;font:600 26px/1.25 var(--serif)}
+.tr-wait-card p{margin:0 0 10px;color:#cfc7b8}
+.tr-wait-card .tr-wait-note{color:#8f877a;font-size:14px;margin-bottom:18px}
+.tr-wait-card a.tr-wait-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border-radius:999px;background:#d9b779;color:#1a1407;font:600 15px/1 var(--sans);text-decoration:none}
+</style>
+<section class="tr-wait-card">
+<div class="tr-wait-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+<h1>Track record</h1>
+<p>Our track record goes live once we've scored enough reads.</p>
+<p class="tr-wait-note">More history added nightly.</p>
+<a class="tr-wait-btn" href="/">Back to Catch'em</a>
+</section>
+</main>`;
+  return chrome("Track record", body, "Track record", stamp, "", feedNav(opts));
+}
+
 export function renderReceipts(doc, stamp, opts = {}) {
   const rows = doc?.rows || [];
 const mark = (r) => {
@@ -4073,8 +4113,7 @@ export function renderPremium(stamp, opts = {}) {
 ${countLine}
 <p>Example reads from this week.${member ? "" : " Names stay blurred until you are a member."}</p>
 <ul class="prem-week">${examples}</ul>
-<p><a href="/track-record">Track record</a></p>
-</section>
+${(opts.trackOpen ?? trackOpen) === true ? '<p><a href="/track-record">Track record</a></p>\n' : ""}</section>
 <h2>Everything free, plus:</h2>
 <div class="prem-grid">
 ${card('<path d="M4 6h16M4 12h16M4 18h10"/>', "Premium reads in Discord", "The deeper reads land in our members-only #reads channel first, every morning.")}
