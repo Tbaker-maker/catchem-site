@@ -61,7 +61,7 @@ export function setChipHtml(slug, rot, today, irCount, { noRotation = false } = 
   if (!r && !irCount) return "";
   const cls = r ? (r.rotated || r.past ? "rchip past" : r.official ? "rchip" : "rchip est") : "";
   const chip = r ? `<a class="${cls}" href="/rotation"><span class="dot" aria-hidden="true"></span><span>${esc(r.text)}${r.sub ? ` <span class="sub">· ${esc(r.sub)}</span>` : ""}</span></a>` : "";
-  const ir = irCount ? `<a class="rchip kind" href="/ir-watchlist?set=${encodeURIComponent(slug)}">${irCount} cards on the IR watchlist</a>` : "";
+  const ir = irCount ? `<a class="rchip kind" href="/ir-watchlist?set=${encodeURIComponent(slug)}">${irCount} Illustration Rares to watch</a>` : "";
   return `<style>${CHIP_CSS}</style><div class="rchips">${chip}${ir}</div>`;
 }
 
@@ -136,7 +136,7 @@ export function watchlistBody(doc, opts = {}) {
 .wl h1{font:500 clamp(30px,7vw,46px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 8px}.wl .lede{max-width:40em;font-size:16px;line-height:1.5;opacity:.85}.wl-list{list-style:none;margin:16px 0;padding:0;display:grid;gap:14px}.wl-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:16px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01))}.wl-pic img,.wl-pic .tile{width:96px;max-width:96px;height:auto;border-radius:10px}.wl-set{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}.wl h2{margin:4px 0;font:600 20px/1.25 var(--serif)}.wl h2 a{color:inherit;text-decoration:none}.wl-pos{margin:0 0 8px;color:var(--gold);font-weight:600}.wl-facts{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}.wl-facts span{opacity:.6;margin-right:6px}.wl-curve{margin:8px 0 0;font-size:13px;opacity:.7}.wl-gate{margin:18px 0;padding:20px;border-radius:20px;border:1px solid var(--gold);text-align:center}.wl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;background:var(--gold);color:#111;font-weight:700;text-decoration:none}.wl-pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 16px;font-size:14px}.wl .fine{font-size:12px;opacity:.6;max-width:44em}
 @media (min-width:768px){.wl-row{grid-template-columns:120px minmax(0,1fr)}.wl-pic img,.wl-pic .tile{width:120px;max-width:120px}}</style>
 <p class="kicker" style="letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)">Premium</p>
-<h1>IR watchlist</h1>
+<h1>Illustration Rares to watch</h1>
 <p class="lede">Illustration Rares and Special Illustration Rares (Scarlet &amp; Violet and Mega), Trainer Gallery, Galarian Gallery and Alternate Art cards (Sword &amp; Shield), and Tag Team (Alternate Art) cards (Sun &amp; Moon), each named by its own rarity. Each one shows its age, where its price sits against its own low and high on file, and its 30 and 90 day trend.</p>
 ${filter}<ul class="wl-list">${items}</ul>${pager}${gate}
 <p class="fine">Facts from our files as of ${esc(shortDate(doc?.asOf))}. Prices are TCGplayer market. The order weighs several facts together: time since release, where the price sits in its range on file, the Pokémon's popularity (Gen 1, starters, Eeveelutions, Pikachu, Charizard and a few others), how its 90 days compare with set and era peers, and its trend. The chips on each card name the facts that weigh most for it. This is a factual signal, not advice.</p></main>`;

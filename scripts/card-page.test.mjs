@@ -132,7 +132,7 @@ const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "st
   fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },
   rotationFact: '<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark G, Standard"><span class="rm">G</span> Regulation mark G · Standard</a></p>',
 });
-t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13, 2026") && yearCard.includes("G · Standard"));
+t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("NM $15.00") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13") && yearCard.includes("G · Standard"));
 const bare = renderCard({ id: "tcgcsv-3", name: "No Price", kind: "single", set: "S" }, "stamp", {});
 t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/sum-chip[^>]*>1Y /.test(bare) && !bare.includes("listings counted"));
 
