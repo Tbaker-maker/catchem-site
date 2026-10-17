@@ -15,10 +15,12 @@ jobs:
       - run: node scripts/public-routes.test.mjs
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/feed-groups.test.mjs
+      - run: node scripts/premium-page.test.mjs
       - run: node scripts/audit-oct16.test.mjs
       - run: node scripts/audit-chips.test.mjs
       - run: node scripts/audit-feed.test.mjs
       - run: node scripts/home-hero.test.mjs
+      - run: node scripts/search-recent.test.mjs
       - run: node scripts/open-data.test.mjs
       - run: node scripts/post-office.test.mjs
       - run: node scripts/sealed-pid.test.mjs

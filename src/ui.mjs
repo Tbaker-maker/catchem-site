@@ -3577,7 +3577,7 @@ ${err}
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
 <div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
-<p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
+<style>.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 import * as search from "/data/search-rank.mjs";
 const rankCatalog=search.rankCatalog;
@@ -3741,7 +3741,18 @@ async function draw(){
     document.getElementById("list").innerHTML=tips+(near.length?'<p class="muted">Nearest names</p>'+near.map(rowHtml).join(""):"");
     return;
   }
-  document.getElementById("meta").textContent=shown.length.toLocaleString("en-US")+" shown";
+  const nameWords=(String(shown[0]&&shown[0][1]||"")+" "+String(shown[0]&&shown[0][2]||"")).toLowerCase().replace(/[^a-z0-9]+/g," ").split(" ").filter(Boolean);
+  function editDist(x,y){ const d=[]; for(let i=0;i<=x.length;i++){ d[i]=[i]; } for(let j=1;j<=y.length;j++) d[0][j]=j; for(let i=1;i<=x.length;i++) for(let j=1;j<=y.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(x[i-1]===y[j-1]?0:1)); return d[x.length][y.length]; }
+  let fixed=false;
+  const fixedQ=String(q||"").toLowerCase().split(" ").filter(Boolean).map(function(w){
+    if(w.length<4 || !/^[a-z]+$/.test(w) || nameWords.some(function(n){ return n.indexOf(w)===0; })) return w;
+    let best="", bd=3;
+    nameWords.forEach(function(n){ const dd=editDist(w,n); if(dd<bd){ bd=dd; best=n; } });
+    if(best){ fixed=true; return best; }
+    return w;
+  }).join(" ");
+  const lead=fixed ? fixedQ : "";
+  document.getElementById("meta").textContent=shown.length.toLocaleString("en-US")+" shown"+(lead?". Showing matches for \u201c"+lead+"\u201d.":"");
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("")+(more?'<p><button type="button" id="s-more" class="win" style="min-height:44px;padding:0 18px;border-radius:12px">Show 40 more</button></p>':"");
   const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
@@ -3749,6 +3760,46 @@ document.getElementById("q").addEventListener("input",function(){ limit=40; draw
 document.getElementById("vtag").addEventListener("input",draw);
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
+(function(){
+  var KEY="catchem-recent-q";
+  var box=document.getElementById("sugg");
+  var qi=document.getElementById("q");
+  if(!box||!qi) return;
+  var SUG=["Charizard","Moonbreon","Pikachu","151 ETB","Evolving Skies booster box","Prismatic Evolutions","Mew ex","Gengar"];
+  function recent(){ try{ return (JSON.parse(localStorage.getItem(KEY)||"[]")||[]).filter(function(x){ return typeof x==="string" && x.length>1; }).slice(0,6); }catch(e){ return []; } }
+  function save(v){
+    v=String(v||"").trim().slice(0,60);
+    if(v.length<2) return;
+    var r=recent().filter(function(x){ return x.toLowerCase()!==v.toLowerCase(); });
+    r.unshift(v);
+    try{ localStorage.setItem(KEY, JSON.stringify(r.slice(0,6))); }catch(e){}
+  }
+  function chip(t){ return '<button type="button" class="sg-chip" data-q="'+html(t)+'">'+html(t)+'</button>'; }
+  function paint(){
+    var show=qi.value.trim().length<2;
+    box.hidden=!show;
+    if(!show) return;
+    var r=recent();
+    box.innerHTML=(r.length?'<p class="sg-h">Recent</p><div class="sg-row">'+r.map(chip).join("")+'<button type="button" class="sg-clear">Clear</button></div>':"")+'<p class="sg-h">Popular</p><div class="sg-row">'+SUG.map(chip).join("")+'</div>';
+  }
+  box.addEventListener("click", function(e){
+    var b=e.target.closest("button");
+    if(!b) return;
+    if(b.classList.contains("sg-clear")){ try{ localStorage.removeItem(KEY); }catch(x){} paint(); return; }
+    qi.value=b.dataset.q;
+    qi.dispatchEvent(new Event("input"));
+    save(b.dataset.q);
+  });
+  var idle=0;
+  qi.addEventListener("input", function(){
+    paint();
+    clearTimeout(idle);
+    idle=setTimeout(function(){ if(document.querySelectorAll("#list img").length) save(qi.value); }, 2500);
+  });
+  qi.addEventListener("keydown", function(e){ if(e.key==="Enter") save(qi.value); });
+  document.getElementById("list").addEventListener("click", function(e){ if(e.target.closest("a")) save(qi.value); });
+  paint();
+})();
 </script></main>`;
   return chrome("Search", body, "Search", "", "", feedNav(opts));
 }
@@ -3845,7 +3896,7 @@ export function renderPost(stamp, mark = "", opts = {}) {
 
 const RATE_LOCK = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
 const PAUSE_STAY = "Pause up to 2 months in any 12. Your number and rate stay. Or cancel anytime.";
-const WATCH_PERK = "Premium gets a Discord note on up to 25 saved products: when one is on the next Feed read, when the labeled market price crosses the amount you set, or when its filtered eBay listings cross the count you set (20 or more).";
+const WATCH_PERK = "Watch up to 25 cards or products. We DM you when the price or listings counted crosses the number you set. Free members can save 25 too, without the DM.";
 
 export function renderPremium(stamp, opts = {}) {
   void stamp;
@@ -3855,7 +3906,7 @@ export function renderPremium(stamp, opts = {}) {
 <style>
 .prem-hero{padding:18px 0 6px}
 .prem-kicker{margin:0 0 14px;letter-spacing:.14em;text-transform:uppercase;font:600 12px/1 var(--sans);color:var(--gold)}
-.prem-hero h1{font:500 clamp(34px,7vw,58px)/1.02 var(--serif);letter-spacing:-.03em;margin:0 0 14px;max-width:11em}
+.prem-hero h1{font:500 clamp(30px,6vw,52px)/1.08 var(--serif);letter-spacing:-.02em;margin:0 0 14px;max-width:14em}
 .prem-lede{font-size:18px;line-height:1.4;margin:0 0 16px;max-width:28em}
 .prem-price{margin:0 0 16px;font:600 22px/1.2 var(--serif);color:var(--gold)}
 .prem-join{display:flex;width:100%;align-items:center;justify-content:center;min-height:48px;padding:0 22px;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
@@ -3865,6 +3916,7 @@ export function renderPremium(stamp, opts = {}) {
 .prem-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
 .prem-card h3{margin:10px 0 6px;font:600 16px/1.3 var(--sans)}
 .prem-card p{margin:0;color:var(--dim);font-size:15px;line-height:1.45}
+.prem-soon{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#241f18;color:var(--gold);font:600 11px/1.5 var(--sans);vertical-align:2px}
 .prem-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#241f18;color:var(--gold)}
 .prem-lock{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:16px;padding:16px}
 .prem-lock p{margin:8px 0 0}
@@ -3880,42 +3932,40 @@ export function renderPremium(stamp, opts = {}) {
 @media(min-width:840px){
   .prem-grid{grid-template-columns:repeat(6,1fr)}
   .prem-card{grid-column:span 2}
-  .prem-card:nth-child(4),.prem-card:nth-child(5){grid-column:span 3}
-  .prem-faq{grid-template-columns:1fr 1fr;column-gap:28px}
+    .prem-faq{grid-template-columns:1fr 1fr;column-gap:28px}
   .prem-join{display:inline-flex;width:auto;min-width:220px}
 }
 </style>
 <section class="prem-hero">
 <p class="prem-kicker">Discord Premium</p>
-<h1>Join the club.</h1>
-<p class="prem-lede">Premium members get a number and the Premium role.</p>
-<p class="prem-price">Discord Premium is $14.99 USD/mo through Stripe.</p>
-<p>Cancel whenever. ${REFUND_LINE}</p>
-<a class="prem-join" href="${DISCORD}">Join in Discord</a>
+<h1>Catch'em Premium · $14.99 USD a month</h1>
+<p class="prem-lede">See the market before everyone else.</p>
+<a class="prem-join" href="${DISCORD}">Join Premium</a>
+<p class="prem-fine">7-day refund on your first charge. Cancel anytime.</p>
 <p class="prem-agree muted"><small>By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></p>
 </section>
-<h2>What you're joining</h2>
+<h2>Everything free, plus:</h2>
 <div class="prem-grid">
-${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "Premium role", "Premium members get a number and the Premium role.")}
+${card('<path d="M4 6h16M4 12h16M4 18h10"/>', "Premium reads in Discord", "The deeper reads land in our members-only #reads channel first, every morning.")}
+${card('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>', "Watchlist pings", WATCH_PERK)}
+${card('<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>', "Member drops <span class=\"prem-soon\">Coming soon</span>", "Monthly below-market drops of sealed and singles, with early access for members.")}
+${card('<path d="M5 12l4 4 10-10"/>', "Vault Votes <span class=\"prem-soon\">Coming soon</span>", "Every Friday, members vote on what Catch'em adds to the vault next.")}
+${card('<path d="M10 4.5v15M14 4.5v15M5.5 9h13M5.5 15h13"/>', "First 222", "The first 222 Premium members get a numbered role that stays yours while you stay. If your membership ends, that number is retired for good.")}
+${card('<path d="M5 5h14v10H9l-4 4z"/>', "Members-only Discord", "Premium channels, the weekly recap and the leaderboard.")}
 </div>
 <h2>Your price stays locked</h2>
 <div class="prem-lock">
 <p>${RATE_LOCK}</p>
-<p>${PAUSE_STAY}</p>
-</div>
-<h2>Members also get</h2>
-<div class="prem-also">
-<p>${WATCH_PERK}</p>
 </div>
 <h2>Questions</h2>
 <div class="prem-faq">
 <div class="prem-q"><b>Can I pause?</b><p>${PAUSE_STAY}</p></div>
-<div class="prem-q"><b>What happens if I cancel?</b><p>Cancel and the number is retired. If you come back, you pay the public rate then on the site.</p></div>
+<div class="prem-q"><b>What happens if I cancel?</b><p>Your number is retired for good, and the locked rate ends with it.</p></div>
 <div class="prem-q"><b>Can I get a refund?</b><p>${REFUND_LINE}</p></div>
-<div class="prem-q"><b>How do I manage it?</b><p>Pause in Discord with /premium. Cancel in Discord with /premium.</p></div>
+<div class="prem-q"><b>How do I manage it?</b><p>Pause or cancel in Discord with /premium.</p></div>
 </div>
 <p class="prem-manage">Already in?</p>
-<div class="prem-acts"><a href="${DISCORD}">Pause in Discord with /premium</a><a href="${DISCORD}">Cancel in Discord with /premium</a></div>
+<div class="prem-acts"><a href="${DISCORD}">Manage in Discord with /premium</a></div>
 </main>`;
   return chrome("Discord Premium", body, "Discord Premium", "", "", feedNav(opts));
 }
