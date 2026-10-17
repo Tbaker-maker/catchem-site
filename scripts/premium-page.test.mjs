@@ -1,0 +1,22 @@
+import { renderPremium } from "../src/ui.mjs";
+import { REFUND_LINE } from "../src/policy.mjs";
+let fail = 0; const t = (n, ok) => { if (!ok) { fail++; console.log("FAIL", n); } };
+const html = renderPremium("");
+const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+const vis = main.replace(/<style>[\s\S]*?<\/style>/, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+t("title", vis.includes("Catch'em Premium · $14.99 USD a month"));
+t("subhead", vis.includes("See the market before everyone else."));
+t("six perk cards", (main.match(/class="prem-card"/g) || []).length === 6);
+t("every card has an icon", (main.match(/class="prem-ico"/g) || []).length === 6);
+t("footer", vis.includes("7-day refund on your first charge. Cancel anytime."));
+t("refund line kept", vis.includes(REFUND_LINE));
+t("button", /class="prem-join"[^>]*>Join Premium</.test(main));
+t("watch perk matches bot cap 25", vis.includes("up to 25") && !/up to 50|Free gets 5/.test(vis));
+t("no em dash", !/\u2014/.test(main));
+t("no raffle words", !/raffle|prize|stadium|giveaway/i.test(vis));
+t("no banned words", !/\b(buy|sell|hold|support|resistance|bottom|printed|play|target|invest|stack|load up|sales)\b/i.test(vis));
+const sents = vis.split(/(?<=\.)\s/).map((x) => x.trim()).filter((x) => x.length > 30);
+t("no duplicate lines", new Set(sents).size === sents.length);
+t("tap targets 44px", /\.prem-join\{[^}]*min-height:48px/.test(main) && /\.prem-acts a\{[^}]*min-height:44px/.test(main));
+if (fail) { console.log(`${fail} failed`); process.exit(1); }
+console.log("premium page: all passed");
