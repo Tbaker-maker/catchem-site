@@ -8,6 +8,7 @@ import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { feedNews } from "../data/feed-news.mjs";
+import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
@@ -686,6 +687,8 @@ export function newsSlice(doc) {
     const name = newsEnglishName(item);
     if (!name) continue;
     if (!isTcgNews(item)) continue;
+    // Japan-only items stay out unless they name an NA or English release.
+    if (!isNaRelevant(item)) continue;
     const older = date < cut;
     if (older && !releaseInNextTwoWeeks(item, asOf)) continue;
     seen.add(href);

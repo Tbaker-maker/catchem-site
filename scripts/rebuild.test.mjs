@@ -525,7 +525,8 @@ const newsDoc = { asOf: "2026-10-02", items: [
   { kind: "news", title: "Pokémon GO celebrates the Pokémon TCG.", url: "https://example.com/go-tcg", source: "Pokémon GO", date: "2026-10-02", sentence: "A Pokémon TCG event is live." },
   { kind: "news", title: "Old recap.", url: "https://example.com/b", source: "PokeBeach", date: "2026-08-01", sentence: "The column looks at an event." },
   { kind: "news", title: "「大会」開催！", url: "https://example.com/c", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp", note: "Translation is missing." },
-  { kind: "news", title: "「ここから」開催！", titleEn: "Japan: A first event is being held", originalTitle: "「ここから」開催！", url: "https://example.com/d", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp" },
+  { kind: "news", title: "「ここから」世界で発売！", titleEn: "Japan: The Pokémon TCG 30th products will go on sale worldwide", originalTitle: "「ここから」世界で発売！", url: "https://example.com/d", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp" },
+  { kind: "news", title: "「ここから」開催！", titleEn: "Japan: A first Pokémon Card event is being held", originalTitle: "「ここから」開催！", url: "https://example.com/jp-only", source: "Pokémon Card (Japan)", date: "2026-10-02", language: "ja", region: "jp" },
   { kind: "news", title: "A new card revealed", url: "https://example.com/e", source: "PokeBeach", date: "2026-08-20" },
   { kind: "news", title: "A booster box date.", url: "https://example.com/f", source: "PokeBeach", date: "2026-08-01", sentence: "The source says the booster box releases on October 10, 2026.", setDate: "November 6th", product: "Booster Box" },
 ]};
@@ -554,7 +555,8 @@ t("one named set is a set page chip", newsLinkTarget({ name: "Prismatic Evolutio
 t("a sealed product name beats the shorter set name", newsLinkTarget({ name: "Celebrations Ultra-Premium Collection restock" }, linkSets, linkProducts)?.href === "/p/tcgcsv-1");
 t("a date chip is not a link", newsLinkTarget({ name: "A note", details: [{ label: "Date", value: "Sep 25, 2026" }] }, linkSets, linkProducts) == null);
 const japan = newsRows.find((row) => row.href === "https://example.com/d");
-t("Japan news says it is Japan news and the file keeps the original title", japan && japan.place === "Japan news" && japan.name === "Japan: A first event is being held" && japan.originalTitle === "「ここから」開催！" && japan.href === "https://example.com/d");
+t("Japan news says it is Japan news and the file keeps the original title", japan && japan.place === "Japan news" && japan.name === "Japan: The Pokémon TCG 30th products will go on sale worldwide" && japan.originalTitle === "「ここから」世界で発売！" && japan.href === "https://example.com/d");
+t("Japan-only news stays off the Feed", !newsRows.some((row) => row.href === "https://example.com/jp-only"));
 t("the news filter does not walk price rows", buildFeedLoop([priced, fact], browseDoc, { filter: "news" }).length === 0);
 t("the news filter uses the news file slice", buildFeedLoop([], null, { filter: "news", news: newsDoc }).some((row) => row.href === "https://example.com/d"));
 const waveBrowse = {
@@ -719,7 +721,7 @@ const japanFile = liveNews.find((row) => row.href === "https://www.pokemon-card.
 const valentine = liveNews.find((row) => row.href === "https://www.pokebeach.com/forums/threads/pokemon-to-release-first-ever-valentine%E2%80%99s-day-tcg-set.157072/");
 const goTcg = liveNews.find((row) => row.href === "https://pokemongo.com/news/tcg-30th-celebration-event");
 t("the news file drops merch and Pokémon GO with no TCG angle", !dedenne && !nightOut && valentine && valentine.dayLabel === "Oct 1, 2026" && valentine.summary.startsWith("We can exclusively reveal") && goTcg && goTcg.source === "Pokémon GO");
-t("the Japan card in the news file says Japan news and keeps the original title", japanFile && japanFile.place === "Japan news" && japanFile.asOf === "2026-10-02" && japanFile.dayLabel === "Oct 2, 2026" && japanFile.originalTitle === "「ここからデビュー！はじめてポケカ体験会」開催！" && japanFile.name.startsWith("Japan:"));
+t("the Japan-only event in the news file stays off the Feed", !japanFile && !liveNews.some((row) => /^Japan:/.test(row.name)));
 const rankedLoop = buildFeedLoop([priced, fact], browseDoc, { filter: "prices" });
 t("a ranked filter stays in ranked order and leaves the fact out", rankedLoop.map((r) => r.id).join(",") === "move-tcgcsv-10-7,move-tcgcsv-99-7" && rankedLoop.every((r) => !(r.readKind === "pokemon")));
 t("the pokemon filter is file order, not a shuffle", buildFeedLoop([priced, fact], browseDoc, { filter: "pokemon" }).map((r) => r.id).join(",") === "pokemon-duraludon");

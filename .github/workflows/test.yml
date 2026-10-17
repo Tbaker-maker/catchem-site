@@ -11,6 +11,7 @@ jobs:
         with:
           node-version: "22"
       - run: node scripts/advice-rules.test.mjs
+      - run: node scripts/jp-news.test.mjs
       - run: node scripts/rebuild.test.mjs
       - run: node scripts/reads.test.mjs
       - run: node scripts/public-routes.test.mjs
