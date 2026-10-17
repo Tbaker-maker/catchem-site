@@ -14,6 +14,8 @@ const pack = ui.slice(ui.indexOf("const feedPack=Promise.all(["), ui.indexOf("co
 t("feed blocks on meta and browse only", pack.includes("/data/feed/meta.json") && pack.includes("/data/feed/browse.json") && !pack.includes("catalogue.json") && !pack.includes("read-library.json") && !pack.includes("/data/sets.json"));
 t("pictures are not fetched while the feed script parses", !ui.includes('const imagePack=grabJson("/data/catalogue-images.json")'));
 t("fonts do not block first paint", ui.includes('rel="preload" as="style"') && ui.includes("display=optional") && !ui.includes("display=swap\" rel=\"stylesheet\""));
+const home = readFileSync(join(root, "index.html"), "utf8");
+t("home fonts do not block first paint", home.includes('rel="preload" as="style"') && home.includes("display=optional") && !home.includes("display=swap"));
 t("chart script is not in the head", !ui.includes("<script>${CHART_JS}\\n${QUICK_JS}</script>"));
 t("search index starts on focus, not on load", ui.includes('addEventListener("focus"') && ui.includes("/data/feed/search/manifest.json"));
 t("hero data is preloaded", ui.includes('rel="preload" href="/data/feed/meta.json"') && ui.includes('rel="preload" href="/data/feed/browse.json"'));
