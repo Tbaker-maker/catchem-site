@@ -7,3 +7,7 @@ if (!ui.includes("CHIP_MAIN={\"\":1,\"prices\":1,\"sealed\":1,\"set\":1,\"signal
 console.log("ok   feed leads with a story and shows six chips plus More");
 if (!ui.includes("feedDay && asOf>=feedDay) return false;")) { console.log("FAIL feed skips bucket fetch for same-night reads"); process.exit(1); }
 console.log("ok   same-night reads skip the bucket fetch");
+if (ui.includes("replace(/[\\s,;·]+$/") || !ui.includes("replace(/[ ,;]+$/,\"\")")) { console.log("FAIL feed source regex has no backslashes inside the inline script"); process.exit(1); }
+console.log("ok   feed source trim survives the template literal");
+if (!ui.includes("Open on a story, not a plain price move.")) { console.log("FAIL client feed opens on a story"); process.exit(1); }
+console.log("ok   client feed opens on a story");
