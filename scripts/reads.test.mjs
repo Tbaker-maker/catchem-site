@@ -1,5 +1,5 @@
 import { pageKind, renderPath } from "../src/index.mjs";
-import { bumpClick, emailLetter, emailSendAllowed, gatePlan, planFromFields, planToFollow, preSend, renderReadsPage, typePlan, upsertFollow } from "../src/reads.mjs";
+import { bumpClick, emailLetter, emailSendAllowed, gatePlan, planFromFields, planToFollow, preSend, renderReadsPage, sampleRead, typePlan, upsertFollow } from "../src/reads.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -39,6 +39,21 @@ t("an email letter keeps a short news line and drops a long body", letter.includ
 t("email does not send without a key", emailSendAllowed({}) === false && emailSendAllowed({ READS_EMAIL_KEY: "abc" }) === true);
 t("clicks store counts only", JSON.stringify(bumpClick({ opens: 1, taps: 0, note: "secret" }, "tap")) === JSON.stringify({ opens: 1, taps: 1 }));
 t("reads is a page", pageKind("/reads") === "reads");
+const poolLines = {
+  "set:sv-prismatic-evolutions": "SV: Prismatic Evolutions: top cards on TCGplayer market are #161/131 at $1,250.07, as of Oct 17.",
+  "pokemon:Umbreon": "Umbreon ex 161/131, Prismatic Evolutions is $1,250.07 on TCGplayer market, as of Oct 17.",
+  "rarity:Special Illustration Rare": "Umbreon ex 161/131, Prismatic Evolutions is $1,250.07 on TCGplayer market, as of Oct 17.",
+  "era:Scarlet and Violet": "SV: Prismatic Evolutions: top cards on TCGplayer market are #161/131 at $1,250.07, as of Oct 17.",
+  "product:sealed": "Prismatic Evolutions Elite Trainer Box: 12 eBay listings counted, middle ask $90.00, as of Oct 17.",
+};
+const picked = { sets: ["sv-prismatic-evolutions"], pokemon: ["Umbreon"], rarities: ["Special Illustration Rare"], eras: ["Scarlet and Violet"], product: "singles", watch: [], addons: {} };
+t("a sample line is shown for each pick from the pool", sampleRead(picked, poolLines).includes("Umbreon ex 161/131, Prismatic Evolutions") && sampleRead(picked, poolLines).includes("#161/131") && !sampleRead(picked, poolLines).includes("listings counted"));
+t("a sealed pick shows the sealed sample and not a card line", sampleRead({ product: "sealed", sets: [], pokemon: [], rarities: [], eras: [], watch: [] }, poolLines).includes("listings counted") && !sampleRead({ product: "sealed", sets: [], pokemon: [], rarities: [], eras: [], watch: [] }, poolLines).includes("Umbreon"));
+t("an empty pool still says the night file fills the line", sampleRead(picked, {}).startsWith("Sample read."));
+const previewPage = renderReadsPage({ signedIn: false, plan: picked, preview: { lines: poolLines } });
+const previewSample = previewPage.split('id="rd-sample">')[1].split("</p>")[0];
+t("the reads preview renders one pool line per pick", previewSample.includes("Umbreon ex 161/131, Prismatic Evolutions") && previewSample.includes("#161/131") && !previewSample.includes("listings counted") && previewPage.includes("id=\"rd-lines\""));
+t("the preview copy is clean", preSend(previewPage.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);
 
 const html = await renderPath("/reads", async () => { throw new Error("no data"); }, { feed: false, reads: { signedIn: false, premium: false } });
 const body = await html.text();

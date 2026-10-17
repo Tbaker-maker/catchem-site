@@ -249,27 +249,36 @@ function box(name, label, on) {
   return `<label class="rd-check"><input type="checkbox" name="${name}" value="1"${on ? " checked" : ""}> ${esc(label)}</label>`;
 }
 
-export function setLabel(slug) {
-  return SET_CHOICES.find((row) => row.slug === slug)?.name || String(slug || "");
-}
-
 export function recommendedPlan(plan) {
   const base = plan && typeof plan === "object" ? { ...blankPlan(), ...plan } : blankPlan();
   if (followCount(base) > 0) return base;
   return { ...base, sets: ["me-30th-celebration"], product: "singles", frequency: base.frequency || "weekly" };
 }
 
-export function sampleRead(plan) {
-  const names = (plan?.sets || []).map(setLabel).filter(Boolean);
-  const product = plan?.product === "sealed" ? "sealed" : "singles";
-  const often = plan?.frequency || "weekly";
-  const watch = (plan?.watch || []).map((row) => row.name || row.id).filter(Boolean);
-  const parts = ["Sample read."];
-  if (watch.length) parts.push(`Your watchlist: ${watch.join(", ")}.`);
-  const subject = names.length ? names.join(", ") : ((plan?.pokemon || []).join(", ") || product);
-  parts.push(`${subject}, ${product}, ${often}.`);
-  parts.push("This is a sample. The night file fills the dated lines.");
-  return parts.join(" ");
+export function sampleLines(plan, lines = {}) {
+  const rows = [];
+  const add = (key) => {
+    const line = lines ? lines[key] : "";
+    const text = String(line || "").trim();
+    if (!text || rows.includes(text)) return;
+    rows.push(text);
+  };
+  for (const slug of plan?.sets || []) add(`set:${slug}`);
+  for (const name of plan?.pokemon || []) add(`pokemon:${name}`);
+  for (const name of plan?.rarities || []) add(`rarity:${name}`);
+  for (const name of plan?.eras || []) add(`era:${name}`);
+  if (plan?.product === "sealed" || plan?.sealed === true) add("product:sealed");
+  for (const row of plan?.watch || []) {
+    if (!row?.id) continue;
+    add(row.kind === "sealed" ? `sealed:${row.id}` : `card:${row.id}`);
+  }
+  return rows.slice(0, 6);
+}
+
+export function sampleRead(plan, lines = {}) {
+  const rows = sampleLines(plan, lines);
+  if (!rows.length) return "Sample read. The night file fills the dated lines.";
+  return rows.join("\n\n");
 }
 
 export function planToFollow(discordId, plan) {
@@ -358,7 +367,9 @@ export function renderReadsPage(state = {}) {
   const saveNote = saveLine(state);
   if (saveNote) notes.push(saveNote);
   if (gatedSuggestion) notes.push(...gatedSuggestion.notes);
-  const sample = sampleRead(shown);
+  const lineMap = state.preview?.lines && typeof state.preview.lines === "object" ? state.preview.lines : {};
+  const sample = sampleRead(shown, lineMap);
+  const lineJson = JSON.stringify(lineMap).replace(/</g, "\\u003c");
   const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
     const label = row.name || row.id || "Saved product";
@@ -378,7 +389,7 @@ export function renderReadsPage(state = {}) {
 .rd-chip{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:999px;background:#f2f2f7;font-size:15px}
 .rd-chip input{width:18px;height:18px}
 .rd-rec{color:#8e8e93;font-size:12px;margin:0 0 8px}
-.rd-sample{font-size:17px;line-height:1.35;margin:0}
+.rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
 .rd-wrap button{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
 </style>
@@ -389,6 +400,7 @@ ${sign}
 <section class="rd-card" id="rd-preview">
 <h2>Sample read</h2>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
+<script type="application/json" id="rd-lines">${lineJson}</script>
 </section>
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
 <h2>Sets</h2>
@@ -427,27 +439,34 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
   var form = document.getElementById("rd-form");
   var out = document.getElementById("rd-sample");
   if (!form || !out) return;
-  function picked(name){
-    var nodes = form.querySelectorAll('input[name="'+name+'"]');
-    var rows = [];
-    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) rows.push(nodes[i].getAttribute("data-label") || nodes[i].value);
-    return rows;
-  }
-  function one(name){
-    var nodes = form.querySelectorAll('input[name="'+name+'"]');
-    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) return nodes[i].getAttribute("data-label") || nodes[i].value;
-    return "";
-  }
   function paint(){
-    var sets = picked("set");
-    var product = (one("product") || "Singles").toLowerCase();
-    var often = (one("frequency") || "Weekly").toLowerCase();
-    var watch = picked("keep");
-    var bits = ["Sample read."];
-    if (watch.length) bits.push("Your watchlist: " + watch.join(", ") + ".");
-    bits.push((sets.length ? sets.join(", ") : product) + ", " + product + ", " + often + ".");
-    bits.push("This is a sample. The night file fills the dated lines.");
-    out.textContent = bits.join(" ");
+    var raw = {};
+    try { raw = JSON.parse(document.getElementById("rd-lines").textContent || "{}"); } catch (e) { raw = {}; }
+    var bits = [];
+    function add(key){
+      var line = raw[key];
+      if (line && bits.indexOf(line) < 0) bits.push(line);
+    }
+    var setNodes = form.querySelectorAll('input[name="set"]');
+    for (var i = 0; i < setNodes.length; i++) if (setNodes[i].checked) add("set:" + setNodes[i].value);
+    function labels(name, prefix){
+      var nodes = form.querySelectorAll('input[name="' + name + '"]');
+      for (var j = 0; j < nodes.length; j++) if (nodes[j].checked) add(prefix + (nodes[j].getAttribute("data-label") || nodes[j].value));
+    }
+    labels("pokemon", "pokemon:");
+    labels("rarity", "rarity:");
+    labels("era", "era:");
+    var product = "";
+    var products = form.querySelectorAll('input[name="product"]');
+    for (var k = 0; k < products.length; k++) if (products[k].checked) product = products[k].value;
+    if (product === "sealed") add("product:sealed");
+    var keeps = form.querySelectorAll('input[name="keep"]');
+    for (var n = 0; n < keeps.length; n++) {
+      if (!keeps[n].checked) continue;
+      var parts = String(keeps[n].value || "").split(":");
+      if (parts[1]) add((parts[0] === "sealed" ? "sealed:" : "card:") + parts[1]);
+    }
+    out.textContent = bits.length ? bits.slice(0, 6).join("\n\n") : "Sample read. The night file fills the dated lines.";
   }
   form.addEventListener("change", paint);
 })();
