@@ -10,6 +10,7 @@ import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
+import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage } from "./reads.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
@@ -111,6 +112,9 @@ export function pageKind(pathname) {
   if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
   if (path === "/premium") return "premium";
+  if (path === "/collection") return "collection";
+  if (path === "/alerts") return "alerts";
+  if (path === "/me") return "account";
   if (path === "/supply") return "supply";
   if (path === "/set-value") return "set-value";
   if (path === "/track-record") return "track";
@@ -574,6 +578,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     return html(renderFeed(freshBundle, "", stamp, withDive));
   }
+  if (kind === "collection") return html(renderCollection(stamp, pageOpts));
+  if (kind === "alerts") return html(renderAlerts(stamp, pageOpts));
+  if (kind === "account") return html(renderAccount(stamp, pageOpts));
   if (kind === "sets") {
     const sets = await loadJson("sets.json", fetchImpl);
     const indexes = await loadJson("indexes.json", fetchImpl).catch(() => null);
@@ -995,7 +1002,7 @@ const worker = {
     if (request.method === "GET" && url.pathname === "/signin") return handleSignIn(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord") return beginDiscord(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord/callback") return finishDiscord(request, env, fetchImpl);
-    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout();
+    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout(request);
     if (request.method === "GET" && url.pathname === POCKET_PATH) {
       try {
         const body = await pocketDocument(fetchImpl);
@@ -1098,6 +1105,7 @@ const worker = {
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/api/vote") return handleVote(request, env);
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
+      if (url.pathname === "/api/me" || url.pathname === "/api/me/export") return handleMe(request, env);
       if (url.pathname === "/api/follow") return handleFollow(request, env);
       if (url.pathname === "/api/reads") return handleReads(request, env);
       if (url.pathname === "/api/reads/click") return handleReadsClick(request, env);
@@ -1149,7 +1157,7 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

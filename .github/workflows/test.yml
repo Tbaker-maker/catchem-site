@@ -37,4 +37,5 @@ jobs:
       - run: node scripts/clean-text.test.mjs
       - run: node scripts/check-ppt-safety.mjs
       - run: node scripts/feed-new.test.mjs
+      - run: node scripts/member.test.mjs
       - run: node scripts/info-tap.test.mjs
