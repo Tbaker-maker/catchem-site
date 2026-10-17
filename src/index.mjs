@@ -14,7 +14,7 @@ import { handleMe, renderAccount, renderAlerts, renderCollection } from "./membe
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { officialSrc, imageForId } from "./catalogue-image.mjs";
+import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 const withChartKit = (page) => {
@@ -1089,8 +1089,12 @@ const worker = {
       }
       // Temporary proxy until the id has a Post Office catalogue hit. No new host may be added.
       if (!IMAGE_HOSTS.includes("images.pokemontcg.io")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-      const img = await fetch("https://images.pokemontcg.io/" + rest);
-      if (!img.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      let img = null;
+      for (const path of editorImageFallbacks(rest)) {
+        const hit = await fetchImpl("https://images.pokemontcg.io/" + path);
+        if (hit && hit.ok) { img = hit; break; }
+      }
+      if (!img) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
       return new Response(img.body, {
         status: 200,
         headers: {
