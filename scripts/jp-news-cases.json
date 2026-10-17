@@ -1,7 +1,7 @@
 [
  {
   "keep": false,
-  "rule": "jp-source",
+  "rule": "region-source",
   "row": {
    "source": "Pokémon Card (Japan)",
    "region": "jp",
@@ -12,7 +12,7 @@
  },
  {
   "keep": false,
-  "rule": "jp-source",
+  "rule": "region-source",
   "row": {
    "source": "Pokémon Card (Japan)",
    "title": "拡張パック「30th CELEBRATION」の収録カード公開！",
@@ -21,7 +21,17 @@
  },
  {
   "keep": false,
-  "rule": "jp-host",
+  "rule": "region-source",
+  "row": {
+   "source": "Pokémon Card (Japan)",
+   "region": "jp",
+   "title": "Japan: Change to the conditions for earning a \"Pokémon World Championships 2027\" berth at \"Champions League 2027 Yokohama\"",
+   "url": "https://www.pokemon-card.com/info/2.html"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "region-host",
   "row": {
    "source": "Somewhere",
    "title": "Card list for Storm Emeralda",
@@ -84,7 +94,7 @@
  },
  {
   "keep": false,
-  "rule": "jp-region",
+  "rule": "region-field",
   "row": {
    "source": "PokeGuardian",
    "region": "Japanese Sets",
@@ -99,6 +109,87 @@
    "source": "Somewhere",
    "title": "ポケカ 新弾の情報",
    "url": "https://example.com/a"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "china",
+  "row": {
+   "source": "PokeBeach",
+   "title": "“Gem Pack Vol 7” to Release in China Featuring Exclusive Misty’s Psyduck!",
+   "url": "https://www.pokebeach.com/forums/threads/gem-pack-vol-7.1/"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "china",
+  "row": {
+   "source": "PokeBeach",
+   "title": "Exclusive N’s Plan and Hilda to Release in China for “Black Bolt” and “White Flare!”",
+   "url": "https://www.pokebeach.com/forums/threads/china-promos.2/"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "korea",
+  "row": {
+   "source": "Limitless",
+   "title": "Korean League Season 4",
+   "url": "https://limitlesstcg.com/tournaments/4"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "thailand",
+  "row": {
+   "source": "Serebii",
+   "title": "Tuesday: Pokémon Champions - Venusaur Distribution + Pokémon Center Bangkok",
+   "url": "https://www.serebii.net/news/2026/1.shtml"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "indonesia",
+  "row": {
+   "source": "Limitless",
+   "title": "Indonesia Premier Ball League",
+   "url": "https://limitlesstcg.com/tournaments/5"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "taiwan",
+  "row": {
+   "source": "Somewhere",
+   "title": "Traditional Chinese Mega Dream ex launches in Taiwan",
+   "url": "https://example.com/tw"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "region-source",
+  "row": {
+   "source": "Pokémon Card (Asia)",
+   "title": "Asia English expansion info",
+   "url": "https://asia.pokemon-card.com/sg/archives/1"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "region-host",
+  "row": {
+   "source": "Somewhere",
+   "title": "Revealed! The Pokémon Center BANGKOK logo!",
+   "url": "https://asia-press.portal-pokemon.com/news/1"
+  }
+ },
+ {
+  "keep": false,
+  "rule": "regional-exclusive",
+  "row": {
+   "source": "Somewhere",
+   "title": "Pikachu promo is a UK exclusive at partner stores",
+   "url": "https://example.com/uk"
   }
  },
  {
@@ -140,6 +231,15 @@
  },
  {
   "keep": true,
+  "rule": "worlds",
+  "row": {
+   "source": "PokeBeach",
+   "title": "Pokemon Worlds 2027 to be Held in Singapore!",
+   "url": "https://www.pokebeach.com/forums/threads/worlds-2027.3/"
+  }
+ },
+ {
+  "keep": true,
   "rule": "na-region",
   "row": {
    "source": "PokeGuardian",
@@ -170,9 +270,9 @@
   "keep": true,
   "rule": "",
   "row": {
-   "source": "Pokémon Card (Asia)",
-   "title": "Asia English expansion info",
-   "url": "https://asia.pokemon-card.com/sg/archives/1"
+   "source": "PokeBeach",
+   "title": "Mega Dragonite ex, Mega Gengar ex, and Mega Feraligatr ex “Special Deck Set” Revealed",
+   "url": "https://www.pokebeach.com/forums/threads/special-deck-set.4/"
   }
  },
  {

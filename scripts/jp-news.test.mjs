@@ -1,4 +1,4 @@
-// Japan-only news stays out of the Feed. Real headlines, same cases as Catchem-data and catchem-bot.
+// Region-only news stays out of the Feed. Real headlines, same cases as Catchem-data and catchem-bot.
 import { readFile } from "node:fs/promises";
 import { jpNewsDecision } from "../src/jp-news.mjs";
 import RULES from "../src/jp-news-rules.mjs";
@@ -28,6 +28,14 @@ const mixed = newsSlice({ asOf: "2026-10-16", items: [
   { kind: "news", title: "New Pokémon TCG Regional Championships confirmed in the United States", url: "https://victoryroad.pro/2027-season-calendar/", source: "Play! Pokémon", date: "2026-10-15", sentence: "Pokémon TCG dates." },
 ] });
 t("a Japan-only story is left out next to an NA story", mixed.length === 1 && mixed[0].href.includes("victoryroad"), JSON.stringify(mixed.map((r) => r.href)));
+const product = newsSlice({ asOf: "2026-10-16", items: [
+  { kind: "news", title: "Mega Dragonite ex, Mega Gengar ex, and Mega Feraligatr ex “Special Deck Set” Revealed", url: "https://www.pokebeach.com/forums/threads/special-deck-set.4/", source: "PokeBeach", date: "2026-10-15", sentence: "A new deck set." },
+  { kind: "news", title: "Mega Charizard X ex Premium Collection Coming in November", url: "https://example.com/pc", source: "PokeGuardian", date: "2026-10-15" },
+  { kind: "news", title: "“Gem Pack Vol 7” to Release in China Featuring Exclusive Misty’s Psyduck!", url: "https://www.pokebeach.com/forums/threads/gem-pack-vol-7.1/", source: "PokeBeach", date: "2026-10-16", sentence: "A China-only pack." },
+  { kind: "news", title: "Get codes for the Pokémon GO Night Out.", url: "https://example.com/go", source: "Pokémon GO", date: "2026-10-15", sentence: "Codes." },
+] });
+t("Special Deck Set and Premium Collection headlines count as card news", product.some((r) => r.href.includes("special-deck-set")) && product.some((r) => r.href === "https://example.com/pc"), JSON.stringify(product.map((r) => r.href)));
+t("a China-only story and a GO story stay off", !product.some((r) => r.href.includes("gem-pack") || r.href.includes("/go")));
 
 // The copy must match Catchem-data main byte for byte.
 const local = await readFile(new URL("../src/jp-news-rules.mjs", import.meta.url), "utf8");
