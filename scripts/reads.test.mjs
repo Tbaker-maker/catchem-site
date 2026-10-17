@@ -1,5 +1,5 @@
 import { pageKind, renderPath } from "../src/index.mjs";
-import { bumpClick, emailLetter, emailSendAllowed, gatePlan, planFromFields, preSend, renderReadsPage, typePlan } from "../src/reads.mjs";
+import { bumpClick, emailLetter, emailSendAllowed, gatePlan, planFromFields, planToFollow, preSend, renderReadsPage, typePlan, upsertFollow } from "../src/reads.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -19,7 +19,14 @@ const fields = new URLSearchParams("discord=0&discord=1&email_on=0&news=0&news=1
 const parsed = gatePlan(planFromFields(fields), { premium: true });
 t("discord stays on and email stays off", parsed.plan.channels.discord === true && parsed.plan.channels.email === false && parsed.plan.addons.news === true && parsed.plan.rarities[0] === "Illustration Rare");
 const page = renderReadsPage({ signedIn: false, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
-t("the picker defaults Discord and does not force email", page.includes("Discord DM") && page.includes("checked") && page.includes("Email, optional") && page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads"));
+t("the picker defaults Discord and does not ask for email", page.includes("Discord DM") && page.includes("checked") && !page.includes("Email") && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads") && page.includes("Scarlet and Violet") && page.includes("Sample read."));
+t("one save button", (page.match(/<button/g) || []).length === 1);
+t("a blank picker starts on the recommended set", renderReadsPage({ signedIn: false }).includes("ME: 30th Celebration") && renderReadsPage({ signedIn: false }).includes("me-30th-celebration"));
+t("a saved plan is one Discord follow", (() => {
+  const row = planToFollow("d:42", { sets: ["me-30th-celebration"], product: "singles", frequency: "weekly", watch: [], addons: {} });
+  const doc = upsertFollow({ follows: [{ id: "9" }] }, row);
+  return row.discordId === "42" && row.sets[0] === "me-30th-celebration" && doc.follows.length === 2 && doc.follows[1].id === "42";
+})());
 t("a signed-out picker does not ping clicks", !page.includes("/api/reads/click"));
 t("a signed-in picker pings clicks", renderReadsPage({ signedIn: true }).includes("/api/reads/click"));
 t("the picker copy is clean", preSend(page.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);
