@@ -37,7 +37,7 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -525,6 +525,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   } catch {
     globalThis.CATCHEM_TCG_IMAGES = true;
   }
+  let trackDoc = null;
+  try {
+    trackDoc = await loadJson("track-record.json", fetchImpl);
+  } catch {
+    trackDoc = null;
+  }
+  const trackOpen = trackRecordIsOpen(trackDoc);
+  setTrackRecordOpen(trackOpen);
   const pageOpts = { ...opts, asOf };
   if (kind === "data") {
     const rel = path.slice("/data/".length);
@@ -533,8 +541,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return proxyPublic(rel, fetchImpl);
   }
   if (kind === "sitemap") {
-    if (path !== "/sitemap-00.xml") return proxyPublic(path.slice(1), fetchImpl);
-    return withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl));
+    if (path !== "/sitemap-00.xml") return withTrackInSitemap(await proxyPublic(path.slice(1), fetchImpl), trackOpen, false);
+    return withTrackInSitemap(await withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl)), trackOpen, true);
   }
   if (kind === "feed") {
     const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
@@ -915,7 +923,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderSetValue(doc, stamp, pageOpts));
   }
   if (kind === "track") {
-    const doc = await loadJson("track-record.json", fetchImpl).catch(() => null);
+    if (!trackOpen) return noindex(html(renderTrackRecordHidden(stamp, pageOpts)));
+    const doc = trackDoc;
     const pageDoc = doc?.public === true ? doc : {
       public: true,
       thin: true,
@@ -1309,6 +1318,16 @@ async function setFeatureHtml(slug, fetchImpl, valueDoc) {
     rotationHtml = setChipHtml(slug, rot, vancouverDay(), n, { noRotation: !!rotationHtml }) + (rotationHtml || "");
   }
   return { setValueHtml: setValueBlock(doc, images, slug), rotationHtml };
+}
+
+// /track-record is left out of every sitemap until it opens, then listed in sitemap-00.
+export async function withTrackInSitemap(res, open, first) {
+  if (!res || !res.ok) return res;
+  let text = await res.text();
+  const loc = "<url><loc>https://catchemtcg.com/track-record</loc></url>";
+  text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/track-record\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
+  if (open && first && text.includes("</urlset>")) text = text.replace("</urlset>", loc + "\n</urlset>");
+  return new Response(text, { status: res.status, headers: res.headers });
 }
 
 export async function withReleasesInSitemap(res) {

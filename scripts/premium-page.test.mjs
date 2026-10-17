@@ -15,7 +15,8 @@ t("footer", vis.includes("7-day refund on your first charge. Cancel anytime."));
 t("refund line kept", vis.includes(REFUND_LINE));
 t("button", /class="prem-join"[^>]*>Get Premium</.test(main));
 t("one join button", (main.match(/class="prem-join"/g) || []).length === 1);
-t("track record link", main.includes('href="/track-record"'));
+t("track record link hidden while the gate is closed", !main.includes('href="/track-record"'));
+t("track record link back once the gate opens", (() => { const open = renderPremium("", { trackOpen: true }); return open.slice(open.indexOf("<main"), open.indexOf("</main>")).includes('href="/track-record"'); })());
 t("blur hides a name from members who are signed out", (() => {
   const hidden = renderPremium("", { proof: { reads30: 12, week: [{ name: "Example Card", asOf: "2026-10-17", kind: "single" }] } });
   const open = renderPremium("", { proof: { reads30: 12, week: [{ name: "Example Card", asOf: "2026-10-17" }] }, premium: true });
