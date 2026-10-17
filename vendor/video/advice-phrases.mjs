@@ -279,7 +279,6 @@ export default {
       "for profit",
       "for a profit",
       "for cash",
-      "for \\$",
       "now",
       "today",
       "tonight",
