@@ -59,7 +59,13 @@ export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel, u
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
   const label = count ? "eBay listings counted" : "Price history";
+  const first = real[0];
+  const last = real[real.length - 1];
+  const summary = count
+    ? `Listings counted from ${esc(first[0])} (${esc(String(first[1]))}) to ${esc(last[0])} (${esc(String(last[1]))}).`
+    : `Price from ${esc(first[0])} to ${esc(last[0])}.`;
   return `<figure class="hc" data-unit="${esc(unit)}" data-snap="${esc(count ? "real" : snap)}" data-pts="${esc(JSON.stringify(pts))}" data-color="${esc(color)}">
+<p class="hc-sum">${summary}</p>
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
@@ -77,7 +83,9 @@ export const HISTORY_CSS = `.hc{margin:16px 0;padding:16px 16px 12px;border-radi
 .hc-gls{position:absolute;inset:0;pointer-events:none}.hc-gl{position:absolute;right:2px;transform:translateY(-120%);font-size:10px;opacity:.38}
 .hc-axis{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
 .hc-gaps{}
-@media(max-width:600px){.hc{padding:14px 12px 10px;border-radius:18px}.hc-plot{height:180px}.hc-pill{padding:6px 10px}}`;
+@media(max-width:600px){.hc{padding:14px 12px 10px;border-radius:18px}.hc-plot{height:180px}.hc-pill{padding:6px 10px}}
+.hc-sum{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}`;
 
 export const HISTORY_JS = `(function(){
 function money(v){return "$"+Number(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}

@@ -1607,8 +1607,8 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <title>${esc(title)} · Catch'em</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${shareTags}
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
+<style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
@@ -1620,7 +1620,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${dockNav(active, feed)}
 </nav>
-<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
+<footer class="site-foot"><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a> · <a href="/track-record">Track record</a> · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});document.addEventListener("keydown",function(ev){if(ev.key!=="/"||ev.metaKey||ev.ctrlKey||ev.altKey||ev.defaultPrevented)return;var el=ev["tar"+"get"];var tag=el&&el.tagName;if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(el&&el.isContentEditable))return;var box=document.getElementById("q");if(box){ev.preventDefault();box.focus();return;}if(location.pathname!=="/search")location.href="/search";});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -1658,6 +1658,7 @@ window.cropCardEdge=function(img){
   }catch(e){}
 };
 </script>
+<script>${CHART_JS}\n${HISTORY_JS}</script>
 <script>window.addEventListener("error",function(e){var body=JSON.stringify({message:String(e.message||""),source:String(e.filename||""),line:e.lineno||0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});window.addEventListener("unhandledrejection",function(e){var reason=e.reason;var message=reason&&reason.message?String(reason.message):String(reason||"");var body=JSON.stringify({message:message,source:"",line:0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});</script></body></html>`;
 }
 
@@ -3487,26 +3488,89 @@ ${table}
 }
 
 export function renderTrackRecord(doc, stamp, opts = {}) {
-  const horizonLine = (label, scored) => {
-    const n = Number(scored) || 0;
-    return `${label}: ${n} scored so far`;
+  const rows = [...(Array.isArray(doc?.rows) ? doc.rows : [])].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(a.name || "").localeCompare(String(b.name || "")));
+  const windows = doc?.windows || {};
+  const money2 = (n) => Number(n) > 0 ? `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    return m ? `${months[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : "";
   };
-  const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${esc(row.line14 || horizonLine("14-day", row.scored14))}</td><td>${esc(row.line28 || horizonLine("28-day", row.scored28))}</td><td>${esc(row.line56 || horizonLine("56-day", row.scored56))}</td></tr>`).join("");
-  const rows = [...(doc?.rows || [])].sort((a, b) => String(b.shipped || "").localeCompare(String(a.shipped || ""))).map((row) => {
-    const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "");
-    const later = (n) => row.marks?.[n]?.price > 0 ? (money(row.marks[n].price) || "—") : "—";
-    const dir = row.direction === "up" || row.direction === "down" ? row.direction : "—";
-    return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : "—"}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
-  }).join("");
-  const body = `<main id="main" tabindex="-1" class="wrap">
+  const mark = (row) => row.moved === true ? `<p class="tr-hit">Moved the way the read described</p>` : row.moved === false ? `<p class="tr-miss">Moved the other way</p>` : `<p class="muted">Still open</p>`;
+  const cards = rows.map((row) => `<article class="tr-row" data-kind="${esc(row.kind || "")}" data-date="${esc(row.date || "")}" data-moved="${row.moved === true ? "1" : row.moved === false ? "0" : ""}">
+<p class="muted">${esc(day(row.date))}</p>
+<h2>${esc(row.name || "")}</h2>
+<p>${esc(row.said || "")}</p>
+<p>${esc(money2(row.priceThen))} then. ${esc(money2(row.priceNow))} now.</p>
+<p class="muted">${esc(row.source || "")}${row.priceDate ? `, ${esc(day(row.priceDate))}` : ""}</p>
+${mark(row)}
+</article>`).join("");
+  const line = windows.d90?.line || doc?.summary || "";
+  const thin = doc?.thin !== false;
+  const body = `<main id="main" tabindex="-1" class="wrap tr-page">
+<style>
+.tr-page h1{margin:8px 0 6px}
+.tr-note{color:#8f877a;font-size:13px;margin:0 0 12px}
+.tr-sum{background:#16140f;border:1px solid #2a261f;border-radius:20px;padding:18px;margin:0 0 14px}
+.tr-sum p{margin:0}
+.tr-sum .tr-line{font:600 20px/1.35 var(--serif)}
+.tr-chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.tr-chips button{flex:none;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #2f2b26;background:#16140f;color:#efe9de;font:600 14px/1 var(--sans)}
+.tr-chips button[aria-pressed="true"]{background:#d9b779;color:#1a1407;border-color:#d9b779}
+.tr-row{background:#16140f;border:1px solid #24211c;border-radius:16px;padding:14px 16px;margin:0 0 10px}
+.tr-row h2{margin:2px 0 8px;font:600 18px/1.3 var(--serif)}
+.tr-row p{margin:0 0 6px}
+.tr-hit{color:#7fc79a;font-weight:600}
+.tr-miss{color:#e0877a;font-weight:600}
+</style>
 <h1>Track record</h1>
-<p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || "—")}.</p>
-<p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
-<p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. ${esc(horizonLine("14-day", doc?.scored14))}. ${esc(horizonLine("28-day", doc?.scored28))}. ${esc(horizonLine("56-day", doc?.scored56))}.</p>
-<table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>14-day</th><th>28-day</th><th>56-day</th></tr></thead><tbody>${types}</tbody></table>
-<table><thead><tr><th>Ship date</th><th>Name</th><th>Ship price</th><th>Direction</th><th>14-day</th><th>28-day</th><th>56-day</th><th>Note</th></tr></thead><tbody>${rows || `<tr><td colspan="8">No reads in the track record file.</td></tr>`}</tbody></table>
+<p class="tr-note">${esc(doc?.disclaimer || "Past moves don't predict future prices.")}</p>
+<section class="tr-sum" aria-live="polite">
+<p class="tr-line" id="tr-line">${esc(line || "More history added nightly")}</p>
+${thin ? `<p class="tr-note" id="tr-thin">More history added nightly</p>` : ""}
+</section>
+<div class="tr-chips" role="group" aria-label="Filter">${[["sealed", "Sealed"], ["single", "Singles"], ["30", "30d"], ["90", "90d"]].map(([k, label]) => `<button type="button" data-tr="${k}" aria-pressed="${k === "90" ? "true" : "false"}">${label}</button>`).join("")}</div>
+<div id="tr-rows">${cards}</div>
+<script type="application/json" id="tr-windows">${JSON.stringify(windows).replace(/</g, "\\u003c")}</script>
+<script>(function(){
+  var rows=[].slice.call(document.querySelectorAll(".tr-row"));
+  var line=document.getElementById("tr-line");
+  var wins={};
+  try{ wins=JSON.parse(document.getElementById("tr-windows").textContent||"{}"); }catch(e){ wins={}; }
+  var asOf=${JSON.stringify(String(doc?.asOf || ""))};
+  function on(k){ var b=document.querySelector('[data-tr="'+k+'"]'); return !!(b && b.getAttribute("aria-pressed")==="true"); }
+  function age(iso){ if(!asOf||!iso) return 0; return Math.round((Date.parse(asOf+"T00:00:00Z")-Date.parse(iso+"T00:00:00Z"))/86400000); }
+  function paint(){
+    var sealed=on("sealed"), single=on("single"), d30=on("30"), d90=on("90")||!on("30");
+    var days=d30&&!d90?30:90;
+    var shown=0;
+    rows.forEach(function(row){
+      var kind=row.getAttribute("data-kind");
+      var kindOk=(!sealed&&!single)||(sealed&&kind==="sealed")||(single&&kind==="single");
+      var dayOk=age(row.getAttribute("data-date"))<=days;
+      var ok=kindOk&&dayOk;
+      row.hidden=!ok;
+      if(ok) shown++;
+    });
+    var key=(sealed&&!single?"sealed":!sealed&&single?"single":"")+(days===30?"30":"90");
+    if(key==="30") key="d30"; else if(key==="90") key="d90"; else if(key==="sealed30"||key==="sealed90"||key==="single30"||key==="single90") {}
+    var bag=wins[key]||{};
+    line.textContent=bag.line||(shown?"More history added nightly":"More history added nightly");
+  }
+  document.querySelectorAll("[data-tr]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var k=btn.getAttribute("data-tr");
+      if(k==="30"||k==="90"){
+        document.querySelector('[data-tr="30"]').setAttribute("aria-pressed", k==="30"?"true":"false");
+        document.querySelector('[data-tr="90"]').setAttribute("aria-pressed", k==="90"?"true":"false");
+      }else btn.setAttribute("aria-pressed", btn.getAttribute("aria-pressed")==="true"?"false":"true");
+      paint();
+    });
+  });
+  paint();
+})();</script>
 </main>`;
-  return chrome("", body, "Track record", stamp, "", feedNav(opts));
+  return chrome("Track record", body, "Track record", stamp, "", feedNav(opts));
 }
 
 export function renderReceipts(doc, stamp, opts = {}) {
@@ -3781,6 +3845,10 @@ async function draw(){
   const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
 document.getElementById("q").addEventListener("input",function(){ limit=40; draw(); });
+document.getElementById("q").addEventListener("focus",function(){
+  if(manifest||usedLite) return;
+  fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
+});
 document.getElementById("vtag").addEventListener("input",draw);
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
@@ -3924,6 +3992,15 @@ const WATCH_PERK = "Watch up to 25 cards or products. We DM you when the price o
 
 export function renderPremium(stamp, opts = {}) {
   void stamp;
+  const proof = opts.proof || null;
+  const member = opts.premium === true;
+  const week = Array.isArray(proof?.week) ? proof.week.slice(0, 3) : [];
+  const count = Number(proof?.reads30);
+  const examples = week.length ? week.map((row) => {
+    const name = member ? esc(row.name || "") : `<span class="prem-blur" aria-hidden="true">${esc(row.name || "")}</span><span class="sr">Name hidden until Premium</span>`;
+    return `<li>${name}<span class="muted">${esc(String(row.asOf || "").slice(0, 10))}</span></li>`;
+  }).join("") : `<li class="muted">More history added nightly</li>`;
+  const countLine = count > 0 ? `<p class="prem-count"><b>${count.toLocaleString("en-US")}</b> reads in the last 30 days.</p>` : "";
   const ico = (paths) => `<span class="prem-ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></span>`;
   const card = (paths, title, copy) => `<article class="prem-card">${ico(paths)}<h3>${title}</h3><p>${copy}</p></article>`;
   const body = `<main id="main" tabindex="-1" class="wrap prem">
@@ -3953,6 +4030,15 @@ export function renderPremium(stamp, opts = {}) {
 .prem-manage{margin:18px 0 0;color:var(--dim);font-size:14px}
 .prem-acts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
 .prem-acts a{flex:1 1 220px;min-width:44px;text-align:center;text-decoration:none;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;display:flex;align-items:center;justify-content:center;font:600 14px var(--sans);padding:8px 12px}
+.prem-proof{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:8px 0 18px}
+.prem-proof h2{margin:0 0 8px;font:600 18px/1.3 var(--sans)}
+.prem-count{margin:0 0 8px;font-size:16px}
+.prem-week{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.prem-week li{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:44px;border-radius:12px;background:#12100e;padding:8px 12px}
+.prem-week li .muted{white-space:nowrap;flex:none}
+.prem-blur{filter:blur(6px);user-select:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.prem-proof a{min-height:44px;display:inline-flex;align-items:center}
 @media(min-width:840px){
   .prem-grid{grid-template-columns:repeat(6,1fr)}
   .prem-card{grid-column:span 2}
@@ -3964,9 +4050,16 @@ export function renderPremium(stamp, opts = {}) {
 <p class="prem-kicker">Discord Premium</p>
 <h1>Catch'em Premium · $14.99 USD a month</h1>
 <p class="prem-lede">See the market before everyone else.</p>
-<a class="prem-join" href="${DISCORD}">Join Premium</a>
+<a class="prem-join" href="${DISCORD}">Get Premium</a>
 <p class="prem-fine">7-day refund on your first charge. Cancel anytime.</p>
 <p class="prem-agree muted"><small>By subscribing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></p>
+</section>
+<section class="prem-proof">
+<h2>From our own files</h2>
+${countLine}
+<p>Example reads from this week.${member ? "" : " Names stay blurred until you are a member."}</p>
+<ul class="prem-week">${examples}</ul>
+<p><a href="/track-record">Track record</a></p>
 </section>
 <h2>Everything free, plus:</h2>
 <div class="prem-grid">
@@ -4311,6 +4404,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
+<link rel="preload" href="/data/feed/meta.json" as="fetch" crossorigin>
+<link rel="preload" href="/data/feed/browse.json" as="fetch" crossorigin>
 ${page === "read" ? '<p><a href="/feed" id="feed-back">Back</a></p><h1>Read</h1>' : `<h1>${focusTitle || "The Feed"}</h1>
 ${focusTitle ? '<p><a class="tap" href="/feed" id="feed-back">Back</a></p>' : '<p><a class="tap" href="/feed/mine">My tracked reads</a></p>'}`}
 ${sheet}
@@ -4361,12 +4456,9 @@ function grabJson(url){
 }
 const feedPack=Promise.all([
   grabJson("/data/feed/meta.json"),
-  grabJson("/data/feed/browse.json"),
-  grabJson("/data/feed/catalogue.json"),
-  grabJson("/data/feed/read-library.json"),
-  grabJson("/data/sets.json")
+  grabJson("/data/feed/browse.json")
 ]);
-const imagePack=grabJson("/data/catalogue-images.json");
+const imagePack=grabJson;
 const start=JSON.parse(document.getElementById("start").textContent);
 const money=n=>!(Number(n)>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const shortFor=()=>'';
@@ -6637,7 +6729,6 @@ function mergeLocalWatch(){
 }
 async function boot(){
   const pack=await feedPack;
-  imagePack.then(function(doc){ catalogueImages=doc&&doc.images||null; });
   mergeLocalWatch();
   const back=document.getElementById("feed-back");
   if(back) back.onclick=function(ev){
@@ -6645,7 +6736,7 @@ async function boot(){
   };
   if(pageMode==="read"){
     meta=pack[0];
-    readLibrary=pack[3];
+    readLibrary=await grabJson("/data/feed/read-library.json");
     await showRead();
     return;
   }
@@ -6661,17 +6752,9 @@ async function boot(){
   const only=focusGroup();
   if(!only){
     browse=pack[1];
-    catalogue=pack[2];
-    readLibrary=pack[3];
-    const doc=pack[4];
-    const bySlug={};
-      const byName={};
-      (doc && Array.isArray(doc.sets) ? doc.sets : []).forEach(function(tile){
-        if(!tile || !tile.slug || !tile.name) return;
-        bySlug[tile.slug]=tile;
-        if(!byName[tile.name]) byName[tile.name]=tile.slug;
-      });
-      setBook={bySlug:bySlug, byName:byName};
+    catalogue=null;
+    readLibrary=null;
+    setBook={bySlug:{}, byName:{}};
     buildReadIndex();
     const setSel=document.getElementById("f-loop-set");
     function fillSetOptions(){
@@ -6977,6 +7060,23 @@ async function boot(){
     openRead=startQ.get("r")||"";
     urlIntent="replace";
     await applyFilter(startQ.get("f")||"", startQ.get("set")||"", false);
+    const warmHeavy=function(){
+      imagePack("/data/catalogue-images.json").then(function(doc){ catalogueImages=doc&&doc.images||null; }).catch(function(){});
+      grabJson("/data/feed/catalogue.json").then(function(doc){ catalogue=doc; buildReadIndex(); }).catch(function(){});
+      grabJson("/data/feed/read-library.json").then(function(doc){ readLibrary=doc; }).catch(function(){});
+      grabJson("/data/sets.json").then(function(doc){
+        const bySlug={}, byName={};
+        (doc && Array.isArray(doc.sets) ? doc.sets : []).forEach(function(tile){
+          if(!tile || !tile.slug || !tile.name) return;
+          bySlug[tile.slug]=tile;
+          if(!byName[tile.name]) byName[tile.name]=tile.slug;
+        });
+        setBook={bySlug:bySlug, byName:byName};
+        buildReadIndex();
+        fillSetOptions();
+      }).catch(function(){});
+    };
+    if("requestIdleCallback" in window) requestIdleCallback(warmHeavy, {timeout:1800}); else setTimeout(warmHeavy, 400);
     const restCfg=(function(){ try{ return JSON.parse(document.getElementById("feed-rest").textContent)||{}; }catch(e){ return {}; } })();
     function loadRest(){
       if(!restCfg.url) return;

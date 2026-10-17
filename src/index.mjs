@@ -16,7 +16,11 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
-const withChartKit = (page) => String(page).replace("</head>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></head>`);
+const withChartKit = (page) => {
+  const html = String(page);
+  if (html.includes("function mount(fig)")) return html;
+  return html.replace("</body>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></body>`);
+};
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
 import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip } from "./pokemon.mjs";
@@ -857,7 +861,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "post" || kind === "build") {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
-  if (kind === "premium") return html(renderPremium(stamp, pageOpts));
+  if (kind === "premium") {
+    const proof = await loadJson("premium-proof.json", fetchImpl).catch(() => null);
+    return html(renderPremium(stamp, { ...pageOpts, proof }));
+  }
   if (kind === "indexes") {
     const list = await loadJson("feed/rating/index-list.json", fetchImpl).catch(() => null);
     const market = await loadJson("indexes.json", fetchImpl).catch(() => null);
@@ -908,10 +915,17 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderSetValue(doc, stamp, pageOpts));
   }
   if (kind === "track") {
-    const doc = await loadJson("track-record.json", fetchImpl).catch(() => ({ count: 0, rows: [], types: [], tooEarly: 0, scored14: 0, scored28: 0, scored56: 0 }));
-    // Hidden unless the data repo marks the track record public. No page, no score, no card line.
-    if (doc?.public !== true) return html(renderNotFound(stamp, pageOpts), 404);
-    return html(renderTrackRecord(doc, stamp, pageOpts));
+    const doc = await loadJson("track-record.json", fetchImpl).catch(() => null);
+    const pageDoc = doc?.public === true ? doc : {
+      public: true,
+      thin: true,
+      asOf: "",
+      disclaimer: "Past moves don't predict future prices.",
+      summary: "",
+      windows: {},
+      rows: [],
+    };
+    return html(renderTrackRecord(pageDoc, stamp, pageOpts));
   }
   if (kind === "compare") {
     const raw = ["a", "b", "c", "d"].map((key) => String(opts[key] || "").trim());
