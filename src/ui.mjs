@@ -4232,8 +4232,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .deep-more summary{cursor:pointer;color:var(--gold);font-weight:600;list-style:none;min-height:28px}
   .deep-more summary::-webkit-details-marker{display:none}
   .deep-lines{margin:8px 0;padding-left:0;list-style:none;display:grid;gap:6px;line-height:1.45}
-  .deep-line{display:flex;align-items:center;gap:12px;min-width:0;padding:8px;border-radius:12px;background:rgba(255,255,255,.03)}
-  .deep-line>span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+  .deep-line{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-width:0;padding:8px;border-radius:12px;background:rgba(255,255,255,.03)}
+  .deep-line>span{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
   .deep-line .card-thumb{width:60px;height:84px;border-radius:8px}
   .card-thumb{width:28px;height:38px;object-fit:cover;border-radius:6px;flex:none;background:#1c1916}
   .deep-chart{margin:10px 0 4px}
