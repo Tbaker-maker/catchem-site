@@ -2883,7 +2883,7 @@ export function renderCard(card, stamp, opts = {}) {
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
-    listings: countedListings(fact, opts.listingSeries, endDay),
+    listings: countedListings(fact, opts.listingSeries, endDay) || opts.itemListings || null,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
   const listReal = (opts.listingSeries || [])
