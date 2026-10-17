@@ -4099,7 +4099,8 @@ export function leadWithStory(reads) {
   if (!list.length || !PLAIN_PRICE.has(String(list[0]?.readKind || list[0]?.kind || ""))) return list;
   const kindOf = (r) => String(r?.readKind || r?.kind || "");
   const isFact = (r) => /^pokemon/.test(kindOf(r)) || /^pokemon-/.test(String(r?.id || ""));
-  let i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)) && !isFact(r));
+  const isNews = (r) => ["news", "newsline", "wave"].includes(kindOf(r));
+  let i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)) && !isFact(r) && !isNews(r));
   if (i < 0) i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)));
   if (i <= 0) return list;
   return [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
@@ -4125,6 +4126,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .chip-row button[aria-pressed="true"]{background:var(--gold);color:#1a1407;border-color:transparent}
   .chip-more{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:5;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--gold);font:600 28px/1 var(--sans)}
   .chip-more[hidden]{display:none}
+  .new-badge{display:inline-flex;align-items:center;align-self:flex-start;min-height:28px;margin:0 0 8px;padding:0 12px;border-radius:999px;background:rgba(127,199,154,.14);color:#7fc79a;font:600 12px/1 var(--sans);letter-spacing:.02em}
   .pill-native{position:absolute;width:44px;height:44px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;pointer-events:none}
   .set-picker{display:flex;flex-direction:column;gap:8px;width:100%;max-width:100%;min-width:0;position:relative;z-index:6}
   .set-picker[hidden]{display:none}
@@ -4429,6 +4431,26 @@ function filesDisagree(card, other){
 ${readStaleAgainstCard.toString()}
 const bucketCache={};
 let feedDay=null;
+function computeFeedDay(){
+  if(feedDay!==null) return feedDay;
+  feedDay="";
+  try{ (JSON.parse((document.getElementById("feed-lead")||{}).textContent||"[]")||[]).forEach(function(r){ const d=String(r&&r.asOf||"").slice(0,10); if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d) && d>feedDay) feedDay=d; }); }catch(e){ feedDay=""; }
+  return feedDay;
+}
+let lastVisitDay=null;
+function lastFeedVisit(){
+  if(lastVisitDay!==null) return lastVisitDay;
+  lastVisitDay="";
+  try{ lastVisitDay=String(localStorage.getItem("catchem-feed-last-day")||""); }catch(e){ lastVisitDay=""; }
+  try{ const today=computeFeedDay(); if(today && today>lastVisitDay) localStorage.setItem("catchem-feed-last-day", today); }catch(e){}
+  return lastVisitDay;
+}
+function isNewSinceVisit(row){
+  const last=lastFeedVisit();
+  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(last)) return false;
+  const d=String(row&&(row.asOf||row.date)||"").slice(0,10);
+  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d) && d>last;
+}
 async function publishedCard(sku){
   const id=String(sku||"");
   const n=Number((id.match(/([0-9]+)/)||[])[1]);
@@ -4448,10 +4470,7 @@ async function stalePrice(row){
   if(!row || !row.sku) return false;
   // A read built the same night as the card files cannot disagree with them,
   // so skip the 130 KB bucket fetch. Older reads still get checked.
-  if(feedDay===null){
-    feedDay="";
-    try{ (JSON.parse((document.getElementById("feed-lead")||{}).textContent||"[]")||[]).forEach(function(r){ const d=String(r&&r.asOf||"").slice(0,10); if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d) && d>feedDay) feedDay=d; }); }catch(e){ feedDay=""; }
-  }
+  computeFeedDay();
   const asOf=String(row.asOf||"").slice(0,10);
   if(feedDay && asOf>=feedDay) return false;
   const card=await publishedCard(row.sku);
@@ -6268,9 +6287,11 @@ function buildFlat(){
     // Open on a story, not a plain price move.
     const PLAIN_KIND={single:1,sealed:1,streak:1,mover:1,price:1,askmove:1,mktmove:1};
     const plainish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return !r || r.pending || PLAIN_KIND[k] || k.indexOf("pokemon")===0; };
-    if(flat.length && plainish(flat[0])){
+    const newsish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return k==="news" || k==="newsline" || k==="wave" || !!(r && r.waveItem); };
+    if(flat.length && (plainish(flat[0]) || newsish(flat[0]))){
       let k=-1;
-      for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } }
+      for(let n=1;n<Math.min(flat.length,60);n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
+      if(k<0 && plainish(flat[0])){ for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } } }
       if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
     }
     markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
@@ -6483,6 +6504,12 @@ async function showFlat(index, dir){
   const row=found.row;
   const news=row.readKind==="news" || row.kind==="news";
   const card=row.waveItem ? waveEl(row) : (news ? newsEl(row) : cardEl(row));
+  if(card && isNewSinceVisit(row)){
+    const nb=document.createElement("span");
+    nb.className="new-badge";
+    nb.textContent="New since your last visit";
+    card.insertBefore(nb, card.firstChild);
+  }
   let stage=host.querySelector(".feed-stage");
   if(!stage){
     host.innerHTML="";
