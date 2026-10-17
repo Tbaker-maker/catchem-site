@@ -7,6 +7,16 @@ const READ_GUARD = banGuard("read");
 
 export const RARITIES = ["Illustration Rare", "Special Illustration Rare", "Ultra Rare"];
 export const ERAS = ["Scarlet and Violet", "Sword and Shield", "Sun and Moon", "Mega Evolution"];
+// Set list dated 2026-10-17 from sets.json. Recommended is the newest main set with both singles and sealed.
+export const SET_CHOICES = [
+  { slug: "me-30th-celebration", name: "ME: 30th Celebration", recommended: true },
+  { slug: "me-ascended-heroes", name: "ME: Ascended Heroes" },
+  { slug: "me05-pitch-black", name: "ME05: Pitch Black" },
+  { slug: "sv-prismatic-evolutions", name: "SV: Prismatic Evolutions" },
+  { slug: "sv10-destined-rivals", name: "SV10: Destined Rivals" },
+  { slug: "sv-black-bolt", name: "SV: Black Bolt" },
+];
+export const POKEMON_CHOICES = ["Pikachu", "Charizard", "Eevee", "Umbreon", "Mew"];
 const FREE_CAP = 1;
 const PREMIUM_CAP = 25;
 
@@ -20,6 +30,7 @@ export function blankPlan() {
     singles: false,
     watch: [],
     frequency: "weekly",
+    product: "singles",
     channels: { discord: true, email: false },
     email: "",
     addons: { news: false, games: false, all: false },
@@ -78,15 +89,10 @@ export function gatePlan(plan, { premium = false } = {}) {
     next.frequency = "weekly";
     notes.push("A free seat is one weekly read. Daily and other schedules are in Premium.");
   }
-  next.channels.discord = plan?.channels?.discord !== false;
-  next.channels.email = plan?.channels?.email === true;
-  next.email = next.channels.email ? String(plan?.email || "").trim().slice(0, 120) : "";
-  if (next.channels.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) {
-    next.channels.email = false;
-    next.email = "";
-    notes.push("Email stays off until the address is filled in. Discord stays on.");
-  }
-  if (!next.channels.discord && !next.channels.email) next.channels.discord = true;
+  next.channels.discord = true;
+  next.channels.email = false;
+  next.email = "";
+  next.product = plan?.product === "sealed" ? "sealed" : "singles";
   next.addons.all = plan?.addons?.all === true;
   next.addons.news = next.addons.all || plan?.addons?.news === true;
   next.addons.games = next.addons.all || plan?.addons?.games === true;
@@ -152,17 +158,24 @@ export function planFromFields(fields) {
   const extraName = String(get("watch_name") || "").trim();
   const extraId = String(get("watch_id") || "").trim();
   if (extraName || extraId) watch.push({ kind: get("watch_kind") === "sealed" ? "sealed" : "card", id: extraId, name: extraName });
+  const chipSets = all("set").map((value) => String(value || "").trim()).filter(Boolean);
+  const chipPokemon = all("pokemon").map((value) => String(value || "").trim()).filter(Boolean);
+  const product = String(get("product") || "singles") === "sealed" ? "sealed" : "singles";
+  const rarities = all("rarity");
+  const eras = all("era");
+  const other = chipSets.length || chipPokemon.length || rarities.some(Boolean) || eras.some(Boolean) || watch.length;
   return {
-    sets: get("sets"),
-    pokemon: get("pokemon"),
-    rarities: all("rarity"),
-    eras: all("era"),
-    sealed: on("sealed"),
-    singles: on("singles"),
+    sets: chipSets.length ? chipSets : get("sets"),
+    pokemon: chipPokemon.length ? chipPokemon : get("pokemon"),
+    rarities,
+    eras,
+    sealed: product === "sealed" && !other,
+    singles: product === "singles" && !other,
     watch,
     frequency: String(get("frequency") || "weekly"),
-    channels: { discord: on("discord"), email: on("email_on") },
-    email: String(get("email") || ""),
+    channels: { discord: true, email: false },
+    email: "",
+    product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
   };
 }
@@ -235,11 +248,85 @@ function box(name, label, on) {
   return `<label class="rd-check"><input type="checkbox" name="${name}" value="1"${on ? " checked" : ""}> ${esc(label)}</label>`;
 }
 
-function choice(name, value, on) {
-  return `<label class="rd-check"><input type="checkbox" name="${name}" value="${esc(value)}"${on ? " checked" : ""}> ${esc(value)}</label>`;
+export function setLabel(slug) {
+  return SET_CHOICES.find((row) => row.slug === slug)?.name || String(slug || "");
+}
+
+export function recommendedPlan(plan) {
+  const base = plan && typeof plan === "object" ? { ...blankPlan(), ...plan } : blankPlan();
+  if (followCount(base) > 0) return base;
+  return { ...base, sets: ["me-30th-celebration"], product: "singles", frequency: base.frequency || "weekly" };
+}
+
+export function sampleRead(plan) {
+  const names = (plan?.sets || []).map(setLabel).filter(Boolean);
+  const product = plan?.product === "sealed" ? "sealed" : "singles";
+  const often = plan?.frequency || "weekly";
+  const watch = (plan?.watch || []).map((row) => row.name || row.id).filter(Boolean);
+  const parts = ["Sample read."];
+  if (watch.length) parts.push(`Your watchlist: ${watch.join(", ")}.`);
+  const subject = names.length ? names.join(", ") : ((plan?.pokemon || []).join(", ") || product);
+  parts.push(`${subject}, ${product}, ${often}.`);
+  parts.push("This is a sample. The night file fills the dated lines.");
+  return parts.join(" ");
+}
+
+export function planToFollow(discordId, plan) {
+  const id = String(discordId || "").replace(/^d:/, "").replace(/[^0-9A-Za-z_-]/g, "").slice(0, 32) || "member";
+  const product = plan?.product === "sealed" ? "sealed" : "singles";
+  const cards = [];
+  const sealedIds = [];
+  for (const row of plan?.watch || []) {
+    const pid = productId(row?.id);
+    if (!pid) continue;
+    if (row.kind === "sealed") sealedIds.push(pid);
+    else cards.push(pid);
+  }
+  const kinds = [];
+  if (product === "sealed" || plan?.sealed) kinds.push("sealed");
+  if (product === "singles" || plan?.singles) kinds.push("single");
+  return {
+    id,
+    discordId: id,
+    sets: plan?.sets || [],
+    cards,
+    sealed: sealedIds,
+    kinds,
+    pokemon: plan?.pokemon || [],
+    rarities: plan?.rarities || [],
+    eras: plan?.eras || [],
+    frequency: plan?.frequency || "weekly",
+    product,
+    news: plan?.addons?.news === true,
+    games: plan?.addons?.games === true,
+  };
+}
+
+export function upsertFollow(doc, follow) {
+  const follows = (Array.isArray(doc?.follows) ? doc.follows : []).filter((row) => row && row.id !== follow.id);
+  follows.push(follow);
+  return {
+    rule: "Each follow is one Discord id. The nightly reads data/custom-reads/follows.json in this shape. A night with no match is skipped.",
+    follows,
+  };
+}
+
+export function readsPickerEnabled(env) {
+  return String(env?.READS_PICKER || "").toLowerCase() !== "off";
+}
+
+function choice(name, value, label, on) {
+  return `<label class="rd-chip"><input type="checkbox" name="${name}" value="${esc(value)}" data-label="${esc(label)}"${on ? " checked" : ""}><span>${esc(label)}</span></label>`;
+}
+
+function radio(name, value, label, on, locked) {
+  return `<label class="rd-chip"><input type="radio" name="${name}" value="${esc(value)}" data-label="${esc(label)}"${on ? " checked" : ""}${locked ? " disabled" : ""}><span>${esc(label)}</span></label>`;
 }
 
 export function renderReadsPage(state = {}) {
+  if (state.picker === false) {
+    return `<main id="main" tabindex="-1" class="rd-wrap"><h1>Your reads</h1><p>Reads are off.</p><p>Discord is the account link. <a href="https://discord.gg/fUSjxDX4Hy">Open Discord</a>.</p></main>`;
+  }
   const signedIn = state.signedIn === true;
   const premium = state.premium === true;
   const base = state.plan && typeof state.plan === "object" ? state.plan : blankPlan();
@@ -250,101 +337,110 @@ export function renderReadsPage(state = {}) {
   if (sealedId && !draft.watch.some((row) => row.id === sealedId)) draft.watch.push({ kind: "sealed", id: sealedId, name: "" });
   const suggestion = typePlan(state.line || "");
   const gatedSuggestion = suggestion ? gatePlan(suggestion, { premium }) : null;
+  let shown = draft;
+  if (gatedSuggestion) {
+    const extra = draft.watch.filter((row) => row.id && !(gatedSuggestion.plan.watch || []).some((item) => item.id === row.id));
+    shown = { ...gatedSuggestion.plan, watch: [...(gatedSuggestion.plan.watch || []), ...extra] };
+  }
+  shown = recommendedPlan(shown);
+  if (!shown.product) shown.product = shown.sealed ? "sealed" : "singles";
   const notes = [];
   if (state.saved) notes.push("Saved.");
   if (gatedSuggestion) notes.push(...gatedSuggestion.notes);
-  const preview = planPreview(gatedSuggestion?.plan || draft);
-  const freq = draft.frequency || "weekly";
-  const freqBox = (value, label) => {
-    const locked = !premium && value !== "weekly";
-    return `<label class="rd-check"><input type="radio" name="frequency" value="${value}"${freq === value ? " checked" : ""}${locked ? " disabled" : ""}> ${esc(label)}</label>`;
-  };
-  const keep = (draft.watch || []).map((row) => {
+  const sample = sampleRead(shown);
+  const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
-    const label = row.name || row.id;
-    return `<label class="rd-check"><input type="checkbox" name="keep" value="${esc(value)}" checked> ${esc(label)}</label>`;
+    const label = row.name || row.id || "Saved product";
+    return choice("keep", value, label, true);
   }).join("");
-  const suggest = gatedSuggestion ? `<form class="rd-card" method="post" action="/api/reads">
-<h2>Ready plan</h2>
-<p>${esc(planPreview(gatedSuggestion.plan).map((block) => block.title + ": " + block.text).join(" "))}</p>
-<input type="hidden" name="sets" value="${esc(gatedSuggestion.plan.sets.join(", "))}">
-<input type="hidden" name="pokemon" value="${esc(gatedSuggestion.plan.pokemon.join(", "))}">
-<input type="hidden" name="frequency" value="${esc(gatedSuggestion.plan.frequency)}">
-${gatedSuggestion.plan.rarities.map((name) => `<input type="hidden" name="rarity" value="${esc(name)}">`).join("")}
-${gatedSuggestion.plan.eras.map((name) => `<input type="hidden" name="era" value="${esc(name)}">`).join("")}
-${gatedSuggestion.plan.sealed ? `<input type="hidden" name="sealed" value="1">` : ""}
-${gatedSuggestion.plan.singles ? `<input type="hidden" name="singles" value="1">` : ""}
-${gatedSuggestion.plan.watch.map((row) => `<input type="hidden" name="keep" value="${esc(`${row.kind}:${row.id}:${row.name}`)}">`).join("")}
-<input type="hidden" name="discord" value="1">
-${gatedSuggestion.plan.addons.news ? `<input type="hidden" name="news" value="1">` : ""}
-${gatedSuggestion.plan.addons.games ? `<input type="hidden" name="games" value="1">` : ""}
-${gatedSuggestion.plan.addons.all ? `<input type="hidden" name="all" value="1">` : ""}
-<button type="submit">Keep this plan</button>
-</form>` : "";
-  const previewHtml = preview.length ? `<section class="rd-card">${preview.map((block) => `<h2>${esc(block.title)}</h2><p>${esc(block.text)}</p>`).join("")}</section>` : "";
   const sign = signedIn ? "" : `<p><a href="/auth/discord?next=/reads">Sign in with Discord</a> to save this read.</p>`;
   const beacon = signedIn
     ? `<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>`
     : "";
   return `<main id="main" tabindex="-1" class="rd-wrap">
 <style>
-.rd-wrap{max-width:440px;margin:0 auto;padding:16px 14px 88px;background:#f2f2f7;color:#1c1c1e;border-radius:28px}
+.rd-wrap{max-width:440px;margin:0 auto;padding:16px 14px 96px;background:#f2f2f7;color:#1c1c1e;border-radius:28px}
 .rd-wrap h1{font-size:28px;line-height:1.15;margin:8px 0}
 .rd-card{background:#fff;border-radius:22px;padding:16px;margin:0 0 12px}
-.rd-card h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8e8e93;margin:0 0 8px}
-.rd-check{display:flex;gap:8px;align-items:center;margin:8px 0;font-size:16px}
-.rd-wrap input[type="text"],.rd-wrap input[type="email"]{width:100%;box-sizing:border-box;border:0;background:#f2f2f7;border-radius:14px;padding:12px;font-size:16px}
-.rd-wrap button{display:block;width:100%;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
+.rd-card h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8e8e93;margin:0 0 10px}
+.rd-chips{display:flex;flex-wrap:wrap;gap:8px}
+.rd-chip{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:999px;background:#f2f2f7;font-size:15px}
+.rd-chip input{width:18px;height:18px}
+.rd-rec{color:#8e8e93;font-size:12px;margin:0 0 8px}
+.rd-sample{font-size:17px;line-height:1.35;margin:0}
+.rd-wrap button{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
-.rd-later{color:#8e8e93}
 </style>
 <h1>Your reads</h1>
 <p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
 ${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
 ${sign}
-${suggest}
-${previewHtml}
-<form class="rd-card" method="get" action="/reads">
-<h2>Type a line</h2>
-<p class="rd-note">One plain line becomes a plan. Nothing is saved until you tap Keep this plan.</p>
-<input type="text" name="line" value="${esc(state.line || "")}" maxlength="180" placeholder="Eeveelutions from Scarlet and Violet, weekly">
-<button type="submit">Show a plan</button>
-</form>
-<form class="rd-card" method="post" action="/api/reads">
-<h2>What to follow</h2>
-<label>Sets <input type="text" name="sets" value="${esc((draft.sets || []).join(", "))}"></label>
-<label>Pokemon <input type="text" name="pokemon" value="${esc((draft.pokemon || []).join(", "))}"></label>
-${RARITIES.map((name) => choice("rarity", name, (draft.rarities || []).includes(name))).join("")}
-${ERAS.map((name) => choice("era", name, (draft.eras || []).includes(name))).join("")}
-${box("singles", "Singles", draft.singles === true)}
-${box("sealed", "Sealed products", draft.sealed === true)}
-${keep ? `<h2>Your watchlist</h2>${keep}` : ""}
-<label>Add a name <input type="text" name="watch_name" maxlength="80"></label>
-<label>Catalog id <input type="text" name="watch_id" value="" maxlength="80"></label>
-<label class="rd-check"><input type="radio" name="watch_kind" value="card" checked> Card</label>
-<label class="rd-check"><input type="radio" name="watch_kind" value="sealed"> Sealed product</label>
+<section class="rd-card" id="rd-preview">
+<h2>Sample read</h2>
+<p class="rd-sample" id="rd-sample">${esc(sample)}</p>
+</section>
+<form class="rd-card" id="rd-form" method="post" action="/api/reads">
+<h2>Sets</h2>
+<p class="rd-rec">Recommended starts on ME: 30th Celebration. Tap to change it.</p>
+<div class="rd-chips">${SET_CHOICES.map((row) => choice("set", row.slug, row.name, (shown.sets || []).includes(row.slug))).join("")}</div>
+<h2>Pokemon</h2>
+<div class="rd-chips">${POKEMON_CHOICES.map((name) => choice("pokemon", name, name, (shown.pokemon || []).includes(name))).join("")}</div>
+<h2>Rarity</h2>
+<div class="rd-chips">${RARITIES.map((name) => choice("rarity", name, name, (shown.rarities || []).includes(name))).join("")}</div>
+<h2>Era</h2>
+<div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}</div>
+<h2>Singles or sealed</h2>
+<div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
+${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}
 <h2>How often</h2>
-${freqBox("daily", "Daily")}
-${freqBox("weekly", "Weekly")}
-${freqBox("monthly", "Monthly")}
-${freqBox("quarterly", "Quarterly")}
+<div class="rd-chips">
+${radio("frequency", "daily", "Daily", shown.frequency === "daily", !premium)}
+${radio("frequency", "weekly", "Weekly", (shown.frequency || "weekly") === "weekly", false)}
+${radio("frequency", "monthly", "Monthly", shown.frequency === "monthly", !premium)}
+${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", !premium)}
+</div>
 <h2>Where it goes</h2>
-<input type="hidden" name="discord" value="0">
-${box("discord", "Discord DM", draft.channels?.discord !== false)}
-<input type="hidden" name="email_on" value="0">
-${box("email_on", "Email, optional", draft.channels?.email === true)}
-<label>Email <input type="email" name="email" value="${esc(draft.email || "")}" autocomplete="email"></label>
-<p class="rd-later">App later.</p>
+<input type="hidden" name="discord" value="1">
+<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>
 <h2>Add-ons</h2>
-<input type="hidden" name="news" value="0">
-${box("news", "Pokemon news", draft.addons?.news === true)}
-<input type="hidden" name="games" value="0">
-${box("games", "Video games", draft.addons?.games === true)}
-<input type="hidden" name="all" value="0">
-${box("all", "All in one", draft.addons?.all === true)}
+<div class="rd-chips">
+${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
+${choice("games", "1", "Video games", shown.addons?.games === true)}
+${choice("all", "1", "All in one", shown.addons?.all === true)}
+</div>
 <p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>
-<button type="submit">Save read</button>
+<button type="submit">Save</button>
 </form>
+<script>
+(function(){
+  var form = document.getElementById("rd-form");
+  var out = document.getElementById("rd-sample");
+  if (!form || !out) return;
+  function picked(name){
+    var nodes = form.querySelectorAll('input[name="'+name+'"]');
+    var rows = [];
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) rows.push(nodes[i].getAttribute("data-label") || nodes[i].value);
+    return rows;
+  }
+  function one(name){
+    var nodes = form.querySelectorAll('input[name="'+name+'"]');
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) return nodes[i].getAttribute("data-label") || nodes[i].value;
+    return "";
+  }
+  function paint(){
+    var sets = picked("set");
+    var product = (one("product") || "Singles").toLowerCase();
+    var often = (one("frequency") || "Weekly").toLowerCase();
+    var watch = picked("keep");
+    var bits = ["Sample read."];
+    if (watch.length) bits.push("Your watchlist: " + watch.join(", ") + ".");
+    bits.push((sets.length ? sets.join(", ") : product) + ", " + product + ", " + often + ".");
+    bits.push("This is a sample. The night file fills the dated lines.");
+    out.textContent = bits.join(" ");
+  }
+  form.addEventListener("change", paint);
+})();
+</script>
 ${beacon}
 </main>`;
 }
@@ -391,6 +487,9 @@ export async function handleReads(request, env) {
   const { plan, notes } = gatePlan(planFromFields(fields), { premium: user.premium === true });
   plan.savedAt = new Date().toISOString();
   await store.put(`reads:${user.sub}`, JSON.stringify(plan));
+  const follow = planToFollow(user.sub, plan);
+  const prev = await store.get("custom-reads:follows", "json");
+  await store.put("custom-reads:follows", JSON.stringify(upsertFollow(prev, follow)));
   if (form) {
     back.searchParams.set("saved", "1");
     return Response.redirect(back, 303);

@@ -11,7 +11,7 @@ import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
-import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage } from "./reads.mjs";
+import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -1159,6 +1159,7 @@ const worker = {
           line: url.searchParams.get("line") || "",
           card: url.searchParams.get("card") || "",
           sealed: url.searchParams.get("sealed") || "",
+          picker: readsPickerEnabled(env),
         };
       }
       let premium = false;
