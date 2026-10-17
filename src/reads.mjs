@@ -249,10 +249,6 @@ function box(name, label, on) {
   return `<label class="rd-check"><input type="checkbox" name="${name}" value="1"${on ? " checked" : ""}> ${esc(label)}</label>`;
 }
 
-export function setLabel(slug) {
-  return SET_CHOICES.find((row) => row.slug === slug)?.name || String(slug || "");
-}
-
 export function recommendedPlan(plan) {
   const base = plan && typeof plan === "object" ? { ...blankPlan(), ...plan } : blankPlan();
   if (followCount(base) > 0) return base;
