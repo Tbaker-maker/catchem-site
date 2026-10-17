@@ -869,12 +869,23 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       }
     }
     let priceHeld = false;
+    let conditionLadder = null;
     if (card && card.kind !== "sealed" && cardId) {
       const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
       if (hold && hold.ids && hold.ids[cardId]) priceHeld = true;
       if (priceCheck) priceHeld = true;
+      const ladder = await loadJson("condition-prices.json", fetchImpl).catch(() => null);
+      const day = String(ladder && ladder.asOf || "").slice(0, 10);
+      const row = ladder && ladder.cards && ladder.cards[cardId];
+      conditionLadder = {
+        asOf: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "",
+        source: "TCGplayer market",
+        printings: row && typeof row === "object" ? row : {},
+      };
+    } else if (card && card.kind !== "sealed") {
+      conditionLadder = { asOf: "", source: "TCGplayer market", printings: {} };
     }
-    if (priceHeld) {
+    if (priceHeld && card) {
       card.price = null;
       card.priceStatus = "checking";
       if (/\$\d/.test(ratingHtml)) ratingHtml = "";
@@ -882,7 +893,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, priceHeld, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
