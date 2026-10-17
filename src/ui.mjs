@@ -4009,8 +4009,20 @@ export function inlineFeedReads(reads, startId = "", n = FEED_INLINE) {
   return out;
 }
 
+const PLAIN_PRICE = new Set(["single", "sealed", "streak", "mover", "price", "askmove", "mktmove"]);
+export function leadWithStory(reads) {
+  const list = Array.isArray(reads) ? reads : [];
+  if (!list.length || !PLAIN_PRICE.has(String(list[0]?.readKind || list[0]?.kind || ""))) return list;
+  const kindOf = (r) => String(r?.readKind || r?.kind || "");
+  const isFact = (r) => /^pokemon/.test(kindOf(r)) || /^pokemon-/.test(String(r?.id || ""));
+  let i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)) && !isFact(r));
+  if (i < 0) i = list.findIndex((r, n) => n < 12 && !PLAIN_PRICE.has(kindOf(r)));
+  if (i <= 0) return list;
+  return [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
+}
+
 export function renderFeed(bundle, startId, stamp, opts = {}) {
-  const reads = feedReads(bundle);
+  const reads = leadWithStory(feedReads(bundle));
   const first = inlineFeedReads(reads, startId);
   const lead = JSON.stringify(first).replace(/</g, "\\u003c");
   const restCfg = JSON.stringify({ total: reads.length, url: reads.length > first.length ? FEED_REST_URL : "", sold: opts.soldOn === true });
@@ -4332,6 +4344,7 @@ function filesDisagree(card, other){
 }
 ${readStaleAgainstCard.toString()}
 const bucketCache={};
+let feedDay=null;
 async function publishedCard(sku){
   const id=String(sku||"");
   const n=Number((id.match(/([0-9]+)/)||[])[1]);
@@ -4349,6 +4362,14 @@ async function publishedCard(sku){
 }
 async function stalePrice(row){
   if(!row || !row.sku) return false;
+  // A read built the same night as the card files cannot disagree with them,
+  // so skip the 130 KB bucket fetch. Older reads still get checked.
+  if(feedDay===null){
+    feedDay="";
+    try{ (JSON.parse((document.getElementById("feed-lead")||{}).textContent||"[]")||[]).forEach(function(r){ const d=String(r&&r.asOf||"").slice(0,10); if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d) && d>feedDay) feedDay=d; }); }catch(e){ feedDay=""; }
+  }
+  const asOf=String(row.asOf||"").slice(0,10);
+  if(feedDay && asOf>=feedDay) return false;
   const card=await publishedCard(row.sku);
   return readStaleAgainstCard(row, card);
 }
@@ -6599,11 +6620,15 @@ async function boot(){
       if(f==="quiet"||f==="mix"||f==="conditions"||f==="soldflat"||f==="solddown"||f==="setshare"||f==="spread"||f==="askmove"||f==="mktmove"||f==="still") return shapeCount(f);
       return 1;
     }
+    const CHIP_MAIN={"":1,"prices":1,"sealed":1,"set":1,"signals":1,"news":1};
+    let chipsAll=false;
     function paintChips(){
       if(!chipRow||!loop) return;
       chipRow.textContent="";
+      let tucked=0;
       Array.prototype.forEach.call(loop.options, function(opt){
         if(opt.value!=="" && filterReads(opt.value)===0) return;
+        if(!chipsAll && !CHIP_MAIN[opt.value] && opt.value!==loop.value){ tucked++; return; }
         const b=document.createElement("button");
         b.type="button";
         b.dataset.value=opt.value;
@@ -6612,6 +6637,15 @@ async function boot(){
         b.onclick=function(){ applyFilter(opt.value, setSel ? setSel.value : "", true); };
         chipRow.appendChild(b);
       });
+      if(tucked || chipsAll){
+        const m=document.createElement("button");
+        m.type="button";
+        m.className="chip-toggle";
+        m.textContent=chipsAll ? "Fewer" : "More";
+        m.setAttribute("aria-expanded", chipsAll ? "true" : "false");
+        m.onclick=function(){ chipsAll=!chipsAll; paintChips(); };
+        chipRow.appendChild(m);
+      }
       fitChips();
       requestAnimationFrame(function(){ fitChips(); });
     }

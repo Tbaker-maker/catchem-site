@@ -765,7 +765,7 @@ t("a supply row is the listing total, and a missing total stays out", isSupplyRo
 t("two files that disagree on price or listings leave the product out", filesDisagree({ id: "tcgcsv-1", price: 10, listings: 5 }, { price: 11, listings: 5 }) && filesDisagree({ listings: 4 }, { listings: 9 }) && !filesDisagree({ price: 10 }, { price: 10 }) && !filesDisagree({ price: 10 }, { listings: 4 }));
 const built = renderFeed({ asOf: "2026-10-03", reads: [priced, fact, lag, lagHalf, supply, supplyBlank] }, "", "", {});
 const builtLead = JSON.parse(built.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
-t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "move-tcgcsv-10-7,pokemon-duraludon,lag-prismatic,supply-one");
+t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "lag-prismatic,move-tcgcsv-10-7,pokemon-duraludon,supply-one");
 t("the feed build has no volume line", !built.includes("No sales count yet") && !built.includes("Sales volume") && !builtLead.some((r) => r.id === "lag-half" || r.id === "supply-blank"));
 
 
@@ -799,7 +799,7 @@ const staleFetch = async (url) => {
 resetJsonCache();
 const staleHtml = await (await renderPath("/feed", staleFetch, { feed: true })).text();
 const staleLead = JSON.parse(staleHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
-t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price from priceStaleIds", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
+t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price from priceStaleIds", staleLead.map((r) => r.id).join(",") === "pokemon-gyarados,move-tcgcsv-684406-7");
 t("the feed asks the card file before it shows that price", staleHtml.includes("function readStaleAgainstCard") && staleHtml.includes("function stalePrice"));
 
 // ── every inline client script must parse ──
