@@ -44,3 +44,5 @@ jobs:
       - run: node scripts/member.test.mjs
       - run: node scripts/info-tap.test.mjs
       - run: node scripts/no-side-scroll.test.mjs
+      - run: node scripts/perf-budget.mjs
+      - run: node scripts/a11y-check.mjs --static

@@ -317,23 +317,19 @@ t("sealed listings hide a missing window and show the night count", listingTrend
 t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["2026-10-09", 10]], "2026-10-09").text === "History since 2026-09-26. 6-month high and low show once we have 6 months.");
 {
   const page = renderTrackRecord({
+    public: true,
     asOf: "2026-10-11",
-    oldest: "2026-10-09",
-    count: 2,
-    tooEarly: 1,
-    noLaterPrice: 1,
-    scored14: 0,
-    scored28: 0,
-    scored56: 0,
-    types: [{ type: "price", reads: 1, tooEarly: 1, noLaterPrice: 0, scored14: 0, scored28: 0, scored56: 0, line14: "0 scored so far", line28: "0 scored so far", line56: "0 scored so far" }],
+    thin: true,
+    disclaimer: "Past moves don't predict future prices.",
+    summary: "Of 1 reads in 90 days, 1 moved the way the read described.",
+    windows: { d90: { reads: 1, moved: 1, line: "Of 1 reads in 90 days, 1 moved the way the read described." } },
     rows: [
-      { status: "too-early", shipped: "2026-10-09", name: "Pidgey", price: 2.63, direction: "up" },
-      { status: "no-score", shipped: "2026-10-10", name: "Example", note: "No ship price in the price file, so no score." },
+      { date: "2026-10-10", name: "Example", said: "Recorded at $10.00.", priceThen: 10, priceNow: 11, source: "eBay asking prices", priceDate: "2026-10-11", kind: "sealed", moved: true },
+      { date: "2026-10-09", name: "Pidgey", said: "Recorded at $2.63.", priceThen: 2.63, priceNow: 2.63, source: "TCGplayer market price", priceDate: "2026-10-09", kind: "single", moved: null },
     ],
   }, "stamp");
   const main = page.slice(page.indexOf("<h1>Track record"), page.indexOf("</main>"));
-  const table = main.slice(main.lastIndexOf("<tbody>"));
-  t("track record is newest first and hides a percent under 20", main.includes("Too early to score") && main.includes("0 scored so far") && main.includes("Newest first") && table.includes("Example") && table.indexOf("2026-10-10") < table.indexOf("2026-10-09") && !main.includes("%") && !page.includes("tcgcsv-"));
+  t("track record lists the later price and hides the method", main.includes("Past moves don") && main.includes("Example") && main.includes("Pidgey") && main.indexOf("2026-10-10") < main.indexOf("2026-10-09") && main.includes("More history added nightly") && !main.includes("scored so far") && !main.includes("14 days") && !page.includes("tcgcsv-"));
   const facts = renderFacts({ market: 12.5, low: 9, date: "2026-10-09", source: "TCGplayer market", listings: 40 });
   t("facts panel is market, low, date, and source", facts.includes("<dt>Market</dt>") && facts.includes("<dt>Low</dt>") && facts.includes("<dt>Date</dt>") && facts.includes("<dt>Source</dt>") && !facts.includes("listings"));
   const compared = compareRows({ market: 10, date: "2026-10-09", source: "TCGplayer market" }, { market: 12, low: 8, source: "TCGplayer market" });
@@ -431,7 +427,7 @@ t("premium is a worker page", pageKind("/premium") === "premium" && premium.stat
 t("premium pause and cancel sit together", premiumHtml.includes('class="prem-acts"') && premiumHtml.includes(">Manage in Discord with /premium</a>") && premiumHtml.includes("Pause or cancel in Discord with /premium.") && premiumHtml.includes('href="https://discord.gg/fUSjxDX4Hy"'));
 t("premium keeps the lock sentence", premiumHtml.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumHtml) && !BANNED.test(clean(premiumHtml)) && !/pay to win|more entries/i.test(premiumHtml));
-t("premium sells the club", premiumHtml.includes("<h1>Catch'em Premium · $14.99 USD a month</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Join Premium</a>") && premiumHtml.includes("7-day refund on your first charge. Cancel anytime."));
+t("premium sells the club", premiumHtml.includes("<h1>Catch'em Premium · $14.99 USD a month</h1>") && premiumHtml.includes('class="prem-join"') && premiumHtml.includes(">Get Premium</a>") && premiumHtml.includes("7-day refund on your first charge. Cancel anytime."));
 t("premium drops the blanket number claim and card-only", !premiumHtml.includes("Claim your First 222 number.") && !premiumHtml.includes("Card payments only."));
 t("premium says Premium members", premiumHtml.includes("Premium members") && !premiumHtml.includes("Pokémon members") && !premiumHtml.includes("Pokemon"));
 t("premium hides a missing seat count and the updated line", !premiumHtml.includes("numbers left") && !premiumHtml.includes("Updated ") && !premiumHtml.includes('id="fresh"'));

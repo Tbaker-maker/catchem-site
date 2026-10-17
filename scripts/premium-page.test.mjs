@@ -13,7 +13,15 @@ t("six perk cards", (main.match(/class="prem-card"/g) || []).length === 6);
 t("every card has an icon", (main.match(/class="prem-ico"/g) || []).length === 6);
 t("footer", vis.includes("7-day refund on your first charge. Cancel anytime."));
 t("refund line kept", vis.includes(REFUND_LINE));
-t("button", /class="prem-join"[^>]*>Join Premium</.test(main));
+t("button", /class="prem-join"[^>]*>Get Premium</.test(main));
+t("one join button", (main.match(/class="prem-join"/g) || []).length === 1);
+t("track record link", main.includes('href="/track-record"'));
+t("blur hides a name from members who are signed out", (() => {
+  const hidden = renderPremium("", { proof: { reads30: 12, week: [{ name: "Example Card", asOf: "2026-10-17", kind: "single" }] } });
+  const open = renderPremium("", { proof: { reads30: 12, week: [{ name: "Example Card", asOf: "2026-10-17" }] }, premium: true });
+  const list = (html) => html.slice(html.indexOf("prem-week"));
+  return hidden.includes("prem-blur") && hidden.includes("12") && list(open).includes("Example Card") && !list(open).includes('class="prem-blur"');
+})());
 t("watch perk matches bot cap 25", vis.includes("up to 25") && !/up to 50|Free gets 5/.test(vis));
 t("no em dash", !/\u2014/.test(main));
 t("no lifetime claim", !/lifetime|forever/i.test(vis));
