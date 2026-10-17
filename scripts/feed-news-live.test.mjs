@@ -31,7 +31,7 @@ t("the Japan-only live story stays off", !withLive.some((r) => r.href.includes("
 const baked = newsOf(renderFeed(bundle, "", "", {}));
 t("with no live file the baked copy still shows", baked.length > 0);
 const emptyLive = newsOf(renderFeed(bundle, "", "", { news: { asOf: "2026-10-17", items: [] } }));
-t("an empty live file falls back to the baked copy", emptyLive.length === baked.length);
+t("a quiet live file shows no news, never the old baked copy", emptyLive.length === 0);
 
 // Live check: the file on Catchem-data main loads and is recent.
 try {

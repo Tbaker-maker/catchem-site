@@ -4122,9 +4122,9 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const first = inlineFeedReads(reads, startId);
   const lead = JSON.stringify(first).replace(/</g, "\\u003c");
   const restCfg = JSON.stringify({ total: reads.length, url: reads.length > first.length ? FEED_REST_URL : "", sold: opts.soldOn === true });
-  // Live news from Catchem-data when it loaded and has rows; the baked copy otherwise.
-  const liveNews = opts.news ? newsSlice(opts.news) : [];
-  const newsLead = JSON.stringify(liveNews.length ? liveNews : newsSlice(feedNews)).replace(/</g, "\\u003c");
+  // Live news from Catchem-data. The baked copy is only for when that file did not load,
+  // so a quiet live day shows no news rather than an old snapshot.
+  const newsLead = JSON.stringify(opts.news ? newsSlice(opts.news) : newsSlice(feedNews)).replace(/</g, "\\u003c");
   const diveLead = JSON.stringify(opts.diveMap || { ids: [], byTcgcsv: {} }).replace(/</g, "\u003c");
   const css = `
   .feed-page{padding-top:8px}
