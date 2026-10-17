@@ -837,7 +837,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date, pct: Number.isFinite(l.pct) ? l.pct : null, prevDay: l.prevDate || "" };
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
-    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    let comesFrom = null;
+    let promosInside = null;
+    if (card && cardId) {
+      const promoFile = await loadJson("promos.json", fetchImpl).catch(() => null);
+      const rows = Array.isArray(promoFile?.cards) ? promoFile.cards : [];
+      if (card.kind === "sealed") {
+        promosInside = rows.filter((row) => row && row.productId === cardId && row.id && row.name).map((row) => ({ id: row.id, name: row.name, num: row.num || "" }));
+      } else {
+        const hit = rows.find((row) => row && row.id === cardId && row.productId && row.productName);
+        if (hit) comesFrom = { id: hit.productId, name: hit.productName };
+      }
+    }
+    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
