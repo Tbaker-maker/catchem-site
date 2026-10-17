@@ -32,7 +32,7 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -183,9 +183,17 @@ export function addFeedEntry(html) {
 
 async function withToday(html, fetchImpl) {
   try {
-    const block = todayStrip(await loadJson("today.json", fetchImpl));
-    if (!block || String(html).includes('class="today-strip"') || !String(html).includes("<footer>")) return html;
-    return String(html).replace("<footer>", block + "<footer>");
+    const doc = await loadJson("today.json", fetchImpl);
+    const block = todayStrip(doc);
+    let out = String(html);
+    const hero = heroToday(doc);
+    const anchor = '<p class="beta" id="fresh">';
+    if (hero && !out.includes('id="hero-today"') && out.includes(anchor)) {
+      const at = out.indexOf("</p>", out.indexOf(anchor));
+      if (at > 0) out = out.slice(0, at + 4) + hero + out.slice(at + 4);
+    }
+    if (!block || out.includes('class="today-strip"') || !out.includes("<footer>")) return out;
+    return out.replace("<footer>", block + "<footer>");
   } catch {
     return html;
   }
