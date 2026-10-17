@@ -30,7 +30,7 @@ export const COPY = {
   },
   rotation: {
     heading: "Rotation",
-    explainer: "A set page shows the regulation mark when at least 80% of that set's cards in the card file share one letter. A rotated date is shown only for a letter the two Pokémon announcements say left Standard: F on April 11, 2025, and G on April 10, 2026.",
+    explainer: "A set page shows the regulation mark from our card file, with its date. A rotated date is shown only for a letter the two Pokémon announcements say left Standard: F on April 11, 2025, and G on April 10, 2026.",
     empty: "No regulation mark on file for this set.",
   },
   releases: {
@@ -73,7 +73,7 @@ export function setValueBlock(doc, images = {}, slug = "") {
     : "";
   return `<section class="sv" aria-labelledby="sv-h"><h2 id="sv-h">${c.heading}</h2>
 <p class="muted">${c.explainer}</p>
-${total ? `<p class="sv-total">Master-set total <b>${total}</b></p>` : ""}
+${total ? `<p class="sv-total">Master-set total <b>${total}</b>${day ? `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(`TCGplayer market price, one of each card, ${day}`)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(`TCGplayer market price, one of each card, ${day}`)}</span></span>` : ""}</p>` : ""}
 ${counts ? `<p>${esc(counts)}</p>` : ""}
 ${rows ? `<ol class="sv-list">${rows}</ol>` : ""}
 <p class="muted">Source: TCGplayer market, ${esc(day)}.</p>
