@@ -328,22 +328,83 @@ export function affEbay(url, campid) {
 export const PAID_NOTE = "Paid link";
 export const PAID_FOOTER = "Paid link. We may earn a commission from links on this page.";
 
-// eBay search link for this exact product: name + set (+ card number for a
-// single), minus obvious noise. A search, not a listing and not a sale.
+// eBay search link for this product, written the way sellers title listings:
+// singles are Pokemon + card name + number as printed + short set name;
+// sealed is Pokemon + set + product type. No quotes and only two
+// exclusions, so the link stays broad enough to show listings. Kept
+// self-contained because the search page inlines it with toString().
 export function ebayQuery(card) {
   if (!card || typeof card !== "object") return "";
-  const clean = (s) => String(s || "").replace(/tcgcsv-\d+/gi, "").replace(/[[\](){}"]/g, " ").replace(/\s+/g, " ").trim();
-  const name = clean(card.name);
-  if (!name) return "";
-  const set = clean(card.set);
+  const sp = (s) => String(s || "").replace(/tcgcsv-\d+/gi, " ").replace(/[\u2014\u2013]/g, " ").replace(/\s+/g, " ").trim();
+  const plain = (s) => sp(String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[“”"]/g, " ").replace(/&/g, " ").replace(/[:,!?*+]/g, " ").replace(/\s-\s/g, " "));
+  const raw = sp(card.name);
+  if (!raw) return "";
   const sealed = card.kind === "sealed";
-  const num = sealed ? "" : clean(card.num).split("/")[0];
+  // Short set name: drop era codes and filler words sellers rarely type.
+  let set = sp(card.set)
+    .replace(/^(?:SWSH|SV|SM|ME|MEE|SVE|XY)\d*\s*:\s*/i, "")
+    .replace(/^(?:SM|XY)\s+-\s+/i, "")
+    .replace(/^(?:Sword & Shield|Scarlet & Violet):\s*/i, "")
+    .replace(/\s*\((Shadowless)\)/i, " $1")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/:?\s*(?:Trainer Gallery|Galarian Gallery|Shiny Vault|Classic Collection|Radiant Collection)$/i, "")
+    .replace(/^McDonald's (?:Promos|Collection) (\d{4})$/i, "McDonald's $1")
+    .replace(/^(Sword & Shield|Scarlet & Violet|Sun & Moon|XY|SM) Base Set$/i, (m, a) => (a.toUpperCase() === "SM" ? "Sun & Moon" : a))
+    .replace(/^(?:Sword & Shield|Scarlet & Violet) Promo Cards$/i, "Promo")
+    .replace(/^Pikachu World Collection Promos$/i, "Pikachu World Collection")
+    .replace(/^Trick or Trade BOOster Bundle.*$/i, "Trick or Trade")
+    .replace(/^(?:BW|DP|HGSS|SM|XY|EX) Trainer Kit.*$/i, "Trainer Kit")
+    .replace(/^McDonald's 25th Anniversary Promos$/i, "McDonald's 25th Anniversary")
+    .replace(/^(?:Wizards|SWSH|SM|XY|BW|DP|HGSS|Scarlet & Violet|Mega Evolution|Black and White|Diamond and Pearl|ME: Mega Evolution|SWSH: Sword & Shield|SV: Scarlet & Violet) (?:Black Star )?Promo(?: Cards|s)?$/i, "Promo")
+    .replace(/^(?:SV|SWSH|ME): /i, "")
+    .replace(/^Scarlet & Violet 151$/i, "151")
+    .replace(/^World Championship Decks$/i, "World Championship")
+    .replace(/^Prize Pack Series Cards$/i, "Prize Pack")
+    .replace(/^(?:Miscellaneous Cards & Products|Blister Exclusives|Deck Exclusives|Southeast Asia Exclusives|League & Championship Cards|Professor Program Promos|Player Placement Trainer Promos|Alternate Art Promos|Jumbo Cards|WoTC Promo|Best of Promos|Best of Game|Nintendo Promos|Kids WB Promos|Countdown Calendar Promos)$/i, "")
+    .replace(/^Pokemon /i, "");
+  set = plain(set);
+  if (sealed) {
+    // Brackets name a variant or pack note; quotes name a deck. Keep the
+    // product words only.
+    let name = plain(raw.replace(/\[([^\]]*)\]/g, (m, v) => (/set of|edition|display|case|\bof \d|\//i.test(v) ? " " : " " + v + " ")).replace(/\([^)]*\)/g, " ").replace(/"[^"]*"/g, " ")).replace(/^Pokemon\s+/i, "");
+    if (!name) name = plain(raw);
+    const low = name.toLowerCase();
+    const words = ["Pokemon"];
+    const setWords = set.toLowerCase().split(" ").filter((w) => w.length > 2);
+    if (set && !setWords.every((w) => low.includes(w))) words.push(set);
+    words.push(name);
+    return words.join(" ").replace(/\s+/g, " ").trim();
+  }
+  // Single: card name before " - 11/12" style suffixes, without notes in
+  // brackets (stamps, artists, finishes) that sellers word many ways.
+  const dash = raw.match(/^(.*?)\s+-\s+(.+)$/);
+  let name = dash ? dash[1] : raw;
+  const suffix = dash ? dash[2] : "";
+  const keep = (raw.match(/\((1st Edition|Shadowless|Prerelease|Staff|Delta Species)\)/i) || [])[1] || "";
+  name = plain(name.replace(/\[[^\]]*\]/g, " ").replace(/\([^)]*\)/g, " "));
+  if (!name) return "";
+  // Number as printed: the " - 11/12" suffix wins (it drops padding sellers
+  // never type), then the number field. Promo codes stay as they are.
+  const numOf = (s) => {
+    const m = String(s || "").match(/^#?([A-Z]{0,5}\d{1,4}[a-z]?(?:\/[A-Z]{0,5}\d{1,4})?)$/i);
+    return m ? m[1] : "";
+  };
+  // Sword & Shield onward prints padded numbers (072/202); older cards do not.
+  const modern = /^(?:SWSH|SV|ME)|^(?:Sword & Shield|Rebel Clash|Darkness Ablaze|Champion's Path|Vivid Voltage|Shining Fates|Battle Styles|Chilling Reign|Evolving Skies|Celebrations|Fusion Strike|Brilliant Stars|Astral Radiance|Pok[eé]mon GO|Lost Origin|Silver Tempest|Crown Zenith|Scarlet & Violet|Paldea Evolved|Obsidian Flames|(?:Pokemon )?151|Paradox Rift|Paldean Fates|Temporal Forces|Twilight Masquerade|Shrouded Fable|Stellar Crown|Surging Sparks|Prismatic Evolutions|Journey Together|Destined Rivals|Black Bolt|White Flare|Mega Evolution|Phantasmal Flames|Ascended Heroes|Perfect Order|Chaos Rising|Pitch Black|Delta Reign|30th Celebration|First Partner|Prize Pack|Battle Academy 202|Trick or Trade|McDonald's (?:Promos|Collection) 20(?:2[1-9])|McDonald's 25th)/i.test(sp(card.set));
+  let num = numOf(suffix.split(" ")[0]) || numOf(sp(card.num));
+  if (/^\d+$/.test(num)) num = String(Number(num));
+  else if (/^\d+\/\d+$/.test(num) && !/^\d+\/\d+$/.test(numOf(suffix.split(" ")[0]))) {
+    // From the number field: keep modern padding (215/203, 045/094) but
+    // drop it where the set size is under 100 and the card is from an
+    // older print, which sellers write as 4/102 or 11/12.
+    const [a, b] = num.split("/");
+    if (!modern) num = Number(a) + "/" + Number(b);
+  }
   const words = ["Pokemon", name];
-  if (set && !name.toLowerCase().includes(set.toLowerCase())) words.push(set);
+  if (keep && !name.toLowerCase().includes(keep.toLowerCase())) words.push(keep);
   if (num && !name.includes(num)) words.push(num);
-  const noise = sealed ? ["-lot", "-proxy", "-custom", "-empty", "-code"] : ["-lot", "-proxy", "-custom", "-orica"];
-  if (sealed && !/\bcase\b/i.test(name)) noise.push("-case");
-  return [...words, ...noise].join(" ");
+  if (set && !name.toLowerCase().includes(set.toLowerCase())) words.push(set);
+  return [...words, "-proxy", "-custom"].join(" ").replace(/\s+/g, " ").trim();
 }
 export function ebaySearchUrl(card, cfg = AFF) {
   const q = ebayQuery(card);
@@ -352,13 +413,21 @@ export function ebaySearchUrl(card, cfg = AFF) {
 export function tcgStoreUrl(card, cfg = AFF) {
   return affTcg(productLink(card), cfg.tcg);
 }
-// Both store links with the disclosure next to them. Hidden when neither exists.
+// Both store links as two shop buttons with the disclosure under them.
+// Hidden when neither exists. Affiliate buttons are the one place "Buy" is
+// allowed in site copy (approved label).
+export const SHOP_NOTE = "Catch'em may earn a small commission, at no extra cost to you.";
+// Banned-word checks run on copy with the approved affiliate buttons taken
+// out: "Buy on TCGplayer" and "Buy on eBay" are the only allowed use.
+export function withoutShopButtons(html) {
+  return String(html || "").replace(/<a class="shop-btn[^"]*"[^>]*>Buy on (?:TCGplayer|eBay)<\/a>/g, " ");
+}
 export function storeLinksHtml(card, esc) {
   const tcg = tcgStoreUrl(card);
   const ebay = ebaySearchUrl(card);
   if (!tcg && !ebay) return "";
   const bits = [];
-  if (tcg) bits.push(`<a href="${esc(tcg)}" rel="sponsored noopener">TCGplayer</a>`);
-  if (ebay) bits.push(`<a href="${esc(ebay)}" rel="sponsored noopener">eBay</a>`);
-  return `<p class="store-links">${bits.join(" · ")} <small class="paid-note">${PAID_NOTE}</small></p>`;
+  if (tcg) bits.push(`<a class="shop-btn shop-tcg" href="${esc(tcg)}" rel="sponsored noopener" target="_blank">Buy on TCGplayer</a>`);
+  if (ebay) bits.push(`<a class="shop-btn shop-ebay" href="${esc(ebay)}" rel="sponsored noopener" target="_blank">Buy on eBay</a>`);
+  return `<div class="shop-block"><div class="shop-btns">${bits.join("")}</div><p class="shop-note">${SHOP_NOTE}</p></div>`;
 }

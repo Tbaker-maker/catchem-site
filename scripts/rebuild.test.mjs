@@ -19,7 +19,7 @@ import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
-import { buildPokemonPages, productLink } from "../src/pokemon.mjs";
+import { buildPokemonPages, productLink, withoutShopButtons } from "../src/pokemon.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -356,7 +356,7 @@ const post = await (await renderPath("/post-office", fetchImpl)).text();
 t("post office drops the catalog line", !post.includes(LOCKED) && !post.includes('id="fresh"'));
 const method = await (await renderPath("/methodology", fetchImpl)).text();
 t("methodology uses the catalog counts", method.includes("28,030") && method.includes("3,235"));
-const badCopy = [stripNews(feedHtml), cardPage, board, method, all].map(clean).filter((html) => BANNED.test(html));
+const badCopy = [stripNews(feedHtml), cardPage, board, method, all].map(withoutShopButtons).map(clean).filter((html) => BANNED.test(html));
 if (badCopy.length) for (const h of [stripNews(feedHtml), cardPage, board, method, all].map(clean)) { const m = h.match(BANNED); if (m) console.error("banned:", m[0], h.slice(Math.max(0, m.index - 80), m.index + 40)); }
 t("pages skip the banned words", badCopy.length === 0);
 const postClean = clean(post);
