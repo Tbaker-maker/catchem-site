@@ -7,6 +7,7 @@ const t = (n, c) => { if (c) console.log("  ok ", n); else { fail++; console.log
 t("feed image rule is low specificity and skips thumbnails", css.includes(".feed-card :where(img:not(.card-face,.card-thumb)){width:100%") && !css.includes(".feed-card img:not(.card-face){width:100%"));
 t("thumbnails stay small", /\.card-thumb\{width:28px/.test(css));
 t("deep read rows are rounded and wrap", /\.deep-line\{[^}]*min-width:0[^}]*border-radius:12px/.test(css) && /\.deep-line>span\{[^}]*min-width:0[^}]*overflow-wrap:anywhere/.test(css));
+t("multi thumb rows put text under the faces", /\.deep-line>span\{flex:1 1 180px/.test(css) && /\.deep-line\{display:flex;flex-wrap:wrap/.test(css));
 t("deep chart label column can shrink", css.includes("grid-template-columns:minmax(0,18em)"));
 t("no width:100% rule on bare feed images", !/\.feed-card img\{[^}]*width:100%/.test(css));
 if (fail) { console.log(fail + " failed"); process.exit(1); }
