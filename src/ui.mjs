@@ -94,6 +94,10 @@ export function money(n) {
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+export function naChip() {
+  return `<span class="na">n/a</span>`;
+}
+
 // A read may mention sales volume, thin sales, or copies sold. No file has a
 // sold count, so that sentence comes out. A price already in the file stays.
 // Nothing is written in its place.
@@ -1167,8 +1171,8 @@ export function renderSupply(doc, stamp, opts = {}) {
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>Counts are active eBay listings, not sales. Both exact nights have to be on file.</p>
 <p>Nights on file: ${Number(doc?.nightCount) || 0}. Products: ${Number(doc?.products) || 0}. Products on ${esc(doc?.asOf || "the latest night")}: ${Number(doc?.productsOnLatest) || 0}.</p>
-<p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${esc(w7.exactStart || "—")} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
-<p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${esc(w30.exactStart || "—")} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
+<p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${w7.exactStart ? esc(w7.exactStart) : naChip()} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
+<p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${w30.exactStart ? esc(w30.exactStart) : naChip()} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
 <p>Flag off or on, published reads: ${reads.length}. Counted before the flag: ${Number(doc?.wouldQualify) || 0}.</p>
 ${below ? `<h2>Checked, not shipped</h2><ul>${below}</ul>` : ""}
 ${cards}
@@ -1186,7 +1190,7 @@ export function renderSetValue(doc, stamp, opts = {}) {
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>The sum is TCGplayer market for singles priced on both exact days. A missing day drops the set. The card count is how many singles had a price on both days.</p>
 <p>Sets on file: ${Number(doc?.sets) || 0}. Window: ${Number(doc?.windowDays) || 30} days.</p>
-<p>Exact start ${esc(doc?.exactStart || "—")} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
+<p>Exact start ${doc?.exactStart ? esc(doc.exactStart) : naChip()} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
 <p>Would qualify: ${Number(doc?.wouldQualify) || 0}. Published reads: ${reads.length}.</p>
 ${days ? `<p class="muted">Price days on file: ${esc(days)}.</p>` : ""}
 ${cards}
@@ -1400,6 +1404,7 @@ a.tap,.site-foot a{min-height:44px;display:inline-flex;align-items:center}
 h1{font:500 34px/1.15 var(--serif);letter-spacing:-.02em;margin:0 0 8px}
 h2{font:500 22px/1.2 var(--serif);margin:22px 0 8px}
 .muted{color:var(--dim)}
+.na{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 8px;border-radius:999px;background:#3a3a3e;color:#aeaeb2;font:600 12px/1 var(--sans);letter-spacing:.02em}
 .vchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.vchip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--gold);background:rgba(212,175,55,.10);border:1px solid rgba(212,175,55,.35);text-decoration:none}a.vchip:hover{background:rgba(212,175,55,.18)}.vchips.sm{margin:4px 0 0}@media(max-width:480px){.srow{flex-wrap:wrap;align-items:flex-start;row-gap:6px}.srow>svg.spark30,.srow>img[height="28"]{display:none}.srow>a{flex:1 1 0;min-width:0}.srow>a b,.srow>a .muted{overflow-wrap:break-word;word-break:normal}.srow>b{align-self:flex-start;padding-top:2px}.srow>.store-links{order:9;flex-basis:100%;padding-left:76px}}.feed-card .vchips{margin:2px 0 6px}.row a:has(.vchips){flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;overflow-wrap:normal}.row a:has(.vchips) br{display:none}.row a:has(.vchips) b,.row a:has(.vchips) .muted{overflow-wrap:break-word;word-break:normal}.vchips.sm .vchip{padding:2px 9px;font-size:11px}
 .chart-note{font-size:15px;line-height:1.45;margin:8px 0 0}
 .counts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
@@ -3144,7 +3149,7 @@ export function renderMovers(doc, stamp, opts = {}) {
     const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
     const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
-    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
+    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || naChip()} <span class="muted">${pct}</span></b></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
@@ -4110,11 +4115,11 @@ export function renderDive(doc, stamp, opts = {}) {
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
   const price = money(latest.priceMedian);
-  const listings = latest.listingCount != null ? String(latest.listingCount) : "—";
+  const listingsHtml = latest.listingCount != null ? esc(String(latest.listingCount)) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
-    const lc = r.listingCount != null ? String(r.listingCount) : "—";
-    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || "—"}</td><td>${esc(lc)}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
+    const lc = r.listingCount != null ? esc(String(r.listingCount)) : naChip();
+    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || naChip()}</td><td>${lc}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
   }).join("");
   const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
   const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
@@ -4132,8 +4137,8 @@ export function renderDive(doc, stamp, opts = {}) {
 <h1>${esc(doc.name || doc.id)}</h1>
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
-<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
-<p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
+<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
+<p class="muted">eBay Browse ask median · ${listingsHtml} active listings (asks, not solds)</p>
 ${buyoutLine}
 ${chartBox(hist, "eBay Browse ask median, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
