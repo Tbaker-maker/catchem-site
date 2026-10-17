@@ -36,7 +36,6 @@ export const SOLD_FILTERS = [
   ["solddown", "Sold, price down"],
 ];
 
-<<<<<<< HEAD
 // "Where this number comes from": source and date only, never the method.
 export function infoTap(text) {
   const t = String(text || "").trim();
@@ -44,14 +43,13 @@ export function infoTap(text) {
   return `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(t)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(t)}</span></span>`;
 }
 export const ITAP_CSS = `.itap{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;min-width:44px;min-height:44px;margin:-10px -6px -10px 0;border-radius:999px;cursor:pointer;outline:none;color:var(--dim,#a8a091)}.itap-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;opacity:.75}.itap:focus-visible .itap-i{outline:2px solid var(--gold,#d9b779);outline-offset:2px}.itap-pop{display:none;position:absolute;z-index:30;left:0;top:100%;width:max-content;max-width:260px;padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;box-shadow:0 10px 24px rgba(0,0,0,.45);font:500 13px/1.4 var(--sans);font-style:normal;color:var(--txt,#efe9de);white-space:normal;text-align:left}.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}@media(max-width:700px){.itap-pop{position:fixed;left:16px;right:16px;top:auto;bottom:96px;width:auto;max-width:none}}`;
-=======
+
 // Method stays private: drop sentences that state thresholds, cutoffs or matching rules.
 export function scrubMethod(text) {
   const parts = String(text || "").split(/(?<=[.!?])\s+/);
   const METHOD = /\b(needs?|at least|or more|or less|under \d|over \d|threshold|cutoff|counted by|matched by|nearest|rule|weights?|weighted|scor(?:e|ed|es|ing)|must|only if|is set at)\b/i;
   return parts.filter((x) => x && !METHOD.test(x)).join(" ").trim();
 }
->>>>>>> origin/main
 
 export function feedFilterOptions(hasSoldFile) {
   const rows = [
