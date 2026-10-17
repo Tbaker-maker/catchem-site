@@ -506,12 +506,12 @@ function newsText(item) {
   return [item && item.title, item && item.titleEn, item && item.sentence, item && item.source, item && item.url].filter(Boolean).join(" ");
 }
 
-// The Feed only carries Pokémon TCG: sets, products, reprints, events, and organized play.
+// The Feed only carries Pokémon TCG: sets, products (deck sets, collections, boxes), reprints, events, and organized play.
 // Pokémon GO, video games, and anime stay out unless the same item also has a TCG angle.
 function isTcgNews(item) {
   const text = newsText(item);
   const source = String(item && item.source || "");
-  const tcg = /pok[eé]mon\s+tcg|\btcg\b|trading card|ポケカ|ポケモンカード|tcg pocket|elite trainer|boosters?|build & battle|build and battle|illustration rare|prerelease|pre-release|promo card|card game|deluxe pack|delta reign|pok[eé]mon card|カードゲーム|チャンピオンズリーグ|champions league|cards?\s+revealed|\breprints?\b/i;
+  const tcg = /pok[eé]mon\s+tcg|\btcg\b|trading card|ポケカ|ポケモンカード|tcg pocket|elite trainer|boosters?|build & battle|build and battle|illustration rare|prerelease|pre-release|promo card|card game|deluxe pack|delta reign|pok[eé]mon card|カードゲーム|チャンピオンズリーグ|champions league|cards?\s+revealed|\breprints?\b|special deck set|\bdeck set\b|premium deck|battle deck|starter deck|theme deck|battle academy|premium collection|collection box|\bex box\b|booster bundle|mini tins?|collector'?s? tin|poster collection|binder collection|\betbs?\b|set list|card list|secret rares?|special illustration|full art/i;
   if (tcg.test(text)) return true;
   if (/^Pokémon Card \((Japan|Asia)\)$/.test(source.trim())) return true;
   const other = /pok[eé]mon go|\bgo pass\b|masters ex|pok[eé]mon masters|pok[eé]mon unite|\bunite license\b|pok[eé]mon sleep|tera raid|pok[eé]mon legends|pok[eé]mon horizons|\banime\b|\bepisode\b|pok[eé]mon champions|caf[eé] remix|pokopia|\bwordle\b|starbucks|sponge cake|terrarium|\bmerch\b|merchandise|\bplush\b|lego pok[eé]mon|\bvgc\b|video game championships|scarlet & violet/i;
