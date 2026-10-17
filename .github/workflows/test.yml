@@ -40,3 +40,4 @@ jobs:
       - run: node scripts/feed-new.test.mjs
       - run: node scripts/member.test.mjs
       - run: node scripts/info-tap.test.mjs
+      - run: node scripts/no-side-scroll.test.mjs
