@@ -3166,6 +3166,20 @@ export function todayStrip(doc) {
   return `<section class="today-strip" aria-label="Today"><style>.today-strip{max-width:1040px;margin:0 auto;padding:8px 16px 24px}.today-strip h2{margin:0 0 10px;font:600 22px/1.2 Georgia,serif}.today-cards{display:grid;gap:10px}.today-cards article{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}.today-cards a{color:inherit;text-decoration:none}.today-cards b{display:block;margin-bottom:6px;color:#d9b779}@media(min-width:800px){.today-cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}</style><h2>Today${asOf ? ` · ${esc(asOf)}` : ""}</h2><div class="today-cards">${items}</div></section>`;
 }
 
+// Phone-first hero add-on: three short "what you get" lines and tonight's live read.
+export function heroToday(doc) {
+  const lines = Array.isArray(doc?.lines) ? doc.lines : [];
+  const row = lines.find((r) => r && r.slot === "mover" && String(r.text || "").trim() && /^\/(c|p)\//.test(String(r.href || "")))
+    || lines.find((r) => r && r.slot === "fact" && String(r.text || "").trim() && /^\//.test(String(r.href || "")));
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(doc?.asOf || "")) ? String(doc.asOf) : "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const when = day ? `${months[Number(day.slice(5, 7)) - 1]} ${Number(day.slice(8, 10))}` : "";
+  const text = String(row?.text || "").trim();
+  if (/[\u2014\u2013]/.test(text)) return "";
+  const live = row ? `<a class="hx-read" href="${esc(row.href)}"><span class="hx-tag">Latest read${when ? `, ${esc(when)}` : ""}</span><span class="hx-text">${esc(text)}</span><span class="hx-go">Open the data</span></a>` : "";
+  return `<style>.hx{display:grid;gap:12px;margin:18px 0 0}.hx-get{list-style:none;margin:0;padding:0;display:grid;gap:6px;font:500 15px/1.4 var(--sans)}.hx-get li{display:flex;gap:10px;align-items:flex-start}.hx-get li::before{content:"";flex:0 0 8px;height:8px;margin-top:7px;border-radius:999px;background:var(--gold,#d9b779)}.hx-read{display:grid;gap:6px;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}.hx-tag{font:600 12px/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--gold,#d9b779)}.hx-text{font:500 15px/1.45 var(--sans)}.hx-go{min-height:44px;display:inline-flex;align-items:center;font:600 15px/1 var(--sans);color:var(--gold,#d9b779)}@media(max-width:700px){.hero{padding:20px 0 28px!important;gap:12px!important}.hero .mark{display:none}.hero .kicker{margin-top:0}}</style><div class="hx" id="hero-today"><ul class="hx-get" aria-label="What you get"><li>Daily reads on every card and sealed product</li><li>Price charts and listings counted, each with its date</li><li>Free to use, no account needed</li></ul>${live}</div>`;
+}
+
 export function renderToday(doc, stamp, opts = {}) {
   const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
   const lines = (doc?.lines || []).map((line) => {
