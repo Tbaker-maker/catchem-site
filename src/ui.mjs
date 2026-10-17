@@ -5834,6 +5834,7 @@ async function showSpot(index){
   stage.appendChild(nav);
   const list=document.createElement("div");
   list.className="feed-list";
+  list.setAttribute("role", "region");
   list.setAttribute("aria-label","More reads");
   stage.appendChild(list);
   fillList(list, index);
@@ -6684,7 +6685,7 @@ async function showFlat(index, dir){
   }
   if(typeof catchemMount==="function") catchemMount(stage);
   let flList=stage.querySelector(".feed-list");
-  if(!flList){ flList=document.createElement("div"); flList.className="feed-list"; flList.setAttribute("aria-label","More reads"); stage.appendChild(flList); }
+  if(!flList){ flList=document.createElement("div"); flList.className="feed-list"; flList.setAttribute("role","region"); flList.setAttribute("aria-label","More reads"); stage.appendChild(flList); }
   fillFlatList(flList, spot, gen);
   try{
     const ahead=flat && flat[spot+1];

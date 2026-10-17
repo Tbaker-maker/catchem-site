@@ -148,5 +148,5 @@ const TAG_LABEL = { headliner: "Fan favourite", eeveelution: "Eeveelution", gen1
 export function cardMarkBadge(entry, doc) {
   if (!entry?.mark) return "";
   const day = shortDate(String(doc?.attrsGenerated || ""));
-  return `<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark ${esc(entry.mark)}"><span class="rm">${esc(entry.mark)}</span> Regulation mark ${esc(entry.mark)} on this card</a> <span class="muted">Mixed set. pokemontcg.io ${esc(entry.ptcgId)}${day ? `, card file ${esc(day)}` : ""}.</span></p>`;
+  return `<p class="rot-badge"><a href="/rotation"><span class="rm">${esc(entry.mark)}</span> Regulation mark ${esc(entry.mark)} on this card</a> <span class="muted">Mixed set. pokemontcg.io ${esc(entry.ptcgId)}${day ? `, card file ${esc(day)}` : ""}.</span></p>`;
 }
