@@ -40,6 +40,7 @@ import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
+import { renderPromos } from "./promos.mjs";
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   status,
@@ -90,6 +91,7 @@ export function pageKind(pathname) {
   const path = norm(pathname);
   if (path === "/feed" || path.startsWith("/feed/")) return "feed";
   if (path === "/sets") return "sets";
+  if (path === "/promos") return "promos";
   if (path.startsWith("/sets/")) return "set";
   if (path === "/artists") return "artists";
   if (path.startsWith("/artists/")) return "artist";
@@ -604,6 +606,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (counts?.soldNote) sets.soldNote = counts.soldNote;
     return html(renderSets(sets, stamp, pageOpts));
   }
+  if (kind === "promos") return html(pageChrome("Promos", renderPromos(), "Promos", stamp, "", pageOpts.feed));
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
