@@ -20,8 +20,8 @@ import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSet
 const DISCORD = DISCORD_INVITE;
 
 export const TAKE_LABELS = {
-  up: "Looks like a buy",
-  dip: "Wait for a dip",
+  up: "Trending up",
+  dip: "Cooling",
   watch: "Watch",
   avoid: "Avoid for now",
   stretched: "Looks stretched",
@@ -4850,10 +4850,10 @@ function matterLines(card){
     wrong="";
   }else if(head.indexOf("6-month low")>=0){
     why="The sentence on this card already calls the latest price a 6-month low"+(priceText?" at "+priceText:"")+(asOf?" on "+asOf:"")+". Product id "+sku+".";
-    wrong="Wrong if the latest price on "+sku+" is not the lowest price in a series that spans at least 150 days, or if the chart spark was treated as that whole series. A listing is not a sale.";
+    wrong="";
   }else if(days===7 && hasChange && Math.abs(change)<8 && priceText && asOf){
-    why="Latest price "+priceText+" on "+asOf+" for "+sku+". The 7-day move is "+Math.abs(change)+"% "+(change<0?"down":"up")+", under the 8% mover line.";
-    wrong="Wrong if this is not "+sku+", or if the 7-day move is 8% or more. A listing is not a sale.";
+    why="TCGplayer market price, "+asOf+". Latest price "+priceText+".";
+    wrong="";
   }else if(head || priceText){
     why="This read is product id "+sku+(asOf?", as of "+asOf:"")+(priceText?", latest price "+priceText:"")+".";
     wrong="Wrong if the sentence names a different product than "+sku+". A listing is not a sale.";
@@ -4867,7 +4867,7 @@ function shipReady(card){
   return (dir==="up"||dir==="down") && price>0;
 }
 const NUM_LABELS={low:"Low ask",high:"High ask",median:"Median ask",count:"Listings",basis:"Basis",from:"Start date",to:"End date",askFrom:"Start ask",askTo:"End ask",market:"TCGplayer market",startPrice:"Start price",endPrice:"End price",startDate:"Start date",endDate:"End date",shipPrice:"Price when posted"};
-const TAKE_WORDS={up:"Looks like a buy",dip:"Wait for a dip",watch:"Watch",avoid:"Avoid for now",stretched:"Looks stretched"};
+const TAKE_WORDS={up:"Trending up",dip:"Cooling",watch:"Watch",avoid:"Avoid for now",stretched:"Looks stretched"};
 const TAKE_NOTE="A take is our read of the numbers, not advice.";
 function isoDayOf(value){
   const s=String(value||"").slice(0,10);

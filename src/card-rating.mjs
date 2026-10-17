@@ -56,7 +56,6 @@ export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}
     const list = have.length > 1 ? `${have.slice(0, -1).join(", ")} and ${have.at(-1)}` : have[0] || "";
     body = have.length ? `<p class="gate">Factor bars for ${esc(list)} are in <a href="/premium">Premium</a>.</p>` : "";
   }
-  const w = doc?.weights ? ORDER.filter((k) => doc.weights[k] != null).map((k) => `${LABEL[k]} ${doc.weights[k]}`).join(", ") : "";
-  const about = `<details><summary>About this rating</summary><p>Similar cards are other ${esc(row.rarity || row.groupLabel)} cards from the same generation, in sets with a similar published pull rate, and with similar popularity. A verdict needs at least 5 such cards. With fewer than 5 there is no verdict. The typical price is the middle price of those cards. "Below" means 0.8x the typical price or less, "above" 1.25x or more. ${w ? `Weights: ${esc(w)}.` : ""} Factors with nothing on file are left out. Facts from our files as of ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
+  const about = `<details><summary>About this rating</summary><p>Compared with similar cards on TCGplayer market price, ${esc(shortDate(asOf))}. A factual comparison, not advice.</p></details>`;
   return `<style>${RATING_CSS}</style><section class="crt" aria-label="Rating">${head}<p class="verdict${row.verdict ? "" : " none"}">${esc(verdict)}</p>${high}<p class="peer">${peer}</p>${comparedWith(row, pool, pic)}${row.index ? `<p class="gate"><a href="${indexHref(indexKeyOf(row, !!row.verdict))}">See the index for these cards</a></p>` : ""}${body}${about}</section>`;
 }
