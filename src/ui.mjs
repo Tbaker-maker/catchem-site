@@ -2617,6 +2617,12 @@ const SINGLE_CSS = `
 .cp-prints{display:flex;gap:8px;overflow-x:auto;list-style:none;margin:10px 0 0;padding:0 0 4px}
 .cp-prints li{flex:none;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
 .cp-prints small{font:500 14px/1.2 var(--sans);color:var(--dim)}
+.cond-block{margin:10px 0 0;min-width:0;max-width:100%}
+.cond-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-width:0;max-width:100%;overflow-x:clip}
+.cond-chip{appearance:none;min-height:44px;min-width:44px;max-width:100%;padding:8px 14px;border-radius:999px;border:1px solid #2f2b26;background:rgba(255,255,255,.06);color:inherit;font:600 14px/1.2 var(--sans);overflow-wrap:anywhere;text-align:center}
+.cond-chip[aria-pressed="true"]{border-color:#d9b779;color:var(--gold)}
+.cond-chip small{display:block;font:500 12px/1.25 var(--sans);color:var(--dim);font-weight:500}
+.cond-print{margin:8px 0 4px;color:var(--dim);font:600 13px/1.2 var(--sans)}
 .cp-cond,.cp-gap{margin:6px 0 0;font:500 14px/1.35 var(--sans)}
 .cp-cond{color:var(--dim)}
 .cp-pattern{margin:12px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
@@ -2654,7 +2660,7 @@ const SINGLE_CSS = `
 @media(min-width:768px){
   .cp-head{flex-direction:row;align-items:flex-start;text-align:left;gap:28px}
   .cp-photo{width:240px;flex:none}
-  .cp-price,.cp-wins{justify-content:flex-start}
+  .cp-price,.cp-wins,.cond-chips{justify-content:flex-start}
 }
 @media(min-width:1100px){
   .cp-charts.has-counts{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:16px;align-items:start}
@@ -2737,7 +2743,7 @@ export function itemRankHtml(card) {
   return `<section class="item-sec" id="rank"><h2>Where it ranks in its set</h2><p class="rank-big">#${rank} of ${of}</p><div class="rank-bar" aria-hidden="true"><i style="width:${fill}%"></i></div><p class="muted">By TCGplayer market price among priced ${card.kind === "sealed" ? "products" : "singles"} in ${setName}. Top ${pctTop}%.</p></section>`;
 }
 
-export function itemReadsHtml(reads, { feed = false, sealed = false, held = false } = {}) {
+export function itemReadsHtml(reads, { feed = false, sealed = false, held = false, dropNm = false } = {}) {
   const stripNm = (text) => String(text || "")
     .replace(/\s*\((?:NM|Near Mint)\)/gi, "")
     .replace(/(\$[\d,]+(?:\.\d{1,2})?)\s+NM\b/g, "$1")
@@ -2755,8 +2761,8 @@ export function itemReadsHtml(reads, { feed = false, sealed = false, held = fals
   const items = list.map((r) => {
     const when = priceDay(String(r.asOf || "").slice(0, 10));
     const label = KIND_LABEL[r.kind] || "Read";
-    const headline = sealed ? stripNm(r.headline) : String(r.headline || "");
-    const lines = (r.lines || []).filter(Boolean).map((l) => (sealed ? stripNm(l) : l)).filter(Boolean);
+    const headline = (sealed || dropNm) ? stripNm(r.headline) : String(r.headline || "");
+    const lines = (r.lines || []).filter(Boolean).map((l) => ((sealed || dropNm) ? stripNm(l) : l)).filter(Boolean);
     const more = lines.length ? `<details><summary>Full read</summary><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${r.source ? `<p class="muted">${esc(r.source)}</p>` : ""}</details>` : "";
     const go = feed && r.id ? `<a class="rd-go" href="/feed/r/${encodeURIComponent(r.id)}">Open this read</a>` : "";
     return `<li id="read-${esc(r.id || "")}"><span class="rk">${esc(label)}</span>${when ? `<span class="muted">${esc(when)}</span>` : ""}<h3>${esc(headline)}</h3>${more}${go}</li>`;
@@ -2787,16 +2793,85 @@ export function withItemSections(mainHtml, marker) {
   return mainHtml.slice(0, at) + css + jump + mainHtml.slice(at);
 }
 
+const COND_ORDER = ["NM", "LP", "MP", "HP", "DMG"];
+const COND_JS = `(function(){
+  var blocks=document.querySelectorAll(".cond-block");
+  for (var i=0;i<blocks.length;i++) {
+    blocks[i].addEventListener("click", function(ev){
+      var b=ev.target.closest("button");
+      if(!b || !b.getAttribute("data-cond")) return;
+      var buttons=ev.currentTarget.querySelectorAll("button");
+      for (var j=0;j<buttons.length;j++) buttons[j].setAttribute("aria-pressed","false");
+      b.setAttribute("aria-pressed","true");
+      if (ev.currentTarget.getAttribute("data-head")!=="1") return;
+      var priceEl=document.querySelector(".cp-now");
+      var labelEl=document.querySelector(".cp-cond-label");
+      var dateEl=document.querySelector(".cp-date");
+      if (!priceEl) return;
+      var amt=b.getAttribute("data-amt") || "";
+      var cond=b.getAttribute("data-cond") || "";
+      if (!labelEl) {
+        labelEl=document.createElement("span");
+        labelEl.className="cp-cond-label";
+        priceEl.parentNode.insertBefore(labelEl, priceEl);
+      }
+      labelEl.textContent=cond;
+      priceEl.textContent=amt || "Price being checked";
+      if (dateEl) dateEl.textContent=b.getAttribute("data-date") || "";
+    });
+  }
+})();`;
+
+function conditionView(card, ladder, held) {
+  if (!card || card.kind === "sealed") return { html: "", selected: null };
+  const printings = ladder && ladder.printings && typeof ladder.printings === "object" ? ladder.printings : {};
+  const names = [];
+  const push = (name) => {
+    const n = String(name || "").trim();
+    if (n && names.indexOf(n) < 0) names.push(n);
+  };
+  for (const row of (card.printings || [])) push(row && row.name);
+  Object.keys(printings).forEach(push);
+  push(card.printing);
+  if (!names.length) names.push("");
+  const headName = String(card.printing || "").trim();
+  const fileDay = String(ladder && ladder.asOf || "").slice(0, 10);
+  let selected = null;
+  const blocks = names.map((name) => {
+    const row = printings[name] && typeof printings[name] === "object" ? printings[name] : {};
+    const rowDay = String(row.date || fileDay || "").slice(0, 10);
+    const isHead = (headName && name === headName) || (!headName && names.length === 1);
+    const chips = COND_ORDER.map((key) => {
+      const amount = !held && Number(row[key]) > 0 ? Number(row[key]) : 0;
+      const cash = amount ? money(amount) : "";
+      if (isHead && !selected && cash) selected = { key, amount, date: rowDay, printing: name };
+      const pressed = selected && selected.printing === name && selected.key === key ? "true" : "false";
+      const label = cash || "Price being checked";
+      const dateText = cash ? priceDay(rowDay) : "";
+      return `<button type="button" class="cond-chip" data-cond="${key}" aria-pressed="${pressed}"${cash ? ` data-amt="${esc(cash)}"` : ""}${dateText ? ` data-date="${esc(dateText)}"` : ""}><b>${key}</b><small>${esc(label)}</small></button>`;
+    }).join("");
+    const title = name && !/^normal$/i.test(name) ? `<p class="cond-print">${esc(name)}</p>` : "";
+    return `<div class="cond-block" data-head="${isHead ? "1" : "0"}">${title}<div class="cond-chips" role="group" aria-label="Condition">${chips}</div></div>`;
+  }).join("");
+  const tapDay = selected ? priceDay(selected.date) : "";
+  const short = tapDay ? tapDay.replace(/, \d{4}$/, "") : "";
+  const tap = short ? infoTap(`TCGplayer market, ${short}`) : "";
+  const src = short ? `<p class="cp-src">TCGplayer market, ${esc(short)}${tap}</p>` : "";
+  return { html: `${blocks}${src}<script>${COND_JS}</script>`, selected };
+}
+
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit, held = false }) {
+  const view = conditionView(card, opts.conditionLadder, held);
+  const showPrice = view.selected ? money(view.selected.amount) : price;
+  const when = view.selected ? priceDay(view.selected.date) : priceDay(endDay);
   const tags = printingTags(card);
   const chips = changeTable(priceSeries.length ? priceSeries : hist, endDay);
   const strip = summaryStrip({
-    prefix: conditionPrefix(card, held),
-    price: held ? "" : price,
+    prefix: view.selected ? view.selected.key : conditionPrefix(card, held),
+    price: held ? "" : showPrice,
     listings: countedListings(opts.fact, opts.listingSeries, endDay),
     rotation: rotationChipLabel(opts.rotationFact),
   });
-  const when = priceDay(endDay);
   const num = String(card.num || "").trim();
   const numBit = num ? ` · ${num.startsWith("#") ? num : `#${num}`}` : "";
   const priceReal = (priceSeries || []).filter((point) => point && Number(point[1]) > 0 && !point[3]);
@@ -2836,7 +2911,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   void also;
   const math = [];
-  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, held });
+  const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, held, dropNm: held || !view.selected || view.selected.key !== "NM" });
   
   return withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance card-page">
 <style>${SINGLE_CSS}</style>
@@ -2851,7 +2926,8 @@ ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " +
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${held ? `<p class="cp-price"><span class="cp-now">Price being checked</span></p>` : (price ? `<p class="cp-price"><span class="cp-now">${price}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p><p class="cp-src">${esc(sourceLine(card))}${infoTap(`${sourceLine(card) || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price"))}</p>` : "")}
+${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span></p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${infoTap(`${sourceLine(card) || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price"))}</p>`}`}
+${view.html}
 ${held ? "" : chips}
 ${strip}
 ${printingsHtml(card, held)}
