@@ -73,7 +73,7 @@ export function setValueBlock(doc, images = {}, slug = "") {
     : "";
   return `<section class="sv" aria-labelledby="sv-h"><h2 id="sv-h">${c.heading}</h2>
 <p class="muted">${c.explainer}</p>
-${total ? `<p class="sv-total">Master-set total <b>${total}</b></p>` : ""}
+${total ? `<p class="sv-total">Master-set total <b>${total}</b>${day ? `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(`TCGplayer market price, one of each card, ${day}`)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(`TCGplayer market price, one of each card, ${day}`)}</span></span>` : ""}</p>` : ""}
 ${counts ? `<p>${esc(counts)}</p>` : ""}
 ${rows ? `<ol class="sv-list">${rows}</ol>` : ""}
 <p class="muted">Source: TCGplayer market, ${esc(day)}.</p>

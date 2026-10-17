@@ -810,7 +810,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true });
       if (block) itemReadHtml = block;
       const l = itemRead?.listings;
-      if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date };
+      if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date, pct: Number.isFinite(l.pct) ? l.pct : null, prevDay: l.prevDate || "" };
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
     return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
@@ -889,7 +889,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const images = await catalogueMap(fetchImpl);
     const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, images); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
     const body = watchlistBody(doc, { premium: opts.premium === true, set: opts.set || "", page: opts.page || "", pic });
-    return html(pageChrome("", body, "IR watchlist", stamp, "", pageOpts.feed === true));
+    return html(pageChrome("", body, "Illustration Rares to watch", stamp, "", pageOpts.feed === true));
   }
   if (kind === "supply") {
     const doc = await loadJson("feed/supply-lead.json", fetchImpl).catch(() => ({ enabled: false, reads: [], wouldQualify: 0 }));
