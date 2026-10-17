@@ -44,3 +44,4 @@ jobs:
       - run: node scripts/member.test.mjs
       - run: node scripts/info-tap.test.mjs
       - run: node scripts/no-side-scroll.test.mjs
+      - run: node scripts/item-read.test.mjs

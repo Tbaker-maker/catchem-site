@@ -44,6 +44,7 @@ export function infoTap(text) {
   return `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(t)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(t)}</span></span>`;
 }
 export const ITAP_CSS = `.itap{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;min-width:44px;min-height:44px;margin:-10px -6px -10px 0;border-radius:999px;cursor:pointer;outline:none;color:var(--dim,#a8a091)}.itap-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;opacity:.75}.itap:focus-visible .itap-i{outline:2px solid var(--gold,#d9b779);outline-offset:2px}.itap-pop{display:none;position:absolute;z-index:30;left:0;top:100%;width:max-content;max-width:260px;padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;box-shadow:0 10px 24px rgba(0,0,0,.45);font:500 13px/1.4 var(--sans);font-style:normal;color:var(--txt,#efe9de);white-space:normal;text-align:left}.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}@media(max-width:700px){.itap-pop{position:fixed;left:16px;right:16px;top:auto;bottom:96px;width:auto;max-width:none}}`;
+export const NA_CSS = `.na{display:inline-block;padding:2px 8px;border-radius:999px;background:#2a2723;color:#8a8175;font:500 12px/1.2 var(--sans);letter-spacing:.02em}`;
 
 // Method stays private: drop sentences that state thresholds, cutoffs or matching rules.
 export function scrubMethod(text) {
@@ -92,6 +93,10 @@ export function money(n) {
   const x = Number(n);
   if (!Number.isFinite(x) || x <= 0) return null;
   return "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function naChip() {
+  return '<span class="na">n/a</span>';
 }
 
 // A read may mention sales volume, thin sales, or copies sold. No file has a
@@ -1167,8 +1172,8 @@ export function renderSupply(doc, stamp, opts = {}) {
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>Counts are active eBay listings, not sales. Both exact nights have to be on file.</p>
 <p>Nights on file: ${Number(doc?.nightCount) || 0}. Products: ${Number(doc?.products) || 0}. Products on ${esc(doc?.asOf || "the latest night")}: ${Number(doc?.productsOnLatest) || 0}.</p>
-<p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${esc(w7.exactStart || "—")} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
-<p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${esc(w30.exactStart || "—")} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
+<p>7 days: ${Number(w7.qualify) || 0} would qualify. Exact start ${esc(w7.exactStart || naChip())} is ${w7.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w7.productsWithBothDays) || 0}.</p>
+<p>30 days: ${Number(w30.qualify) || 0} would qualify. Exact start ${esc(w30.exactStart || naChip())} is ${w30.exactStartOnFile ? "on file" : "not a night on file"}. Products with both of their own exact days: ${Number(w30.productsWithBothDays) || 0}.</p>
 <p>Flag off or on, published reads: ${reads.length}. Counted before the flag: ${Number(doc?.wouldQualify) || 0}.</p>
 ${below ? `<h2>Checked, not shipped</h2><ul>${below}</ul>` : ""}
 ${cards}
@@ -1186,7 +1191,7 @@ export function renderSetValue(doc, stamp, opts = {}) {
 <p class="muted">${on ? "The read is on." : "This read is off until the rule is kept."} Updated ${esc(doc?.asOf || "")}.</p>
 <p>The sum is TCGplayer market for singles priced on both exact days. A missing day drops the set. The card count is how many singles had a price on both days.</p>
 <p>Sets on file: ${Number(doc?.sets) || 0}. Window: ${Number(doc?.windowDays) || 30} days.</p>
-<p>Exact start ${esc(doc?.exactStart || "—")} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
+<p>Exact start ${esc(doc?.exactStart || naChip())} is ${doc?.exactStartOnFile ? "on file" : "not a price day on file"}.</p>
 <p>Would qualify: ${Number(doc?.wouldQualify) || 0}. Published reads: ${reads.length}.</p>
 ${days ? `<p class="muted">Price days on file: ${esc(days)}.</p>` : ""}
 ${cards}
@@ -1608,7 +1613,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}${FEATURE_CSS}${NA_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${CHART_JS}\n${QUICK_JS}</script><script>${HISTORY_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
@@ -1873,7 +1878,7 @@ function paintMine(){
     if(!got){ cost+=price; leftPriced++; }
   });
   var pct=total?Math.round((have/total)*1000)/10:0;
-  var costText=leftPriced?cash(cost):"—";
+  var costText=leftPriced?cash(cost):naChip();
   var mode=scope==="grand"?"Grand master. ":scope==="master"?"Master set. ":scope==="base"?"Base set. ":"";
   var noun=unpriced===1?"card unpriced.":"cards unpriced.";
   el.textContent=mode+"Owned "+have+" of "+total+" ("+pct+"%). Cost to complete "+costText+". "+unpriced+" "+noun;
@@ -3143,7 +3148,7 @@ export function renderMovers(doc, stamp, opts = {}) {
     const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
     const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
-    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || "—"} <span class="muted">${pct}</span></b></div>`;
+    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || naChip()} <span class="muted">${pct}</span></b></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
@@ -3494,13 +3499,13 @@ export function renderTrackRecord(doc, stamp, opts = {}) {
   const types = (doc?.types || []).map((row) => `<tr><td>${esc(row.type)}</td><td>${row.reads}</td><td>${row.tooEarly}</td><td>${row.noLaterPrice}</td><td>${esc(row.line14 || horizonLine("14-day", row.scored14))}</td><td>${esc(row.line28 || horizonLine("28-day", row.scored28))}</td><td>${esc(row.line56 || horizonLine("56-day", row.scored56))}</td></tr>`).join("");
   const rows = [...(doc?.rows || [])].sort((a, b) => String(b.shipped || "").localeCompare(String(a.shipped || ""))).map((row) => {
     const note = row.status === "too-early" ? "Too early to score." : row.status === "no-later-price" ? "No later price, so no score." : (row.note || "");
-    const later = (n) => row.marks?.[n]?.price > 0 ? (money(row.marks[n].price) || "—") : "—";
-    const dir = row.direction === "up" || row.direction === "down" ? row.direction : "—";
-    return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : "—"}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
+    const later = (n) => row.marks?.[n]?.price > 0 ? (money(row.marks[n].price) || naChip()) : naChip();
+    const dir = row.direction === "up" || row.direction === "down" ? row.direction : naChip();
+    return `<tr><td>${esc(row.shipped || "")}</td><td>${esc(row.name || "")}</td><td>${row.price > 0 ? esc(money(row.price) || "") : naChip()}</td><td>${esc(dir)}</td><td>${esc(later("14"))}</td><td>${esc(later("28"))}</td><td>${esc(later("56"))}</td><td>${esc(note)}</td></tr>`;
   }).join("");
   const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Track record</h1>
-<p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || "—")}.</p>
+<p class="muted">Scored through ${esc(doc?.asOf || "")}. Newest first. Oldest read ${esc(doc?.oldest || naChip())}.</p>
 <p>A read needs 14 days and a later price on the exact day. Days checked: 14, 28, and 56. Under 14 days is too early to score. No later price is not a miss. The ship price is the price on the ship date in the price file.</p>
 <p>Reads stored: ${Number(doc?.count) || 0}. Too early: ${Number(doc?.tooEarly) || 0}. No later price: ${Number(doc?.noLaterPrice) || 0}. ${esc(horizonLine("14-day", doc?.scored14))}. ${esc(horizonLine("28-day", doc?.scored28))}. ${esc(horizonLine("56-day", doc?.scored56))}.</p>
 <table><thead><tr><th>Type</th><th>Reads</th><th>Too early</th><th>No later price</th><th>14-day</th><th>28-day</th><th>56-day</th></tr></thead><tbody>${types}</tbody></table>
@@ -4017,11 +4022,11 @@ export function renderDive(doc, stamp, opts = {}) {
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
   const price = money(latest.priceMedian);
-  const listings = latest.listingCount != null ? String(latest.listingCount) : "—";
+  const listings = latest.listingCount != null ? String(latest.listingCount) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
-    const lc = r.listingCount != null ? String(r.listingCount) : "—";
-    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || "—"}</td><td>${esc(lc)}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
+    const lc = r.listingCount != null ? String(r.listingCount) : naChip();
+    return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || naChip()}</td><td>${esc(lc)}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
   }).join("");
   const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
   const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
@@ -4039,7 +4044,7 @@ export function renderDive(doc, stamp, opts = {}) {
 <h1>${esc(doc.name || doc.id)}</h1>
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
-<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || "—"}</p>
+<p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
 <p class="muted">eBay Browse ask median · ${esc(listings)} active listings (asks, not solds)</p>
 ${buyoutLine}
 ${chartBox(hist, "eBay Browse ask median, daily")}
