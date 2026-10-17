@@ -12,6 +12,7 @@ import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
+import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -1117,6 +1118,7 @@ const worker = {
     if (request.method === "GET" && (url.pathname === "/video" || url.pathname.startsWith("/video/"))) {
       if (!video) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
     }
+    if (isPipePath(url.pathname)) return handleReadsPipe(request, env);
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/api/vote") return handleVote(request, env);
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
@@ -1156,6 +1158,8 @@ const worker = {
           signedIn: !!viewer?.sub,
           premium: viewer?.premium === true,
           saved: url.searchParams.get("saved") === "1",
+          note: url.searchParams.get("note") || "",
+          pipe: readsPipeReady(env),
           line: url.searchParams.get("line") || "",
           card: url.searchParams.get("card") || "",
           sealed: url.searchParams.get("sealed") || "",
