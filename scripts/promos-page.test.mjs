@@ -12,7 +12,8 @@ assert.ok(page.includes('aria-label="Art type"'), "art chips");
 assert.ok(page.includes('aria-label="Source product"'), "source chips");
 assert.ok(page.includes(">Sealed promos<"), "sealed tab");
 assert.ok(page.includes('id="promo-count"'), "count line");
-assert.ok(page.includes("fetch(\"/data/promos.json\")"), "loads the promo file");
+assert.ok(page.includes('id="promo-more"'), "show more");
+assert.ok(page.includes("shown=48"), "first page is 48");
 assert.ok(!page.includes("Near Mint") && !/\bNM\b/.test(page.slice(page.indexOf("promo-page"))), "no condition label");
 assert.equal(describePage("promos"), "Every priced Pokémon TCG promo, with the TCGplayer market price and the art type.");
 for (const m of page.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)) {

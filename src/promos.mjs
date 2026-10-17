@@ -17,6 +17,7 @@ function chips(id, label, values, first) {
 // literal loses its backslashes.
 const PAGE_JS = `
 var doc=null;
+var shown=48;
 function money(n){return !(n>0)?"":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function html(s){
   var raw=String(s==null?"":s);
@@ -85,9 +86,13 @@ function draw(){
   document.getElementById("promo-art").hidden=tab==="sealed";
   document.getElementById("promo-source").hidden=tab==="sealed";
   document.getElementById("promo-era").hidden=tab==="sealed";
-  if(!rows.length){ box.innerHTML=""; note.hidden=false; note.textContent=tab==="sealed"?"No sealed promo packs in this file.":"No promos match these filters."; return; }
+  var more=document.getElementById("promo-more");
+  if(!rows.length){ box.innerHTML=""; note.hidden=false; note.textContent=tab==="sealed"?"No sealed promo packs in this file.":"No promos match these filters."; more.hidden=true; return; }
   note.hidden=true;
-  box.innerHTML=rows.map(function(r){ return tile(r, tab==="sealed"); }).join("");
+  var slice=rows.slice(0, shown);
+  box.innerHTML=slice.map(function(r){ return tile(r, tab==="sealed"); }).join("");
+  if(rows.length>shown){ more.hidden=false; more.textContent="Show more ("+(rows.length-shown)+" left)"; }
+  else more.hidden=true;
 }
 function bind(id){
   var root=document.getElementById(id);
@@ -96,6 +101,7 @@ function bind(id){
     var b=ev.target.closest("button");
     if(!b||!root.contains(b)) return;
     root.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", x===b?"true":"false"); });
+    shown=48;
     draw();
   });
 }
@@ -111,6 +117,7 @@ fetch("/data/promos.json").then(function(r){ return r.ok?r.json():null; }).then(
   note.textContent="Promos did not load.";
 });
 ["promo-tabs","promo-era","promo-art","promo-source"].forEach(bind);
+document.getElementById("promo-more").addEventListener("click",function(){ shown+=48; draw(); });
 `;
 
 export function renderPromos() {
@@ -133,6 +140,7 @@ export function renderPromos() {
 .art-chips button{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #2f2b26;background:#1a1815;color:inherit;font:600 13px/1 var(--sans);cursor:pointer}
 .art-chips button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
 .artchip{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:999px;background:#3a3a3e;color:#aeaeb2;font:600 12px/1 var(--sans)}
+.promo-more{min-height:44px;margin:4px 0 28px;padding:0 18px;border-radius:999px;border:1px solid #2f2b26;background:#1a1815;color:inherit;font:600 14px/1 var(--sans);cursor:pointer}
 @media(max-width:640px){.promo-page h1{font-size:28px}.promo-grid{grid-template-columns:1fr}}
 </style>`;
   return `<main id="main" tabindex="-1" class="wrap promo-page">
@@ -145,6 +153,7 @@ ${chips("promo-art", "Art type", ARTS, "All art")}
 ${chips("promo-source", "Source product", SOURCES, "All sources")}
 <p class="muted" id="promo-note" hidden>No promos match these filters.</p>
 <div class="promo-grid" id="promo-list"></div>
+<button type="button" id="promo-more" class="promo-more" hidden>Show more</button>
 </main>
 <script>
 ${PAGE_JS}
