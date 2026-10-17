@@ -26,7 +26,7 @@ const h = readSheet(read, { facts, reads: [], rotation: { mark: "I", status: "St
 t("listings counted with 7-day change", h.includes("12 listings counted, Oct 14, 7-day +20% from Oct 7"));
 t("30-day and 1Y change", h.includes("30-day -22.3%, Sep 14 to Oct 14") && h.includes("1Y -30.8%"));
 t("eBay vs TCGplayer gap", h.includes("eBay ask $50.00 vs TCGplayer $47.36 (+5.6%)"));
-t("hero uses tonight's dated price, not the old high", h.includes("NM $47.36 TCGplayer, Oct 14, 2026") && !h.includes("$84.45 TCGplayer"));
+t("hero uses tonight's dated price, not the old high", h.includes("$47.36 TCGplayer, Oct 14, 2026") && !h.includes("NM $47.36") && !h.includes("$84.45 TCGplayer"));
 t("high, low, days since high, rank", h.includes("High $84.54 on May 29, 2025") && h.includes("503 days since the last high, now 44% under it") && h.includes("No. 8 of 244"));
 t("percent facts are not scaled twice", h.includes("singles index +0.6%"));
 t("pattern shows rate vs base and n", h.includes("right 25% of the time 7 days later, vs 20.8% normally. Based on 3,503 past cases") && h.includes("set 1 to 3 years old"));

@@ -24,7 +24,7 @@ t("high/low, days since high, rank", h.includes("503 days since the last high") 
 t("listings counted with change", h.includes("12 listings counted, Oct 14, 1-day +20% from Oct 13"));
 t("pattern and set momentum", h.includes("vs 20.8% normally") && h.includes("singles index -18.3%"));
 t("what-we-see line", h.includes("44% under its high"));
-t("Near Mint label for singles", h.includes("(Near Mint)"));
+t("no invented Near Mint label", !h.includes("(Near Mint)") && !h.includes("NM $"));
 t("Rip and rotation skipped when the page already has them", !itemReadBlock(row, { skipRip: true, skipRotation: true }).includes("Rip value") && !itemReadBlock(row, { skipRotation: true }).includes("Mark I"));
 t("no banned words, no em dash", !/[\u2014\u2013]/.test(h) && !banGuard("item-read", /\b(supply)\b/i, PAGE).test(h.replace(/<[^>]+>/g, " ")));
 t("empty row renders nothing", itemReadBlock({ item: {} }) === "" && itemReadBlock(null) === "");

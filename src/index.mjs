@@ -233,12 +233,28 @@ function withCatalogue(list, images) {
 // isolate and tripped Cloudflare error 1102, so it is gone. Without the list,
 // only the build-time stale flag applies.
 const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase"]);
-async function omitStalePriceReads(reads, _fetchImpl, opts = {}) {
+async function omitStalePriceReads(reads, fetchImpl, opts = {}) {
   // The build-time stale flag is about prices. Dated facts (Pokemon, listings
   // counted, news, releases, rotation, deep reads) stay true on their own date.
   const list = (Array.isArray(reads) ? reads : []).filter((read) => !read?.stale || DATED_FACT_KINDS.has(String(read?.readKind || read?.kind || "")));
   const drop = new Set((Array.isArray(opts.staleIds) ? opts.staleIds : []).map(String));
-  return drop.size ? list.filter((r) => !drop.has(String(r?.id))) : list;
+  let held = opts.holdIds;
+  if (!held && fetchImpl) {
+    try {
+      const doc = await loadJson("price-hold.json", fetchImpl);
+      held = doc && doc.ids && typeof doc.ids === "object" ? doc.ids : {};
+    } catch {
+      held = {};
+    }
+  }
+  const heldIds = held && typeof held === "object" ? held : {};
+  return list.filter((read) => {
+    if (drop.has(String(read?.id || ""))) return false;
+    const sku = String(read?.sku || read?.cardId || "");
+    if (!sku || !heldIds[sku]) return true;
+    const blob = `${read?.headline || ""} ${read?.path || ""} ${(read?.lines || []).join(" ")} ${read?.price || ""}`;
+    return !/\$\d/.test(blob);
+  });
 }
 
 // Every read about one item, full rows, from the small per-item lookup
@@ -849,14 +865,33 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         if (hit) comesFrom = { id: hit.productId, name: hit.productName };
       }
     }
-    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    let priceHeld = false;
+    if (card && card.kind !== "sealed" && cardId) {
+      const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
+      if (hold && hold.ids && hold.ids[cardId]) priceHeld = true;
+      if (priceCheck) priceHeld = true;
+    }
+    if (priceHeld) {
+      card.price = null;
+      card.priceStatus = "checking";
+      if (/\$\d/.test(ratingHtml)) ratingHtml = "";
+      if (/\$\d/.test(cycleHtml)) cycleHtml = "";
+      itemReadHtml = "";
+      priceRead = null;
+    }
+    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, priceHeld, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
+    const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
+    const held = hold && hold.ids && typeof hold.ids === "object" ? hold.ids : {};
     const images = await catalogueMap(fetchImpl);
     const painted = { ...doc };
     for (const key of ["singles", "sealed", "singlesRising", "singlesFalling", "sealedRising", "sealedFalling"]) {
-      if (Array.isArray(doc[key])) painted[key] = withCatalogue(doc[key], images);
+      if (Array.isArray(doc[key])) {
+        const rows = key.startsWith("sealed") ? doc[key] : doc[key].filter((row) => row && !held[row.id]);
+        painted[key] = withCatalogue(rows, images);
+      }
     }
     return html(renderMovers(painted, stamp, pageOpts));
   }
@@ -1334,7 +1369,15 @@ export function vancouverDay(now = new Date()) {
 }
 
 async function setFeatureHtml(slug, fetchImpl, valueDoc) {
-  const doc = valueDoc || await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
+  let doc = valueDoc || await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
+  const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
+  const held = hold && hold.ids && typeof hold.ids === "object" ? hold.ids : {};
+  if (doc && Array.isArray(doc.top)) {
+    const top = doc.top.filter((row) => row && !held[row.id]);
+    const dropped = top.length !== doc.top.length;
+    doc = { ...doc, top };
+    if (dropped && doc.master) doc = { ...doc, master: { ...doc.master, total: null } };
+  }
   const images = doc ? await catalogueMap(fetchImpl) : {};
   const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
   let rotationHtml = rot ? rotationBadge(rotationRow(rot, slug), rot) : undefined;

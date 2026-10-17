@@ -282,7 +282,7 @@ export function readSheet(read, ctx = {}) {
   const rarity = String(meta.rarity || it.rarity || "").trim();
   const artist = String(meta.artist || it.artist || "").trim();
   const prices = it.price > 0 && dayLabel(it.priceAsOf)
-    ? { line: `${it.kind === "sealed" ? "" : "NM "}${money(it.price)} TCGplayer, ${dayLabel(it.priceAsOf)}`, gap: "" }
+    ? { line: `${it.condition === "NM" ? "NM " : ""}${money(it.price)} TCGplayer, ${dayLabel(it.priceAsOf)}`, gap: "" }
     : priceBits(read);
   const name = cleanTitle(String(read.name || meta.name || "").trim());
   const bits = [number, rarity, artist].filter(Boolean);
