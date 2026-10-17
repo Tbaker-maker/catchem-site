@@ -1951,7 +1951,7 @@ function draw(){
   const vsel=document.getElementById("vtag");
   if(vsel && vsel.options.length===1){var seenT={};rows.forEach(function(r){(r.tags||[]).forEach(function(t){seenT[t]=(seenT[t]||0)+1;});});Object.keys(seenT).sort().forEach(function(t){var o=document.createElement("option");o.value=t;o.textContent=t+" ("+seenT[t]+")";vsel.appendChild(o);});}
   const vtag=vsel?vsel.value:"";
-  var artOn=document.querySelector("#art-chips button[aria-pressed=\"true\"]");
+  var artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
   var artWant=artOn?String(artOn.getAttribute("data-art")||""):"";
   if(artWant) list=list.filter(function(r){return r.kind==="sealed"||artType(r)===artWant;});
   if(vtag) list=list.filter(r=>(r.tags||[]).indexOf(vtag)>=0);
@@ -3861,7 +3861,7 @@ async function draw(){
   const n=++drawN;
   const q=document.getElementById("q").value.trim();
   const vtag=document.getElementById("vtag").value;
-  const artOn=document.querySelector("#art-chips button[aria-pressed=\"true\"]");
+  const artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
   const art=artOn?String(artOn.getAttribute("data-art")||""):"";
   const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
   const hasArt=function(r){return !art || (r[5]!=="sealed" && artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:Array.isArray(r[9])?r[9]:[]})===art);};
