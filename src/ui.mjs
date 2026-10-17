@@ -1635,7 +1635,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
 <style>${CSS}${FEATURE_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -2805,6 +2805,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
 ${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
+${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " + String(card.setSlug || "")) ? `<p><a href="/promos">All promos</a></p>` : ""}
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}

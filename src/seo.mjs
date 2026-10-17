@@ -26,6 +26,7 @@ export function describePage(kind, name) {
     case "pokemon": return n ? `Every ${n} card in the catalog, with TCGplayer market prices.` : "Pokémon TCG cards with TCGplayer market prices.";
     case "artist": return n && n !== "Artist" ? `Pokémon TCG cards illustrated by ${n}, with TCGplayer market prices.` : "Pokémon TCG cards by illustrator.";
     case "sets": return "Every Pokémon TCG set, with card counts and TCGplayer market prices.";
+    case "promos": return "Every priced Pokémon TCG promo, with the TCGplayer market price and the art type.";
     case "rip": return "Rip value. History-based estimates of opening a pack or sealed product, from dated pull rates and singles prices. Not advice.";
     case "artists": return "Pokémon TCG illustrators and the cards they drew.";
     case "search": return "Search every Pokémon TCG card and sealed product by name, set, or number.";
