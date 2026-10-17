@@ -39,4 +39,4 @@ t("says not advice", /not advice/.test(paid));
 if (fail) { console.log(`ir-cycle: ${fail} failed`); process.exit(1); } else console.log("ir-cycle ok");
 import { rotationBadge } from "../src/features.mjs";
 if (!/Checked Oct 12, 2026/.test(rotationBadge({ mark: "I", status: "Standard", checked: "2026-10-12" }, { asOf: "2026-08-24" }))) { console.log("  FAIL badge checked"); process.exit(1); }
-if (!/Card file, Aug 24, 2026/.test(rotationBadge({ mark: "H", status: "Standard" }, { asOf: "2026-08-24" }))) { console.log("  FAIL badge card file"); process.exit(1); }
+if (!/As of Aug 24, 2026/.test(rotationBadge({ mark: "H", status: "Standard" }, { asOf: "2026-08-24" }))) { console.log("  FAIL badge card file"); process.exit(1); }

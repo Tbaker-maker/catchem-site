@@ -15,6 +15,7 @@ jobs:
       - run: node scripts/public-routes.test.mjs
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/feed-groups.test.mjs
+      - run: node scripts/audit-oct16.test.mjs
       - run: node scripts/open-data.test.mjs
       - run: node scripts/post-office.test.mjs
       - run: node scripts/sealed-pid.test.mjs

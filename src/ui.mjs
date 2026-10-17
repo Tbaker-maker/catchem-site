@@ -2263,7 +2263,7 @@ function rotationChipLabel(html) {
   const mark = src.match(/class="rm">([^<]+)</);
   if (!mark) return "";
   const status = src.match(/Regulation mark [^<·]*· ([^<]+)/);
-  return status ? `${mark[1]} · ${status[1]}` : `Mark ${mark[1]}`;
+  return status ? `Mark ${mark[1]} · ${status[1]}` : `Mark ${mark[1]}`;
 }
 
 function countedListings(fact, series, endDay) {
@@ -2271,7 +2271,9 @@ function countedListings(fact, series, endDay) {
   const day = String(fact?.listingsAsOf || "").slice(0, 10);
   if (Number.isFinite(n) && n >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(day)) return { n, day };
   const pts = (series || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0);
-  const row = pts.find((point) => String(point.date).slice(0, 10) === endDay) || null;
+  const endMs = Date.parse(`${endDay}T00:00:00Z`);
+  const near = Number.isFinite(endMs) ? pts.filter((point) => { const ms = Date.parse(`${String(point.date).slice(0, 10)}T00:00:00Z`); return ms <= endMs && endMs - ms <= 3 * 86400000; }).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)) : [];
+  const row = pts.find((point) => String(point.date).slice(0, 10) === endDay) || near[0] || null;
   if (!row) return null;
   return { n: Number(row.listingCount), day: String(row.date).slice(0, 10) };
 }
@@ -2500,7 +2502,8 @@ export function pokemonStripHtml(strip) {
   const high = end(strip.high, strip.highDate);
   if (!low || !high) return "";
   const noun = count === 1 ? "card" : "cards";
-  const range = count === 1 || low === high ? low : `${low} to ${high}`;
+  const sameDay = priceDay(strip.lowDate) && priceDay(strip.lowDate) === priceDay(strip.highDate);
+  const range = count === 1 || low === high ? low : sameDay ? `${money(strip.low)} to ${money(strip.high)} on ${priceDay(strip.highDate)}` : `${low} to ${high}`;
   const text = `Every ${name} card we price: ${count} ${noun}, ${range}.`;
   if (/[\u2014\u2013]/.test(text)) return "";
   return `<a class="cp-mon" href="/pokemon/${esc(slug)}">${esc(text)}</a>`;
@@ -4417,7 +4420,7 @@ function priceRow(card){
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
-  const src=String(card.source||"").replace(/,?\s*[0-9]{4}-[0-9]{2}-[0-9]{2}/g,"").replace(/\s*via\s+tcgcsv/i,"").trim();
+  const src=String(card.source||"").replace(/,?\s*[0-9]{4}-[0-9]{2}-[0-9]{2}/g,"").replace(/\s*via\s+tcgcsv/i,"").replace(/[\s,;·]+$/,"").trim();
   const srcBit=src?'<span class="muted"> · '+html(src)+"</span>":"";
   return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+srcBit+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }

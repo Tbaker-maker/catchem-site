@@ -799,7 +799,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     let itemReadHtml = "";
     if (card && card.setSlug) {
       const itemRead = await loadItemRead(card.setSlug, card.id, fetchImpl);
-      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact });
+      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true });
       if (block) itemReadHtml = block;
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";

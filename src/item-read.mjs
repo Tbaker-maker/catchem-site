@@ -8,7 +8,7 @@ const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const short = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(iso || "") ? `${months[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}` : "");
 const pp = (n) => (Number(n) > 0 ? "+" : "") + Math.round(Number(n) * 10) / 10 + "%";
 
-export function itemReadBlock(f, { skipRip = false, skipRotation = false } = {}) {
+export function itemReadBlock(f, { skipRip = false, skipRotation = false, skipWindows = false } = {}) {
   if (!f || typeof f !== "object") return "";
   const doc = { ...f, id: f.id || "item", asOf: f.asOf || f.item?.priceAsOf || "" };
   if (skipRip) delete doc.rip;
@@ -20,7 +20,7 @@ export function itemReadBlock(f, { skipRip = false, skipRotation = false } = {})
   const fc = factCards(doc);
   const line = String(doc.line || "").trim();
   const lineHtml = line && !BANNED.test(line) && !/[\u2014\u2013]/.test(line) ? `<p class="ir-line">${esc(line)}</p>` : "";
-  const all = [...windows, ...chips];
+  const all = [...(skipWindows ? [] : windows), ...chips];
   const body = `${lineHtml}${all.length ? `<ul class="rd-chips">${all.join("")}</ul>` : ""}${fc.pattern}${fc.range || fc.cards.length ? `<div class="rd-cards">${fc.range}${fc.cards.join("")}</div>` : ""}`;
   if (!body) return "";
   return `<section class="item-read" aria-label="Our read"><style>${CSS}</style><h2>Our read</h2>${body}<p class="muted ir-src">${esc(`From our dated files. TCGplayer market${doc.item?.kind === "sealed" ? "" : " (Near Mint)"}, eBay asks and listings counted. As of ${short(doc.asOf)}.`)}</p></section>`;

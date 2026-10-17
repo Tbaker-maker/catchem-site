@@ -90,7 +90,7 @@ export function rotationBadge(row, doc) {
   const status = row.status ? ` · ${esc(row.status)}` : "";
   const day = longDay(doc?.asOf);
   const checked = longDay(row.checked);
-  return `<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark ${esc(row.mark)}${row.status ? `, ${esc(row.status)}` : ""}"><span class="rm">${esc(row.mark)}</span> Regulation mark ${esc(row.mark)}${status}</a>${checked ? ` <span class="muted">Checked ${esc(checked)}.</span>` : day ? ` <span class="muted">Card file, ${esc(day)}.</span>` : ""}</p>`;
+  return `<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark ${esc(row.mark)}${row.status ? `, ${esc(row.status)}` : ""}"><span class="rm">${esc(row.mark)}</span> Regulation mark ${esc(row.mark)}${status}</a>${checked ? ` <span class="muted">Checked ${esc(checked)}.</span>` : day ? ` <span class="muted">As of ${esc(day)}.</span>` : ""}</p>`;
 }
 
 const TYPE_LABELS = {
