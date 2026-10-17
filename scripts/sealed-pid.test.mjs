@@ -7,36 +7,34 @@ assert.equal(tcgPid({ id: "tcgcsv-5", tcgPlayerId: "9" }), 5);
 console.log("sealed pid ok");
 
 // Store links (TCGplayer by id, eBay search by exact product) + disclosure.
-import { affEbay, affTcg, ebayQuery, ebaySearchUrl, productLink, setAffiliateConfig, storeLinksHtml, tcgStoreUrl } from "../src/pokemon.mjs";
+import { SHOP_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, productLink, setAffiliateConfig, storeLinksHtml, tcgStoreUrl } from "../src/pokemon.mjs";
 import { quickView, renderCard, renderSearch, esc } from "../src/ui.mjs";
 assert.equal(productLink({ id: "tcgcsv-229277" }), "https://www.tcgplayer.com/product/229277");
 assert.equal(productLink({ id: "sv1-pc-etb", tcgPlayerId: null }), "", "no id, no TCG link");
 assert.equal(productLink({ id: "x", name: "Battle Styles Booster Box" }), "", "never by name");
 const single = ebayQuery({ name: "Umbreon VMAX (Alternate Art Secret)", set: "Evolving Skies", num: "215/203", kind: "single" });
-assert.ok(single.startsWith("Pokemon Umbreon VMAX Alternate Art Secret Evolving Skies 215 "), single);
-assert.ok(/-lot\b/.test(single) && /-proxy\b/.test(single) && /-custom\b/.test(single) && !/-case/.test(single));
+assert.equal(single, "Pokemon Umbreon VMAX 215/203 Evolving Skies -proxy -custom");
 const box = ebayQuery({ name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed" });
-assert.ok(box.includes("-case") && box.includes("-lot") && !/\b\d+\b(?! )/.test(box.replace(/SWSH05/, "")), box);
-assert.ok(!ebayQuery({ name: "Detective Pikachu Case File", set: "Detective Pikachu", kind: "sealed" }).includes("-case"), "a product named case keeps case");
+assert.equal(box, "Pokemon Battle Styles Booster Box");
 assert.ok(!ebayQuery({ name: "Gengar tcgcsv-123", set: "", kind: "single" }).includes("tcgcsv"));
 assert.equal(ebaySearchUrl({}), "", "no name, no eBay link");
 assert.ok(ebaySearchUrl({ name: "Lost Origin Booster Bundle", set: "SWSH11: Lost Origin", kind: "sealed" }).startsWith("https://www.ebay.com/sch/i.html?_nkw=Pokemon%20Lost%20Origin%20Booster%20Bundle"));
 assert.equal(storeLinksHtml({}, esc), "", "both missing: the line is hidden");
 const both = storeLinksHtml({ id: "tcgcsv-1", name: "A", kind: "sealed" }, esc);
-assert.ok(both.includes("TCGplayer") && both.includes("eBay") && both.includes("Paid link"));
+assert.ok(both.includes(">Buy on TCGplayer</a>") && both.includes(">Buy on eBay</a>") && both.includes(SHOP_NOTE));
 const onlyEbay = storeLinksHtml({ id: "sv1-pc-etb", name: "A", kind: "sealed" }, esc);
-assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("eBay") && onlyEbay.includes("Paid link"));
+assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("Buy on eBay") && onlyEbay.includes(SHOP_NOTE));
 const qv = quickView({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", hist: [] });
 assert.ok(qv.tcgUrl.endsWith("/229277") && qv.ebayUrl.includes("ebay.com/sch"));
 const page = renderCard({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", price: 283.93, hist: [] }, {}, {});
-assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes("Paid link"));
+assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes('class="shop-block"') && page.includes(SHOP_NOTE));
 const sr = renderSearch({});
 assert.ok(sr.includes("function storeLinks(r)") && sr.includes("Paid link"));
 console.log("store links ok");
 
 // Paid-link disclosure + affiliate ids from config.
 assert.ok(!page.includes("Affiliate link") && !sr.includes("Affiliate link"));
-assert.ok(page.includes('<small class="paid-note">Paid link</small>'));
+assert.ok(!page.includes('<small class="paid-note">Paid link</small>'), "item pages use the shop block, not the old Paid link row");
 assert.ok(page.includes("Paid link. We may earn a commission from links on this page."));
 assert.equal(affTcg("https://www.tcgplayer.com/product/1", ""), "https://www.tcgplayer.com/product/1", "empty: plain");
 assert.equal(affTcg("https://www.tcgplayer.com/product/1", "https://tcgplayer.pxf.io/c/1/2/3"), "https://tcgplayer.pxf.io/c/1/2/3?u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F1");

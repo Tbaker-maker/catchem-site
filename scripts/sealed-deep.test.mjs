@@ -1,3 +1,4 @@
+import { withoutShopButtons } from "../src/pokemon.mjs";
 // Sealed page: eBay ask and Rip value only when the file has them.
 import { renderCard } from "../src/ui.mjs";
 
@@ -33,7 +34,7 @@ const single = renderCard({ ...card, kind: "single", hist: [["2026-10-01", 70], 
   rip: { contentsEV: 5, roiPct: 1, beatChance: 2, median: 4, asOf: "2026-10-13" },
 });
 t("a single does not take the sealed rip block", !single.includes("<h2>Rip value</h2>") && !single.includes("eBay ask $"));
-const main = html.slice(html.indexOf("<main"), html.lastIndexOf("</main>")).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
+const main = withoutShopButtons(html.slice(html.indexOf("<main"), html.lastIndexOf("</main>"))).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 t("sealed deep copy stays clean", !/[\u2014\u2013]/.test(html) && !BANNED.test(main) && !/No data/i.test(main));
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }

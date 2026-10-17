@@ -19,7 +19,7 @@ import { hidePublishedNotes } from "./public-routes.mjs";
 import { localPaths, scriptFetchPaths, deadLocals } from "./dead-paths.mjs";
 import { readFile } from "node:fs/promises";
 import { resetJsonCache } from "../src/data.mjs";
-import { buildPokemonPages, productLink } from "../src/pokemon.mjs";
+import { buildPokemonPages, productLink, withoutShopButtons } from "../src/pokemon.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -34,7 +34,7 @@ const LOCKED = "The full catalog: every card and every artist. Pick one and the 
 const PAID = "Paid link. We may earn a commission from links on this page.";
 
 function clean(html) {
-  let text = String(html).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID").replaceAll(TAKE_FOOTER, "FOOT");
+  let text = withoutShopButtons(String(html)).replaceAll(LOCKED, "LOCKED").replaceAll(PAID, "PAID").replaceAll(TAKE_FOOTER, "FOOT");
   for (const label of Object.values(TAKE_LABELS)) text = text.replaceAll(label, "TAKE");
   return text;
 }

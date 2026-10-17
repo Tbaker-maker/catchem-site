@@ -1,4 +1,5 @@
 import vm from "node:vm";
+import { withoutShopButtons } from "../src/pokemon.mjs";
 import { renderCompare, compareRows } from "../src/ui.mjs";
 import { renderPath } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
@@ -44,7 +45,7 @@ t("legend chips stack on a narrow screen and sit in a row when wide", page.inclu
 t("legend chips keep a real thumbnail and drop a bad one", legs.includes('src="/data/editor/tcg/base1/1_hires.png"') && !legs.includes("javascript") && (legs.match(/<img /g) || []).length === 1);
 t("legend links the product and a sealed row uses the product path", legs.includes('href="/c/tcgcsv-1"') && legs.includes('href="/c/tcgcsv-2"') && legs.includes('href="/p/tcgcsv-3"'));
 t("a missing catalog row stays a column and a one-sided low stays off", page.includes("Not in the catalog") && page.includes("$3.00") && page.includes("$40.00") && !page.includes(">Low<"));
-t("compare copy stays clean", !/[\u2014\u2013]/.test(page) && !/No data/i.test(page) && !BANNED.test(page) && !/winner|score|better|higher|lower/i.test(page.split("<footer")[0]));
+t("compare copy stays clean", !/[\u2014\u2013]/.test(page) && !/No data/i.test(page) && !BANNED.test(withoutShopButtons(page)) && !/winner|score|better|higher|lower/i.test(page.split("<footer")[0]));
 
 {
   const broken = [];
