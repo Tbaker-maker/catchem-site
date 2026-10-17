@@ -3063,10 +3063,10 @@ ${artistGroups(rows)}
 
 export const ARTIST_SORTS = [
   ["", "Default"],
-  ["name-asc", "Name A–Z"],
-  ["name-desc", "Name Z–A"],
-  ["price-desc", "Price high–low"],
-  ["price-asc", "Price low–high"],
+  ["name-asc", "Name A to Z"],
+  ["name-desc", "Name Z to A"],
+  ["price-desc", "Price high to low"],
+  ["price-asc", "Price low to high"],
   ["release-desc", "Newest set"],
   ["release-asc", "Oldest set"],
 ];
@@ -4026,7 +4026,7 @@ export function renderDive(doc, stamp, opts = {}) {
   const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
   const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
   const outlierNote = outlier && (outlier.note || (outlier.pctGap != null
-    ? `Price flagged: ${Math.abs(Number(outlier.pctGap))}% ${Number(outlier.pctGap) < 0 || outlier.direction === "low" ? "below" : "above"} recent median — review`
+    ? `Price flagged for review: ${Math.abs(Number(outlier.pctGap))}% ${Number(outlier.pctGap) < 0 || outlier.direction === "low" ? "below" : "above"} the recent median`
     : null));
   const outlierLine = outlier
     ? `<p style="border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin:12px 0"><b>${esc(outlierNote || `Outlier: ${String(outlier.flag)}`)}</b>${outlier.asOf ? ` <span class="muted">(${esc(outlier.asOf)})</span>` : ""}${outlier.provisionalLabel ? `<br><span class="muted">${esc(String(outlier.provisionalLabel))}</span>` : ""}</p>`
@@ -4052,7 +4052,7 @@ ${outlierLine}
 ${catalog}
 <p class="muted">Charts-only hub is deferred. This page is the launch-lean deep-dive a read can open.</p>
 </main>`;
-  const diveTitle = `${doc.name || doc.id} — Deep dive`;
+  const diveTitle = `${doc.name || doc.id} · Deep dive`;
   const diveDesc = [
     latest.set || "",
     latest.subtype || "",

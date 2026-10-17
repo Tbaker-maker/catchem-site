@@ -197,7 +197,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     listingChange: { label: "net change in active eBay listings (estimate)", net: 191, from: "2026-10-04", to: "2026-10-06", days: 3, startTotal: 3881, endTotal: 4072, readEligible: false },
   }, "stamp", { feed: true });
   t("dive does not publish the listing-change estimate", !withChange.includes("net change in active eBay listings") && !withChange.includes("over 3 days of eBay Browse totals"));
-  t("dive share card has og tags", flagged.includes('property="og:title"') && flagged.includes("Temporal Forces Pokemon Center Elite Trainer Box — Deep dive · Catch&#39;em") && flagged.includes('property="og:description"') && flagged.includes("eBay Browse ask median") && flagged.includes('property="og:image" content="https://catchemtcg.com/og.png"') && flagged.includes('name="twitter:card" content="summary_large_image"') && flagged.includes('rel="canonical" href="https://catchemtcg.com/dive/sv5-pc-etb"'));
+  t("dive share card has og tags", flagged.includes('property="og:title"') && flagged.includes("Temporal Forces Pokemon Center Elite Trainer Box · Deep dive · Catch&#39;em") && flagged.includes('property="og:description"') && flagged.includes("eBay Browse ask median") && flagged.includes('property="og:image" content="https://catchemtcg.com/og.png"') && flagged.includes('name="twitter:card" content="summary_large_image"') && flagged.includes('rel="canonical" href="https://catchemtcg.com/dive/sv5-pc-etb"'));
 }
 {
   const divePage = await renderPath("/dive/sv3pt5-etb", fetchImpl, { feed: true });
