@@ -227,13 +227,13 @@ export function factCards(f) {
       r.daysSinceHigh > 0 && Number.isFinite(r.fromHighPct) ? `${r.daysSinceHigh} days since the last high, now ${Math.abs(r.fromHighPct)}% under it.` : (r.daysSinceHigh === 0 ? "At its high on file tonight." : ""),
       f.rank && f.rank.rank > 0 ? `No. ${f.rank.rank} of ${f.rank.of} by price in ${f.rank.set}.` : "",
     ].filter(Boolean);
-    range = `<article class="rd-card"><h3>High and low</h3>${lines.map((x) => `<p>${esc(x)}</p>`).join("")}<p class="muted">${esc(`TCGplayer market, ${dayLabel(r.from)} to ${dayLabel(r.now?.date || f.asOf)}`)}</p></article>`;
+    range = `<article class="rd-card"><h3>${esc(dayLabel(r.from) ? `High and low since ${shortDay(r.from)}` : "High and low")}</h3>${lines.map((x) => `<p>${esc(x)}</p>`).join("")}<p class="muted">${esc(`TCGplayer market, ${dayLabel(r.from)} to ${dayLabel(r.now?.date || f.asOf)}`)}</p></article>`;
   }
   let pattern = "";
   const p = f.pattern;
   if (p && p.rate > 0 && p.base > 0 && p.n > 0 && p.horizon > 0) {
     const when = (p.keys || []).map((k) => KEY_WORDS[k]).filter(Boolean).join(", ");
-    pattern = `<section class="rd-pattern"><h3>Passed scanner pattern</h3><p>${esc(`This pattern was right ${p.rate}% of the time vs ${p.base}% normally, over ${p.n} cases, looking ${p.horizon} days ahead.`)}</p>${when ? `<p>${esc(`Matches this item: ${when}.`)}</p>` : ""}<p class="muted">${esc(`Own nightly days only, later time split. ${dayLabel(p.asOf)}`)}</p></section>`;
+    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p>${esc(`Items matching this pattern were right ${p.rate}% of the time ${p.horizon} days later, vs ${p.base}% for all items. Based on ${Number(p.n).toLocaleString("en-US")} past cases.`)}</p>${when ? `<p>${esc(`Why it matches: ${when}.`)}</p>` : ""}<p class="muted">${esc(`Tested only on our own nightly files, on later dates than it was built from. ${dayLabel(p.asOf)}`)}</p></section>`;
   }
   const cards = [];
   const m = f.setMomentum;
