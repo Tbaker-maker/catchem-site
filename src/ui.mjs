@@ -2690,6 +2690,7 @@ function conditionPrefix(card, held) {
 
 function conditionLine(note) {
   const text = String(note?.text || "").trim();
+  if (/near mint unless labeled/i.test(text)) return "";
   const when = priceDay(String(note?.asOf || "").slice(0, 10));
   if (!text || !when) return "";
   const src = String(note.source || "").trim();

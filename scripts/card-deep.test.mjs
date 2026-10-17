@@ -49,7 +49,7 @@ const html = renderCard(card, "stamp", {
 });
 t("two printings show price and date", html.includes("Holofoil") && html.includes("Reverse Holofoil") && html.includes("$9.50") && html.includes("Oct 13, 2026") && html.includes("cp-prints"));
 t("one printing stays off", !renderCard({ ...card, printings: [{ name: "Normal", price: 15, asOf: "2026-10-13" }] }, "stamp", {}).includes('<ul class="cp-prints"'));
-t("condition note keeps the file sentence and date", html.includes("Near Mint unless labeled.") && html.includes("TCGplayer market daily file is Near Mint.") && html.includes("Oct 13, 2026"));
+t("the old Near Mint default sentence stays off", !html.includes("Near Mint unless labeled.") && !html.includes("daily file is Near Mint"));
 t("pattern sentence is the gate", html.includes(patternSentence(pattern).text) && html.includes("cp-pattern"));
 t("eBay ask and the gap stay dated", html.includes("eBay ask $18.00 (any condition), Oct 13, 2026") && html.includes("eBay ask is $3.00 above the TCGplayer price"));
 t("a thin card hides the deep bits", !renderCard({ id: "tcgcsv-1", name: "X", kind: "single" }, "stamp", {}).includes('<section class="cp-pattern"') && !renderCard({ id: "tcgcsv-1", name: "X", kind: "single" }, "stamp", {}).includes('<p class="cp-cond"'));
