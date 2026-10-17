@@ -4447,7 +4447,7 @@ function priceRow(card){
   const day=monthDay(card.asOf);
   const year=String(card.asOf||"").slice(0,4);
   const stamp=day && /^[0-9]{4}$/.test(year)?'<span class="muted">'+day+", "+year+"</span>":"";
-  const src=String(card.source||"").replace(/,?\s*[0-9]{4}-[0-9]{2}-[0-9]{2}/g,"").replace(/\s*via\s+tcgcsv/i,"").replace(/[\s,;·]+$/,"").trim();
+  const src=String(card.source||"").replace(/,? *[0-9]{4}-[0-9]{2}-[0-9]{2}( to)?/g,"").replace(/ *via +tcgcsv/i,"").replace(/[ ,;]+$/,"").trim();
   const srcBit=src?'<span class="muted"> · '+html(src)+"</span>":"";
   return '<p class="px"><span class="price">'+money(card.price)+"</span>"+stamp+srcBit+winChip("7D", card.change7)+winChip("30D", card.change30)+winChip("90D", card.change90)+"</p>";
 }
@@ -6178,6 +6178,14 @@ function buildFlat(){
     const seenNow=readSeen(window.localStorage);
     const wordRnd=freshRandom(visitSeed ^ 0x9e3779b9);
     flat=freshOrder(rows,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
+    // Open on a story, not a plain price move.
+    const PLAIN_KIND={single:1,sealed:1,streak:1,mover:1,price:1,askmove:1,mktmove:1};
+    const plainish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return !r || r.pending || PLAIN_KIND[k] || k.indexOf("pokemon")===0; };
+    if(flat.length && plainish(flat[0])){
+      let k=-1;
+      for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } }
+      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
+    }
     markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
     return;
   }
