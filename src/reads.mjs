@@ -1,9 +1,12 @@
-// Custom Reads picker. No network. Email is stored only when opted in and is never sent here.
+// Custom Reads picker. Email delivery lives in reads-email.mjs and is off unless
+// the READS_EMAIL_KEY worker secret is set. The address is never part of the plan
+// or the follow the nightly reads; it stays in FEED_KV under reads-email:<id>.
 
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
+import { emailDeliveryOn, saveEmailChoice } from "./reads-email.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -68,7 +71,7 @@ export function followCount(plan) {
     + (plan.watch?.length || 0);
 }
 
-export function gatePlan(plan, { premium = false } = {}) {
+export function gatePlan(plan, { premium = false, emailOn = false } = {}) {
   const next = blankPlan();
   const notes = [];
   next.sets = cleanList(plan?.sets);
@@ -91,8 +94,14 @@ export function gatePlan(plan, { premium = false } = {}) {
     next.frequency = "weekly";
     notes.push("A free seat is one weekly read. Daily and other schedules are in Premium.");
   }
-  next.channels.discord = true;
-  next.channels.email = false;
+  if (emailOn) {
+    next.channels.email = plan?.channels?.email === true;
+    next.channels.discord = plan?.channels?.discord !== false;
+    if (!next.channels.discord && !next.channels.email) next.channels.discord = true;
+  } else {
+    next.channels.discord = true;
+    next.channels.email = false;
+  }
   next.email = "";
   next.product = plan?.product === "sealed" ? "sealed" : "singles";
   next.addons.all = plan?.addons?.all === true;
@@ -175,7 +184,7 @@ export function planFromFields(fields) {
     singles: product === "singles" && !other,
     watch,
     frequency: String(get("frequency") || "weekly"),
-    channels: { discord: true, email: false },
+    channels: { discord: all("discord").some((v) => String(v) === "1"), email: on("email_on") },
     email: "",
     product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
@@ -185,7 +194,7 @@ export function planFromFields(fields) {
 export function preSend(text) {
   const body = String(text || "").trim();
   if (!body) return { ok: false, why: "empty" };
-  if (/—|–/.test(body)) return { ok: false, why: "copy" };
+  if (/\u2014|\u2013/.test(body)) return { ok: false, why: "copy" };
   const emptySection = ["no", "data"].join(" ");
   if (body.toLowerCase().includes(emptySection)) return { ok: false, why: "copy" };
   if (READ_GUARD.test(body)) return { ok: false, why: "copy" };
@@ -214,6 +223,7 @@ export function emailLetter(plan, payload) {
 export function emailSendAllowed(env) {
   return !!(env && String(env.READS_EMAIL_KEY || "").trim());
 }
+export { emailDeliveryOn };
 
 export function bumpClick(row, kind) {
   const opens = Number(row?.opens) || 0;
@@ -310,6 +320,8 @@ export function planToFollow(discordId, plan) {
     product,
     news: plan?.addons?.news === true || plan?.addons?.all === true,
     games: plan?.addons?.games === true || plan?.addons?.all === true,
+    discord: plan?.channels?.discord !== false,
+    email: plan?.channels?.email === true && plan?.emailConfirmed === true,
     savedAt: String(plan?.savedAt || ""),
   };
 }
@@ -318,7 +330,7 @@ export function upsertFollow(doc, follow) {
   const follows = (Array.isArray(doc?.follows) ? doc.follows : []).filter((row) => row && row.id !== follow.id);
   follows.push(follow);
   return {
-    rule: "Each follow is one Discord id. The nightly reads this list through /api/reads/export and never commits it. A night with no match is skipped.",
+    rule: "Each follow is one Discord id. The nightly reads this list through /api/reads/export and never commits it. A night with no match is skipped. Email addresses are never in this list.",
     follows,
   };
 }
@@ -336,11 +348,44 @@ function radio(name, value, label, on, locked) {
 }
 
 // What Save says. It only promises a DM when the nightly can read the follow.
+export const EMAIL_NOTES = Object.freeze({
+  sent: "Check your inbox. Tap the link in that email to start reads by email.",
+  on: "Email reads are on.",
+  bad: "That email address does not look right, so nothing was sent to it.",
+  fail: "The confirm email did not go out. Try Save again in a few minutes.",
+  stopped: "Email reads are off.",
+});
+
 export function saveLine(state = {}) {
   if (state.note === "closed") return "Saving is not open yet, so nothing was stored.";
   if (!state.saved) return "";
+  if (state.emailNote && EMAIL_NOTES[state.emailNote]) {
+    const discordOff = state.plan?.channels?.discord === false;
+    return (discordOff ? "Saved. " : (state.pipe === true ? "Saved. Discord DM reads start after the next nightly run. " : "Saved. ")) + EMAIL_NOTES[state.emailNote];
+  }
   if (state.pipe === true) return "Saved. Your first read comes by Discord DM after the next nightly run.";
   return "Saved. Reads by Discord DM are not switched on yet, so none will arrive for now.";
+}
+
+// "Where it goes". With email off this is the Discord chip plus a calm coming soon line.
+export function whereItGoes(plan, email = {}) {
+  if (!email || email.on !== true) {
+    return `<input type="hidden" name="discord" value="1">
+<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>
+<p class="rd-note">Email delivery is coming soon.</p>`;
+  }
+  const discordOn = plan?.channels?.discord !== false;
+  const mailOn = plan?.channels?.email === true || !!email.address;
+  const status = email.confirmed ? "Email reads go to this address." : email.address ? "Waiting for you to tap the confirm link we emailed." : "We email a confirm link first. Nothing is sent until you tap it.";
+  return `<div class="rd-chips">
+<label class="rd-chip"><input type="checkbox" name="discord" value="1"${discordOn ? " checked" : ""}><span>Discord DM</span></label>
+<label class="rd-chip"><input type="checkbox" id="rd-mail-on" name="email_on" value="1"${mailOn ? " checked" : ""}><span>Email</span></label>
+</div>
+<div class="rd-email-wrap" id="rd-email-wrap"${mailOn ? "" : " hidden"}>
+<label class="visually-hidden" for="rd-email">Email address</label>
+<input class="rd-email" id="rd-email" type="email" name="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" placeholder="you@example.com" value="${esc(email.address || "")}">
+<p class="rd-note">${esc(status)} Every email has a one tap unsubscribe.</p>
+</div>`;
 }
 
 export function renderReadsPage(state = {}) {
@@ -407,6 +452,9 @@ export function renderReadsPage(state = {}) {
 .rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
+.rd-email{display:block;width:100%;box-sizing:border-box;min-height:44px;margin:10px 0 0;padding:0 16px;border:1px solid #d1d1d6;border-radius:14px;background:#fff;color:#1c1c1e;font-size:16px}
+.rd-email:focus{outline:2px solid #8a6a2f;outline-offset:1px}
+.rd-email-wrap[hidden]{display:none}
 </style>
 <h1>Your reads</h1>
 <p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
@@ -442,8 +490,7 @@ ${radio("frequency", "monthly", "Monthly", shown.frequency === "monthly", !premi
 ${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", !premium)}
 </div>
 <h2>Where it goes</h2>
-<input type="hidden" name="discord" value="1">
-<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>
+${whereItGoes(shown, state.email)}
 <h2>Add-ons</h2>
 <div class="rd-chips">
 ${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
@@ -504,6 +551,10 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     });
   }
   form.addEventListener("change", paint);
+  var mail = document.getElementById("rd-mail-on");
+  var mailWrap = document.getElementById("rd-email-wrap");
+  function mailPaint(){ if (mail && mailWrap) mailWrap.hidden = !mail.checked; }
+  if (mail) { mail.addEventListener("change", mailPaint); mailPaint(); }
 })();
 </script>
 ${beacon}
@@ -549,17 +600,30 @@ export async function handleReads(request, env) {
   else {
     try { fields = await request.json(); } catch { return json({ ok: false, error: "Bad read." }, 400); }
   }
-  const { plan, notes } = gatePlan(planFromFields(fields), { premium: user.premium === true });
+  const emailOn = emailDeliveryOn(env);
+  const { plan, notes } = gatePlan(planFromFields(fields), { premium: user.premium === true, emailOn });
   plan.savedAt = new Date().toISOString();
+  let emailNote = "";
+  if (emailOn) {
+    const get = (key) => (typeof fields.get === "function" ? fields.get(key) : fields?.[key]) || "";
+    const address = get("email") || (typeof fields.get === "function" ? "" : fields?.email || "");
+    emailNote = await saveEmailChoice(env, user.sub, { want: plan.channels.email, email: address }).catch(() => "fail");
+    if (emailNote === "bad" || emailNote === "fail") {
+      if (emailNote === "bad") plan.channels.email = false;
+      if (!plan.channels.email && !plan.channels.discord) plan.channels.discord = true;
+    }
+    plan.emailConfirmed = emailNote === "on";
+  }
   await store.put(`reads:${user.sub}`, JSON.stringify(plan));
   const follow = planToFollow(user.sub, plan);
   const prev = await store.get(FOLLOWS_KEY, "json");
   await store.put(FOLLOWS_KEY, JSON.stringify(upsertFollow(prev, follow)));
   if (form) {
     back.searchParams.set("saved", "1");
+    if (emailNote && emailNote !== "none" && emailNote !== "off") back.searchParams.set("email", emailNote);
     return Response.redirect(back, 303);
   }
-  return json({ ok: true, plan, notes, pipe: readsPipeReady(env), emailArmed: emailSendAllowed(env) });
+  return json({ ok: true, plan, notes, pipe: readsPipeReady(env), emailArmed: emailOn, email: emailNote || "off" });
 }
 
 export async function handleReadsClick(request, env) {

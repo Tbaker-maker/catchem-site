@@ -50,6 +50,16 @@ export function cleanOutbox(doc) {
   return { day, builtAt: String(doc.builtAt || ""), members };
 }
 
+// A member who picked email only gets discord:false, which the bot already
+// skips. Everyone else stays exactly as the nightly wrote them.
+export function withChannels(outbox, followsDoc) {
+  const off = new Set((Array.isArray(followsDoc?.follows) ? followsDoc.follows : [])
+    .filter((row) => row && row.discord === false)
+    .map((row) => String(row.id)));
+  if (!off.size) return outbox;
+  return { ...outbox, members: outbox.members.map((row) => (off.has(String(row.discordId)) ? { ...row, discord: false } : row)) };
+}
+
 // GET /api/reads/export        -> saved follows (the nightly reads this)
 // GET /api/reads/outbox        -> tonight's DM outbox (the bot reads this)
 // PUT /api/reads/outbox        -> the nightly stores the outbox
@@ -77,8 +87,9 @@ export async function handleReadsPipe(request, env) {
   }
   if (url.pathname === "/api/reads/outbox") {
     if (request.method === "GET") {
-      const doc = await store.get(OUTBOX_KEY, "json");
-      return json({ ok: true, ...(cleanOutbox(doc) || { day: "", builtAt: "", members: [] }) });
+      const doc = cleanOutbox(await store.get(OUTBOX_KEY, "json")) || { day: "", builtAt: "", members: [] };
+      const follows = await store.get(FOLLOWS_KEY, "json");
+      return json({ ok: true, ...withChannels(doc, follows) });
     }
     if (request.method === "PUT" || request.method === "POST") {
       const text = await request.text();

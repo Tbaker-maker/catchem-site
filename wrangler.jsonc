@@ -25,6 +25,10 @@
   "kv_namespaces": [
     { "binding": "FEED_KV", "id": "390cb142f21947d4af9f4d10df12f61d" }
   ],
+  // Hourly Custom Reads email run (src/reads-email.mjs). It returns at once
+  // unless the READS_EMAIL_KEY secret (Resend) is set. READS_EMAIL_ENABLED=off
+  // is the kill switch. Sends at most one email per member per day.
+  "triggers": { "crons": ["23 * * * *"] },
   "assets": {
     "directory": "./site-public",
     "binding": "ASSETS",

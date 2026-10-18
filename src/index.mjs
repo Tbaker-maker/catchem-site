@@ -13,6 +13,7 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
+import { emailDeliveryOn, handleEmailLink, isEmailPath, loadEmailRow, runEmailDelivery } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -1056,6 +1057,14 @@ const worker = {
   async fetch(request, env, ctx) {
     return edgeFetch(worker.render, request, env, ctx);
   },
+  // Hourly. Emails confirmed Custom Reads members from the nightly outbox.
+  // Returns at once with no storage reads while email delivery is off.
+  async scheduled(event, env, ctx) {
+    if (!emailDeliveryOn(env)) return;
+    const job = runEmailDelivery(env, { publicFetch: env?.PUBLIC_FETCH || fetch }).catch(() => null);
+    if (ctx?.waitUntil) ctx.waitUntil(job);
+    else await job;
+  },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
     setAffiliateConfig(env);
@@ -1202,6 +1211,7 @@ const worker = {
       if (!video) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
     }
     if (isPipePath(url.pathname)) return handleReadsPipe(request, env);
+    if (isEmailPath(url.pathname)) return handleEmailLink(request, env);
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/api/vote") return handleVote(request, env);
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
@@ -1236,6 +1246,11 @@ const worker = {
         let viewer = null;
         try { viewer = await readUser(request, env); } catch { viewer = null; }
         const stored = await loadStoredPlan(env?.FEED_KV, viewer?.sub);
+        let email = { on: emailDeliveryOn(env) };
+        if (email.on && viewer?.sub) {
+          const row = await loadEmailRow(env, viewer.sub).catch(() => null);
+          if (row) email = { on: true, address: row.email || "", confirmed: row.confirmed === true };
+        }
         let preview = null;
         try { preview = await loadJson("reads-preview.json", fetchImpl); } catch { preview = null; }
         let chipDoc = null;
@@ -1246,6 +1261,8 @@ const worker = {
           premium: viewer?.premium === true,
           saved: url.searchParams.get("saved") === "1",
           note: url.searchParams.get("note") || "",
+          emailNote: url.searchParams.get("email") || "",
+          email,
           pipe: readsPipeReady(env),
           line: url.searchParams.get("line") || "",
           card: url.searchParams.get("card") || "",
