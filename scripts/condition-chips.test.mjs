@@ -51,7 +51,7 @@ const nmOnly = renderCard({
   printing: "Normal",
   source: "TCGplayer market",
 }, "stamp", { conditionLadder: { asOf: "2026-10-17", printings: { Normal: { date: "2026-10-17", NM: 3 } } } });
-t("NM only leaves the other chips checking", nmOnly.includes("$3.00") && (nmOnly.match(/Price being checked/g) || []).length >= 4 && !nmOnly.includes("LP $"));
+t("NM only shows that chip", nmOnly.includes("$3.00") && nmOnly.includes(">NM<") && !nmOnly.includes(">LP<") && !nmOnly.includes("Price being checked"));
 
 const played = renderCard({
   id: "tcgcsv-3",
@@ -87,7 +87,45 @@ const heldPlayed = renderCard({
   conditionLadder: { asOf: "2026-10-17", printings: { "1st Edition Holofoil": { date: "2026-10-17", LP: 12, MP: 7 } } },
   priceCheck: true,
 });
-t("a held vintage card does not show the condition dollars", heldPlayed.includes("Price being checked") && heldPlayed.includes("1st Edition Holofoil") && heldPlayed.includes("Unlimited Holofoil") && !heldPlayed.includes("$12.00") && !heldPlayed.includes("$237.50") && !heldPlayed.includes("$365.17") && !heldPlayed.includes("NM $"));
+t("a held vintage card says the checking line once and has no chips", (heldPlayed.match(/Price being checked/g) || []).length === 1 && !heldPlayed.includes('class="cond-chip"') && heldPlayed.includes("1st Edition Holofoil") && heldPlayed.includes("Unlimited Holofoil") && heldPlayed.includes("Buy on TCGplayer") && heldPlayed.includes("Buy on eBay") && !heldPlayed.includes("$12.00") && !heldPlayed.includes("$237.50") && !heldPlayed.includes("$365.17") && !heldPlayed.includes("NM $"));
+
+const plain = renderCard({
+  id: "tcgcsv-87428",
+  name: "Mewtwo ex",
+  kind: "single",
+  set: "EX Ruby and Sapphire",
+  price: 677.43,
+  asOf: "2026-10-17",
+  printing: "Holofoil",
+  source: "TCGplayer market",
+}, "stamp", { conditionLadder: { asOf: "2026-10-17", source: "TCGplayer market", printings: {} } });
+t("a modern card with no conditions shows the market dollar and no chips", plain.includes("$677.43") && plain.includes("TCGplayer market") && !plain.includes('class="cond-chip"') && !plain.includes("Price being checked") && !/\bNM\b/.test(plain));
+
+const unverified = renderCard({
+  id: "tcgcsv-11",
+  name: "Odd",
+  kind: "single",
+  set: "Test",
+  price: 50,
+  priceStatus: "checking",
+  asOf: "2026-10-17",
+  printing: "Holofoil",
+  printings: [{ name: "Holofoil", price: 50, asOf: "2026-10-17" }],
+  source: "TCGplayer market",
+}, "stamp", { priceHeld: true, conditionLadder: { asOf: "2026-10-17", printings: { Holofoil: { date: "2026-10-17", NM: 50 } } } });
+t("a modern unverified card is one checking line and no chips", (unverified.match(/Price being checked/g) || []).length === 1 && !unverified.includes('class="cond-chip"') && !unverified.includes("$50"));
+
+const passed = renderCard({
+  id: "tcgcsv-12",
+  name: "Charizard",
+  kind: "single",
+  set: "Base",
+  price: 400,
+  asOf: "2026-10-17",
+  printing: "1st Edition Holofoil",
+  source: "TCGplayer market",
+}, "stamp", { conditionLadder: { asOf: "2026-10-17", printings: { "1st Edition Holofoil": { date: "2026-10-17", NM: 400 } } } });
+t("a vintage card with a passing sample shows that dollar and its chip", passed.includes("$400.00") && passed.includes(">NM<") && passed.includes('class="cond-chip"') && !passed.includes("Price being checked") && !passed.includes(">LP<"));
 
 const split = renderCard({
   id: "tcgcsv-4",
