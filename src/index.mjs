@@ -13,6 +13,7 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
+import { emailView, handleEmailLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -1061,6 +1062,9 @@ const worker = {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    if (url.pathname === "/reads/email/confirm" || url.pathname === "/reads/email/stop") {
+      return handleEmailLink(request, env);
+    }
     if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/favicon.ico" || url.pathname === "/favicon.svg")) {
       return new Response(request.method === "HEAD" ? null : FAVICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
     }
@@ -1236,6 +1240,7 @@ const worker = {
         let viewer = null;
         try { viewer = await readUser(request, env); } catch { viewer = null; }
         const stored = await loadStoredPlan(env?.FEED_KV, viewer?.sub);
+        const mail = await emailView(env?.FEED_KV, viewer?.sub);
         let preview = null;
         try { preview = await loadJson("reads-preview.json", fetchImpl); } catch { preview = null; }
         let chipDoc = null;
@@ -1245,6 +1250,8 @@ const worker = {
           signedIn: !!viewer?.sub,
           premium: viewer?.premium === true,
           saved: url.searchParams.get("saved") === "1",
+          email: url.searchParams.get("email") || "",
+          emailValue: mail.email || "",
           note: url.searchParams.get("note") || "",
           pipe: readsPipeReady(env),
           line: url.searchParams.get("line") || "",
