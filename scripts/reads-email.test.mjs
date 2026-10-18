@@ -156,7 +156,7 @@ const after = await runEmailDelivery(env2, { now: now + 50 * 3600 * 1000, fetchI
 t("no email after unsubscribe", after.sent === 0);
 
 // 6. Repo safety
-t("cleanEmail lowercases and refuses junk", cleanEmail(" A@B.co ") === "a@b.co" && cleanEmail("a@b") === "" && cleanEmail("x".repeat(260) + "@a.co") === "");
+t("cleanEmail lowercases and refuses junk", cleanEmail(" A@Example.com ") === "a@example.com" && cleanEmail("a@b") === "" && cleanEmail("x".repeat(260) + "@a.co") === "");
 const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" }).split("\n").filter((f) => f && !/\.(png|jpg|jpeg|gif|webp|b64|woff2?|ico)$/i.test(f));
 const found = [];
 for (const f of tracked) {
