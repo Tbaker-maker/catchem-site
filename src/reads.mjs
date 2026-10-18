@@ -1,9 +1,11 @@
-// Custom Reads picker. No network. Email is stored only when opted in and is never sent here.
+// Custom Reads picker. The address, when opted in, is stored in FEED_KV only.
+// Letters are sent from reads-email.mjs, and only after a confirm click.
 
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
+import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -92,8 +94,11 @@ export function gatePlan(plan, { premium = false } = {}) {
     notes.push("A free seat is one weekly read. Daily and other schedules are in Premium.");
   }
   next.channels.discord = true;
-  next.channels.email = false;
+  const askedEmail = plan?.channels?.email === true;
+  const cleanMail = validEmail(plan?.email);
+  next.channels.email = askedEmail && !!cleanMail;
   next.email = "";
+  if (askedEmail && !cleanMail) notes.push("Enter an email to turn Email on.");
   next.product = plan?.product === "sealed" ? "sealed" : "singles";
   next.addons.all = plan?.addons?.all === true;
   next.addons.news = next.addons.all || plan?.addons?.news === true;
@@ -175,8 +180,8 @@ export function planFromFields(fields) {
     singles: product === "singles" && !other,
     watch,
     frequency: String(get("frequency") || "weekly"),
-    channels: { discord: true, email: false },
-    email: "",
+    channels: { discord: true, email: on("email_on") },
+    email: String(get("email") || ""),
     product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
   };
@@ -339,8 +344,13 @@ function radio(name, value, label, on, locked) {
 export function saveLine(state = {}) {
   if (state.note === "closed") return "Saving is not open yet, so nothing was stored.";
   if (!state.saved) return "";
-  if (state.pipe === true) return "Saved. Your first read comes by Discord DM after the next nightly run.";
-  return "Saved. Reads by Discord DM are not switched on yet, so none will arrive for now.";
+  let emailBit = "";
+  if (state.email === "pending") emailBit = " Check your inbox and open the confirm link. No read email goes out before that.";
+  else if (state.email === "confirmed") emailBit = " Email is confirmed.";
+  else if (state.email === "off") emailBit = " Your email is saved. Letters stay off until sending is switched on.";
+  else if (state.email === "bad") emailBit = " Enter an email to turn Email on.";
+  if (state.pipe === true) return "Saved. Your first read comes by Discord DM after the next nightly run." + emailBit;
+  return "Saved. Reads by Discord DM are not switched on yet, so none will arrive for now." + emailBit;
 }
 
 export function renderReadsPage(state = {}) {
@@ -407,6 +417,8 @@ export function renderReadsPage(state = {}) {
 .rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
+.rd-mail{display:block;margin-top:8px}
+.rd-mail input{display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:6px;border:0;border-radius:16px;background:#f2f2f7;padding:0 14px;font-size:16px}
 </style>
 <h1>Your reads</h1>
 <p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
@@ -444,6 +456,9 @@ ${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", 
 <h2>Where it goes</h2>
 <input type="hidden" name="discord" value="1">
 <p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>
+<label class="rd-chip"><input type="checkbox" name="email_on" value="1"${shown.channels?.email === true ? " checked" : ""}> <span>Email</span></label>
+<label class="rd-mail">Email address<input type="email" name="email" inputmode="email" autocomplete="email" maxlength="120" value="${esc(state.emailValue || "")}"></label>
+<p class="rd-note">Email stays off until you open the confirm link. Every letter has a one click stop link.</p>
 <h2>Add-ons</h2>
 <div class="rd-chips">
 ${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
@@ -520,10 +535,11 @@ function json(obj, status = 200) {
 export async function loadStoredPlan(store, sub) {
   if (!store || !sub) return blankPlan();
   const row = await store.get(`reads:${sub}`, "json");
-  return row && typeof row === "object" ? row : blankPlan();
+  if (!row || typeof row !== "object") return blankPlan();
+  return { ...row, email: "" };
 }
 
-export async function handleReads(request, env) {
+export async function handleReads(request, env, fetchImpl = fetch) {
   const user = await readUser(request, env);
   const form = (request.headers.get("content-type") || "").includes("application/x-www-form-urlencoded");
   const back = new URL("/reads", request.url);
@@ -549,17 +565,27 @@ export async function handleReads(request, env) {
   else {
     try { fields = await request.json(); } catch { return json({ ok: false, error: "Bad read." }, 400); }
   }
-  const { plan, notes } = gatePlan(planFromFields(fields), { premium: user.premium === true });
+  const raw = planFromFields(fields);
+  const { plan, notes } = gatePlan(raw, { premium: user.premium === true });
   plan.savedAt = new Date().toISOString();
+  let emailState = "";
+  if (plan.channels.email) {
+    emailState = await rememberEmail(store, user.sub, raw.email, env, fetchImpl, new URL(request.url).origin);
+  } else if (raw.channels?.email === true) {
+    emailState = "bad";
+  } else {
+    await clearEmailChoice(store, user.sub);
+  }
   await store.put(`reads:${user.sub}`, JSON.stringify(plan));
   const follow = planToFollow(user.sub, plan);
   const prev = await store.get(FOLLOWS_KEY, "json");
   await store.put(FOLLOWS_KEY, JSON.stringify(upsertFollow(prev, follow)));
   if (form) {
     back.searchParams.set("saved", "1");
+    if (emailState) back.searchParams.set("email", emailState);
     return Response.redirect(back, 303);
   }
-  return json({ ok: true, plan, notes, pipe: readsPipeReady(env), emailArmed: emailSendAllowed(env) });
+  return json({ ok: true, plan, notes, pipe: readsPipeReady(env), emailArmed: emailSendAllowed(env), email: emailState });
 }
 
 export async function handleReadsClick(request, env) {

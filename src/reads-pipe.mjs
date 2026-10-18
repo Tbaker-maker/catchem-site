@@ -3,6 +3,8 @@
 // needs the CUSTOM_READS_TOKEN worker secret as a bearer token. Nothing here
 // is public, and the token is never echoed back.
 
+import { deliverOutboxEmails } from "./reads-email.mjs";
+
 export const FOLLOWS_KEY = "custom-reads:follows";
 export const OUTBOX_KEY = "custom-reads:outbox";
 const MAX_OUTBOX = 900000;
@@ -41,12 +43,22 @@ export function removeFollow(doc, id) {
   return { ...(doc && typeof doc === "object" ? doc : {}), follows };
 }
 
+function withoutContact(row) {
+  if (!row || typeof row !== "object") return row;
+  const copy = { ...row };
+  delete copy.email;
+  delete copy.emailAddress;
+  delete copy.address;
+  return copy;
+}
+
 export function cleanOutbox(doc) {
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) return null;
   const day = String(doc.day || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   const members = (Array.isArray(doc.members) ? doc.members : [])
-    .filter((row) => row && typeof row === "object" && /^\d{5,25}$/.test(String(row.discordId || "")));
+    .filter((row) => row && typeof row === "object" && /^\d{5,25}$/.test(String(row.discordId || "")))
+    .map(withoutContact);
   return { day, builtAt: String(doc.builtAt || ""), members };
 }
 
@@ -63,7 +75,7 @@ export async function handleReadsPipe(request, env) {
   if (url.pathname === "/api/reads/export") {
     if (request.method === "GET") {
       const doc = await store.get(FOLLOWS_KEY, "json");
-      const follows = Array.isArray(doc?.follows) ? doc.follows : [];
+      const follows = (Array.isArray(doc?.follows) ? doc.follows : []).map(withoutContact);
       return json({ ok: true, rule: doc?.rule || "", follows });
     }
     if (request.method === "DELETE") {
@@ -88,7 +100,13 @@ export async function handleReadsPipe(request, env) {
       const clean = cleanOutbox(doc);
       if (!clean) return json({ ok: false, error: "Bad outbox." }, 400);
       await store.put(OUTBOX_KEY, JSON.stringify(clean));
-      return json({ ok: true, day: clean.day, members: clean.members.length });
+      let email = { armed: false, sent: 0, skipped: 0 };
+      try {
+        email = await deliverOutboxEmails({ store, env, outbox: clean, origin: url.origin });
+      } catch {
+        email = { armed: false, sent: 0, skipped: 0 };
+      }
+      return json({ ok: true, day: clean.day, members: clean.members.length, email });
     }
     return json({ ok: false, error: "Use GET or PUT." }, 405);
   }
