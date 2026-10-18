@@ -55,14 +55,16 @@ const previewSample = previewPage.split('id="rd-sample">')[1].split("</p>")[0];
 t("the reads preview renders one pool line per pick", previewSample.includes("Umbreon ex 161/131, Prismatic Evolutions") && previewSample.includes("#161/131") && !previewSample.includes("listings counted") && previewPage.includes("id=\"rd-lines\""));
 t("the preview copy is clean", preSend(previewPage.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);
 const foreignChip = { name: "Leafeon (Call of Legends) 13/95", signals: [{ kind: "move", dir: "up", text: "18% 7D", label: "Price up 18 percent over 7 days" }], blurb: "TCGplayer market is up 18% over 7 days, as of Oct 17." };
-const foreign = renderReadsPage({ signedIn: false, plan: picked, preview: { lines: poolLines, chip: foreignChip } });
-t("a sample does not wear another card's chips", foreign.includes("Umbreon ex 161/131") && !foreign.includes("18% 7D") && !foreign.includes("id=\"rd-chip\""));
+const chipDoc = { asOf: "2026-10-17", byId: { leaf: foreignChip } };
+const foreign = renderReadsPage({ signedIn: false, plan: picked, preview: { lines: poolLines, chips: chipDoc } });
+const foreignHost = foreign.split('id="rd-chip">')[1].split("</div>")[0];
+t("a sample does not wear another card's chips", foreign.includes("Umbreon ex 161/131") && !foreignHost.includes("18% 7D") && !foreignHost.includes("Leafeon"));
 const own = renderReadsPage({
   signedIn: false,
   plan: { sets: [], pokemon: ["Leafeon"], rarities: [], eras: [], product: "singles", watch: [], addons: {} },
   preview: {
     lines: { "pokemon:Leafeon": "Leafeon (Call of Legends) 13/95 is $57.57 on TCGplayer market, as of Oct 17." },
-    chip: foreignChip,
+    chips: chipDoc,
   },
 });
 t("a sample keeps chips when the line names that card", own.includes("18% 7D") && own.includes("id=\"rd-chip\"") && preSend(own.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);

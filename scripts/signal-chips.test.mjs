@@ -23,7 +23,7 @@ const all = {
 const row = signalRowHtml(all, { href: "/feed/r/fake-all" });
 t("a full read renders a wrapped row and keeps four chips", (row.match(/class="sig /g) || []).length === 4 && row.includes("sig-row") && row.includes("5% 7D") && row.includes("min-height") === false);
 t("the row is a 44px tap target in css", readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8").includes(".sig-row{display:flex;flex-wrap:wrap") && readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8").includes("min-height:44px"));
-t("up is green and down is red only on the price arrow", row.includes("is-down") && row.includes("is-amber") && !row.includes("is-up"));
+t("up is green and down is red only on the price arrow", row.includes("is-down") && row.includes("is-lead") && !row.includes("is-amber") && !row.includes("is-up"));
 t("the blurb and every icon line pass the copy rules", preSend(all.blurb).ok && ICON_LINES.every(([, line]) => preSend(line).ok) && preSend(ICON_SOURCE).ok);
 t("no sideways scroll rule on the chip row", !/\.sig-row\{[^}]*overflow-x/.test(readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8")));
 
@@ -53,23 +53,31 @@ t("the deep read header shows the chip", opened.includes("sig-block") && opened.
 const dotted = all.signals.map((chip) => ({ ...chip, strength: chip.kind === "move" ? 2 : 3 }));
 for (const chip of dotted) {
   const html = signalRowHtml({ signals: [chip], blurb: all.blurb });
-  t("dots on " + chip.kind, (html.match(/class="sig-strength"/g) || []).length === 1 && !html.includes("sig-score"));
+  t("dots on " + chip.kind, (html.match(/class="sig-strength"/g) || []).length === 1 && !html.includes("sig-overall"));
 }
 const down = signalRowHtml({
   signals: [{ kind: "move", dir: "down", text: "5% 7D", label: "Price down 5 percent over 7 days", strength: 2 }],
   blurb: all.blurb,
   strength: 4,
 });
-t("the score sits on top and the dots are not a direction class", down.includes("sig-score") && down.indexOf("sig-score") < down.indexOf("sig-row") && down.includes("is-down") && !/class="sig-strength[^"]*is-/.test(down));
+t("the score sits on top and the dots are not a direction class", down.includes("sig-overall") && down.indexOf("sig-overall") < down.indexOf("sig-row") && down.includes("is-down") && !/class="sig-strength[^"]*is-/.test(down));
 const css = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
 t("dots stay one colour in either direction", css.includes(".sig.is-down .sig-strength") && css.includes(".sig.is-up .sig-strength") && css.includes(".sig-strength{display:inline-flex;gap:3px;align-items:center;margin-left:2px;color:#d9b779}") && !css.includes(".sig-strength{color:#e0675b") && !css.includes(".sig-strength{color:#7fc79a"));
-t("fast mode keeps the dots and the score", css.includes(".is-fast .sig-blurb") && !css.includes(".is-fast .sig-score") && !css.includes(".is-fast .sig-strength"));
-t("the score row can wrap and stays a 44px tap", css.includes(".sig-score{display:flex;flex-wrap:wrap") && css.includes(".sig-score{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;min-width:0;min-height:44px"));
+t("fast mode keeps the dots and the score", css.includes(".is-fast .sig-blurb") && !css.includes(".is-fast .sig-overall") && !css.includes(".is-fast .sig-strength"));
+t("the score row can wrap and stays a 44px tap", css.includes(".sig-overall{display:flex;flex-wrap:wrap") && css.includes(".sig-overall{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;min-width:0;min-height:44px"));
 const dashDots = signalRowHtml({ signals: [{ kind: "move", dir: "dash", text: "", label: "Price being checked", strength: 5 }], blurb: "Price being checked." });
-t("a grey dash has no dots and no score", dashDots.includes("is-dash") && !dashDots.includes("sig-strength") && !dashDots.includes("sig-score") && !dashDots.includes("%"));
+t("a grey dash has no dots and no score", dashDots.includes("is-dash") && !dashDots.includes("sig-strength") && !dashDots.includes("sig-overall") && !dashDots.includes("%"));
 const quiet = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "18%", label: "Listings counted down 18 percent", strength: 2 }], blurb: "Listings counted are down 18%, as of Oct 17." });
-t("no proven score stays off the row", !quiet.includes("sig-score") && quiet.includes("sig-strength") && !/\bNM\b|Near Mint/.test(quiet));
-t("the strength line passes the copy rules", preSend("Signal strength, Oct 17.").ok && preSend("One dot is a quiet reading. Five dots is an unusual reading.").ok);
+t("no proven score stays off the row", !quiet.includes("sig-overall") && quiet.includes("sig-strength") && !/\bNM\b|Near Mint/.test(quiet));
+t("the strength line passes the copy rules", preSend("Signal strength, Oct 17.").ok && preSend("One dot is a quiet reading. Five dots is an unusual reading.").ok && preSend("eBay listings counted, Oct 18.").ok);
+const gone = signalRowHtml({ signals: [{ kind: "gone", dots: 2, word: "Steady", label: "Listings gone, steady", strength: 2 }] });
+t("gone uses a speed word, not a second dot scale", gone.includes("Steady") && !gone.includes("sig-dots") && (gone.match(/class="sig-strength"/g) || []).length === 1);
+const lead = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "Listings -18% 7d · Draining · Many sellers · Slowing", label: "Listings counted down 18 percent over 7 days. Draining. Many sellers. Slowing", strength: 4 }], blurb: "Listings counted are down 18% over 7 days, as of Oct 18." }, { asOf: "2026-10-18" });
+t("the supply chip is the prominent line", lead.includes("is-lead") && lead.includes("Listings -18% 7d") && lead.includes("Many sellers") && lead.includes("eBay listings counted, Oct 18.") && !lead.includes("is-amber") && preSend("Listings counted are down 18% over 7 days, as of Oct 18.").ok && preSend("eBay listings counted, Oct 18.").ok);
+const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
+const client = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
+t("chips load for a signed out visitor", ui.includes('"/data/signal-chips.json"') && client.includes("function signalJoin") && !client.includes("premium"));
+t("the key names no Arrow or Flame label", !client.includes(">Arrow<") && !client.includes(">Flame<") && client.includes("icon-key-row") && client.includes("color:#efe9de"));
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("signal chips: all ok");

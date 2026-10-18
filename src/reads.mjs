@@ -3,7 +3,7 @@
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
-import { SIGNAL_CSS, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
+import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -370,8 +370,20 @@ export function renderReadsPage(state = {}) {
   if (gatedSuggestion) notes.push(...gatedSuggestion.notes);
   const lineMap = state.preview?.lines && typeof state.preview.lines === "object" ? state.preview.lines : {};
   const sample = sampleRead(shown, lineMap);
-  const chip = state.preview?.chip;
-  const chipFits = !!(chip && chip.name && sample.includes(String(chip.name)));
+  const chipDoc = state.preview?.chips && typeof state.preview.chips === "object" ? state.preview.chips : null;
+  const matched = chipForSample(sample, chipDoc);
+  const kinds = (matched?.signals || []).map((chip) => chip.kind);
+  if ((matched?.signals || []).some((chip) => chip.strength >= 1 && chip.strength <= 5)) kinds.push("dots");
+  if (matched && matched.strength >= 1 && matched.strength <= 5) kinds.push("score");
+  const blob = Object.values(lineMap).join("\n");
+  const catalog = [];
+  const asOf = chipDoc?.asOf || "";
+  for (const row of Object.values(chipDoc?.byId || {})) {
+    const name = String(row?.name || "").trim();
+    if (name.length < 8 || !blob.includes(name)) continue;
+    catalog.push({ name, html: signalRowHtml(row, { href: "", light: true, asOf }) });
+  }
+  const catalogJson = JSON.stringify(catalog).replace(/</g, "\\u003c");
   const lineJson = JSON.stringify(lineMap).replace(/</g, "\\u003c");
   const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
@@ -393,7 +405,7 @@ export function renderReadsPage(state = {}) {
 .rd-chip input{width:18px;height:18px}
 .rd-rec{color:#8e8e93;font-size:12px;margin:0 0 8px}
 .rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
-.rd-wrap button{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
+.rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
 </style>
 <h1>Your reads</h1>
@@ -404,9 +416,10 @@ ${sign}
 <h2>Sample read</h2>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
 <style>${SIGNAL_CSS}</style>
-${chipFits ? `<div id="rd-chip" data-name="${esc(chip.name)}">${signalRowHtml(chip, { href: "", light: true })}</div>` : ""}
-${iconKeyHtml()}
+<div id="rd-chip">${matched ? signalRowHtml(matched, { href: "", light: true, asOf }) : ""}</div>
+${iconKeyHtml(chipDoc?.asOf || "", kinds)}
 <script type="application/json" id="rd-lines">${lineJson}</script>
+<script type="application/json" id="rd-chip-catalog">${catalogJson}</script>
 </section>
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
 <h2>Sets</h2>
@@ -473,8 +486,22 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
       if (parts[1]) add((parts[0] === "sealed" ? "sealed:" : "card:") + parts[1]);
     }
     out.textContent = bits.length ? bits.slice(0, 6).join("\n\n") : "Sample read. The night file fills the dated lines.";
-    var chip = document.getElementById("rd-chip");
-    if (chip) chip.hidden = out.textContent.indexOf(chip.getAttribute("data-name") || "\n") < 0;
+    var catalog = [];
+    try { catalog = JSON.parse(document.getElementById("rd-chip-catalog").textContent || "[]"); } catch (e) { catalog = []; }
+    var sample = out.textContent || "";
+    var best = null;
+    for (var c = 0; c < catalog.length; c++) {
+      if (sample.indexOf(catalog[c].name) >= 0 && (!best || catalog[c].name.length > best.name.length)) best = catalog[c];
+    }
+    var host = document.getElementById("rd-chip");
+    if (host) host.innerHTML = best ? best.html : "";
+    var seen = {};
+    if (host) host.querySelectorAll("[data-kind]").forEach(function (el) { seen[el.getAttribute("data-kind")] = 1; });
+    if (host && host.querySelector(".sig-strength")) seen.dots = 1;
+    if (host && host.querySelector(".sig-overall")) seen.score = 1;
+    document.querySelectorAll(".icon-key-row").forEach(function (row) {
+      row.hidden = !seen[row.getAttribute("data-icon")];
+    });
   }
   form.addEventListener("change", paint);
 })();
