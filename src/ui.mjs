@@ -4633,7 +4633,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
-${page !== "read" ? feedToolsHtml() : ""}
+${page !== "read" ? feedToolsHtml(bundle?.asOf || "") : ""}
 <div id="feed-one"><div class="skel-card" aria-hidden="true"></div></div>
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>

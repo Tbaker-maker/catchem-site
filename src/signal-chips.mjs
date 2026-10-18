@@ -12,6 +12,7 @@ export const ICON_LINES = Object.freeze([
   ["Badge", "SIR, IR, or FA. That is the art on the card."],
   ["Tag", "Vintage or Modern."],
   ["Bars", "How much data is on file. More bars means more data."],
+  ["Dots", "One dot is a quiet reading. Five dots is an unusual reading."],
 ]);
 
 export const ICON_SOURCE = "TCGplayer market and eBay listings counted. The date is the date on the read.";
@@ -35,6 +36,11 @@ export const SIGNAL_CSS = `
 .sig-dots{display:inline-flex;gap:3px}
 .sig-dots i{width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.25)}
 .sig-dots i.on{background:currentColor}
+.sig-strength{display:inline-flex;gap:3px;align-items:center;margin-left:2px;color:#d9b779}
+.sig-strength i{width:6px;height:6px;border-radius:999px;background:rgba(217,183,121,.35)}
+.sig-strength i.on{background:#d9b779}
+.sig.is-up .sig-strength,.sig.is-down .sig-strength,.sig.is-amber .sig-strength,.sig.is-flat .sig-strength,.sig.is-neutral .sig-strength{color:#d9b779}
+.sig-score{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;min-width:0;min-height:44px;margin:0;color:#d9b779;font:600 13px/1 var(--sans,"IBM Plex Sans",system-ui,sans-serif)}
 .sig-blurb{margin:0;max-width:100%;font:400 15px/1.4 var(--sans,"IBM Plex Sans",system-ui,sans-serif);color:var(--dim,#c4baab);overflow-wrap:anywhere}
 .is-fast .sig-blurb,.is-fast .one-line,.is-fast .print-run{display:none}
 .feed-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;max-width:100%;margin:0 0 8px}
@@ -54,6 +60,9 @@ export const SIGNAL_CSS = `
 .sig-block.on-light .sig.is-neutral{color:#8a6a2f}
 .sig-block.on-light .sig-blurb{color:#3a3a3c}
 .sig-block.on-light .sig-track{background:#e5e5ea}
+.sig-block.on-light .sig-strength,.sig-block.on-light .sig-score{color:#8a6a2f}
+.sig-block.on-light .sig-strength i{background:rgba(138,106,47,.25)}
+.sig-block.on-light .sig-strength i.on{background:#8a6a2f}
 .rd-wrap .icon-key summary{background:#fff;color:#1c1c1e;border-color:#e5e5ea}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 `;
@@ -76,35 +85,41 @@ export function signalMarkup(card, escape, opts) {
     if (dir === "down") return "▼";
     return "";
   }
+  function meter(n) {
+    const v = Math.round(Number(n));
+    if (!(v >= 1) || v > 5) return "";
+    const bits = [1, 2, 3, 4, 5].map(function (i) { return '<i class="' + (i <= v ? "on" : "") + '"></i>'; }).join("");
+    return '<span class="sig-strength" aria-hidden="true">' + bits + '</span><span class="visually-hidden"> Signal strength ' + v + " of 5.</span>";
+  }
   function one(chip) {
     const kind = String(chip && chip.kind || "");
     if (kind === "move") {
       if (chip.dir === "dash") return '<span class="sig is-dash">' + glyph("dash") + '<span class="visually-hidden">' + e(chip.label || "Price being checked") + "</span></span>";
       const tone = chip.dir === "up" ? "is-up" : chip.dir === "down" ? "is-down" : "is-flat";
       const shown = mark(chip.dir) || glyph("flat");
-      return '<span class="sig ' + tone + '"><span aria-hidden="true">' + shown + "</span> " + e(chip.text || "") + "</span>";
+      return '<span class="sig ' + tone + '"><span aria-hidden="true">' + shown + "</span> " + e(chip.text || "") + meter(chip.strength) + "</span>";
     }
     if (kind === "listings") {
       const tone = chip.dir === "down" ? "is-amber" : "is-neutral";
-      return '<span class="sig ' + tone + '">' + glyph("stack") + '<span aria-hidden="true">' + mark(chip.dir) + "</span> " + e(chip.text || "") + "</span>";
+      return '<span class="sig ' + tone + '">' + glyph("stack") + '<span aria-hidden="true">' + mark(chip.dir) + "</span> " + e(chip.text || "") + meter(chip.strength) + "</span>";
     }
     if (kind === "gone") {
       const n = Math.max(1, Math.min(3, Number(chip.dots) || 1));
       const dots = [1, 2, 3].map(function (i) { return '<i class="' + (i <= n ? "on" : "") + '"></i>'; }).join("");
-      return '<span class="sig is-neutral">' + glyph("flame") + '<span class="sig-dots" aria-hidden="true">' + dots + "</span></span>";
+      return '<span class="sig is-neutral">' + glyph("flame") + '<span class="sig-dots" aria-hidden="true">' + dots + "</span>" + meter(chip.strength) + "</span>";
     }
     if (kind === "range") {
       const pos = Math.max(0, Math.min(1, Number(chip.pos) || 0));
-      return '<span class="sig is-neutral"><span class="sig-track" aria-hidden="true"><span class="sig-dot" style="left:' + Math.round(pos * 100) + '%"></span></span></span>';
+      return '<span class="sig is-neutral"><span class="sig-track" aria-hidden="true"><span class="sig-dot" style="left:' + Math.round(pos * 100) + '%"></span></span>' + meter(chip.strength) + "</span>";
     }
-    if (kind === "momentum") return '<span class="sig is-neutral">' + e(chip.word || "") + "</span>";
-    if (kind === "rotation") return '<span class="sig is-neutral">' + glyph("clock") + " " + e(chip.text || "") + "</span>";
-    if (kind === "art") return '<span class="sig is-neutral">' + e(chip.badge || "") + "</span>";
-    if (kind === "era") return '<span class="sig is-neutral">' + e(chip.tag || "") + "</span>";
+    if (kind === "momentum") return '<span class="sig is-neutral">' + e(chip.word || "") + meter(chip.strength) + "</span>";
+    if (kind === "rotation") return '<span class="sig is-neutral">' + glyph("clock") + " " + e(chip.text || "") + meter(chip.strength) + "</span>";
+    if (kind === "art") return '<span class="sig is-neutral">' + e(chip.badge || "") + meter(chip.strength) + "</span>";
+    if (kind === "era") return '<span class="sig is-neutral">' + e(chip.tag || "") + meter(chip.strength) + "</span>";
     if (kind === "confidence") {
       const n = Math.max(1, Math.min(3, Number(chip.bars) || 1));
       const bars = [1, 2, 3].map(function (i) { return '<i class="' + (i <= n ? "on" : "") + '"></i>'; }).join("");
-      return '<span class="sig is-neutral"><span class="sig-bars" aria-hidden="true">' + bars + "</span></span>";
+      return '<span class="sig is-neutral"><span class="sig-bars" aria-hidden="true">' + bars + "</span>" + meter(chip.strength) + "</span>";
     }
     return "";
   }
@@ -119,7 +134,11 @@ export function signalMarkup(card, escape, opts) {
     : '<div class="sig-row" role="group" aria-label="' + e(label) + '">' + bits + "</div>";
   const blurb = String(card && card.blurb || "").trim();
   const line = blurb ? '<p class="sig-blurb">' + e(blurb) + "</p>" : "";
-  return '<div class="sig-block' + light + '">' + row + line + "</div>";
+  const scoreN = Math.round(Number(card && card.strength));
+  const score = scoreN >= 1 && scoreN <= 5
+    ? '<p class="sig-score"><span class="sig-score-label">Signal strength</span>' + meter(scoreN) + "</p>"
+    : "";
+  return '<div class="sig-block' + light + '">' + score + row + line + "</div>";
 }
 
 export function signalRowHtml(card, opts = {}) {
@@ -132,13 +151,17 @@ function esc(s) {
   return String(s ?? "").replace(/&/g, "&" + "amp;").replace(/</g, "&" + "lt;").replace(/>/g, "&" + "gt;").replace(/"/g, "&" + "quot;");
 }
 
-export function iconKeyHtml() {
+export function iconKeyHtml(asOf) {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const m = String(asOf || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const when = m ? months[Number(m[2]) - 1] + " " + Number(m[3]) : "";
   const rows = ICON_LINES.map(([name, line]) => `<p><b>${esc(name)}.</b> ${esc(line)}</p>`).join("");
-  return `<details class="icon-key" id="icon-key"><summary>What the icons mean</summary><div class="icon-key-body">${rows}<p>${esc(ICON_SOURCE)}</p></div></details>`;
+  const score = "Signal strength" + (when ? ", " + when : "") + ".";
+  return `<details class="icon-key" id="icon-key"><summary>What the icons mean</summary><div class="icon-key-body">${rows}<p>${esc(score)}</p><p>${esc(ICON_SOURCE)}</p></div></details>`;
 }
 
-export function feedToolsHtml() {
-  return `<div class="feed-tools"><button type="button" id="fast-mode" class="fast-toggle" aria-pressed="false">Fast mode</button>${iconKeyHtml()}</div>`;
+export function feedToolsHtml(asOf) {
+  return `<div class="feed-tools"><button type="button" id="fast-mode" class="fast-toggle" aria-pressed="false">Fast mode</button>${iconKeyHtml(asOf)}</div>`;
 }
 
 export function attachSignals(bundle, doc) {
@@ -149,7 +172,10 @@ export function attachSignals(bundle, doc) {
     const hit = byId[row.id];
     if (!hit || !Array.isArray(hit.signals) || !hit.signals.length) return row;
     if (Array.isArray(row.signals) && row.signals.length) return row;
-    return { ...row, signals: hit.signals.slice(0, 4), blurb: hit.blurb || row.blurb || "" };
+    const next = { ...row, signals: hit.signals.slice(0, 4), blurb: hit.blurb || row.blurb || "" };
+    const score = Math.round(Number(hit.strength));
+    if (score >= 1 && score <= 5) next.strength = score;
+    return next;
   });
   return { ...bundle, reads };
 }
