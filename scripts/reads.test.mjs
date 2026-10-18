@@ -20,7 +20,7 @@ const parsed = gatePlan(planFromFields(fields), { premium: true });
 t("discord stays on and email stays off", parsed.plan.channels.discord === true && parsed.plan.channels.email === false && parsed.plan.addons.news === true && parsed.plan.rarities[0] === "Illustration Rare");
 const page = renderReadsPage({ signedIn: false, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 t("the picker defaults Discord and does not ask for email", page.includes("Discord DM") && page.includes("checked") && page.includes("Email delivery is coming soon.") && !page.includes('name="email"') && !page.includes('name="email_on"') && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads") && page.includes("Scarlet and Violet") && page.includes("Sample read."));
-t("one save button", (page.match(/<button/g) || []).length === 1);
+t("one save button", (page.match(/<button type="submit"/g) || []).length === 1);
 t("a blank picker starts on the recommended set", renderReadsPage({ signedIn: false }).includes("ME: 30th Celebration") && renderReadsPage({ signedIn: false }).includes("me-30th-celebration"));
 t("a saved plan is one Discord follow", (() => {
   const row = planToFollow("d:42", { sets: ["me-30th-celebration"], product: "singles", frequency: "weekly", watch: [], addons: {} });

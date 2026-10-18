@@ -7,6 +7,7 @@ import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
 import { emailDeliveryOn, saveEmailChoice } from "./reads-email.mjs";
+import { cleanLength } from "./reads-article.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -40,6 +41,8 @@ export function blankPlan() {
     email: "",
     addons: { news: false, games: false, all: false },
     deep: false,
+    length: "standard",
+    focus: "",
   };
 }
 
@@ -121,6 +124,9 @@ export function gatePlan(plan, { premium = false, emailOn = false } = {}) {
   }
   if (full > cap) notes.push(premium ? "25 follows saved." : "A free seat keeps one weekly read.");
   next.deep = premium === true;
+  next.length = cleanLength(plan?.length, premium);
+  if (String(plan?.length || "") === "deep" && !premium) notes.push("Deep dive is in Premium, so this read is Standard.");
+  next.focus = plan?.focus === "vintage" ? "vintage" : "";
   return { plan: next, notes };
 }
 
@@ -188,6 +194,8 @@ export function planFromFields(fields) {
     email: "",
     product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
+    length: String(get("length") || "standard"),
+    focus: String(get("focus") || ""),
   };
 }
 
@@ -321,6 +329,8 @@ export function planToFollow(discordId, plan) {
     news: plan?.addons?.news === true || plan?.addons?.all === true,
     games: plan?.addons?.games === true || plan?.addons?.all === true,
     discord: plan?.channels?.discord !== false,
+    length: cleanLength(plan?.length, true),
+    focus: plan?.focus === "vintage" ? "vintage" : "",
     email: plan?.channels?.email === true && plan?.emailConfirmed === true,
     savedAt: String(plan?.savedAt || ""),
   };
@@ -365,6 +375,28 @@ export function saveLine(state = {}) {
   }
   if (state.pipe === true) return "Saved. Your first read comes by Discord DM after the next nightly run.";
   return "Saved. Reads by Discord DM are not switched on yet, so none will arrive for now.";
+}
+
+// One tap presets. Each sets a pathway and a read length. No new tags.
+export const PRESETS = Object.freeze([
+  { id: "sealed", label: "Sealed collector" },
+  { id: "chase", label: "Chase card hunter" },
+  { id: "vintage", label: "Vintage fan" },
+  { id: "completer", label: "Set completer" },
+]);
+export const PRESET_FIELDS = Object.freeze({
+  sealed: { sets: [], rarity: [], product: "sealed", length: "standard", focus: "" },
+  chase: { sets: [], rarity: ["Special Illustration Rare", "Illustration Rare"], product: "singles", length: "glance", focus: "" },
+  vintage: { sets: [], rarity: [], product: "singles", length: "standard", focus: "vintage" },
+  completer: { sets: "keep", rarity: [], product: "singles", length: "deep", focus: "" },
+});
+
+export function lengthPicker(plan, premium) {
+  const now = cleanLength(plan?.length, premium);
+  const opt = (value, label, note, locked) => `<label class="rd-chip rd-len"><input type="radio" name="length" value="${value}"${now === value ? " checked" : ""}${locked ? " disabled" : ""}><span>${esc(label)} <small>${esc(note)}</small></span></label>`;
+  return `<h2>Read length</h2>
+<div class="rd-chips">${opt("glance", "Glance", "about 20 seconds", false)}${opt("standard", "Standard", "about 1 minute", false)}${opt("deep", "Deep dive", premium ? "3 to 5 minutes" : "Premium", !premium)}</div>
+<p class="rd-note">Length is for email reads. Discord DMs stay short for now.</p>`;
 }
 
 // "Where it goes". With email off this is the Discord chip plus a calm coming soon line.
@@ -455,6 +487,9 @@ export function renderReadsPage(state = {}) {
 .rd-email{display:block;width:100%;box-sizing:border-box;min-height:44px;margin:10px 0 0;padding:0 16px;border:1px solid #d1d1d6;border-radius:14px;background:#fff;color:#1c1c1e;font-size:16px}
 .rd-email:focus{outline:2px solid #8a6a2f;outline-offset:1px}
 .rd-email-wrap[hidden]{display:none}
+.rd-preset{border:0;cursor:pointer;color:#1c1c1e;font-weight:600}
+.rd-preset:focus-visible{outline:2px solid #8a6a2f;outline-offset:2px}
+.rd-len small{color:#8e8e93;font-size:13px}
 </style>
 <h1>Your reads</h1>
 <p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
@@ -470,6 +505,10 @@ ${iconKeyHtml(chipDoc?.asOf || "", kinds)}
 <script type="application/json" id="rd-chip-catalog">${catalogJson}</script>
 </section>
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
+<h2>Quick start</h2>
+<p class="rd-rec">One tap sets up a read. You can still change anything below.</p>
+<div class="rd-chips">${PRESETS.map((row) => `<button type="button" class="rd-chip rd-preset" data-preset="${esc(row.id)}">${esc(row.label)}</button>`).join("")}</div>
+<input type="hidden" name="focus" id="rd-focus" value="${esc(shown.focus === "vintage" ? "vintage" : "")}">
 <h2>Sets</h2>
 <p class="rd-rec">Recommended starts on ME: 30th Celebration. Tap to change it.</p>
 <div class="rd-chips">${SET_CHOICES.map((row) => choice("set", row.slug, row.name, (shown.sets || []).includes(row.slug))).join("")}</div>
@@ -491,6 +530,7 @@ ${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", 
 </div>
 <h2>Where it goes</h2>
 ${whereItGoes(shown, state.email)}
+${state.email?.on === true ? lengthPicker(shown, premium) : ""}
 <h2>Add-ons</h2>
 <div class="rd-chips">
 ${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
@@ -551,6 +591,31 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     });
   }
   form.addEventListener("change", paint);
+  var presets = ${JSON.stringify(PRESET_FIELDS)};
+  function setChecks(name, values){
+    var nodes = form.querySelectorAll('input[name="' + name + '"]');
+    for (var i = 0; i < nodes.length; i++) nodes[i].checked = values.indexOf(nodes[i].value) >= 0;
+  }
+  function setRadio(name, value){
+    var nodes = form.querySelectorAll('input[name="' + name + '"]');
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].value === value && !nodes[i].disabled) nodes[i].checked = true;
+  }
+  var presetButtons = form.querySelectorAll("[data-preset]");
+  for (var p = 0; p < presetButtons.length; p++) presetButtons[p].addEventListener("click", function(ev){
+    var cfg = presets[ev.currentTarget.getAttribute("data-preset")];
+    if (!cfg) return;
+    setChecks("set", cfg.sets === "keep" ? (function(){ var on = []; var n = form.querySelectorAll('input[name="set"]'); for (var i = 0; i < n.length; i++) if (n[i].checked) on.push(n[i].value); return on.length ? on : [n[0] && n[0].value]; })() : cfg.sets);
+    setChecks("pokemon", []);
+    setChecks("rarity", cfg.rarity);
+    setChecks("era", []);
+    setRadio("product", cfg.product);
+    setRadio("length", cfg.length);
+    if (cfg.length === "deep") { var d = form.querySelector('input[name="length"][value="deep"]'); if (!d || d.disabled) setRadio("length", "standard"); }
+    var focus = document.getElementById("rd-focus");
+    if (focus) focus.value = cfg.focus || "";
+    for (var q = 0; q < presetButtons.length; q++) presetButtons[q].setAttribute("aria-pressed", presetButtons[q] === ev.currentTarget ? "true" : "false");
+    paint();
+  });
   var mail = document.getElementById("rd-mail-on");
   var mailWrap = document.getElementById("rd-email-wrap");
   function mailPaint(){ if (mail && mailWrap) mailWrap.hidden = !mail.checked; }

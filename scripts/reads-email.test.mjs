@@ -2,10 +2,11 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import {
-  buildMessage, canSend, cleanCopy, cleanEmail, emailDeliveryOn, enrichRead, feedIndex, handleEmailLink,
-  makeToken, memberEmail, memberKey, readToken, renderReadsEmail, runEmailDelivery, saveEmailChoice, subjectFor, RESEND_URL,
+  buildMessage, canSend, cleanEmail, emailDeliveryOn, handleEmailLink, loadContext,
+  makeToken, memberKey, readToken, runEmailDelivery, saveEmailChoice, subjectFor, RESEND_URL,
 } from "../src/reads-email.mjs";
-import { gatePlan, planFromFields, planToFollow, renderReadsPage, whereItGoes } from "../src/reads.mjs";
+import { analyze, buildArticle, renderArticle, storyFor, pathwayOf } from "../src/reads-article.mjs";
+import { gatePlan, lengthPicker, planFromFields, planToFollow, renderReadsPage, whereItGoes, PRESETS } from "../src/reads.mjs";
 import { FOLLOWS_KEY, OUTBOX_KEY, withChannels } from "../src/reads-pipe.mjs";
 import worker from "../src/index.mjs";
 
@@ -50,6 +51,13 @@ t("an email only member is skipped by the bot", (() => {
   return out.members[0].discord === false && !("discord" in out.members[1]);
 })());
 
+// Read length and presets
+t("free plans cannot keep Deep dive", gatePlan({ length: "deep" }, { premium: false }).plan.length === "standard" && gatePlan({ length: "deep" }, { premium: true }).plan.length === "deep" && gatePlan({ length: "glance" }, {}).plan.length === "glance");
+t("the length picker locks Deep dive for free", /value="deep"[^>]*disabled/.test(lengthPicker({}, false)) && !/value="deep"[^>]*disabled/.test(lengthPicker({}, true)) && lengthPicker({}, true).includes("Glance") && lengthPicker({}, true).includes("Standard"));
+t("the length picker shows only when email is on", !offPage.includes('type="radio" name="length"') && onPage.includes('type="radio" name="length"'));
+t("four one tap presets with 44px chips", PRESETS.length === 4 && ["Sealed collector", "Chase card hunter", "Vintage fan", "Set completer"].every((l) => offPage.includes(l)) && offPage.includes('data-preset="vintage"'));
+t("the follow carries length and focus and no address", (() => { const f = planToFollow("d:1", gatePlan({ length: "glance", focus: "vintage" }, {}).plan); return f.length === "glance" && f.focus === "vintage"; })());
+
 // 2. Scheduled run does nothing while off
 await (async () => {
   let touched = false;
@@ -83,52 +91,80 @@ t("the confirm link turns email on", ok.status === 200 && row1.confirmed === tru
 t("confirm is refused while the flag is off", (await handleEmailLink(new Request(link), { FEED_KV: store, SESSION_SECRET: SECRET }, { now })).status === 200 && JSON.parse(store.m.get(memberKey(ID))).confirmed === true);
 t("tokens are bound to their purpose", (await readToken(env, "unsub", (await makeToken(env, "confirm", ID, ADDR, now)), now)) === null);
 
-// 4. Delivery, held cards, design, cap
+// 4. Article: data, pathways, lengths, honesty
+const D = (i) => new Date(Date.parse("2026-10-18T00:00:00Z") - i * 86400000).toISOString().slice(0, 10);
+const series = (vals) => vals.map((v, i) => [D(vals.length - 1 - i), v]);
+const movers = { asOf: "2026-10-18", singles: [
+  { id: "move-tcgcsv-1001", name: "Ledian - 144/142", set: "SV07: Stellar Crown", hist: series([5, 5.1, 5.0, 5.2, 5.1, 5.3, 5.4, 5.6, 5.9, 6.3]), href: "/c/tcgcsv-1001" },
+  { id: "move-tcgcsv-1002", name: "Charizard ex - 199/165", set: "SV: Scarlet & Violet 151", hist: series([300, 310, 330, 350, 370, 360, 340, 320, 300, 280]), href: "/c/tcgcsv-1002" },
+  { id: "move-tcgcsv-1003", name: "Pikachu - 004/131", set: "SV: Prismatic Evolutions", hist: series([2, 2, 2, 2, 2, 2, 2, 2, 2.2, 2.3]), href: "/c/tcgcsv-1003" },
+  { id: "move-tcgcsv-1004", name: "Junk Ask Card", set: "SV: Prismatic Evolutions", hist: series([10, 10, 10, 10, 10, 10, 10, 10, 99999, 99999]), href: "/c/tcgcsv-1004" },
+  { id: "move-tcgcsv-555", name: "Espeon", set: "Neo Discovery", hist: series([900, 910, 920, 930, 940, 950, 960, 970, 980, 1200]), href: "/c/tcgcsv-555" },
+  { id: "move-tcgcsv-1005", name: "Dark Charizard", set: "Team Rocket", hist: series([400, 400, 405, 410, 420, 430, 440, 450, 455, 470]), href: "/c/tcgcsv-1005" },
+], sealed: [
+  { id: "move-tcgcsv-77", name: "Shining Legends Elite Trainer Box", set: "Shining Legends", hist: series([80, 81, 82, 82, 83, 84, 85, 86, 88, 90]), href: "/p/tcgcsv-77" },
+] };
+const listings = { asOf: "2026-10-18", products: [
+  { id: "sm35-etb", name: "Shining Legends Elite Trainer Box", listingsCounted: { n: 20, date: "2026-10-18", prev: { n: 6, date: "2026-10-17" } } },
+  { id: "tiny", name: "Tiny Tin", listingsCounted: { n: 2, date: "2026-10-18", prev: { n: 1, date: "2026-10-17" } } },
+] };
+const readsDoc = { asOf: "2026-10-18", reads: [
+  { id: "pf-1", readKind: "pattern-forming", headline: "Charizard ex 199/165: a flat range is forming, $280.00 on Sep 10 to $280.00 on Oct 18.", href: "/c/tcgcsv-1002", asOf: "2026-10-18" },
+  { id: "news-1", readKind: "newsline", headline: "Stream details for the Nice Regional are out (Victory Road, Oct 14)", href: "https://victoryroad.pro/2027-nice/", source: "Victory Road, 2026-10-14" },
+  { id: "rot-1", readKind: "rotation", headline: "SV: Scarlet & Violet 151 (mark G) left Standard: rotated April 10, 2026.", asOf: "2026-10-18" },
+] };
+const setsDoc = { sets: [{ slug: "sv-scarlet-and-violet-151", name: "SV: Scarlet & Violet 151", release: "2023-09-22" }, { slug: "team-rocket", name: "Team Rocket", release: "2000-04-24" }, { slug: "neo-discovery", name: "Neo Discovery", release: "2001-06-01" }, { slug: "sv07", name: "SV07: Stellar Crown", release: "2024-09-13" }] };
 const holdIds = { "tcgcsv-555": "vintage" };
-const bundle = { reads: [
-  { id: "high-tcgcsv-86681", sku: "tcgcsv-86681", name: "Leafeon (Call of Legends) 13/95", headline: "Leafeon (Call of Legends) 13/95 is up 18% over 7 days." },
-  { id: "deep-slump-tcgcsv-555", sku: "tcgcsv-555", headline: "Slump watch: Espeon is 41% under its Jun 25 high." },
-] };
-const chipDoc = { asOf: "2026-10-18", byId: { "high-tcgcsv-86681": { signals: [{ kind: "move", dir: "up", text: "18% 7D", strength: 3 }, { kind: "range", pos: 0.9, strength: 4 }, { kind: "momentum", word: "Rising", strength: 3 }], blurb: "TCGplayer market is up 18% over 7 days, as of Oct 18." } }, bySku: { "tcgcsv-77": { signals: [{ kind: "listings", text: "Listings \u25B2 9%", strength: 1 }], blurb: "Listings counted are up 9%, as of Oct 18." } } };
-const member = { discordId: ID, lead: "Your daily Catch'em read, Oct 18.", reads: [
-  { line: "Leafeon 13/95, Call of Legends is $40.00 on TCGplayer market, as of Oct 18.", cardId: "tcgcsv-86681", kind: "card", name: "Leafeon - 13/95" },
-  { line: "Espeon 1st Edition, Neo Discovery is $900.00 on TCGplayer market, as of Oct 18.", cardId: "tcgcsv-555", kind: "card", name: "Espeon" },
-  { line: "Some card: Price being checked, as of Oct 18.", cardId: "tcgcsv-556", kind: "card" },
-  { line: "Shining Legends Elite Trainer Box: 40 eBay listings counted, middle ask $80.00, as of Oct 18.", cardId: "tcgcsv-77", kind: "sealed", name: "Shining Legends Elite Trainer Box" },
-] };
-const ctx = { holdIds, chipDoc, feed: feedIndex(bundle, holdIds), rows: new Map([[ID, row1]]) };
-const doc = memberEmail(member, ctx);
-t("held and Price being checked cards never appear as reads", doc.reads.length === 2 && !JSON.stringify(doc).includes("Espeon") && !/price being checked/i.test(JSON.stringify(doc)));
-t("a held card is skipped even through its feed read", enrichRead({ line: "x is $1.00, as of Oct 18.", cardId: "tcgcsv-555" }, ctx) === null);
+const actx = { movers, listings, reads: readsDoc, sets: setsDoc, holdIds };
+const art = buildArticle({ follow: {}, ctx: actx, asOf: "2026-10-18", length: "standard" });
+const all = JSON.stringify(art);
+t("default pathway is a bit of everything with a lead story", art.path === "default" && /led your read|biggest move/.test(art.lead));
+t("held cards never appear", !all.includes("Espeon") && !all.includes("tcgcsv-555"));
+t("junk outlier highs are skipped", !all.includes("Junk Ask Card"));
+t("Vintage means WOTC era only", (() => { const pool = []; const a = buildArticle({ follow: { focus: "vintage" }, ctx: actx, asOf: "2026-10-18" }); return a.path === "vintage" ? a.top.name === "Dark Charizard" : a.fallback.length > 0; })() && !buildArticle({ follow: {}, ctx: actx }).top.vintage === !buildArticle({ follow: {}, ctx: actx }).top.name.includes("Dark Charizard"));
+t("supply shows listings counted with both dates and skips tiny counts", art.supply.length === 1 && art.supply[0].word === "Stacking" && art.supply[0].prev === 6 && art.supply[0].n === 20);
+t("group tiles count up, down and listings draining", art.tiles.length === 3 && art.tiles[0].t === "went up" && art.tiles[1].t === "went down");
+const turn = analyze(series([300, 310, 330, 350, 370, 360, 340, 320, 300, 280]));
+t("a turn after a climb gets a turn story", /then turned|turned down/.test(storyFor({ id: "x", name: "Card", a: turn })));
+const jump = analyze(series([10, 10, 10, 10, 15, 15, 15, 15.1, 15, 15]));
+t("a one step jump then flat gets that story", /One jump|one big step/.test(storyFor({ id: "y", name: "Card", a: jump })));
+const thin = analyze([["2026-10-17", 5], ["2026-10-18", 6]]);
+t("thin data gets quiet wording", thin.thin && /thin file|Only a few days/.test(storyFor({ id: "z", name: "Card", a: thin })));
+t("a huge single step never leads", analyze(series([400, 400, 400, 400, 1500, 1500, 1500, 1500])).thin === true);
+t("no story uses the generic up X% over 7 days line", ![art.top, ...art.ups, ...art.downs].some((i) => /over 7 days/i.test(i.story)));
+t("pathways come from the follow", pathwayOf({ cards: ["tcgcsv-1"] }) === "watchlist" && pathwayOf({ pokemon: ["Pikachu"] }) === "pokemon" && pathwayOf({ sets: ["a"] }) === "set" && pathwayOf({}) === "default");
+const poke = buildArticle({ follow: { pokemon: ["Charizard"] }, ctx: actx, asOf: "2026-10-18" });
+t("a Pokemon pathway leads with that Pokemon and has its own intro", poke.path === "pokemon" && /Charizard/.test(poke.top.name) && /Charizard/.test(poke.intro));
+const set151 = buildArticle({ follow: { sets: ["sv-scarlet-and-violet-151"] }, ctx: actx, asOf: "2026-10-18" });
+t("a narrow quiet set falls back to everything and says so", set151.path === "default" && /quiet day/.test(set151.fallback));
+t("news shows only when it ties to the follow", art.news && !poke.news);
+const html = renderArticle(art, { unsubscribe: "https://catchemtcg.com/reads/email/unsubscribe?t=x" });
+t("the standard article has the approved sections", ["Top move", "The whole group today", "Also moving up", "Moving down", "Listings counted", "Pattern to know", "News"].every((h) => html.includes(h)));
+t("card images, pill deltas and a small table chart, no SVG", html.includes("tcgplayer-cdn.tcgplayer.com/product/") && html.includes("border-radius:999px;padding:3px 10px") && html.includes('valign="bottom"') && !html.includes("<svg"));
+t("lead move has small rounded shop buttons and the footer has the grey commission note", html.includes(">Buy on TCGplayer<") && html.includes(">Buy on eBay<") && html.includes("Catch&#39;em may earn a small commission, at no extra cost to you."));
+t("dark CTA and a small grey footer", html.includes(">See every card in your read<") && /font:400 11px\/1\.5[^"]*;color:#8e8e93/.test(html));
+const glance = renderArticle({ ...art, length: "glance" }, { more: "https://catchemtcg.com/reads/brief?t=x" });
+t("glance has three moves with Read more anchors and one supply line", (glance.match(/>Read more</g) || []).length === 3 && glance.includes("#top-move") && glance.includes("Supply: ") && !glance.includes("Moving down"));
+const deep = renderArticle({ ...art, length: "deep" });
+t("deep dive adds why it matters and charts on rows", deep.includes("Why it matters") && (deep.match(/valign="bottom"/g) || []).length > (html.match(/valign="bottom"/g) || []).length);
+// "A listing is not a sale." is the house disclaimer and the only allowed use.
+const visibleA = [html, glance, deep].join(" ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/A listing is not a sale\./g, " ");
+t("no dashes, sold, sales, NM, Near Mint or advice in any length", !/[\u2013\u2014]/.test(html + glance + deep) && !/\bsold\b|\bsales?\b|\bNM\b|Near Mint/i.test(visibleA));
+
+const member = { discordId: ID, lead: "Your daily Catch'em read, Oct 18.", reads: [{ line: "Ledian 144/142 is $6.30 on TCGplayer market, as of Oct 18.", cardId: "tcgcsv-1001", kind: "card" }] };
+const files = { "reads.json": readsDoc, "price-hold.json": { ids: holdIds }, "movers.json": movers, "listings-counted.json": listings, "sets.json": setsDoc };
+const publicFetch = async (url) => { const name = String(url).split("/public/").pop(); return files[name] ? new Response(JSON.stringify(files[name]), { status: 200 }) : new Response("no", { status: 404 }); };
+const ctx = { ...(await loadContext(publicFetch)), rows: new Map([[ID, row1]]), follows: new Map([[ID, { id: ID, length: "glance" }]]) };
 const msg = await buildMessage(env, member, ctx, "2026-10-18", now);
 t("subject is Your Catch'em reads, <date>", msg.subject === "Your Catch'em reads, Oct 18" && subjectFor("2026-10-18") === msg.subject);
-t("the email links each read to its /feed/r/ page", msg.html.includes("https://catchemtcg.com/feed/r/high-tcgcsv-86681"));
-t("a morning brief: greeting with the date and one top move line", msg.html.includes("Morning brief, Oct 18") && msg.html.includes("Good morning.") && msg.html.includes("Top move: Leafeon (Call of Legends) 13/95, price up 18% in 7 days."));
-t("each read has a story line, not the generic up X% over 7 days sentence", msg.html.includes("Leafeon (Call of Legends) 13/95 is up 18% over 7 days.") && !msg.html.includes("TCGplayer market is up 18% over 7 days"));
-t("signals are plain words, one or two per read", msg.html.includes("Price up 18% in 7 days") && msg.html.includes("Listings stacking, up 9%") && doc.reads.every((r) => r.words.length <= 2));
-t("no icon chips and no dot rows", !/[\u25CF\u25CB\u25B2\u25BC\u25AE\u25AF]/.test(msg.html.replace(/<style[\s\S]*?<\/style>/, "")) && !msg.html.includes("sig-") && !msg.html.includes("Range"));
-t("one See the read link per read", (msg.html.match(/>See the read</g) || []).length === doc.reads.length);
-t("small rounded Buy on TCGplayer and Buy on eBay buttons", msg.html.includes(">Buy on TCGplayer<") && msg.html.includes(">Buy on eBay<") && /min-height:44px;line-height:44px;padding:0 16px;border-radius:999px/.test(msg.html));
-t("short footer with the grey commission note and unsubscribe", /color:#8e8e93">Catch&#39;em may earn a small commission, at no extra cost to you\./.test(msg.html) && msg.html.includes(">Unsubscribe<"));
-t("table layout with inline styles and dark mode meta", msg.html.includes('role="presentation"') && msg.html.includes('name="color-scheme" content="light dark"'));
-t("three to five reads at most", memberEmail({ ...member, reads: Array.from({ length: 9 }, (_, i) => ({ line: `Card ${i} is $${i + 1}.00 on TCGplayer market, as of Oct 18.`, cardId: "tcgcsv-10" + i, kind: "card", name: "Card " + i })) }, ctx).reads.length === 5);
-t("the morning brief waits for the morning", (await runEmailDelivery(on(kv({ [OUTBOX_KEY]: { day: "2026-10-18", members: [member] } })), { now: Date.parse("2026-10-18T09:00:00Z"), fetchImpl: fakeSend })).skipped === "before morning");
+t("the member length is used and glance links to the signed brief page", msg.length === "glance" && msg.html.includes("https://catchemtcg.com/reads/brief?t="));
 t("List-Unsubscribe and List-Unsubscribe-Post headers", /^<https:\/\/catchemtcg\.com\/reads\/email\/unsubscribe\?t=[^>]+>$/.test(msg.headers["List-Unsubscribe"]) && msg.headers["List-Unsubscribe-Post"] === "List-Unsubscribe=One-Click");
-t("the body has the same one tap unsubscribe link", msg.html.includes(msg.headers["List-Unsubscribe"].slice(1, -1).replace(/&/g, "&amp;")));
-const visible = (msg.html + "\n" + msg.text + "\n" + msg.subject).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
-t("no em or en dashes anywhere in the email", !/[\u2013\u2014]/.test(msg.html + msg.text + msg.subject));
-t("no sold or sales wording and no NM", !/\bsold\b|\bsales?\b/i.test(visible) && !/\bNM\b/.test(visible));
-t("each read line passes the advice checker", doc.reads.every((r) => cleanCopy(r.story) && r.words.every(cleanCopy)));
-t("a line with an advice phrase is dropped", enrichRead({ line: "You should buy this now before it moons.", cardId: "tcgcsv-9" }, ctx) === null);
-
 // Delivery run with a stored outbox
 const fullStore = kv({
   [OUTBOX_KEY]: { day: "2026-10-18", builtAt: "2026-10-18T13:00:00Z", members: [member, { discordId: "900000000000000203", reads: member.reads }] },
   [FOLLOWS_KEY]: { follows: [{ id: ID, discord: true, email: true }, { id: "900000000000000203", discord: true, email: false }] },
   [memberKey(ID)]: row1,
 });
-const files = { "reads.json": bundle, "signal-chips.json": chipDoc, "price-hold.json": { ids: holdIds } };
-const publicFetch = async (url) => { const name = String(url).split("/").pop(); return files[name] ? new Response(JSON.stringify(files[name]), { status: 200 }) : new Response("no", { status: 404 }); };
 const box = [];
 const send2 = async (url, init) => { box.push(JSON.parse(init.body)); return new Response("{}", { status: 200 }); };
 const env2 = on(fullStore);

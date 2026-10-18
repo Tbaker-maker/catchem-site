@@ -7,9 +7,10 @@
 
 import { FOLLOWS_KEY, OUTBOX_KEY, cleanOutbox } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
-import { ebaySearchUrl, tcgStoreUrl, SHOP_NOTE, setAffiliateConfig } from "./pokemon.mjs";
-import { AFFILIATION, TCGPLAYER_ATTRIBUTION } from "./affiliation.mjs";
+import { setAffiliateConfig } from "./pokemon.mjs";
+import { AFFILIATION } from "./affiliation.mjs";
 import { loadJson } from "./data.mjs";
+import { articleText, buildArticle, cleanLength, renderArticle, unpackSpark } from "./reads-article.mjs";
 
 const GUARD = banGuard("email read");
 export const EMAIL_KEY_PREFIX = "reads-email:";
@@ -19,7 +20,6 @@ export const RESEND_URL = "https://api.resend.com/emails";
 const CONFIRM_TTL_MS = 48 * 3600 * 1000;
 const UNSUB_TTL_MS = 400 * 24 * 3600 * 1000;
 const CONFIRM_GAP_MS = 10 * 60 * 1000;
-const MAX_READS = 5;
 // A morning brief. Nothing goes out before this UTC hour (14 is 7 AM PT).
 const SEND_HOUR_UTC = 14;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -143,256 +143,31 @@ function esc(value) {
   });
 }
 
-// ---------- reads for one member ----------
+// ---------- held cards ----------
 
 export function isHeld(row, holdIds) {
-  const id = String(row?.cardId || row?.sku || "");
+  const id = String(row?.cardId || row?.sku || row?.id || "");
   if (id && holdIds && holdIds[id]) return true;
-  const text = [row?.line, row?.headline, row?.blurb].join(" ");
+  const text = [row?.line, row?.headline, row?.name].join(" ");
   return /price being checked/i.test(text);
 }
 
-function chipHit(chipDoc, readId, sku) {
-  const byId = chipDoc?.byId || {};
-  const bySku = chipDoc?.bySku || {};
-  const pick = (row) => (row && Array.isArray(row.signals) && row.signals.length ? row : null);
-  return pick(readId && byId[readId]) || pick(sku && bySku[sku]) || null;
-}
+// ---------- confirm email (same white rounded card look as the read) ----------
 
-// The feed read for this product, so the email links to the same /feed/r/ page.
-export function feedIndex(bundle, holdIds) {
-  const map = new Map();
-  const stale = new Set((bundle?.priceStaleIds || []).map(String));
-  for (const read of bundle?.reads || []) {
-    const sku = String(read?.sku || "");
-    if (!sku || !read?.id || map.has(sku)) continue;
-    if (stale.has(String(read.id)) || read.stale) continue;
-    if (holdIds && holdIds[sku]) continue;
-    map.set(sku, read);
-  }
-  return map;
-}
-
-// A short, specific story line for a read. Never the generic chip blurb
-// ("TCGplayer market is up 18% over 7 days"). The feed headline wins when it
-// says something specific; otherwise the dated fact line from the nightly.
-const GENERIC = /^(TCGplayer market|Listings counted) (is|are) (up|down|flat)\b/i;
-export function storyLine(feedHeadline, line) {
-  const head = String(feedHeadline || "").replace(/\s+/g, " ").trim();
-  const fact = String(line || "").replace(/\s+/g, " ").trim();
-  const pick = head && !GENERIC.test(head) && head !== fact ? head.replace(/^[A-Z][a-z]+ watch:\s*/, "") : fact;
-  return shortStory(pick);
-}
-
-// Keep it short: the first sentence when the whole thing runs long.
-export function shortStory(text) {
-  const s = String(text || "").trim();
-  if (s.length <= 150) return s;
-  const m = s.match(/^(.{40,}?[.])\s+(?=[A-Z])/);
-  return m && m[1].length <= 200 ? m[1] : s;
-}
-
-function pctOf(text) {
-  const m = String(text || "").match(/(\d+(?:\.\d+)?)\s*%/);
-  return m ? m[1] : "";
-}
-function daysOf(text) {
-  const m = String(text || "").match(/(\d+)\s*D\b/i);
-  return m ? m[1] : "7";
-}
-
-// One or two key signals, written as plain words. Supply leads.
-export function signalWords(signals) {
-  const out = [];
-  const list = Array.isArray(signals) ? signals : [];
-  const listing = list.find((s) => s && s.kind === "listings");
-  if (listing) {
-    const t = String(listing.text || "");
-    const pct = pctOf(t);
-    const days = /\b(\d+)\s*d\b/i.test(t) ? t.match(/\b(\d+)\s*d\b/i)[1] + "d" : "";
-    const down = /\u25BC|\bdown\b|-\s*\d/i.test(t);
-    const up = /\u25B2|\bup\b|\+\s*\d/i.test(t);
-    if (pct && (up || down)) out.push((down ? "Listings draining" : "Listings stacking") + ", " + (down ? "down " : "up ") + pct + "%" + (days ? " in " + days : ""));
-    else if (pct) out.push("Listings counted flat");
-  }
-  const move = list.find((s) => s && s.kind === "move" && s.dir !== "dash");
-  if (move) {
-    const pct = pctOf(move.text);
-    const days = daysOf(move.text);
-    if (move.dir === "up" && pct) out.push("Price up " + pct + "% in " + days + " days");
-    else if (move.dir === "down" && pct) out.push("Price down " + pct + "% in " + days + " days");
-    else out.push("Price flat over " + days + " days");
-  }
-  if (out.length < 2) {
-    const mom = list.find((s) => s && s.kind === "momentum" && s.word);
-    if (mom && String(mom.word).toLowerCase() !== "flat") out.push("Momentum " + String(mom.word).toLowerCase());
-  }
-  if (out.length < 2) {
-    const gone = list.find((s) => s && s.kind === "gone");
-    if (gone) out.push("Listings going " + String(gone.word || "steady").toLowerCase());
-  }
-  return out.slice(0, 2);
-}
-
-function titleOf(row, feed) {
-  const raw = String(feed?.name || row?.name || "").replace(/\s+-\s+/g, " ").replace(/\s+/g, " ").trim();
-  return raw.length <= 90 ? raw : "";
-}
-
-export function enrichRead(row, ctx = {}) {
-  if (!row || typeof row !== "object") return null;
-  const line = String(row.line || "").replace(/\s+/g, " ").trim();
-  if (!line || line.length > 220) return null;
-  if (isHeld(row, ctx.holdIds)) return null;
-  const sku = /^tcgcsv-\d+$/.test(String(row.cardId || "")) ? String(row.cardId) : "";
-  const feed = sku && ctx.feed ? ctx.feed.get(sku) : null;
-  const chip = chipHit(ctx.chipDoc, feed?.id, sku);
-  if ((chip?.signals || []).some((s) => s && s.kind === "move" && s.dir === "dash")) return null;
-  const story = storyLine(feed?.headline, line);
-  const title = titleOf(row, feed);
-  const words = signalWords(chip?.signals);
-  if (isHeld({ line: story, headline: title }, null)) return null;
-  for (const text of [story, title, ...words].filter(Boolean)) if (!cleanCopy(text)) return null;
-  let href = SITE + "/feed";
-  if (feed?.id) href = SITE + "/feed/r/" + encodeURIComponent(feed.id);
-  else if (sku) href = SITE + "/c/" + encodeURIComponent(sku);
-  else if (row.set) href = SITE + "/sets/" + encodeURIComponent(String(row.set));
-  const sealed = row.kind === "sealed";
-  const shop = sku ? { tcg: tcgStoreUrl({ id: sku }), ebay: ebaySearchUrl({ name: row.name || feed?.name || "", kind: sealed ? "sealed" : "single" }) } : null;
-  const move = (chip?.signals || []).find((s) => s && s.kind === "move" && (s.dir === "up" || s.dir === "down"));
-  const size = move ? Number(pctOf(move.text)) || 0 : 0;
-  return { title, story, words, href, shop, sealed, size, moveWord: move ? words.find((w) => w.startsWith("Price ")) || "" : "" };
-}
-
-// The top move for the greeting: the biggest price move among the picked reads.
-export function topMove(reads) {
-  const best = [...(reads || [])].filter((r) => r.size > 0 && r.moveWord && r.title).sort((a, b) => b.size - a.size)[0];
-  if (best) return "Top move: " + best.title + ", " + best.moveWord.charAt(0).toLowerCase() + best.moveWord.slice(1) + ".";
-  return reads?.[0]?.story || "";
-}
-
-export function memberEmail(member, ctx = {}) {
-  const reads = [];
-  for (const row of member?.reads || []) {
-    const hit = enrichRead(row, ctx);
-    if (hit) reads.push(hit);
-    if (reads.length >= MAX_READS) break;
-  }
-  const extra = (rows) => (rows || []).filter((r) => r && cleanCopy(r.headline) && cleanCopy(r.line) && /^https:\/\//.test(String(r.url || ""))).slice(0, 2);
-  const news = extra(member?.news);
-  const games = extra(member?.games);
-  if (!reads.length && !news.length && !games.length) return null;
-  const top = topMove(reads);
-  return { top: cleanCopy(top) ? top : "", reads, news, games };
-}
-
-// ---------- email markup: a morning brief (tables and inline styles for Gmail) ----------
-
-const C = {
-  page: "#f4f2ee", card: "#ffffff", ink: "#1c1c1e", dim: "#48484a", soft: "#8e8e93", line: "#e7e3dc",
-  gold: "#8a6a2f", goldBg: "#fbf6ec",
-};
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-
-function smallButton(href, label, dark) {
-  const bg = dark ? C.ink : C.card;
-  const fg = dark ? "#ffffff" : C.ink;
-  const border = dark ? C.ink : "#cfcac2";
-  return `<td style="padding:0 8px 0 0"><a href="${esc(href)}" target="_blank" rel="sponsored noopener" class="${dark ? "ce-btn-dark" : "ce-btn-light"}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;border-radius:999px;background:${bg};border:1px solid ${border};color:${fg};font:600 14px/44px ${FONT};text-decoration:none;white-space:nowrap">${esc(label)}</a></td>`;
-}
-function button(href, label, dark) { return smallButton(href, label, dark); }
-
-function readBlock(read, i, total) {
-  const shopBits = [];
-  if (read.shop?.tcg) shopBits.push(smallButton(read.shop.tcg, "Buy on TCGplayer", true));
-  if (read.shop?.ebay) shopBits.push(smallButton(read.shop.ebay, "Buy on eBay", false));
-  const shop = shopBits.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0 0"><tr>${shopBits.join("")}</tr></table>` : "";
-  const words = read.words.length ? `<p class="ce-gold" style="margin:8px 0 0;font:600 13px/1.4 ${FONT};color:${C.gold}">${read.words.map(esc).join(" &middot; ")}</p>` : "";
-  const rule = i < total - 1 ? `border-bottom:1px solid ${C.line};` : "";
-  return `<tr><td class="ce-rule" style="padding:18px 20px;${rule}">
-${read.title ? `<p class="ce-ink" style="margin:0 0 4px;font:700 16px/1.3 ${FONT};color:${C.ink}">${esc(read.title)}</p>` : ""}
-<p class="ce-dim" style="margin:0;font:400 15px/1.5 ${FONT};color:${C.dim}">${esc(read.story)}</p>
-${words}
-<p style="margin:6px 0 0"><a href="${esc(read.href)}" target="_blank" class="ce-ink" style="display:inline-block;min-height:44px;line-height:44px;font:600 15px/44px ${FONT};color:${C.ink};text-decoration:underline">See the read</a></p>
-${shop}
-</td></tr>`;
-}
-
-function extraBlock(title, rows) {
-  if (!rows?.length) return "";
-  const items = rows.map((r) => `<p class="ce-dim" style="margin:0 0 10px;font:400 15px/1.45 ${FONT};color:${C.dim}"><a href="${esc(r.url)}" target="_blank" class="ce-ink" style="color:${C.ink};font-weight:600;text-decoration:none">${esc(r.headline)}</a><br>${esc(r.line)}</p>`).join("");
-  return `<tr><td style="padding:16px 20px;border-top:1px solid ${C.line}"><p style="margin:0 0 10px;font:600 12px/1 ${FONT};letter-spacing:.06em;text-transform:uppercase;color:${C.soft}">${esc(title)}</p>${items}</td></tr>`;
-}
-
-function shell({ title, preheader, body, footer }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(title)}</title>
-<style>
-:root{color-scheme:light dark;supported-color-schemes:light dark}
-@media (prefers-color-scheme: dark){.ce-page{background:#111111 !important}.ce-card{background:#1c1c1e !important;border-color:#2c2c2e !important}.ce-brief{background:#2a2419 !important;border-color:#2c2c2e !important}.ce-ink{color:#f2f2f7 !important}.ce-dim{color:#c7c7cc !important}.ce-gold{color:#d9b779 !important}.ce-rule{border-color:#2c2c2e !important}.ce-btn-dark{background:#f2f2f7 !important;color:#1c1c1e !important;border-color:#f2f2f7 !important}.ce-btn-light{background:#1c1c1e !important;color:#f2f2f7 !important;border-color:#48484a !important}}
-</style></head>
-<body style="margin:0;padding:0;background:${C.page}" class="ce-page">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader || "")}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.page}" class="ce-page" style="background:${C.page}"><tr><td align="center" style="padding:20px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px">
-${body}
-<tr><td style="padding:16px 8px 28px;font:400 12px/1.5 ${FONT};color:${C.soft}">${footer}</td></tr>
-</table></td></tr></table></body></html>`;
-}
-
-function card(inner) {
-  return `<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.card}" class="ce-card" style="background:${C.card};border:1px solid ${C.line};border-radius:20px">${inner}</table></td></tr>`;
-}
-
-export function renderReadsEmail(doc, { day, unsubscribe, manage = SITE + "/reads" } = {}) {
-  const when = dayLabel(day);
-  const brand = `<tr><td style="padding:4px 8px 14px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${C.ink}" style="background:${C.ink};border-radius:10px;width:28px;height:28px;text-align:center;font:800 15px/28px ${FONT};color:#d9b779">C</td><td class="ce-ink" style="padding-left:10px;font:700 16px/1 ${FONT};color:${C.ink}">Catch'em</td></tr></table></td></tr>`;
-  const greet = `<tr><td class="ce-brief" bgcolor="${C.goldBg}" style="padding:22px 20px 18px;background:${C.goldBg};border-radius:20px 20px 0 0;border-bottom:1px solid ${C.line}">
-<p class="ce-gold" style="margin:0;font:600 12px/1 ${FONT};letter-spacing:.06em;text-transform:uppercase;color:${C.gold}">${esc(when ? "Morning brief, " + when : "Morning brief")}</p>
-<h1 class="ce-ink" style="margin:8px 0 0;font:700 22px/1.3 ${FONT};color:${C.ink}">Good morning. Here are your reads.</h1>
-${doc.top ? `<p class="ce-dim" style="margin:8px 0 0;font:400 15px/1.45 ${FONT};color:${C.dim}">${esc(doc.top)}</p>` : ""}
-</td></tr>`;
-  const reads = doc.reads.map((r, i) => readBlock(r, i, doc.reads.length)).join("");
-  const body = brand + card(greet + reads + extraBlock("Pokemon news", doc.news) + extraBlock("Video games", doc.games));
-  const footer = [
-    `<span style="color:${C.soft}">${esc(SHOP_NOTE)}</span>`,
-    `TCGplayer market and eBay listings counted${when ? ", " + esc(when) : ""}. ${esc(TCGPLAYER_ATTRIBUTION)}`,
-    `<a href="${esc(unsubscribe)}" style="color:${C.soft};text-decoration:underline">Unsubscribe</a> &nbsp;&middot;&nbsp; <a href="${esc(manage)}" style="color:${C.soft};text-decoration:underline">Change your reads</a>`,
-  ].map((line) => `<p style="margin:0 0 6px;color:${C.soft}">${line}</p>`).join("");
-  return shell({ title: subjectFor(day), preheader: doc.top || doc.reads[0]?.story || "", body, footer });
-}
-
-export function readsEmailText(doc, { day, unsubscribe } = {}) {
-  const when = dayLabel(day);
-  const out = ["Good morning. Here are your Catch'em reads" + (when ? " for " + when : "") + "."];
-  if (doc.top) out.push(doc.top);
-  out.push("");
-  for (const r of doc.reads) {
-    if (r.title) out.push(r.title);
-    out.push(r.story);
-    if (r.words.length) out.push(r.words.join(" \u00B7 "));
-    out.push("See the read: " + r.href);
-    if (r.shop?.tcg) out.push("Buy on TCGplayer: " + r.shop.tcg);
-    if (r.shop?.ebay) out.push("Buy on eBay: " + r.shop.ebay);
-    out.push("");
-  }
-  for (const [title, rows] of [["Pokemon news", doc.news], ["Video games", doc.games]]) {
-    if (!rows?.length) continue;
-    out.push(title);
-    for (const r of rows) out.push(r.headline, r.line, r.url, "");
-  }
-  out.push(SHOP_NOTE, "Unsubscribe: " + unsubscribe, "Change your reads: " + SITE + "/reads");
-  return out.join("\n");
-}
-
+const C = { page: "#f2f2f7", ink: "#1c1c1e", dim: "#636366", soft: "#8e8e93", gold: "#8e8e93" };
+const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif";
+const CF = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif";
 export function renderConfirmEmail(link) {
-  const inner = `<tr><td style="padding:22px 20px">
-<p style="margin:0;font:600 12px/1 ${FONT};letter-spacing:.06em;text-transform:uppercase;color:${C.gold}">Catch'em</p>
-<h1 class="ce-ink" style="margin:8px 0 8px;font:700 22px/1.3 ${FONT};color:${C.ink}">Confirm your email</h1>
-<p class="ce-dim" style="margin:0 0 16px;font:400 15px/1.45 ${FONT};color:${C.dim}">Tap the button to get your Custom Reads by email. Nothing is sent until you confirm. The link works for 48 hours.</p>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${button(link, "Confirm email", true)}</tr></table>
-<p style="margin:14px 0 0;font:400 13px/1.45 ${FONT};color:${C.soft}">If you did not ask for this, you can ignore this email.</p>
-</td></tr>`;
-  return shell({ title: "Confirm your Catch'em reads email", preheader: "One tap and your reads come by email.", body: card(inner), footer: `<p style="margin:0">${esc(AFFILIATION)}</p>` });
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Confirm your Catch'em reads email</title></head>
+<body style="margin:0;padding:0;background:#f2f2f7"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f2f2f7" style="background:#f2f2f7"><tr><td align="center" style="padding:16px 14px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:420px">
+<tr><td style="padding:4px 6px 12px;font:700 15px/1 ${CF};color:#1c1c1e">Catch'em</td></tr>
+<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background:#ffffff;border-radius:22px"><tr><td style="padding:18px">
+<p style="margin:0 0 6px;font:700 21px/1.3 ${CF};color:#1c1c1e">Confirm your email</p>
+<p style="margin:0 0 16px;font:400 15px/1.5 ${CF};color:#636366">Tap the button to get your Custom Reads by email. Nothing is sent until you confirm. The link works for 48 hours.</p>
+<a href="${esc(link)}" style="display:block;text-align:center;background:#1c1c1e;color:#ffffff;border-radius:999px;padding:12px;font:600 15px/20px ${CF};text-decoration:none">Confirm email</a>
+<p style="margin:12px 0 0;font:400 13px/1.4 ${CF};color:#8e8e93">If you did not ask for this, you can ignore this email.</p>
+</td></tr></table></td></tr>
+<tr><td style="padding:8px 10px;text-align:center;font:400 11px/1.5 ${CF};color:#8e8e93">${esc(AFFILIATION)}</td></tr></table></td></tr></table></body></html>`;
 }
 
 
@@ -480,12 +255,33 @@ function page(title, text, status = 200) {
 }
 
 export function isEmailPath(pathname) {
-  return pathname === "/reads/email/confirm" || pathname === "/reads/email/unsubscribe";
+  return pathname === "/reads/email/confirm" || pathname === "/reads/email/unsubscribe" || pathname === "/reads/brief";
+}
+
+// The Standard version of a member's read on the site, opened from Glance
+// "Read more" links. Signed link, today's outbox only. No address is shown.
+export async function handleBrief(request, env, { now = Date.now(), publicFetch } = {}) {
+  const url = new URL(request.url);
+  if (!emailDeliveryOn(env) || !env?.FEED_KV) return page("Email delivery is coming soon", "Your reads come by Discord DM for now.");
+  const tok = await readToken(env, "brief", url.searchParams.get("t"), now);
+  const [id, wantDay] = String(tok?.id || "").split("|");
+  if (!tok || !id || !wantDay) return page("This link has run out", "Open your latest read from your email or from Your reads.", 400);
+  const outbox = cleanOutbox(await env.FEED_KV.get(OUTBOX_KEY, "json"));
+  const member = outbox && outbox.day === wantDay ? outbox.members.find((m) => String(m.discordId) === id) : null;
+  if (!member) return page("This read has moved on", "A newer read is out. The Feed has today's moves.");
+  const follows = await env.FEED_KV.get(FOLLOWS_KEY, "json");
+  const follow = (follows?.follows || []).find((f) => String(f.id) === id) || {};
+  setAffiliateConfig(env);
+  const ctx = await loadContext(publicFetch || env?.PUBLIC_FETCH || fetch);
+  const doc = await articleFor(env, member, { ...follow, length: "standard" }, ctx, outbox.day);
+  if (!doc) return page("Quiet day", "Nothing moved enough to write up. The Feed has today's moves.");
+  return new Response(renderArticle(doc, { page: true }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 }
 
 // GET confirm: one tap turns email on. GET or POST unsubscribe: one tap turns it off.
 export async function handleEmailLink(request, env, { now = Date.now() } = {}) {
   const url = new URL(request.url);
+  if (url.pathname === "/reads/brief") return handleBrief(request, env, { now });
   const store = env?.FEED_KV;
   if (!store) return page("Not open yet", "Email reads are not open yet.", 503);
   if (url.pathname === "/reads/email/confirm") {
@@ -527,30 +323,63 @@ export function canSend(row, outboxDay, now = Date.now()) {
   return true;
 }
 
-async function loadContext(fetchImpl) {
-  const [bundle, chipDoc, hold] = await Promise.all([
-    loadJson("reads.json", fetchImpl).catch(() => null),
-    loadJson("signal-chips.json", fetchImpl).catch(() => null),
-    loadJson("price-hold.json", fetchImpl).catch(() => null),
-  ]);
+export async function loadContext(fetchImpl) {
+  const get = (f) => loadJson(f, fetchImpl).catch(() => null);
+  const [reads, hold, movers, listings, sets] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json")]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
-  return { holdIds, chipDoc, feed: feedIndex(bundle, holdIds) };
+  const sparkBags = new Map();
+  const spark = async (id) => {
+    const n = Number((String(id).match(/(\d+)/) || [])[1] || 0);
+    const b = String(n % 100).padStart(2, "0");
+    if (!sparkBags.has(b)) sparkBags.set(b, await get("sparks/" + b + ".json"));
+    const doc = sparkBags.get(b);
+    return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
+  };
+  return { reads, holdIds, movers, listings, sets, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
+// Watched items get their own 30 day history from the sparks file.
+async function watchedFor(follow, ctx) {
+  const out = [];
+  const names = new Map();
+  for (const r of ctx.reads?.reads || []) if (r?.sku && !names.has(r.sku)) names.set(r.sku, r.name);
+  for (const id of [...(follow?.cards || []), ...(follow?.sealed || [])].slice(0, 25)) {
+    if (!/^tcgcsv-\d+$/.test(id) || ctx.holdIds[id]) continue;
+    const hist = ctx.spark ? await ctx.spark(id) : [];
+    const name = names.get(id) || "";
+    if (hist.length < 2 || !name) continue;
+    out.push({ id, name, set: "", kind: (follow.sealed || []).includes(id) ? "sealed" : "single", hist, href: SITE + "/c/" + id });
+  }
+  return out;
+}
+
+export async function articleFor(env, member, follow, ctx, day) {
+  // Deep dive is gated to Premium when the plan is saved.
+  const length = cleanLength(follow?.length, true);
+  const watched = await watchedFor(follow, ctx);
+  return buildArticle({ follow, ctx: { ...ctx, watched }, asOf: day || ctx.asOf, length });
+}
+
+export function briefUrl(token) { return SITE + "/reads/brief?t=" + encodeURIComponent(token); }
+
 export async function buildMessage(env, member, ctx, day, now = Date.now()) {
-  const doc = memberEmail(member, ctx);
-  if (!doc) return null;
   const id = String(member.discordId || "").replace(/^d:/, "");
   const row = ctx.rows?.get(id);
+  const follow = ctx.follows?.get(id) || {};
+  const doc = await articleFor(env, member, follow, ctx, day);
+  if (!doc) return null;
   const token = await makeToken(env, "unsub", id, row?.email || "", now);
   const unsubscribe = unsubUrl(token);
+  const more = briefUrl(await makeToken(env, "brief", id + "|" + day, "", now));
   return {
     to: row?.email || "",
     subject: subjectFor(day),
-    html: renderReadsEmail(doc, { day, unsubscribe }),
-    text: readsEmailText(doc, { day, unsubscribe }),
+    html: renderArticle(doc, { unsubscribe, more: doc.length === "glance" ? more : "" }),
+    text: articleText(doc, { unsubscribe, more: doc.length === "glance" ? more : "" }),
     headers: { "List-Unsubscribe": "<" + unsubscribe + ">", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     idem: "reads-" + id + "-" + day,
+    length: doc.length,
+    path: doc.path,
   };
 }
 
@@ -575,7 +404,8 @@ export async function runEmailDelivery(env, { now = Date.now(), fetchImpl = fetc
   }
   if (!rows.size) return { skipped: "none due", sent: 0 };
   setAffiliateConfig(env);
-  const ctx = { ...(await loadContext(publicFetch || fetchImpl)), rows };
+  const followMap = new Map((follows?.follows || []).filter((f) => f && f.id).map((f) => [String(f.id), f]));
+  const ctx = { ...(await loadContext(publicFetch || fetchImpl)), rows, follows: followMap };
   let sent = 0;
   let failed = 0;
   for (const m of outbox.members) {
