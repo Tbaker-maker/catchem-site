@@ -50,5 +50,26 @@ t("feed copy for the key stays clean", ICON_LINES.every(([, line]) => preSend(li
 const opened = renderFeed({ reads: [{ id: "fake-all", name: "Umbreon ex", headline: "A read.", href: "/c/tcgcsv-1", signals: [{ kind: "art", badge: "SIR", label: "Special Illustration Rare" }], blurb: "Art type is Special Illustration Rare.", asOf: "2026-10-17" }] }, "fake-all", "Oct 17", { page: "read" });
 t("the deep read header shows the chip", opened.includes("sig-block") && opened.includes("SIR") && opened.includes(">Read</h1>"));
 
+const dotted = all.signals.map((chip) => ({ ...chip, strength: chip.kind === "move" ? 2 : 3 }));
+for (const chip of dotted) {
+  const html = signalRowHtml({ signals: [chip], blurb: all.blurb });
+  t("dots on " + chip.kind, (html.match(/class="sig-strength"/g) || []).length === 1 && !html.includes("sig-score"));
+}
+const down = signalRowHtml({
+  signals: [{ kind: "move", dir: "down", text: "5% 7D", label: "Price down 5 percent over 7 days", strength: 2 }],
+  blurb: all.blurb,
+  strength: 4,
+});
+t("the score sits on top and the dots are not a direction class", down.includes("sig-score") && down.indexOf("sig-score") < down.indexOf("sig-row") && down.includes("is-down") && !/class="sig-strength[^"]*is-/.test(down));
+const css = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
+t("dots stay one colour in either direction", css.includes(".sig.is-down .sig-strength") && css.includes(".sig.is-up .sig-strength") && css.includes(".sig-strength{display:inline-flex;gap:3px;align-items:center;margin-left:2px;color:#d9b779}") && !css.includes(".sig-strength{color:#e0675b") && !css.includes(".sig-strength{color:#7fc79a"));
+t("fast mode keeps the dots and the score", css.includes(".is-fast .sig-blurb") && !css.includes(".is-fast .sig-score") && !css.includes(".is-fast .sig-strength"));
+t("the score row can wrap and stays a 44px tap", css.includes(".sig-score{display:flex;flex-wrap:wrap") && css.includes(".sig-score{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;min-width:0;min-height:44px"));
+const dashDots = signalRowHtml({ signals: [{ kind: "move", dir: "dash", text: "", label: "Price being checked", strength: 5 }], blurb: "Price being checked." });
+t("a grey dash has no dots and no score", dashDots.includes("is-dash") && !dashDots.includes("sig-strength") && !dashDots.includes("sig-score") && !dashDots.includes("%"));
+const quiet = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "18%", label: "Listings counted down 18 percent", strength: 2 }], blurb: "Listings counted are down 18%, as of Oct 17." });
+t("no proven score stays off the row", !quiet.includes("sig-score") && quiet.includes("sig-strength") && !/\bNM\b|Near Mint/.test(quiet));
+t("the strength line passes the copy rules", preSend("Signal strength, Oct 17.").ok && preSend("One dot is a quiet reading. Five dots is an unusual reading.").ok);
+
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("signal chips: all ok");
