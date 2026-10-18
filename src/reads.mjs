@@ -370,6 +370,8 @@ export function renderReadsPage(state = {}) {
   if (gatedSuggestion) notes.push(...gatedSuggestion.notes);
   const lineMap = state.preview?.lines && typeof state.preview.lines === "object" ? state.preview.lines : {};
   const sample = sampleRead(shown, lineMap);
+  const chip = state.preview?.chip;
+  const chipFits = !!(chip && chip.name && sample.includes(String(chip.name)));
   const lineJson = JSON.stringify(lineMap).replace(/</g, "\\u003c");
   const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
@@ -402,7 +404,7 @@ ${sign}
 <h2>Sample read</h2>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
 <style>${SIGNAL_CSS}</style>
-${state.preview?.chip ? signalRowHtml(state.preview.chip, { href: "", light: true }) : ""}
+${chipFits ? `<div id="rd-chip" data-name="${esc(chip.name)}">${signalRowHtml(chip, { href: "", light: true })}</div>` : ""}
 ${iconKeyHtml()}
 <script type="application/json" id="rd-lines">${lineJson}</script>
 </section>
@@ -471,6 +473,8 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
       if (parts[1]) add((parts[0] === "sealed" ? "sealed:" : "card:") + parts[1]);
     }
     out.textContent = bits.length ? bits.slice(0, 6).join("\n\n") : "Sample read. The night file fills the dated lines.";
+    var chip = document.getElementById("rd-chip");
+    if (chip) chip.hidden = out.textContent.indexOf(chip.getAttribute("data-name") || "\n") < 0;
   }
   form.addEventListener("change", paint);
 })();
