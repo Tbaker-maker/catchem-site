@@ -126,6 +126,8 @@ const stale = await handleBrief(new Request(await briefLink(env, "https://catche
 t("an old brief link says the read moved on", (await stale.text()).includes("moved on"));
 const routed = await worker.fetch(new Request("https://catchemtcg.com/reads/brief"), { FEED_KV: store }, { waitUntil() {} });
 t("the worker serves /reads/brief", routed.status === 200 && (await routed.text()).includes("Not available"));
+// An empty Glance day sends nothing; Standard gets the #291 letter instead.
+await store.put(`reads:d:${ID}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "daily", length: "standard", sets: [], watch: [] }));
 const quietOutbox = { day: "2026-10-19", members: outbox.members };
 await deliverOutboxEmails({ store, env, outbox: quietOutbox, fetchImpl: resend, feedReads: [], articleCtx: { movers: { singles: [], sealed: [] }, listings: { products: [] }, reads: { reads: [] }, sets: { sets: [] }, holdIds: {} } });
 const plain = JSON.parse(calls[1].init.body);

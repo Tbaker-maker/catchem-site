@@ -191,6 +191,8 @@ export function buildPool(ctx) {
   }
   for (const r of ctx.reads?.reads || []) {
     if (!/^tcgcsv-\d+$/.test(String(r.sku || "")) || stale.has(String(r.id)) || r.stale) continue;
+    // Only daily price charts. Ratios, year ago and range charts are not prices.
+    if (r.chart?.label && !/^TCGplayer market/.test(String(r.chart.label))) continue;
     const pts = (r.chart?.points || []).filter((p) => Date.parse(p[0] + "T00:00:00Z") >= Date.parse((ctx.reads?.asOf || "") + "T00:00:00Z") - 35 * DAY);
     const setName = (String(r.name || "").match(/\(([^)]+)\)\s*[\w/]*$/) || [])[1] || "";
     add({ id: r.sku, name: r.name, set: setName, kind: "single", hist: pts, href: SITE + "/feed/r/" + encodeURIComponent(r.id) });
@@ -244,7 +246,7 @@ export function pathwayFilter(path, follow, ctx) {
 
 // ---------- the article ----------
 
-export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "standard" } = {}) {
+export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "standard", history = {} } = {}) {
   const pool = buildPool(ctx);
   const supplyAll = supplyRows(ctx);
   let path = pathwayOf(follow);
@@ -301,6 +303,11 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     news: newsRead ? { text: newsRead.headline, href: newsRead.href, source: String(newsRead.source || "").split(",")[0] } : null,
     setCompare,
   };
+  // Phase 2. Each part hides when it has nothing real to show.
+  doc.report = watchReport(follow, pool, history.sinceDay, asOf || ctx.asOf);
+  doc.away = history.awaySince ? catchUp(pool, history.awaySince, top.id) : null;
+  doc.quiet = isQuiet(mine, supply);
+  doc.building = doc.quiet && length !== "glance" ? buildingQuietly(mine) : [];
   return doc;
 }
 
@@ -375,9 +382,40 @@ function shell(title, preheader, body, footer) {
 <tr><td style="padding:8px 10px;text-align:center;font:400 11px/1.5 ${FONT};color:${C.soft}">${footer}</td></tr></table></td></tr></table></body></html>`;
 }
 
+// A dated move row for the report card and catch up: from, to, pill.
+function windowRow(r) {
+  const img = r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
+  const flat = Math.abs(r.change) < 0.5;
+  const tag = flat
+    ? `<span class="ce-dim ce-tile" style="display:inline-block;border-radius:999px;padding:3px 10px;font:600 13px/1.4 ${FONT};background:${C.tile};color:${C.dim};white-space:nowrap">Flat</span>`
+    : pill(r.change);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
+<a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a>
+<p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(`${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])}`)}</p>
+</td><td width="76" align="right" valign="middle" style="padding-left:8px">${tag}</td></tr></table>`;
+}
+
+function reportCard(rep, L) {
+  const head = rep.firstRead ? `Your watchlist since ${day(rep.since)}` : `Your watchlist since your last read, ${day(rep.since)}`;
+  const up = rep.rows.filter((r) => r.change >= 0.5).length;
+  const down = rep.rows.filter((r) => r.change <= -0.5).length;
+  const flat = rep.rows.length - up - down;
+  const sum = [up ? `${up} up` : "", down ? `${down} down` : "", flat ? `${flat} flat` : ""].filter(Boolean).join(", ");
+  const rows = L === "glance" ? rep.rows.slice(0, 3) : rep.rows;
+  return card(h2("Watchlist report card") + `<p class="ce-ink" style="margin:0 0 6px;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(head)}</p><p style="margin:0 0 8px;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sum)}. TCGplayer market on the dates shown.</p>` + rows.map(windowRow).join(""), "report-card");
+}
+
+function awayCard(away) {
+  return card(h2("While you were away") + para(`The three biggest moves since ${day(away.since)}, on TCGplayer market.`, ";margin-top:0;font-size:13px") + away.rows.map(windowRow).join(""), "away");
+}
+
+function buildingCard(rows) {
+  return card(h2("What's building quietly") + para("A quiet day. These are slow, steady moves that are easy to miss.", ";margin-top:0;font-size:13px") + rows.map((r) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : ""}<td valign="middle" style="padding:8px 0"><a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(r.line)}</p></td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(r.change)}</td></tr></table>`).join(""), "building");
+}
+
 const LENGTH_NAME = { glance: "Glance", standard: "Daily read", deep: "Deep dive" };
 
-export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false } = {}) {
+export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null } = {}) {
   const L = doc.length;
   const when = day(doc.asOf);
   const anchor = (id) => (more ? more + "#" + id : "");
@@ -385,6 +423,8 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
   const sub = `${LENGTH_NAME[L]} · ${when} · ${doc.label}`;
   body.push(card(`<p class="ce-ink" style="margin:0 0 6px;font:700 21px/1.3 ${FONT};color:${C.ink}">${esc(doc.lead)}</p><p style="margin:0;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sub)}</p>${L !== "glance" ? para(doc.intro) : ""}${doc.fallback ? para(doc.fallback, ";font-style:italic") : ""}`));
+  if (doc.report) body.push(reportCard(doc.report, L));
+  if (doc.away) body.push(awayCard(doc.away));
   const t = doc.top;
   if (L === "glance") {
     const moves = [t, ...doc.ups, ...doc.downs].slice(0, 3);
@@ -397,14 +437,19 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     if (doc.ups.length) body.push(card(h2("Also moving up") + doc.ups.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-up"));
     if (doc.downs.length) body.push(card(h2("Moving down") + doc.downs.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-down"));
     if (doc.supply.length) body.push(card(h2("Listings counted") + para("Draining means fewer eBay listings counted than the night before. Stacking means more. A listing is not a sale.", ";margin-top:0;font-size:13px") + doc.supply.map(supplyRow).join(""), "supply"));
+    if (doc.building?.length) body.push(buildingCard(doc.building));
     if (L === "deep" && doc.setCompare.length) body.push(card(h2("Set by set") + doc.setCompare.map((r) => `<p class="ce-dim" style="margin:0 0 8px;font:400 14px/1.4 ${FONT};color:${C.dim}"><b class="ce-ink" style="color:${C.ink}">${esc(r.set)}</b>: ${r.up} up, ${r.down} down, of ${r.n} in this read.</p>`).join(""), "sets"));
     if (doc.vintage) body.push(card(h2("Vintage note") + row(doc.vintage, { deep: L === "deep" }), "vintage"));
     if (doc.pattern) body.push(card(h2("Pattern to know") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.pattern.text)}</p><p style="margin:6px 0 0;font:400 13px/1.35 ${FONT};color:${C.soft}">Pattern as of ${esc(day(doc.pattern.asOf))}. TCGplayer market.</p>`, "pattern"));
     if (doc.rotation) body.push(card(h2("Rotation") + `<p class="ce-dim" style="margin:0;font:400 15px/1.45 ${FONT};color:${C.dim}">${esc(doc.rotation.text)}</p>`, "rotation"));
   }
   if (doc.news && L !== "glance") body.push(card(h2("News") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.news.text)}</p><p style="margin:6px 0 0;font:400 13px/1.35 ${FONT}"><a href="${esc(doc.news.href)}" style="color:${C.soft};text-decoration:underline">${esc(doc.news.source || "Source")}</a></p>`, "news"));
-  const cta = L === "glance" && more ? more : SITE + "/feed";
-  body.push(`<tr><td style="padding:4px 0 8px"><a href="${esc(cta)}" class="ce-btn-dark" style="display:block;text-align:center;background:${C.ink};color:#ffffff;border-radius:999px;padding:12px;min-height:20px;font:600 15px/20px ${FONT};text-decoration:none">${L === "glance" ? "Read the full version" : "See every card in your read"}</a></td></tr>`);
+  const cta = more || SITE + "/feed";
+  const ctaLabel = L === "glance" ? "Read the full version" : more ? "Open this read on the site" : "See every card in your read";
+  body.push(`<tr><td style="padding:4px 0 8px"><a href="${esc(cta)}" class="ce-btn-dark" style="display:block;text-align:center;background:${C.ink};color:#ffffff;border-radius:999px;padding:12px;min-height:20px;font:600 15px/20px ${FONT};text-decoration:none">${esc(ctaLabel)}</a></td></tr>`);
+  if (suggest?.href && suggest?.text) {
+    body.push(`<tr><td style="padding:4px 10px 4px;text-align:center"><p style="margin:0;font:400 12px/1.5 ${FONT};color:${C.soft}">${esc(suggest.text)}</p><a href="${esc(suggest.href)}" class="ce-btn-light" style="display:inline-block;margin-top:6px;min-height:44px;line-height:44px;padding:0 18px;border-radius:999px;background:${C.card};border:1px solid #d1d1d6;color:${C.ink};font:600 14px/44px ${FONT};text-decoration:none">${esc(suggest.label)}</a></td></tr>`);
+  }
   const footer = [
     "Prices are TCGplayer market on the dates shown. Listings counted are eBay listings on the dates shown. A listing is not a sale.",
     SHOP_NOTE,
@@ -414,13 +459,18 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   return shell(`Your Catch'em reads, ${when}`, doc.lead, body.join("\n"), footer);
 }
 
-export function articleText(doc, { unsubscribe = "", more = "" } = {}) {
+export function articleText(doc, { unsubscribe = "", more = "", suggest = null } = {}) {
   const out = [doc.lead, doc.intro];
   if (doc.fallback) out.push(doc.fallback);
+  const w = (r) => `${r.name}: ${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])} (${pct(r.change)})`;
+  if (doc.report) out.push("", "Watchlist report card, since " + day(doc.report.since), ...doc.report.rows.map(w));
+  if (doc.away) out.push("", "While you were away, since " + day(doc.away.since), ...doc.away.rows.map(w));
   out.push("", "Top move: " + doc.top.name + " " + pct(doc.top.a.change), doc.top.story, doc.top.href, "");
   for (const i of [...doc.ups, ...doc.downs].slice(0, doc.length === "glance" ? 2 : 6)) out.push(i.name + " " + pct(i.a.change), i.story, "");
   for (const r of doc.supply.slice(0, doc.length === "glance" ? 1 : 3)) out.push(`${r.name}: ${r.word.toLowerCase()}, ${r.prev} to ${r.n} listings counted (${day(r.prevDate)} to ${day(r.date)}).`);
+  if (doc.building?.length && doc.length !== "glance") out.push("", "What's building quietly", ...doc.building.map((r) => r.name + ": " + r.line));
   if (more) out.push("", "Read the full version: " + more);
+  if (suggest?.href) out.push("", suggest.text + " " + suggest.label + ": " + suggest.href);
   out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads");
   return out.filter((l) => l !== undefined).join("\n");
 }
@@ -429,8 +479,9 @@ export function articleText(doc, { unsubscribe = "", more = "" } = {}) {
 
 // The saved plan (reads:d:<id> in FEED_KV) as an article follow.
 // Deep dive needs plan.deep, which gatePlan sets only for Premium.
-export function followFromPlan(plan) {
+export function followFromPlan(plan, sendDay = "") {
   const p = plan && typeof plan === "object" ? plan : {};
+  const pickLength = lengthFor(p, sendDay);
   const cards = [];
   const sealed = [];
   const names = {};
@@ -448,7 +499,8 @@ export function followFromPlan(plan) {
     names,
     product: p.product === "sealed" || p.sealed === true ? "sealed" : "singles",
     focus: p.focus === "vintage" ? "vintage" : "",
-    length: cleanLength(p.length, p.deep === true),
+    length: pickLength.length,
+    weekday: pickLength.weekday,
   };
 }
 
@@ -484,10 +536,125 @@ export async function watchedFor(follow, ctx) {
   return out;
 }
 
-export async function articleForPlan(plan, ctx, asOf, lengthOverride = "") {
+export async function articleForPlan(plan, ctx, asOf, lengthOverride = "", history = {}) {
   if (!ctx) return null;
-  const follow = followFromPlan(plan);
+  const follow = followFromPlan(plan, asOf || ctx.asOf);
   const length = lengthOverride || follow.length;
   const watched = await watchedFor(follow, ctx);
-  return buildArticle({ follow, ctx: { ...ctx, watched }, asOf: asOf || ctx.asOf, length });
+  const doc = buildArticle({ follow, ctx: { ...ctx, watched }, asOf: asOf || ctx.asOf, length, history });
+  if (doc) doc.weekday = follow.weekday;
+  return doc;
+}
+
+// ---------- phase 2: length by day ----------
+
+export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+export const WEEKDAY_NAMES = { sun: "Sunday", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
+
+export function weekdayOf(d) {
+  const ms = Date.parse(String(d || "").slice(0, 10) + "T12:00:00Z");
+  return Number.isFinite(ms) ? WEEKDAYS[new Date(ms).getUTCDay()] : "";
+}
+
+// The length for one send day. A weekday choice wins over the everyday length.
+export function lengthFor(plan, sendDay) {
+  const premium = plan?.deep === true;
+  const w = weekdayOf(sendDay);
+  const by = w ? String(plan?.lengthByDay?.[w] || "") : "";
+  if (by && LENGTHS.includes(by)) return { length: cleanLength(by, premium), weekday: w };
+  return { length: cleanLength(plan?.length, premium), weekday: "" };
+}
+
+export function cleanLengthByDay(value, premium) {
+  const out = {};
+  for (const w of WEEKDAYS) {
+    const v = String(value?.[w] || "");
+    if (LENGTHS.includes(v)) out[w] = cleanLength(v, premium);
+  }
+  return out;
+}
+
+// ---------- phase 2: windows, report card, catch up, quiet days ----------
+
+function dayMs(d) { return Date.parse(String(d).slice(0, 10) + "T00:00:00Z"); }
+
+// Price on the last day on file at or before sinceDay, then the latest price.
+export function windowMove(a, sinceDay) {
+  if (!a?.pts?.length || !/^\d{4}-\d{2}-\d{2}$/.test(String(sinceDay || ""))) return null;
+  let base = null;
+  for (const p of a.pts) if (p[0] <= sinceDay) base = p;
+  if (!base) base = a.pts[0];
+  const last = a.pts[a.pts.length - 1];
+  if (!(last[0] > base[0])) return null;
+  const inside = a.pts.filter((p) => p[0] >= base[0]);
+  let bigStep = 0;
+  for (let i = 1; i < inside.length; i++) bigStep = Math.max(bigStep, Math.abs((inside[i][1] - inside[i - 1][1]) / inside[i - 1][1]) * 100);
+  return { from: base, to: last, change: ((last[1] - base[1]) / base[1]) * 100, points: inside.length, bigStep };
+}
+
+// How each watched item moved since the member's last read, with both dates.
+export function watchReport(follow, pool, sinceDay, asOf) {
+  const ids = [...(follow?.cards || []), ...(follow?.sealed || [])];
+  if (!ids.length) return null;
+  const fallbackSince = asOf ? new Date(dayMs(asOf) - 7 * DAY).toISOString().slice(0, 10) : "";
+  const since = /^\d{4}-\d{2}-\d{2}$/.test(String(sinceDay || "")) ? sinceDay : fallbackSince;
+  const byId = new Map(pool.map((i) => [i.id, i]));
+  const rows = [];
+  for (const id of ids) {
+    const i = byId.get(id);
+    if (!i) continue;
+    const w = windowMove(i.a, since);
+    if (!w) continue;
+    rows.push({ id, name: i.name, kind: i.kind, image: i.image, href: i.href, ...w });
+  }
+  if (!rows.length) return null;
+  rows.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
+  return { since, firstRead: !sinceDay, rows: rows.slice(0, 8) };
+}
+
+// The three biggest moves across the days a member missed. Thin or one step
+// jumps stay out so a catch up never leads with a shaky number.
+export function catchUp(pool, sinceDay, skipId = "") {
+  const rows = [];
+  for (const i of pool) {
+    if (i.id === skipId) continue;
+    const w = windowMove(i.a, sinceDay);
+    if (!w || w.points < 3 || w.bigStep >= 100 || Math.abs(w.change) < 5) continue;
+    rows.push({ id: i.id, name: i.name, kind: i.kind, image: i.image, href: i.href, ...w });
+  }
+  if (!rows.length) return null;
+  rows.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
+  const top3 = rows.slice(0, 3);
+  // Say the real start: if our history begins after sinceDay, use that date.
+  const earliest = top3.map((r) => r.from[0]).sort()[0];
+  return { since: earliest > sinceDay ? earliest : sinceDay, rows: top3 };
+}
+
+// Quiet: no solid move of 5% or more in this read, and no listings counted shift.
+export function isQuiet(items, supply) {
+  if ((supply || []).length) return false;
+  return !(items || []).some((i) => !i.a.thin && Math.abs(i.a.change) >= 5);
+}
+
+// Slow real signals: small steps the same way for several price days, or a
+// steady drift with no step bigger than 3%.
+export function buildingQuietly(items) {
+  const out = [];
+  for (const i of items || []) {
+    const a = i.a;
+    if (!a || a.junk || a.pts.length < 8) continue;
+    const recent = a.pts.slice(-8);
+    const steps = [];
+    for (let k = 1; k < recent.length; k++) steps.push(((recent[k][1] - recent[k - 1][1]) / recent[k - 1][1]) * 100);
+    if (steps.some((x) => Math.abs(x) > 3)) continue;
+    const drift = ((recent[recent.length - 1][1] - recent[0][1]) / recent[0][1]) * 100;
+    const run = Math.abs(a.streak);
+    if (run < 4 && Math.abs(drift) < 2) continue;
+    const dir = drift >= 0 ? "up" : "down";
+    const line = run >= 4
+      ? `${run} price days in a row ${dir === "up" ? "up" : "down"}, in small steps: ${money(recent[0][1])} on ${day(recent[0][0])} to ${money(recent[recent.length - 1][1])} on ${day(recent[recent.length - 1][0])}.`
+      : `A slow drift ${dir}, no step over 3%: ${money(recent[0][1])} on ${day(recent[0][0])} to ${money(recent[recent.length - 1][1])} on ${day(recent[recent.length - 1][0])}.`;
+    out.push({ id: i.id, name: i.name, image: i.image, href: i.href, change: drift, line, score: run * 2 + Math.abs(drift) });
+  }
+  return out.sort((x, y) => y.score - x.score).slice(0, 3);
 }

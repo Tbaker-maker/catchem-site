@@ -13,7 +13,7 @@ import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
-import { emailSendAllowed, emailView, handleBrief, handleEmailLink } from "./reads-email.mjs";
+import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
@@ -1063,6 +1063,7 @@ const worker = {
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     if (url.pathname === "/reads/brief") return handleBrief(request, env, { fetchImpl });
+    if (url.pathname === "/reads/email/length") return handleLengthLink(request, env);
     if (url.pathname === "/reads/email/confirm" || url.pathname === "/reads/email/stop") {
       return handleEmailLink(request, env);
     }
