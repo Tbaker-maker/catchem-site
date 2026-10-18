@@ -3,7 +3,8 @@
 // is set (a Resend API key). The key is never logged.
 
 import { isClean } from "./advice-rules.mjs";
-import { SHOP_NOTE, ebaySearchUrl, tcgStoreUrl } from "./pokemon.mjs";
+import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
+import { articleForPlan, articleText, loadContext, renderArticle } from "./reads-article.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -406,6 +407,40 @@ async function setPlanEmail(store, id, on) {
   await store.put(key, JSON.stringify(plan));
 }
 
+// Glance "Read more" opens the Standard version on the site. The link is signed
+// for one member and one outbox day, and shows no address.
+export async function briefLink(env, origin, discordId, day) {
+  const secret = mailSecret(env);
+  const id = String(discordId || "").replace(/^d:/, "");
+  if (!secret || !/^\d{5,25}$/.test(id) || !/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
+  const mac = await hmacHex(secret, `brief:${id}:${day}`);
+  const url = new URL("/reads/brief", origin || ORIGIN);
+  url.searchParams.set("id", id);
+  url.searchParams.set("d", day);
+  url.searchParams.set("t", mac);
+  return url.toString();
+}
+
+export async function handleBrief(request, env, { fetchImpl = fetch, ctx = null } = {}) {
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get("id") || "");
+  const day = String(url.searchParams.get("d") || "");
+  const mac = String(url.searchParams.get("t") || "");
+  const store = env?.FEED_KV;
+  const secret = mailSecret(env);
+  if (!store || !secret || !/^\d{5,25}$/.test(id) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return htmlResponse(notePage("Not available", "This link is not active."));
+  if (!sameText(await hmacHex(secret, `brief:${id}:${day}`), mac)) return htmlResponse(notePage("Link not valid", "Open the latest read from your email."));
+  const outbox = await store.get("custom-reads:outbox", "json");
+  if (String(outbox?.day || "") !== day) return htmlResponse(notePage("This read has moved on", "A newer read is out. The Feed has today's moves."));
+  const plan = await store.get(`reads:d:${id}`, "json");
+  setAffiliateConfig(env);
+  let context = ctx;
+  if (!context) { try { context = await loadContext(fetchImpl); } catch { context = null; } }
+  const doc = await articleForPlan(plan, context, day, "standard");
+  if (!doc) return htmlResponse(notePage("Quiet day", "Nothing moved enough to write up. The Feed has today's moves."));
+  return htmlResponse(renderArticle(doc, { page: true }));
+}
+
 export async function handleEmailLink(request, env) {
   const url = new URL(request.url);
   const purpose = url.pathname === "/reads/email/stop" ? "stop" : "confirm";
@@ -450,7 +485,20 @@ function addonCards(member) {
   return out;
 }
 
-export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null } = {}) {
+// The approved white card article, built from the member's plan and the public
+// dated files. Null when the day is too quiet, so the plain letter goes instead.
+export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin = ORIGIN }) {
+  if (!ctx) return null;
+  let doc = null;
+  try { doc = await articleForPlan(plan, ctx, day); } catch { doc = null; }
+  if (!doc) return null;
+  const more = doc.length === "glance" ? await briefLink(env, origin, id, day) : "";
+  const html = renderArticle(doc, { unsubscribe: stopUrl, more });
+  const text = articleText(doc, { unsubscribe: stopUrl, more });
+  return { html, text, length: doc.length, path: doc.path };
+}
+
+export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null, articleCtx = undefined } = {}) {
   if (!emailSendAllowed(env)) return { armed: false, sent: 0, skipped: 0 };
   const day = String(outbox?.day || "");
   if (!store || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { armed: true, sent: 0, skipped: 0 };
@@ -464,6 +512,13 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
       feed = [];
     }
   }
+  let ctx = articleCtx;
+  const article = async () => {
+    if (ctx === undefined) {
+      try { setAffiliateConfig(env); ctx = await loadContext(fetchImpl); } catch { ctx = null; }
+    }
+    return ctx;
+  };
   const ledgerKey = `reads-email-sent:${day}`;
   const prior = await store.get(ledgerKey, "json");
   const ledger = new Set(Array.isArray(prior) ? prior.map(String) : []);
@@ -485,14 +540,19 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
       skipped++;
       continue;
     }
-    const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
-    const reads = [...prepared, ...addonCards(member)];
-    if (!reads.length) { skipped++; continue; }
     const stopUrl = await emailLink(env, origin, "stop", id, email);
-    const lead = scrub(member.lead || "") || readsSubject(day);
-    const html = readsEmailHtml({ lead, day, reads, stopUrl });
-    const text = readsEmailText({ lead, day, reads, stopUrl });
-    if (!stopUrl || !emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }
+    if (!stopUrl) { skipped++; continue; }
+    let letter = await articleLetter({ env, id, plan, ctx: await article(), day, stopUrl, origin });
+    if (letter && (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html))) letter = null;
+    if (!letter) {
+      const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
+      const reads = [...prepared, ...addonCards(member)];
+      if (!reads.length) { skipped++; continue; }
+      const lead = scrub(member.lead || "") || readsSubject(day);
+      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl }), text: readsEmailText({ lead, day, reads, stopUrl }) };
+    }
+    const { html, text } = letter;
+    if (!emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }
     const ok = await postResend({
       env,
       to: email,

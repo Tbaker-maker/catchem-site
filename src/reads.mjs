@@ -6,6 +6,7 @@ import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
+import { cleanLength } from "./reads-article.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -39,8 +40,24 @@ export function blankPlan() {
     email: "",
     addons: { news: false, games: false, all: false },
     deep: false,
+    length: "standard",
+    focus: "",
   };
 }
+
+// One tap starting points. They only set picker fields; Save still decides.
+export const PRESETS = [
+  { id: "sealed", label: "Sealed collector", note: "Sealed only, Standard read." },
+  { id: "chase", label: "Chase card hunter", note: "Illustration Rares and SIRs, Glance read." },
+  { id: "vintage", label: "Vintage fan", note: "WOTC era cards, before mid 2003." },
+  { id: "completer", label: "Set completer", note: "Your set, Deep dive read." },
+];
+
+export const LENGTH_CHOICES = [
+  { id: "glance", label: "Glance", note: "Headline and three moves. About 20 seconds." },
+  { id: "standard", label: "Standard", note: "The full read. About a minute." },
+  { id: "deep", label: "Deep dive", note: "Charts, run stage and set by set. Premium." },
+];
 
 function cleanList(value, cap = 25) {
   const parts = Array.isArray(value) ? value : String(value || "").split(",");
@@ -117,6 +134,9 @@ export function gatePlan(plan, { premium = false } = {}) {
   }
   if (full > cap) notes.push(premium ? "25 follows saved." : "A free seat keeps one weekly read.");
   next.deep = premium === true;
+  next.length = cleanLength(plan?.length, premium === true);
+  if (String(plan?.length || "") === "deep" && next.length !== "deep") notes.push("Deep dive is in Premium, so this read is Standard.");
+  next.focus = plan?.focus === "vintage" ? "vintage" : "";
   return { plan: next, notes };
 }
 
@@ -184,7 +204,32 @@ export function planFromFields(fields) {
     email: String(get("email") || ""),
     product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
+    length: String(get("length") || "standard"),
+    focus: all("focus").includes("vintage") ? "vintage" : "",
   };
+}
+
+export function lengthPicker(shown, premium) {
+  const now = cleanLength(shown?.length, premium === true);
+  return `<h2>Read length</h2>
+<div class="rd-chips">${LENGTH_CHOICES.map((row) => radio("length", row.id, row.label, now === row.id, row.id === "deep" && premium !== true)).join("")}</div>
+<p class="rd-note">${LENGTH_CHOICES.map((row) => `${row.label}: ${row.note}`).join(" ")} Length is for email reads. Discord DMs stay short for now.</p>`;
+}
+
+// Email shows only once sending is switched on. Before that, one quiet line.
+export function whereItGoes(shown, state = {}) {
+  const head = `<h2>Where it goes</h2>
+<input type="hidden" name="discord" value="1">
+<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>`;
+  if (state.emailArmed !== true) {
+    return `${head}
+<p class="rd-note" id="rd-mail-soon">Email delivery is coming soon.</p>`;
+  }
+  return `${head}
+<label class="rd-chip"><input type="checkbox" name="email_on" value="1"${shown.channels?.email === true ? " checked" : ""}> <span>Email</span></label>
+<label class="rd-mail">Email address<input type="email" name="email" inputmode="email" autocomplete="email" maxlength="120" value="${esc(state.emailValue || "")}"></label>
+<p class="rd-note">Email stays off until you open the confirm link. Every letter has a one click stop link.</p>
+${lengthPicker(shown, state.premium === true)}`;
 }
 
 export function preSend(text) {
@@ -418,6 +463,8 @@ export function renderReadsPage(state = {}) {
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}
 .rd-mail{display:block;margin-top:8px}
+.rd-preset{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font-size:15px;font-weight:600}
+.rd-preset[aria-pressed="true"]{background:#1c1c1e;color:#fff}
 .rd-mail input{display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:6px;border:0;border-radius:16px;background:#f2f2f7;padding:0 14px;font-size:16px}
 </style>
 <h1>Your reads</h1>
@@ -434,6 +481,9 @@ ${iconKeyHtml(chipDoc?.asOf || "", kinds)}
 <script type="application/json" id="rd-chip-catalog">${catalogJson}</script>
 </section>
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
+<h2>Quick start</h2>
+<div class="rd-chips">${PRESETS.map((row) => `<button type="button" class="rd-preset" data-preset="${row.id}" title="${esc(row.note)}">${esc(row.label)}</button>`).join("")}</div>
+<p class="rd-note" id="rd-preset-note">Tap one to fill the picks below. Nothing saves until you tap Save.</p>
 <h2>Sets</h2>
 <p class="rd-rec">Recommended starts on ME: 30th Celebration. Tap to change it.</p>
 <div class="rd-chips">${SET_CHOICES.map((row) => choice("set", row.slug, row.name, (shown.sets || []).includes(row.slug))).join("")}</div>
@@ -442,7 +492,7 @@ ${iconKeyHtml(chipDoc?.asOf || "", kinds)}
 <h2>Rarity</h2>
 <div class="rd-chips">${RARITIES.map((name) => choice("rarity", name, name, (shown.rarities || []).includes(name))).join("")}</div>
 <h2>Era</h2>
-<div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}</div>
+<div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}${choice("focus", "vintage", "Vintage, WOTC era", shown.focus === "vintage")}</div>
 <h2>Singles or sealed</h2>
 <div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
 ${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}
@@ -453,12 +503,7 @@ ${radio("frequency", "weekly", "Weekly", (shown.frequency || "weekly") === "week
 ${radio("frequency", "monthly", "Monthly", shown.frequency === "monthly", !premium)}
 ${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", !premium)}
 </div>
-<h2>Where it goes</h2>
-<input type="hidden" name="discord" value="1">
-<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>
-<label class="rd-chip"><input type="checkbox" name="email_on" value="1"${shown.channels?.email === true ? " checked" : ""}> <span>Email</span></label>
-<label class="rd-mail">Email address<input type="email" name="email" inputmode="email" autocomplete="email" maxlength="120" value="${esc(state.emailValue || "")}"></label>
-<p class="rd-note">Email stays off until you open the confirm link. Every letter has a one click stop link.</p>
+${whereItGoes(shown, state)}
 <h2>Add-ons</h2>
 <div class="rd-chips">
 ${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
@@ -519,6 +564,32 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     });
   }
   form.addEventListener("change", paint);
+  function setAll(name, values){
+    var nodes = form.querySelectorAll('input[name="' + name + '"]');
+    for (var i = 0; i < nodes.length; i++) if (!nodes[i].disabled) nodes[i].checked = values.indexOf(nodes[i].value) >= 0;
+  }
+  function pickOne(name, value){
+    var nodes = form.querySelectorAll('input[name="' + name + '"]');
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].value === value && !nodes[i].disabled) nodes[i].checked = true;
+  }
+  var presets = {
+    sealed: function(){ pickOne("product", "sealed"); setAll("rarity", []); setAll("focus", []); pickOne("length", "standard"); },
+    chase: function(){ pickOne("product", "singles"); setAll("rarity", ["Special Illustration Rare", "Illustration Rare"]); setAll("focus", []); pickOne("length", "glance"); },
+    vintage: function(){ pickOne("product", "singles"); setAll("focus", ["vintage"]); },
+    completer: function(){ pickOne("product", "singles"); setAll("focus", []); pickOne("length", "standard"); pickOne("length", "deep"); }
+  };
+  var buttons = form.querySelectorAll(".rd-preset");
+  for (var b = 0; b < buttons.length; b++) {
+    buttons[b].addEventListener("click", function(ev){
+      var id = ev.currentTarget.getAttribute("data-preset");
+      if (!presets[id]) return;
+      presets[id]();
+      for (var k = 0; k < buttons.length; k++) buttons[k].setAttribute("aria-pressed", buttons[k] === ev.currentTarget ? "true" : "false");
+      var note = document.getElementById("rd-preset-note");
+      if (note) note.textContent = (ev.currentTarget.getAttribute("title") || "") + " Tap Save to keep it.";
+      paint();
+    });
+  }
 })();
 </script>
 ${beacon}
@@ -569,7 +640,12 @@ export async function handleReads(request, env, fetchImpl = fetch) {
   const { plan, notes } = gatePlan(raw, { premium: user.premium === true });
   plan.savedAt = new Date().toISOString();
   let emailState = "";
-  if (plan.channels.email) {
+  const armed = emailSendAllowed(env);
+  if (!armed && !raw.email) {
+    const prior = await store.get(`reads:${user.sub}`, "json");
+    plan.channels.email = prior?.channels?.email === true;
+    if (prior?.length && !raw.length) plan.length = cleanLength(prior.length, user.premium === true);
+  } else if (plan.channels.email) {
     emailState = await rememberEmail(store, user.sub, raw.email, env, fetchImpl, new URL(request.url).origin);
   } else if (raw.channels?.email === true) {
     emailState = "bad";
