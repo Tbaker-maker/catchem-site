@@ -88,7 +88,7 @@ t("the letter links each read and has a stop link", html.includes("https://catch
 t("the letter has strength dots and no dashes or forbidden words", html.includes("border-radius:999px") && html.includes("8a6a2f") && !/[\u2013\u2014]/.test(html) && !/\b(sold|sales)\b/i.test(text) && !/price being checked/i.test(html) && !html.includes(TO));
 t("the letter copy passes the checker", emailCopyOk(text) && readsSubject("2026-10-18") === "Your Catch'em reads, Oct 18, 2026" && !/[\u2013\u2014]/.test(readsSubject("2026-10-18")));
 
-const off = await deliverOutboxEmails({ store, env: { FEED_KV: store }, outbox: { day: "2026-10-18", members: [] }, fetchImpl, feedReads: [] });
+const off = await deliverOutboxEmails({ store, env: { FEED_KV: store }, outbox: { day: "2026-10-18", members: [] }, fetchImpl, feedReads: [], articleCtx: null });
 t("sending stays off without the key", off.armed === false && off.sent === 0 && calls.length === 0);
 
 await store.put(`reads:d:${ID}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
@@ -106,12 +106,12 @@ const outbox = {
     ],
   }],
 };
-const first = await deliverOutboxEmails({ store, env, outbox, fetchImpl, feedReads: [] });
+const first = await deliverOutboxEmails({ store, env, outbox, fetchImpl, feedReads: [], articleCtx: null });
 t("one confirmed member gets one letter", first.armed === true && first.sent === 1 && calls.length === 1);
 const payload = JSON.parse(calls[0].init.body);
 t("the provider call is Resend and keeps the address out of the letter", calls[0].url === "https://api.resend.com/emails" && calls[0].init.headers.authorization === `Bearer ${KEY}` && payload.from === "Catch'em <reads@catchemtcg.com>" && payload.to[0] === TO && payload.subject === "Your Catch'em reads, Oct 18, 2026" && !payload.html.includes(TO) && !payload.html.includes("Price being checked") && !/[\u2013\u2014]/.test(payload.html));
 t("the letter carries List-Unsubscribe", payload.headers["List-Unsubscribe"].includes("/reads/email/stop?id=" + ID) && payload.headers["List-Unsubscribe-Post"] === "List-Unsubscribe=One-Click");
-const second = await deliverOutboxEmails({ store, env, outbox, fetchImpl, feedReads: [] });
+const second = await deliverOutboxEmails({ store, env, outbox, fetchImpl, feedReads: [], articleCtx: null });
 t("a second pass the same day does not send again", second.sent === 0 && calls.length === 1);
 
 const link = await emailLink(env, "https://catchemtcg.com", "stop", ID, TO);
@@ -124,6 +124,7 @@ const afterStop = await deliverOutboxEmails({
   outbox: { ...outbox, day: "2026-10-19" },
   fetchImpl,
   feedReads: [],
+  articleCtx: null,
 });
 t("a stopped member gets no later letter", afterStop.sent === 0 && calls.length === 1);
 
