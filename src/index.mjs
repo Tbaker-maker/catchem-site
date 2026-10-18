@@ -33,7 +33,7 @@ import { renderScanner, renderWeekly } from "./weekly.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome } from "./ui.mjs";
-import { attachSignals } from "./signal-chips.mjs";
+import { attachSignals, chipLookup, signalRowHtml } from "./signal-chips.mjs";
 import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
@@ -424,6 +424,15 @@ async function pokemonStripFor(card, fetchImpl) {
   }
 }
 
+async function signalCardFor(id, fetchImpl) {
+  try {
+    const doc = await loadJson("signal-chips.json", fetchImpl);
+    return chipLookup(doc, id);
+  } catch {
+    return null;
+  }
+}
+
 export async function quickFor(cardId, fetchImpl, opts = {}) {
   const id = String(cardId || "").trim();
   if (!id || id.length > 80 || /[^A-Za-z0-9._-]/.test(id)) return null;
@@ -474,7 +483,7 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
     }
   }
   const productReads = await readsFor(id, fetchImpl);
-  return quickView(card, {
+  const view = quickView(card, {
     fact,
     listingSeries,
     productReads,
@@ -483,6 +492,14 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
     crop: pic.crop,
     feed: opts.feed === true,
   });
+  if (view) {
+    try {
+      const chips = await loadJson("signal-chips.json", fetchImpl);
+      const hit = chipLookup(chips, id);
+      if (hit) view.signalsHtml = signalRowHtml(hit, { href: "" });
+    } catch { /* chips stay off this popup */ }
+  }
+  return view;
 }
 
 async function compareItem(id, fetchImpl) {
@@ -711,7 +728,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           const pic = officialSrc({ id: hit.id, kind: "single" }, images);
           const reads = await cardReadSplit(hit.id, fetchImpl);
           const conditionNote = await conditionNoteFor(fetchImpl);
-          return html(renderCard(row, stamp, { ...pageOpts, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
+          return html(renderCard(row, stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
@@ -882,7 +899,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(card, stamp, { ...pageOpts, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    return html(renderCard(card, stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -1234,7 +1251,7 @@ const worker = {
           card: url.searchParams.get("card") || "",
           sealed: url.searchParams.get("sealed") || "",
           picker: readsPickerEnabled(env),
-          preview: preview && preview.lines ? { lines: preview.lines, chip: chipDoc?.preview || null } : null,
+          preview: preview && preview.lines ? { lines: preview.lines, chip: chipDoc?.preview || null, chips: chipDoc || null } : null,
         };
       }
       let premium = false;
