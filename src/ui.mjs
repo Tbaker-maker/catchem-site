@@ -2677,8 +2677,9 @@ function printingsHtml(card, held = false) {
   if (!rows.length) return "";
   return `<ul class="cp-prints" aria-label="Printings">${rows.map((row) => {
     const when = priceDay(String(row.asOf).slice(0, 10));
-    const amount = held || !(Number(row.price) > 0) ? "Price being checked" : money(row.price);
-    return `<li><span>${esc(row.name)}</span><b>${amount.startsWith("Price") ? esc(amount) : amount}</b><small>${esc(when)}</small></li>`;
+    if (held) return `<li><span>${esc(row.name)}</span>${when ? `<small>${esc(when)}</small>` : ""}</li>`;
+    const amount = money(row.price);
+    return `<li><span>${esc(row.name)}</span><b>${amount}</b><small>${esc(when)}</small></li>`;
   }).join("")}</ul>`;
 }
 
@@ -2818,14 +2819,14 @@ const COND_JS = `(function(){
         priceEl.parentNode.insertBefore(labelEl, priceEl);
       }
       labelEl.textContent=cond;
-      priceEl.textContent=amt || "Price being checked";
+      if (amt) priceEl.textContent=amt;
       if (dateEl) dateEl.textContent=b.getAttribute("data-date") || "";
     });
   }
 })();`;
 
 function conditionView(card, ladder, held) {
-  if (!card || card.kind === "sealed") return { html: "", selected: null };
+  if (!card || card.kind === "sealed" || held) return { html: "", selected: null };
   const printings = ladder && ladder.printings && typeof ladder.printings === "object" ? ladder.printings : {};
   const names = [];
   const push = (name) => {
@@ -2839,27 +2840,31 @@ function conditionView(card, ladder, held) {
   const headName = String(card.printing || "").trim();
   const fileDay = String(ladder && ladder.asOf || "").slice(0, 10);
   let selected = null;
-  const blocks = names.map((name) => {
+  const blocks = [];
+  for (const name of names) {
     const row = printings[name] && typeof printings[name] === "object" ? printings[name] : {};
     const rowDay = String(row.date || fileDay || "").slice(0, 10);
     const isHead = (headName && name === headName) || (!headName && names.length === 1);
-    const chips = COND_ORDER.map((key) => {
-      const amount = !held && Number(row[key]) > 0 ? Number(row[key]) : 0;
+    const chips = [];
+    for (const key of COND_ORDER) {
+      const amount = Number(row[key]) > 0 ? Number(row[key]) : 0;
       const cash = amount ? money(amount) : "";
-      if (isHead && !selected && cash) selected = { key, amount, date: rowDay, printing: name };
+      if (!cash) continue;
+      if (isHead && !selected) selected = { key, amount, date: rowDay, printing: name };
       const pressed = selected && selected.printing === name && selected.key === key ? "true" : "false";
-      const label = cash || "Price being checked";
-      const dateText = cash ? priceDay(rowDay) : "";
-      return `<button type="button" class="cond-chip" data-cond="${key}" aria-pressed="${pressed}"${cash ? ` data-amt="${esc(cash)}"` : ""}${dateText ? ` data-date="${esc(dateText)}"` : ""}><b>${key}</b><small>${esc(label)}</small></button>`;
-    }).join("");
+      const dateText = priceDay(rowDay);
+      chips.push(`<button type="button" class="cond-chip" data-cond="${key}" aria-pressed="${pressed}" data-amt="${esc(cash)}"${dateText ? ` data-date="${esc(dateText)}"` : ""}><b>${key}</b><small>${esc(cash)}</small></button>`);
+    }
+    if (!chips.length) continue;
     const title = name && !/^normal$/i.test(name) ? `<p class="cond-print">${esc(name)}</p>` : "";
-    return `<div class="cond-block" data-head="${isHead ? "1" : "0"}">${title}<div class="cond-chips" role="group" aria-label="Condition">${chips}</div></div>`;
-  }).join("");
+    blocks.push(`<div class="cond-block" data-head="${isHead ? "1" : "0"}">${title}<div class="cond-chips" role="group" aria-label="Condition">${chips.join("")}</div></div>`);
+  }
+  if (!blocks.length) return { html: "", selected: null };
   const tapDay = selected ? priceDay(selected.date) : "";
   const short = tapDay ? tapDay.replace(/, \d{4}$/, "") : "";
   const tap = short ? infoTap(`TCGplayer market, ${short}`) : "";
   const src = short ? `<p class="cp-src">TCGplayer market, ${esc(short)}${tap}</p>` : "";
-  return { html: `${blocks}${src}<script>${COND_JS}</script>`, selected };
+  return { html: `${blocks.join("")}${src}<script>${COND_JS}</script>`, selected };
 }
 
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit, held = false }) {
