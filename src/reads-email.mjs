@@ -4,7 +4,7 @@
 
 import { isClean } from "./advice-rules.mjs";
 import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
-import { articleForPlan, articleText, loadContext, renderArticle } from "./reads-article.mjs";
+import { WEEKDAY_NAMES, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, renderArticle } from "./reads-article.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -407,6 +407,121 @@ async function setPlanEmail(store, id, on) {
   await store.put(key, JSON.stringify(plan));
 }
 
+// ---------- phase 2: per member read history (FEED_KV only, never an address) ----------
+
+export function statsKey(discordId) {
+  const id = String(discordId || "").replace(/^d:/, "");
+  return /^\d{5,25}$/.test(id) ? `reads-email-stats:${id}` : "";
+}
+
+export async function loadStats(store, id) {
+  const key = statsKey(id);
+  const row = store && key ? await store.get(key, "json") : null;
+  return { sent: Array.isArray(row?.sent) ? row.sent.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s?.day || ""))) : [], awayDay: String(row?.awayDay || "") };
+}
+
+async function saveStats(store, id, stats) {
+  const key = statsKey(id);
+  if (!store || !key) return;
+  await store.put(key, JSON.stringify({ sent: stats.sent.slice(-20), awayDay: stats.awayDay || "", updatedAt: new Date().toISOString() }));
+}
+
+export async function recordSend(store, id, entry, away = false) {
+  const stats = await loadStats(store, id);
+  stats.sent = stats.sent.filter((s) => s.day !== entry.day);
+  stats.sent.push({ day: entry.day, length: entry.length || "", weekday: entry.weekday || "", opens: 0 });
+  if (away) stats.awayDay = entry.day;
+  await saveStats(store, id, stats);
+}
+
+// A Read more tap on /reads/brief counts as one open for that send day.
+export async function recordOpen(store, id, day) {
+  const stats = await loadStats(store, id);
+  const hit = stats.sent.find((s) => s.day === day);
+  if (!hit) return false;
+  hit.opens = Math.min(99, (Number(hit.opens) || 0) + 1);
+  await saveStats(store, id, stats);
+  return true;
+}
+
+const GAP = { daily: 1, weekly: 7, monthly: 31, quarterly: 92 };
+function daysBetween(a, b) { return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000); }
+
+// What the article needs from history: the last read day (report card) and,
+// when the member missed reads, the day the catch up starts.
+export function historyFor(stats, plan, day) {
+  const past = stats.sent.filter((s) => s.day < day).sort((a, b) => (a.day < b.day ? -1 : 1));
+  if (!past.length) return {};
+  const sinceDay = past[past.length - 1].day;
+  const gap = daysBetween(sinceDay, day);
+  const every = GAP[String(plan?.frequency || "weekly")] || 7;
+  let awaySince = "";
+  if (gap > every * 2) awaySince = sinceDay; // paused or missed at least one read
+  else {
+    const lastThree = past.slice(-3);
+    const recentAway = stats.awayDay && daysBetween(stats.awayDay, day) < 7;
+    if (lastThree.length === 3 && lastThree.every((s) => !(s.opens > 0)) && !recentAway && daysBetween(lastThree[0].day, day) >= 3) awaySince = lastThree[0].day;
+  }
+  if (awaySince && daysBetween(awaySince, day) > 30) awaySince = new Date(Date.parse(day + "T00:00:00Z") - 30 * 86400000).toISOString().slice(0, 10);
+  return { sinceDay, awaySince };
+}
+
+const LENGTH_LABEL = { glance: "Glance", standard: "Standard", deep: "Deep dive" };
+
+// Learns your length. Only a suggestion: nothing changes until the member taps.
+export function suggestLength(stats, current, premium) {
+  const same = stats.sent.filter((s) => s.length === current);
+  const last5 = same.slice(-5);
+  const opened = (rows) => rows.filter((s) => s.opens > 0).length;
+  if (current === "glance" && last5.length >= 3 && opened(last5) >= 3) return { to: "standard", why: `You opened Read more on ${opened(last5)} of your last ${last5.length} Glance reads.` };
+  if (current === "standard" && premium && last5.length >= 5 && opened(last5) >= 4) return { to: "deep", why: `You opened ${opened(last5)} of your last ${last5.length} reads on the site.` };
+  const last6 = same.slice(-6);
+  if ((current === "standard" || current === "deep") && last6.length >= 6 && opened(last6) === 0) return { to: current === "deep" ? "standard" : "glance", why: `You have not opened your last ${last6.length} ${LENGTH_LABEL[current]} reads on the site.` };
+  return null;
+}
+
+export async function lengthLink(env, origin, discordId, length, weekday = "") {
+  const secret = mailSecret(env);
+  const id = String(discordId || "").replace(/^d:/, "");
+  if (!secret || !/^\d{5,25}$/.test(id) || !LENGTH_LABEL[length] || (weekday && !WEEKDAY_NAMES[weekday])) return "";
+  const mac = await hmacHex(secret, `length:${id}:${length}:${weekday}`);
+  const url = new URL("/reads/email/length", origin || ORIGIN);
+  url.searchParams.set("id", id);
+  url.searchParams.set("l", length);
+  if (weekday) url.searchParams.set("w", weekday);
+  url.searchParams.set("t", mac);
+  return url.toString();
+}
+
+// GET shows one Switch button; the POST from that button makes the change.
+// Mail scanners open links on their own, so a GET never changes the plan.
+export async function handleLengthLink(request, env) {
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get("id") || "");
+  const length = String(url.searchParams.get("l") || "");
+  const weekday = String(url.searchParams.get("w") || "");
+  const mac = String(url.searchParams.get("t") || "");
+  const store = env?.FEED_KV;
+  const secret = mailSecret(env);
+  if (!store || !secret || !/^\d{5,25}$/.test(id) || !LENGTH_LABEL[length] || (weekday && !WEEKDAY_NAMES[weekday])) return htmlResponse(notePage("Not available", "This link is not active."));
+  if (!sameText(await hmacHex(secret, `length:${id}:${length}:${weekday}`), mac)) return htmlResponse(notePage("Link not valid", "Change your read length on your reads page."));
+  const label = LENGTH_LABEL[length] + (weekday ? ` on ${WEEKDAY_NAMES[weekday]}s` : "");
+  if (request.method === "GET") {
+    return htmlResponse(notePage(`Switch to ${label}?`, "One tap below. You can change it back any time on your reads page.").replace(
+      `<a href="/reads"`,
+      `<form method="post" action="${esc(url.pathname + url.search)}" style="margin:0 0 12px"><button type="submit" style="min-height:44px;padding:0 20px;border:0;border-radius:999px;background:#1c1c1e;color:#ffffff;font:600 16px Arial,Helvetica,sans-serif">Switch to ${esc(label)}</button></form><a href="/reads"`,
+    ));
+  }
+  if (request.method !== "POST") return htmlResponse(notePage("Not available", "Open the link from the letter."));
+  const plan = await store.get(`reads:d:${id}`, "json");
+  if (!plan || typeof plan !== "object") return htmlResponse(notePage("Not available", "Save your reads first."));
+  const next = cleanLength(length, plan.deep === true);
+  if (weekday) plan.lengthByDay = { ...(plan.lengthByDay || {}), [weekday]: next };
+  else plan.length = next;
+  await store.put(`reads:d:${id}`, JSON.stringify(plan));
+  return htmlResponse(notePage("Length saved", `Your reads are ${LENGTH_LABEL[next]}${weekday ? ` on ${WEEKDAY_NAMES[weekday]}s` : ""} from the next one.`));
+}
+
 // Glance "Read more" opens the Standard version on the site. The link is signed
 // for one member and one outbox day, and shows no address.
 export async function briefLink(env, origin, discordId, day) {
@@ -436,7 +551,11 @@ export async function handleBrief(request, env, { fetchImpl = fetch, ctx = null 
   setAffiliateConfig(env);
   let context = ctx;
   if (!context) { try { context = await loadContext(fetchImpl); } catch { context = null; } }
-  const doc = await articleForPlan(plan, context, day, "standard");
+  await recordOpen(store, id, day);
+  const stats = await loadStats(store, id);
+  const sentRow = stats.sent.find((s) => s.day === day);
+  const pageLength = sentRow?.length === "deep" && plan?.deep === true ? "deep" : "standard";
+  const doc = await articleForPlan(plan, context, day, pageLength, historyFor(stats, plan, day));
   if (!doc) return htmlResponse(notePage("Quiet day", "Nothing moved enough to write up. The Feed has today's moves."));
   return htmlResponse(renderArticle(doc, { page: true }));
 }
@@ -487,15 +606,22 @@ function addonCards(member) {
 
 // The approved white card article, built from the member's plan and the public
 // dated files. Null when the day is too quiet, so the plain letter goes instead.
-export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin = ORIGIN }) {
+export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin = ORIGIN, stats = { sent: [], awayDay: "" } }) {
   if (!ctx) return null;
   let doc = null;
-  try { doc = await articleForPlan(plan, ctx, day); } catch { doc = null; }
-  if (!doc) return null;
-  const more = doc.length === "glance" ? await briefLink(env, origin, id, day) : "";
-  const html = renderArticle(doc, { unsubscribe: stopUrl, more });
-  const text = articleText(doc, { unsubscribe: stopUrl, more });
-  return { html, text, length: doc.length, path: doc.path };
+  const history = historyFor(stats, plan, day);
+  try { doc = await articleForPlan(plan, ctx, day, "", history); } catch { doc = null; }
+  // Nothing to write up is the quietest day: Glance sends nothing then either.
+  if (!doc) return followFromPlan(plan, day).length === "glance" ? { skip: "quiet", length: "glance" } : null;
+  // Quiet day mode: Glance sends nothing. A watchlist report card or a catch up still goes.
+  if (doc.quiet && doc.length === "glance" && !doc.report && !doc.away) return { skip: "quiet", length: doc.length };
+  const more = await briefLink(env, origin, id, day);
+  const tip = suggestLength(stats, doc.length, plan?.deep === true);
+  const tipHref = tip ? await lengthLink(env, origin, id, tip.to, doc.weekday || "") : "";
+  const suggest = tip && tipHref ? { text: `${tip.why} ${LENGTH_LABEL[tip.to]} might suit you${doc.weekday ? ` on ${WEEKDAY_NAMES[doc.weekday]}s` : ""}.`, label: `Try ${LENGTH_LABEL[tip.to]}`, href: tipHref, to: tip.to } : null;
+  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest });
+  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest });
+  return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };
 }
 
 export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null, articleCtx = undefined } = {}) {
@@ -542,7 +668,9 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
     }
     const stopUrl = await emailLink(env, origin, "stop", id, email);
     if (!stopUrl) { skipped++; continue; }
-    let letter = await articleLetter({ env, id, plan, ctx: await article(), day, stopUrl, origin });
+    const stats = await loadStats(store, id);
+    let letter = await articleLetter({ env, id, plan, ctx: await article(), day, stopUrl, origin, stats });
+    if (letter?.skip) { skipped++; continue; }
     if (letter && (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html))) letter = null;
     if (!letter) {
       const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
@@ -566,6 +694,7 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
     ledger.add(id);
     sent++;
     await store.put(ledgerKey, JSON.stringify([...ledger]));
+    await recordSend(store, id, { day, length: letter.length || "", weekday: letter.weekday || "" }, letter.away === true);
   }
   return { armed: true, sent, skipped };
 }

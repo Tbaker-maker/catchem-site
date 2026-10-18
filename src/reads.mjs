@@ -6,7 +6,7 @@ import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
-import { cleanLength } from "./reads-article.mjs";
+import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay } from "./reads-article.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -41,6 +41,7 @@ export function blankPlan() {
     addons: { news: false, games: false, all: false },
     deep: false,
     length: "standard",
+    lengthByDay: {},
     focus: "",
   };
 }
@@ -137,6 +138,8 @@ export function gatePlan(plan, { premium = false } = {}) {
   next.length = cleanLength(plan?.length, premium === true);
   if (String(plan?.length || "") === "deep" && next.length !== "deep") notes.push("Deep dive is in Premium, so this read is Standard.");
   next.focus = plan?.focus === "vintage" ? "vintage" : "";
+  next.lengthByDay = cleanLengthByDay(plan?.lengthByDay, premium === true);
+  if (!premium && Object.values(plan?.lengthByDay || {}).includes("deep")) notes.push("Deep dive days are in Premium, so those days are Standard.");
   return { plan: next, notes };
 }
 
@@ -205,6 +208,7 @@ export function planFromFields(fields) {
     product,
     addons: { news: on("news"), games: on("games"), all: on("all") },
     length: String(get("length") || "standard"),
+    lengthByDay: Object.fromEntries(WEEKDAYS.map((w) => [w, String(get("len_" + w) || "")]).filter((row) => row[1])),
     focus: all("focus").includes("vintage") ? "vintage" : "",
   };
 }
@@ -213,7 +217,21 @@ export function lengthPicker(shown, premium) {
   const now = cleanLength(shown?.length, premium === true);
   return `<h2>Read length</h2>
 <div class="rd-chips">${LENGTH_CHOICES.map((row) => radio("length", row.id, row.label, now === row.id, row.id === "deep" && premium !== true)).join("")}</div>
-<p class="rd-note">${LENGTH_CHOICES.map((row) => `${row.label}: ${row.note}`).join(" ")} Length is for email reads. Discord DMs stay short for now.</p>`;
+<p class="rd-note">${LENGTH_CHOICES.map((row) => `${row.label}: ${row.note}`).join(" ")} Length is for email reads. Discord DMs stay short for now.</p>
+${lengthByDayPicker(shown, premium)}`;
+}
+
+// Length by day: one row per weekday. "Same" uses the everyday length above.
+export function lengthByDayPicker(shown, premium) {
+  const by = cleanLengthByDay(shown?.lengthByDay, premium === true);
+  const order = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  const opts = [["", "Same"], ["glance", "Glance"], ["standard", "Standard"], ["deep", "Deep dive"]];
+  const rows = order.map((w) => `<fieldset class="rd-day"><legend>${WEEKDAY_NAMES[w]}</legend><div class="rd-chips">${opts.map(([v, label]) => radio("len_" + w, v, label, (by[w] || "") === v, v === "deep" && premium !== true)).join("")}</div></fieldset>`).join("");
+  const count = Object.keys(by).length;
+  return `<details class="rd-days"${count ? " open" : ""}><summary>Length by day${count ? ` (${count} set)` : ""}</summary>
+<p class="rd-note">Pick a different length for any day, for example Glance on weekdays and Deep dive on Sunday. Same uses your everyday length.</p>
+<div class="rd-chips"><button type="button" class="rd-preset" data-days="weekday-glance">Glance weekdays</button><button type="button" class="rd-preset" data-days="clear">All the same</button></div>
+${rows}</details>`;
 }
 
 // Email shows only once sending is switched on. Before that, one quiet line.
@@ -465,6 +483,10 @@ export function renderReadsPage(state = {}) {
 .rd-mail{display:block;margin-top:8px}
 .rd-preset{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font-size:15px;font-weight:600}
 .rd-preset[aria-pressed="true"]{background:#1c1c1e;color:#fff}
+.rd-days{margin:12px 0;border-radius:16px;background:#f8f8fa;padding:4px 12px}
+.rd-days summary{min-height:44px;line-height:44px;font-weight:600;cursor:pointer}
+.rd-day{border:0;margin:0 0 10px;padding:0}
+.rd-day legend{font-size:13px;color:#636366;margin:0 0 6px;padding:0}
 .rd-mail input{display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:6px;border:0;border-radius:16px;background:#f2f2f7;padding:0 14px;font-size:16px}
 </style>
 <h1>Your reads</h1>
@@ -578,7 +600,16 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     vintage: function(){ pickOne("product", "singles"); setAll("focus", ["vintage"]); },
     completer: function(){ pickOne("product", "singles"); setAll("focus", []); pickOne("length", "standard"); pickOne("length", "deep"); }
   };
-  var buttons = form.querySelectorAll(".rd-preset");
+  var dayButtons = form.querySelectorAll("[data-days]");
+  for (var d = 0; d < dayButtons.length; d++) {
+    dayButtons[d].addEventListener("click", function(ev){
+      var mode = ev.currentTarget.getAttribute("data-days");
+      ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].forEach(function(w){
+        pickOne("len_" + w, mode === "weekday-glance" && w !== "sat" && w !== "sun" ? "glance" : "");
+      });
+    });
+  }
+  var buttons = form.querySelectorAll(".rd-preset[data-preset]");
   for (var b = 0; b < buttons.length; b++) {
     buttons[b].addEventListener("click", function(ev){
       var id = ev.currentTarget.getAttribute("data-preset");
@@ -645,6 +676,7 @@ export async function handleReads(request, env, fetchImpl = fetch) {
     const prior = await store.get(`reads:${user.sub}`, "json");
     plan.channels.email = prior?.channels?.email === true;
     if (prior?.length && !raw.length) plan.length = cleanLength(prior.length, user.premium === true);
+    if (prior?.lengthByDay && !Object.keys(raw.lengthByDay || {}).length) plan.lengthByDay = cleanLengthByDay(prior.lengthByDay, user.premium === true);
   } else if (plan.channels.email) {
     emailState = await rememberEmail(store, user.sub, raw.email, env, fetchImpl, new URL(request.url).origin);
   } else if (raw.channels?.email === true) {
