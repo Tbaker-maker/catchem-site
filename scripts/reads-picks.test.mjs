@@ -1,6 +1,6 @@
 // Saved rarity, era, artist and generation picks really filter the email.
 import { buildArticle, followFromPlan, pathwayOf, picksTest, artistChoices, renderArticle, okCopy } from "../src/reads-article.mjs";
-import { gatePlan, planFromFields, followCount } from "../src/reads.mjs";
+import { gatePlan, planFromFields, followCount, ARTIST_CHOICES, ARTIST_MORE, renderReadsPage } from "../src/reads.mjs";
 
 let fail = 0;
 const t = (name, cond) => { if (cond) console.log("  ok ", name); else { fail++; console.log("  FAIL", name); } };
@@ -66,8 +66,10 @@ t("Mega Evolution is its own generation", followFromPlan({ generations: ["ME", "
 t("artist choices count tagged cards", artistChoices(tags, 1)[0].slug === "akira-komayama" && artistChoices(tags, 1)[0].n === 3);
 const html = renderArticle(chase, {}).replace("A listing is not a sale.", "");
 t("chase email copy follows the rules", !/[\u2013\u2014]/.test(html) && !/\bsold\b|\bsales?\b/i.test(html) && !/\bNM\b/.test(html));
-const saveArt = gatePlan(planFromFields({ artist: ["ken-sugimori", "nobody"], generation: ["ME", "12"] }), { premium: true }).plan;
-t("saved artist and generation picks are cleaned to known choices", saveArt.artists.join() === "ken-sugimori" && saveArt.generations.join() === "ME");
+const saveArt = gatePlan(planFromFields({ artist: ["akira-komayama", "nobody"], generation: ["ME", "12"] }), { premium: true }).plan;
+t("saved artist and generation picks are cleaned to known choices", saveArt.artists.join() === "akira-komayama" && saveArt.generations.join() === "ME");
 
+t("artist chips lead with modern IR and SIR illustrators", ARTIST_CHOICES.length === 12 && ARTIST_CHOICES.some((a) => a.slug === "akira-komayama") && !ARTIST_CHOICES.some((a) => a.slug === "5ban-graphics"));
+t("more artists can be saved too", ARTIST_MORE.length > 0 && gatePlan({ artists: [ARTIST_MORE[0].slug] }, { premium: true }).plan.artists.join() === ARTIST_MORE[0].slug);
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("reads picks: all passed");

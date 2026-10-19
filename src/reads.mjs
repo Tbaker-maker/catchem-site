@@ -21,20 +21,48 @@ export const SET_CHOICES = [
   { slug: "sv10-destined-rivals", name: "SV10: Destined Rivals" },
   { slug: "sv-black-bolt", name: "SV: Black Bolt" },
 ];
-// Illustrators with the most credited cards in data/path-tags.json (Oct 19).
+// Illustrators ranked by IR + SIR cards credited in data/path-tags.json
+// (Oct 19), ties broken by total credited cards. Top 12 show as chips.
 export const ARTIST_CHOICES = [
-  { slug: "5ban-graphics", name: "5ban Graphics" },
-  { slug: "ken-sugimori", name: "Ken Sugimori" },
+  { slug: "kantaro", name: "kantaro" },
+  { slug: "akira-egawa", name: "Akira Egawa" },
+  { slug: "okacheke", name: "Okacheke" },
+  { slug: "jerky", name: "Jerky" },
+  { slug: "teeziro", name: "Teeziro" },
+  { slug: "yukihiro-tada", name: "Yukihiro Tada" },
   { slug: "mitsuhiro-arita", name: "Mitsuhiro Arita" },
-  { slug: "kagemaru-himeno", name: "Kagemaru Himeno" },
-  { slug: "kouki-saitou", name: "Kouki Saitou" },
-  { slug: "masakazu-fukuda", name: "Masakazu Fukuda" },
-  { slug: "ryo-ueda", name: "Ryo Ueda" },
-  { slug: "toyste-beach", name: "Toyste Beach" },
-  { slug: "atsuko-nishida", name: "Atsuko Nishida" },
-  { slug: "naoki-saito", name: "Naoki Saito" },
-  { slug: "shin-nagasawa", name: "Shin Nagasawa" },
-  { slug: "keiji-kinebuchi", name: "Keiji Kinebuchi" },
+  { slug: "akira-komayama", name: "Akira Komayama" },
+  { slug: "nagimiso", name: "nagimiso" },
+  { slug: "gidora", name: "Gidora" },
+  { slug: "dom", name: "Dom" },
+  { slug: "jiro-sasumo", name: "Jiro Sasumo" },
+];
+// The next ones, behind a "More artists" tap.
+export const ARTIST_MORE = [
+  { slug: "rend", name: "Rend" },
+  { slug: "yano-keiji", name: "Yano Keiji" },
+  { slug: "souichirou-gunjima", name: "Souichirou Gunjima" },
+  { slug: "mina-nakai", name: "Mina Nakai" },
+  { slug: "toshinao-aoki", name: "Toshinao Aoki" },
+  { slug: "atsushi-furusawa", name: "Atsushi Furusawa" },
+  { slug: "okubo", name: "Okubo" },
+  { slug: "mashu", name: "mashu" },
+  { slug: "ryota-murayama", name: "Ryota Murayama" },
+  { slug: "tetsu-kayama", name: "Tetsu Kayama" },
+  { slug: "minaminami-take", name: "MINAMINAMI Take" },
+  { slug: "oswaldo-kato", name: "Oswaldo KATO" },
+  { slug: "keiichiro-ito", name: "Keiichiro Ito" },
+  { slug: "saboteri", name: "Saboteri" },
+  { slug: "osare", name: "osare" },
+  { slug: "kuroimori", name: "Kuroimori" },
+  { slug: "tomowaka", name: "Tomowaka" },
+  { slug: "tomokazu-komiya", name: "Tomokazu Komiya" },
+  { slug: "sowsow", name: "sowsow" },
+  { slug: "shibuzoh", name: "Shibuzoh." },
+  { slug: "hyogonosuke", name: "Hyogonosuke" },
+  { slug: "miki-kudo", name: "miki kudo" },
+  { slug: "tika-matsuno", name: "Tika Matsuno" },
+  { slug: "akagi", name: "akagi" },
 ];
 export const GENERATIONS = [["1", "Gen 1"], ["2", "Gen 2"], ["3", "Gen 3"], ["4", "Gen 4"], ["5", "Gen 5"], ["6", "Gen 6"], ["7", "Gen 7"], ["8", "Gen 8"], ["9", "Gen 9"], ["ME", "Mega Evolution"]];
 export const POKEMON_CHOICES = ["Pikachu", "Charizard", "Eevee", "Umbreon", "Mew"];
@@ -115,7 +143,7 @@ export function gatePlan(plan, { premium = false } = {}) {
   next.pokemon = cleanList(plan?.pokemon);
   next.rarities = cleanList(plan?.rarities).filter((name) => RARITIES.includes(name));
   next.eras = cleanList(plan?.eras).filter((name) => ERAS.includes(name));
-  next.artists = cleanList(plan?.artists).filter((slug) => ARTIST_CHOICES.some((a) => a.slug === slug));
+  next.artists = cleanList(plan?.artists).filter((slug) => [...ARTIST_CHOICES, ...ARTIST_MORE].some((a) => a.slug === slug));
   next.generations = cleanList(plan?.generations).filter((g) => GENERATIONS.some((row) => row[0] === g));
   next.sealed = plan?.sealed === true;
   next.singles = plan?.singles === true;
@@ -507,6 +535,7 @@ export function renderReadsPage(state = {}) {
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
 .rd-note{color:#636366;font-size:14px}.rd-note a,.rd-sign{color:#7a5a1f}
 .rd-mail{display:block;margin-top:8px}
+.rd-more summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#0a84ff;font-size:15px;font-weight:600;list-style:none}.rd-more summary::-webkit-details-marker{display:none}.rd-more[open] summary{margin-bottom:8px}
 .rd-preset{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font-size:15px;font-weight:600}
 .rd-preset[aria-pressed="true"]{background:#1c1c1e;color:#fff}
 .rd-days{margin:12px 0;border-radius:16px;background:#f8f8fa;padding:4px 12px}
@@ -546,6 +575,7 @@ ${sign}
 <h2>Artist</h2>
 <p class="rd-note">Only cards with an illustrator credit on file show up here.</p>
 <div class="rd-chips">${ARTIST_CHOICES.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div>
+<details class="rd-more"${ARTIST_MORE.some((row) => (shown.artists || []).includes(row.slug)) ? " open" : ""}><summary>More artists</summary><div class="rd-chips">${ARTIST_MORE.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div></details>
 <h2>Singles or sealed</h2>
 <div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
 ${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}
