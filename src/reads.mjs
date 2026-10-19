@@ -460,7 +460,7 @@ export function renderReadsPage(state = {}) {
     const label = row.name || row.id || "Saved product";
     return choice("keep", value, label, true);
   }).join("");
-  const sign = signedIn ? "" : `<p><a href="/auth/discord?next=/reads">Sign in with Discord</a> to save this read.</p>`;
+  const sign = signedIn ? "" : `<p><a class="rd-sign" href="/auth/discord?next=/reads">Sign in with Discord</a> to save this read.</p>`;
   const beacon = signedIn
     ? `<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>`
     : "";
@@ -476,7 +476,7 @@ export function renderReadsPage(state = {}) {
 .rd-rec{color:#8e8e93;font-size:12px;margin:0 0 8px}
 .rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
-.rd-note{color:#636366;font-size:14px}.rd-note a{color:#7a5a1f}
+.rd-note{color:#636366;font-size:14px}.rd-note a,.rd-sign{color:#7a5a1f}
 .rd-mail{display:block;margin-top:8px}
 .rd-preset{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font-size:15px;font-weight:600}
 .rd-preset[aria-pressed="true"]{background:#1c1c1e;color:#fff}

@@ -1201,6 +1201,31 @@ const worker = {
       if (request.method === "HEAD") return new Response(null, { status: 200, headers });
       return new Response(bytes, { status: 200, headers });
     }
+    if (request.method === "GET" && url.pathname === "/api/card-hero") {
+      // Right-sized card hero (about 430px wide JPEG, ~70 KB) for phones and 1x screens.
+      // Any miss redirects to the page's own hi-res picture, so the hero never breaks.
+      const pid = Math.trunc(Number(url.searchParams.get("pid")));
+      const fb = String(url.searchParams.get("fb") || "");
+      const back = /^\/data\/editor\/tcg\/[a-z0-9]+\/[A-Za-z0-9._-]+$/.test(fb) ? fb : "";
+      const miss = () => back ? new Response(null, { status: 302, headers: { location: back, "cache-control": "public, max-age=3600" } }) : new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      if (!(pid > 0) || !IMAGE_HOSTS.includes("tcgplayer-cdn.tcgplayer.com")) return miss();
+      let edge = null;
+      try { edge = typeof caches !== "undefined" ? caches.default : null; } catch { edge = null; }
+      const key = new Request(url.origin + "/api/card-hero?pid=" + pid, { method: "GET" });
+      if (edge) { try { const hit = await edge.match(key); if (hit) return hit; } catch {} }
+      try {
+        const probe = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
+        if (!probe.ok) return miss();
+        const pb = new Uint8Array(await probe.arrayBuffer());
+        const d = [...new Uint8Array(await crypto.subtle.digest("SHA-256", pb))].map((x) => x.toString(16).padStart(2, "0")).join("");
+        if (d.startsWith("23c8d781")) return miss();
+        const img = await fetch("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_600x600.jpg");
+        if (!img.ok) return miss();
+        const out = new Response(await img.arrayBuffer(), { status: 200, headers: { "content-type": img.headers.get("content-type") || "image/jpeg", "cache-control": "public, max-age=2592000, immutable" } });
+        if (edge) { try { const put = edge.put(key, out.clone()); if (typeof ctx !== "undefined" && ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(put); else await put; } catch {} }
+        return out;
+      } catch { return miss(); }
+    }
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/video/quota") return handleVideoQuota(request, env);
