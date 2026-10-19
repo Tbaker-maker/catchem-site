@@ -74,7 +74,7 @@ export function indexHistoryChart(points, { color = "#d9b779", label = "Index le
   const spanDays = (Date.parse(points.at(-1)[0]) - Date.parse(points[0][0])) / DAY;
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
-  return `<figure class="hc" data-unit="index" data-snap="real" data-pts="${esc(JSON.stringify(points))}" data-color="${esc(color)}">
+  return `<figure class="hc" data-unit="index" data-snap="real" data-default-days="31" data-pts="${esc(JSON.stringify(points))}" data-color="${esc(color)}">
 <p class="hc-sum">${esc(label)} from ${esc(real[0][0])} to ${esc(real.at(-1)[0])}.</p>
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
@@ -177,6 +177,7 @@ function srcOf(p){return unit==="count"?"Listings counted, eBay":p[2]==="f"?"Pok
 function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.querySelector(".hc-dot");if(ln)ln.setAttribute("visibility","hidden");if(dot)dot.setAttribute("visibility","hidden");}
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});hide();draw(+b.getAttribute("data-days"));});});
-draw(0);}
+var def=fig.getAttribute("data-default-days"),pick=def?fig.querySelector('.hc-pill[data-days="'+def+'"]'):null;
+if(pick){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===pick?"true":"false");});draw(+def);}else draw(0);}
 function all(){document.querySelectorAll("figure.hc[data-pts]").forEach(mount);}window.catchemHistoryMount=all;
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",all);else all();})();`;
