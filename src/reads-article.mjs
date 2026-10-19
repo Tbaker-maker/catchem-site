@@ -401,7 +401,7 @@ export function barChart(a, { height = 64 } = {}) {
     return `<td valign="bottom" style="padding:0 1px"><div style="height:${h}px;background:${tone};border-radius:3px 3px 0 0;font-size:0;line-height:0">&nbsp;</div></td>`;
   }).join("");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-tile" bgcolor="${C.tile}" style="background:${C.tile};border-radius:16px;margin-top:12px"><tr><td style="padding:10px 10px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;height:${height}px"><tr>${cells}</tr></table>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font:400 10px/1.6 ${FONT};color:${C.soft}">${esc(day(pts[0][0]) + " " + money(pts[0][1]))}</td><td align="right" style="font:400 10px/1.6 ${FONT};color:${C.soft}">${esc(day(pts[pts.length - 1][0]) + " " + money(pts[pts.length - 1][1]))}</td></tr></table></td></tr></table>`;
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-soft" style="font:400 10px/1.6 ${FONT};color:${C.soft}">${esc(day(pts[0][0]) + " " + money(pts[0][1]))}</td><td align="right" class="ce-soft" style="font:400 10px/1.6 ${FONT};color:${C.soft}">${esc(day(pts[pts.length - 1][0]) + " " + money(pts[pts.length - 1][1]))}</td></tr></table></td></tr></table>`;
 }
 
 function card(inner, id = "") {
@@ -412,10 +412,10 @@ function para(t, extra = "") { return `<p class="ce-dim" style="margin:10px 0 0;
 function meta(i) { return `${i.set ? i.set + " · " : ""}${money(i.a.start[1])} ${day(i.a.start[0])} to ${money(i.a.last[1])} ${day(i.a.last[0])}`; }
 
 function row(i, { more = "", deep = false } = {}) {
-  const img = i.image ? `<td width="52" valign="top" style="padding-right:12px"><img src="${esc(i.image)}" width="52" height="72" alt="" style="display:block;width:52px;height:72px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
+  const img = i.image ? `<td width="52" valign="top" style="padding-right:12px"><img src="${esc(i.image)}" width="52" height="72" alt="" class="ce-img" style="display:block;width:52px;height:72px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
   const extra = deep && i.a.stageInfo ? ` · Run stage: ${i.a.stage} ${i.a.stageInfo.dir === "down" ? "▼" : "▲"}` : "";
   const moreLink = more ? `<br><a href="${esc(more)}" class="ce-ink" style="color:${C.ink};font-weight:600;text-decoration:underline;display:inline-block;min-height:24px">Read more</a>` : "";
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
 <a href="${esc(i.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(i.name)}</a>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(i) + extra)}</p>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(i.story)}${moreLink}</p>
@@ -433,31 +433,49 @@ function shopButtons(i) {
 
 function supplyRow(r) {
   const up = r.word === "Stacking";
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr><td style="padding:8px 0"><span class="ce-ink" style="font:600 15px/1.25 ${FONT};color:${C.ink}">${esc(r.name)}</span>
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr><td style="padding:8px 0"><span class="ce-ink" style="font:600 15px/1.25 ${FONT};color:${C.ink}">${esc(r.name)}</span>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(`${r.word}: ${r.prev} to ${r.n} listings counted, ${day(r.prevDate)} to ${day(r.date)}.`)}</p></td><td width="76" align="right" style="padding-left:8px"><span style="display:inline-block;border-radius:999px;padding:3px 10px;font:600 13px/1.4 ${FONT};background:${C.tile};color:${C.dim};white-space:nowrap" class="ce-dim ce-tile">${esc(pct(r.change))}</span></td></tr></table>`;
 }
 
 function tilesHtml(tiles) {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${tiles.map((t) => `<td width="33%" style="padding:0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-tile" bgcolor="${C.tile}" style="background:${C.tile};border-radius:14px"><tr><td align="center" style="padding:10px 4px"><b class="ce-ink" style="display:block;font:700 20px/1.2 ${FONT};color:${C.ink}">${esc(t.n)}</b><span style="font:400 12px/1.3 ${FONT};color:${C.soft}">${esc(t.t)}</span></td></tr></table></td>`).join("")}</tr></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${tiles.map((t) => `<td width="33%" style="padding:0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-tile" bgcolor="${C.tile}" style="background:${C.tile};border-radius:14px"><tr><td align="center" style="padding:10px 4px"><b class="ce-ink" style="display:block;font:700 20px/1.2 ${FONT};color:${C.ink}">${esc(t.n)}</b><span class="ce-soft" style="font:400 12px/1.3 ${FONT};color:${C.soft}">${esc(t.t)}</span></td></tr></table></td>`).join("")}</tr></table>`;
+}
+
+// Brand dark look (catchemtcg.com): used when the reader's app is in dark mode.
+// Same rules go under prefers-color-scheme and Outlook's [data-ogsc]/[data-ogsb] hooks.
+export const DARK = { page: "#12100e", card: "#1a1815", tile: "#211e1a", ink: "#efe9de", dim: "#cfc6b6", soft: "#a89f90", gold: "#d9b779", goldInk: "#1a1407", line: "#2c2823", up: "#7fd99a", upBg: "#123d22", dn: "#ff9a90", dnBg: "#4a1714" };
+function darkRules(t, b) {
+  const D = DARK;
+  return [
+    `${b}.ce-page{background:${D.page} !important}`, `${b}.ce-card{background:${D.card} !important}`, `${b}.ce-tile{background:${D.tile} !important}`,
+    `${t}.ce-ink{color:${D.ink} !important}`, `${t}.ce-dim{color:${D.dim} !important}`, `${t}.ce-soft,${t}.ce-soft a{color:${D.soft} !important}`, `${t}.ce-brand{color:${D.gold} !important}`,
+    `${b}.ce-up{background:${D.upBg} !important}`, `${t}.ce-up{color:${D.up} !important}`, `${b}.ce-dn{background:${D.dnBg} !important}`, `${t}.ce-dn{color:${D.dn} !important}`,
+    `${b}.ce-btn-dark{background:${D.gold} !important;border-color:${D.gold} !important}`, `${t}.ce-btn-dark{color:${D.goldInk} !important}`,
+    `${b}.ce-btn-light{background:${D.card} !important;border-color:${D.gold} !important}`, `${t}.ce-btn-light{color:${D.ink} !important}`,
+    `${b}.ce-line{border-color:${D.line} !important}`, `${b}.ce-img{background:${D.tile} !important}`,
+  ].join("");
+}
+export function darkCss() {
+  return `@media (prefers-color-scheme: dark){${darkRules("", "")}}\n${darkRules("[data-ogsc] ", "[data-ogsb] ")}`;
 }
 
 function shell(title, preheader, body, footer) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(title)}</title>
 <style>:root{color-scheme:light dark;supported-color-schemes:light dark}
-@media (prefers-color-scheme: dark){.ce-page{background:#000000 !important}.ce-card{background:#1c1c1e !important}.ce-tile{background:#2c2c2e !important}.ce-ink{color:#f2f2f7 !important}.ce-dim{color:#c7c7cc !important}.ce-soft{color:#98989d !important}.ce-up{background:#123d22 !important;color:#7fd99a !important}.ce-dn{background:#4a1714 !important;color:#ff9a90 !important}.ce-btn-dark{background:#f2f2f7 !important;color:#1c1c1e !important;border-color:#f2f2f7 !important}.ce-btn-light{background:#1c1c1e !important;color:#f2f2f7 !important;border-color:#48484a !important}}</style></head>
+${darkCss()}</style></head>
 <body class="ce-page" style="margin:0;padding:0;background:${C.page}"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-page" bgcolor="${C.page}" style="background:${C.page}"><tr><td align="center" style="padding:16px 14px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:420px">${body}
-<tr><td style="padding:8px 10px;text-align:center;font:400 11px/1.5 ${FONT};color:${C.soft}">${footer}</td></tr></table></td></tr></table></body></html>`;
+<tr><td class="ce-soft" style="padding:8px 10px;text-align:center;font:400 11px/1.5 ${FONT};color:${C.soft}">${footer}</td></tr></table></td></tr></table></body></html>`;
 }
 
 // A dated move row for the report card and catch up: from, to, pill.
 function windowRow(r) {
-  const img = r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
+  const img = r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" class="ce-img" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
   const flat = Math.abs(r.change) < 0.5;
   const tag = flat
     ? `<span class="ce-dim ce-tile" style="display:inline-block;border-radius:999px;padding:3px 10px;font:600 13px/1.4 ${FONT};background:${C.tile};color:${C.dim};white-space:nowrap">Flat</span>`
     : pill(r.change);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
 <a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(`${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])}`)}</p>
 </td><td width="76" align="right" valign="middle" style="padding-left:8px">${tag}</td></tr></table>`;
@@ -470,7 +488,7 @@ function reportCard(rep, L) {
   const flat = rep.rows.length - up - down;
   const sum = [up ? `${up} up` : "", down ? `${down} down` : "", flat ? `${flat} flat` : ""].filter(Boolean).join(", ");
   const rows = L === "glance" ? rep.rows.slice(0, 3) : rep.rows;
-  return card(h2("Watchlist report card") + `<p class="ce-ink" style="margin:0 0 6px;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(head)}</p><p style="margin:0 0 8px;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sum)}. TCGplayer market on the dates shown.</p>` + rows.map(windowRow).join(""), "report-card");
+  return card(h2("Watchlist report card") + `<p class="ce-ink" style="margin:0 0 6px;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(head)}</p><p class="ce-soft" style="margin:0 0 8px;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sum)}. TCGplayer market on the dates shown.</p>` + rows.map(windowRow).join(""), "report-card");
 }
 
 function awayCard(away) {
@@ -478,7 +496,7 @@ function awayCard(away) {
 }
 
 function buildingCard(rows) {
-  return card(h2("What's building quietly") + para("A quiet day. These are slow, steady moves that are easy to miss.", ";margin-top:0;font-size:13px") + rows.map((r) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : ""}<td valign="middle" style="padding:8px 0"><a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(r.line)}</p></td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(r.change)}</td></tr></table>`).join(""), "building");
+  return card(h2("What's building quietly") + para("A quiet day. These are slow, steady moves that are easy to miss.", ";margin-top:0;font-size:13px") + rows.map((r) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" class="ce-img" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : ""}<td valign="middle" style="padding:8px 0"><a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(r.line)}</p></td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(r.change)}</td></tr></table>`).join(""), "building");
 }
 
 const LENGTH_NAME = { glance: "Glance", standard: "Daily read", deep: "Deep dive" };
@@ -488,9 +506,9 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   const when = day(doc.asOf);
   const anchor = (id) => (more ? more + "#" + id : "");
   const body = [];
-  body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
+  body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
   const sub = `${LENGTH_NAME[L]} · ${when} · ${doc.label}`;
-  body.push(card(`<p class="ce-ink" style="margin:0 0 6px;font:700 21px/1.3 ${FONT};color:${C.ink}">${esc(doc.lead)}</p><p style="margin:0;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sub)}</p>${L !== "glance" ? para(doc.intro) : ""}${doc.fallback ? para(doc.fallback, ";font-style:italic") : ""}`));
+  body.push(card(`<p class="ce-ink" style="margin:0 0 6px;font:700 21px/1.3 ${FONT};color:${C.ink}">${esc(doc.lead)}</p><p class="ce-soft" style="margin:0;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sub)}</p>${L !== "glance" ? para(doc.intro) : ""}${doc.fallback ? para(doc.fallback, ";font-style:italic") : ""}`));
   if (doc.report) body.push(reportCard(doc.report, L));
   if (doc.away) body.push(awayCard(doc.away));
   const t = doc.top;
@@ -498,7 +516,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     const moves = [t, ...doc.ups, ...doc.downs].slice(0, 3);
     body.push(card(h2("Three moves") + moves.map((i, n) => row(i, { more: anchor(n === 0 ? "top-move" : "move-" + i.id) })).join("") + (doc.supply[0] ? `<p class="ce-dim" style="margin:12px 0 0;font:400 14px/1.45 ${FONT};color:${C.dim}">Supply: ${esc(doc.supply[0].name)} ${esc(doc.supply[0].word.toLowerCase())}, ${doc.supply[0].prev} to ${doc.supply[0].n} listings counted (${esc(day(doc.supply[0].prevDate))} to ${esc(day(doc.supply[0].date))}).</p>` : "")));
   } else {
-    const img = t.image ? `<td width="88" valign="top" style="padding-right:12px"><img src="${esc(t.image)}" width="88" height="122" alt="" style="display:block;width:88px;height:122px;object-fit:cover;border-radius:14px;background:${C.line}"></td>` : "";
+    const img = t.image ? `<td width="88" valign="top" style="padding-right:12px"><img src="${esc(t.image)}" width="88" height="122" alt="" class="ce-img" style="display:block;width:88px;height:122px;object-fit:cover;border-radius:14px;background:${C.line}"></td>` : "";
     const why = L === "deep" ? [t.a.stageInfo ? `Run stage: ${stageLine(t.a.stageInfo)}` : "", t.vintage ? "This card is from the WOTC era, before mid 2003." : "", `Window: ${day(t.a.start[0])} to ${day(t.a.last[0])}, TCGplayer market.`].filter(Boolean) : [];
     body.push(card(h2("Top move") + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}<td valign="middle"><a href="${esc(t.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(t.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(t))}</p></td><td width="76" align="right" valign="middle">${pill(t.a.change)}</td></tr></table>` + barChart(t.a) + para(t.story) + (L === "deep" && why.length ? `<p class="ce-ink" style="margin:14px 0 0;font:600 14px/1.3 ${FONT};color:${C.ink}">Why it matters</p>` + why.map((w) => para(w)).join("") : "") + shopButtons(t) + `<p style="margin:10px 0 0"><a href="${esc(t.href)}" class="ce-ink" style="display:inline-block;min-height:44px;line-height:44px;font:600 15px/44px ${FONT};color:${C.ink};text-decoration:underline">See the read</a></p>`, "top-move"));
     if (doc.tiles.length) body.push(card(h2(doc.path === "default" ? "The whole group today" : doc.label + " today") + tilesHtml(doc.tiles) + para(`Price change over each item's latest 7 days on file, up to ${when}. Listings counted are the last two nights.`, ";font-size:13px")));
@@ -508,15 +526,15 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     if (doc.building?.length) body.push(buildingCard(doc.building));
     if (L === "deep" && doc.setCompare.length) body.push(card(h2("Set by set") + doc.setCompare.map((r) => `<p class="ce-dim" style="margin:0 0 8px;font:400 14px/1.4 ${FONT};color:${C.dim}"><b class="ce-ink" style="color:${C.ink}">${esc(r.set)}</b>: ${r.up} up, ${r.down} down, of ${r.n} in this read.</p>`).join(""), "sets"));
     if (doc.vintage) body.push(card(h2("Vintage note") + row(doc.vintage, { deep: L === "deep" }), "vintage"));
-    if (doc.pattern) body.push(card(h2("Pattern to know") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.pattern.text)}</p><p style="margin:6px 0 0;font:400 13px/1.35 ${FONT};color:${C.soft}">Pattern as of ${esc(day(doc.pattern.asOf))}. TCGplayer market.</p>`, "pattern"));
+    if (doc.pattern) body.push(card(h2("Pattern to know") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.pattern.text)}</p><p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.35 ${FONT};color:${C.soft}">Pattern as of ${esc(day(doc.pattern.asOf))}. TCGplayer market.</p>`, "pattern"));
     if (doc.rotation) body.push(card(h2("Rotation") + `<p class="ce-dim" style="margin:0;font:400 15px/1.45 ${FONT};color:${C.dim}">${esc(doc.rotation.text)}</p>`, "rotation"));
   }
-  if (doc.news && L !== "glance") body.push(card(h2("News") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.news.text)}</p><p style="margin:6px 0 0;font:400 13px/1.35 ${FONT}"><a href="${esc(doc.news.href)}" style="color:${C.soft};text-decoration:underline">${esc(doc.news.source || "Source")}</a></p>`, "news"));
+  if (doc.news && L !== "glance") body.push(card(h2("News") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.news.text)}</p><p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.35 ${FONT}"><a href="${esc(doc.news.href)}" style="color:${C.soft};text-decoration:underline">${esc(doc.news.source || "Source")}</a></p>`, "news"));
   const cta = more || SITE + "/feed";
   const ctaLabel = L === "glance" ? "Read the full version" : more ? "Open this read on the site" : "See every card in your read";
   body.push(`<tr><td style="padding:4px 0 8px"><a href="${esc(cta)}" class="ce-btn-dark" style="display:block;text-align:center;background:${C.ink};color:#ffffff;border-radius:999px;padding:12px;min-height:20px;font:600 15px/20px ${FONT};text-decoration:none">${esc(ctaLabel)}</a></td></tr>`);
   if (suggest?.href && suggest?.text) {
-    body.push(`<tr><td style="padding:4px 10px 4px;text-align:center"><p style="margin:0;font:400 12px/1.5 ${FONT};color:${C.soft}">${esc(suggest.text)}</p><a href="${esc(suggest.href)}" class="ce-btn-light" style="display:inline-block;margin-top:6px;min-height:44px;line-height:44px;padding:0 18px;border-radius:999px;background:${C.card};border:1px solid #d1d1d6;color:${C.ink};font:600 14px/44px ${FONT};text-decoration:none">${esc(suggest.label)}</a></td></tr>`);
+    body.push(`<tr><td style="padding:4px 10px 4px;text-align:center"><p class="ce-soft" style="margin:0;font:400 12px/1.5 ${FONT};color:${C.soft}">${esc(suggest.text)}</p><a href="${esc(suggest.href)}" class="ce-btn-light" style="display:inline-block;margin-top:6px;min-height:44px;line-height:44px;padding:0 18px;border-radius:999px;background:${C.card};border:1px solid #d1d1d6;color:${C.ink};font:600 14px/44px ${FONT};text-decoration:none">${esc(suggest.label)}</a></td></tr>`);
   }
   const footer = [
     "Prices are TCGplayer market on the dates shown. Listings counted are eBay listings on the dates shown. A listing is not a sale.",

@@ -4,7 +4,7 @@
 
 import { isClean } from "./advice-rules.mjs";
 import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
-import { WEEKDAY_NAMES, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, renderArticle } from "./reads-article.mjs";
+import { WEEKDAY_NAMES, darkCss, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, renderArticle } from "./reads-article.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -181,47 +181,42 @@ export function attachFeed(rows, feedReads) {
 }
 
 function chipHtml(chip) {
-  return `<span style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}</span>`;
+  return `<span class="ce-tile ce-ink" style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}</span>`;
 }
 
 function button(href, label, light = false) {
   const bg = light ? "#f2f2f7" : "#1c1c1e";
   const color = light ? "#1c1c1e" : "#ffffff";
-  return `<a href="${esc(href)}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;margin:0 8px 8px 0;border-radius:999px;background:${bg};color:${color};text-decoration:none;font:600 15px/44px Arial,Helvetica,sans-serif;">${esc(label)}</a>`;
+  return `<a href="${esc(href)}" class="${light ? "ce-btn-light" : "ce-btn-dark"}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;margin:0 8px 8px 0;border-radius:999px;background:${bg};color:${color};text-decoration:none;font:600 15px/44px Arial,Helvetica,sans-serif;">${esc(label)}</a>`;
 }
 
 export function readsEmailHtml({ lead, day, reads, stopUrl }) {
   const when = readsDateLabel(day);
   const cards = (reads || []).map((read) => {
     const title = read.href
-      ? `<a href="${esc(read.href)}" style="color:#1c1c1e;text-decoration:none;">${esc(read.headline)}</a>`
+      ? `<a href="${esc(read.href)}" class="ce-ink" style="color:#1c1c1e;text-decoration:none;">${esc(read.headline)}</a>`
       : esc(read.headline);
     const open = read.href ? `<p style="margin:8px 0 0;">${button(read.href, "Open this read", true)}</p>` : "";
     const shops = [
       read.tcgUrl ? button(read.tcgUrl, "Buy on TCGplayer") : "",
       read.ebayUrl ? button(read.ebayUrl, "Buy on eBay") : "",
     ].join("");
-    const note = shops ? `<p style="margin:4px 0 0;color:#8e8e93;font:13px/1.4 Arial,Helvetica,sans-serif;">${esc(SHOP_NOTE)}</p>` : "";
-    const blurb = read.blurb ? `<p style="margin:8px 0 0;color:#3a3a3c;font:15px/1.45 Arial,Helvetica,sans-serif;">${esc(read.blurb)}</p>` : "";
+    const note = shops ? `<p class="ce-soft" style="margin:4px 0 0;color:#8e8e93;font:13px/1.4 Arial,Helvetica,sans-serif;">${esc(SHOP_NOTE)}</p>` : "";
+    const blurb = read.blurb ? `<p class="ce-dim" style="margin:8px 0 0;color:#3a3a3c;font:15px/1.45 Arial,Helvetica,sans-serif;">${esc(read.blurb)}</p>` : "";
     const chips = read.chips?.length ? `<p style="margin:10px 0 0;">${read.chips.map(chipHtml).join("")}</p>` : "";
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 class="ce-ink" style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
   }).join("");
   const stop = stopUrl
-    ? `<p style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
+    ? `<p class="ce-soft" style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
     : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(readsSubject(day))}</title>
-<style>
-@media (prefers-color-scheme: dark) {
-  .ce-bg { background:#12100e !important; }
-  .ce-card { background:#1c1916 !important; }
-  .ce-text, .ce-text a { color:#efe9de !important; }
-  .ce-muted { color:#c4baab !important; }
-}
+<style>:root{color-scheme:light dark;supported-color-schemes:light dark}
+${darkCss()}
 </style></head>
-<body class="ce-bg" style="margin:0;padding:0;background:#f2f2f7;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-bg" style="background:#f2f2f7;"><tr><td align="center" style="padding:16px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;"><tr><td class="ce-text" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-muted" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
-<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="background:#ffffff;border-radius:22px;margin:0 0 12px;"><tr><td style="padding:18px 16px;"><p class="ce-text" style="margin:0;font:700 22px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${esc(lead || readsSubject(day))}</p></td></tr></table>
+<body class="ce-page" style="margin:0;padding:0;background:#f2f2f7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-page" style="background:#f2f2f7;"><tr><td align="center" style="padding:16px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;"><tr><td class="ce-ink ce-brand" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-soft" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
+<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="background:#ffffff;border-radius:22px;margin:0 0 12px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:700 22px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${esc(lead || readsSubject(day))}</p></td></tr></table>
 ${cards}
 ${stop}
 </td></tr></table>
