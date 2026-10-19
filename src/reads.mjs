@@ -238,7 +238,7 @@ ${rows}</details>`;
 export function whereItGoes(shown, state = {}) {
   const head = `<h2>Where it goes</h2>
 <input type="hidden" name="discord" value="1">
-<p class="rd-chip"><input type="checkbox" checked disabled> <span>Discord DM</span></p>`;
+<p class="rd-chip"><input type="checkbox" checked disabled aria-label="Discord DM"> <span>Discord DM</span></p>`;
   if (state.emailArmed !== true) {
     return `${head}
 <p class="rd-note" id="rd-mail-soon">Email delivery is coming soon.</p>`;
@@ -476,7 +476,7 @@ export function renderReadsPage(state = {}) {
 .rd-rec{color:#8e8e93;font-size:12px;margin:0 0 8px}
 .rd-sample{font-size:17px;line-height:1.35;margin:0;white-space:pre-wrap}
 .rd-wrap button[type="submit"]{display:block;width:100%;min-height:44px;border:0;border-radius:999px;background:#1c1c1e;color:#fff;padding:12px;font-weight:600;font-size:16px}
-.rd-note{color:#636366;font-size:14px}
+.rd-note{color:#636366;font-size:14px}.rd-note a{color:#7a5a1f}
 .rd-mail{display:block;margin-top:8px}
 .rd-preset{min-height:44px;padding:0 16px;border:0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font-size:15px;font-weight:600}
 .rd-preset[aria-pressed="true"]{background:#1c1c1e;color:#fff}
@@ -564,7 +564,7 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
       var parts = String(keeps[n].value || "").split(":");
       if (parts[1]) add((parts[0] === "sealed" ? "sealed:" : "card:") + parts[1]);
     }
-    out.textContent = bits.length ? bits.slice(0, 6).join("\n\n") : "Sample read. The night file fills the dated lines.";
+    out.textContent = bits.length ? bits.slice(0, 6).join("\\n\\n") : "Sample read. The night file fills the dated lines.";
     var catalog = [];
     try { catalog = JSON.parse(document.getElementById("rd-chip-catalog").textContent || "[]"); } catch (e) { catalog = []; }
     var sample = out.textContent || "";

@@ -113,13 +113,15 @@ function listingsChip(read) {
     ? Number(rec.n)
     : (Number.isInteger(Number(read?.listings)) ? Number(read.listings) : null);
   const day = dayLabel(fromListings ? (rec.date || read?.listingsAsOf) : read?.listingsAsOf);
-  if (n == null || n < 0 || !day) return "";
+  if (n == null || !(n > 0) || !day) return "";
   const prev = fromListings ? Number(rec.prev) : NaN;
   const prevDay = fromListings ? dayLabel(rec.prevDate) : "";
   let change = "";
   if (prev > 0 && prevDay) {
     const pct = Math.round(((n - prev) / prev) * 1000) / 10;
-    change = `, 7-day ${pct > 0 ? "+" : ""}${pct}% from ${prevDay}`;
+    const span = Math.round((Date.parse(rec.date) - Date.parse(rec.prevDate)) / 86400000);
+    const win = span === 1 ? "1-day" : span >= 7 ? "7-day" : span > 1 ? `${span}-day` : "";
+    change = win ? `, ${win} ${pct > 0 ? "+" : ""}${pct}% from ${prevDay}` : "";
   }
   return chip(`${n} listings counted, ${day}${change}`);
 }
@@ -203,7 +205,7 @@ export function factChips(f) {
   if (!f || typeof f !== "object") return [];
   const out = [];
   const l = f.listings;
-  if (l && Number.isInteger(l.n) && dayLabel(l.date)) {
+  if (l && Number.isInteger(l.n) && l.n > 0 && dayLabel(l.date)) {
     let tail = "";
     if (Number.isFinite(l.pct) && dayLabel(l.prevDate)) tail = `, ${l.span >= 7 ? "7-day" : `${l.span}-day`} ${pp(l.pct)} from ${shortDay(l.prevDate)}`;
     out.push(chip(`${l.n} listings counted, ${shortDay(l.date)}${tail}`));
@@ -287,7 +289,7 @@ export function readSheet(read, ctx = {}) {
   const name = cleanTitle(String(read.name || meta.name || "").trim());
   const bits = [number, rarity, artist].filter(Boolean);
   const hero = (face || logo || name || bits.length || prices.line)
-    ? `<div class="rd-hero">${face ? `<img class="rd-face" alt="" src="${esc(face)}" width="120" height="168">` : ""}<div>${name ? `<h2>${esc(name)}</h2>` : ""}<div class="rd-meta">${logo ? `<img class="rd-logo" alt="" src="${esc(logo)}" height="28">` : ""}${bits.map((bit) => `<span>${esc(bit)}</span>`).join("")}</div>${prices.line ? `<p>${esc(prices.line)}</p>` : ""}</div></div>`
+    ? `<div class="rd-hero">${face ? `<img class="rd-face" alt="" src="${esc(face)}" width="120" height="168" decoding="async" onerror="this.remove()">` : ""}<div>${name ? `<h2>${esc(name)}</h2>` : ""}<div class="rd-meta">${logo ? `<img class="rd-logo" alt="" src="${esc(logo)}" height="28">` : ""}${bits.map((bit) => `<span>${esc(bit)}</span>`).join("")}</div>${prices.line ? `<p>${esc(prices.line)}</p>` : ""}</div></div>`
     : "";
   const fc = factCards(facts);
   const chipRow = facts ? [!facts.listings ? listingsChip(read) : "", ...factChips(facts), ...rotTagChips(read, ctx)].filter(Boolean).join("") : chipsFor(read, ctx);

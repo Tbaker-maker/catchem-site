@@ -1150,20 +1150,28 @@ const worker = {
       }
       // Temporary proxy until the id has a Post Office catalogue hit. No new host may be added.
       if (!IMAGE_HOSTS.includes("images.pokemontcg.io")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+      // Card pictures never change for a given path: serve from the edge cache so a
+      // repeat view never waits on the upstream host (it was the card page LCP).
+      let edge = null;
+      try { edge = typeof caches !== "undefined" ? caches.default : null; } catch { edge = null; }
+      const edgeKey = new Request(url.origin + url.pathname, { method: "GET" });
+      if (edge) { try { const hit = await edge.match(edgeKey); if (hit) return hit; } catch {} }
       let img = null;
       for (const path of editorImageFallbacks(rest)) {
         const hit = await fetchImpl("https://images.pokemontcg.io/" + path);
         if (hit && hit.ok) { img = hit; break; }
       }
       if (!img) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-      return new Response(img.body, {
+      const out = new Response(img.body, {
         status: 200,
         headers: {
           "content-type": img.headers.get("content-type") || "image/png",
-          "cache-control": "public, max-age=86400",
+          "cache-control": "public, max-age=2592000, immutable",
           "access-control-allow-origin": "*",
         },
       });
+      if (edge) { try { const put = edge.put(edgeKey, out.clone()); if (typeof ctx !== "undefined" && ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(put); else await put; } catch {} }
+      return out;
     }
     if (request.method === "GET" && url.pathname === "/api/quick") {
       const id = url.searchParams.get("id") || "";
