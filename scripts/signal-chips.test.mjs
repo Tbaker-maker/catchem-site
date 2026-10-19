@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { preSend } from "../src/reads.mjs";
-import { ICON_LINES, ICON_SOURCE, TILE_JS, attachSignals, chipLookup, signalRowHtml } from "../src/signal-chips.mjs";
+import { ICON_LINES, ICON_SOURCE, TILE_JS, attachSignals, chipLookup, signalJoin, signalLeadMarkup, signalRowHtml } from "../src/signal-chips.mjs";
 import { renderFeed } from "../src/ui.mjs";
 
 let fail = 0;
@@ -80,8 +80,19 @@ t("tile css: rounded, 44px plus, no layout shift, reduced motion", css.includes(
 t("one guarded listener flips tiles and Escape flips back", TILE_JS.includes("__ceTiles") && TILE_JS.includes("Escape") && TILE_JS.includes("aria-pressed"));
 const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 const client = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
-t("chips and tiles load for a signed out visitor", ui.includes('"/data/signal-chips.json"') && client.includes("function signalJoin") && client.includes("next.tiles=hit.tiles") && !client.includes("premium"));
+t("chips and tiles load for a signed out visitor", ui.includes('"/data/signal-chips.json"') && client.includes("function signalJoin") && client.includes("next.tiles = hit.tiles") && !client.includes("premium"));
 t("bySku may point at a byId key", chipLookup({ byId: { r1: { tiles } }, bySku: { "tcgcsv-1": "r1" } }, "move-tcgcsv-1-7")?.tiles === tiles);
+const joinedMove = signalJoin({ id: "move-tcgcsv-9-7", sku: "tcgcsv-9", href: "/c/tcgcsv-9" }, { byId: { "deep-card-tcgcsv-9": { tiles, signals: all.signals } } });
+t("a quick read joins tiles by the tcgcsv id when bySku is empty", joinedMove.tiles === tiles);
+const own = { data: tiles.data, price: { ...tiles.price, pct: 1.5 } };
+t("the read's own tiles win over another row with the same sku", signalJoin({ id: "move-tcgcsv-9-7", sku: "tcgcsv-9" }, { byId: { "move-tcgcsv-9-7": { tiles: own, signals: [{ kind: "move", dir: "up", text: "1.5% 7D", label: "Price up 1.5 percent over 7 days" }] }, "deep-card-tcgcsv-9": { tiles } } }).tiles.price.pct === 1.5);
+const leadHtml = signalLeadMarkup({ id: "move-tcgcsv-9-7", sku: "tcgcsv-9" }, { byId: { "deep-card-tcgcsv-9": { tiles, signals: all.signals } } }, (s) => String(s ?? ""));
+t("next reads show compact tiles, not one pill", leadHtml.includes('class="tiles"') && leadHtml.includes("is-compact") && !leadHtml.includes("sig-row"));
+const moved = attachSignals({ reads: [{ id: "move-tcgcsv-9-7", sku: "tcgcsv-9", signals: [{ kind: "era", tag: "Modern", label: "Modern" }] }] }, { byId: { "deep-card-tcgcsv-9": { tiles, signals: all.signals, blurb: all.blurb } } });
+t("tiles attach by sku when the row already has a chip", moved.reads[0].signals[0].kind === "era" && moved.reads[0].tiles.price.pct === 7.2);
+t("fast mode keeps the tiles on screen", css.includes(".is-fast .tiles{display:grid}") && !/\.is-fast \.tiles\{[^}]*display:none/.test(css));
+t("a read page replaces a pill header instead of skipping tiles", client.includes("function signalBitsMarkup") && client.includes('closest("article")') && !client.includes('querySelector("main .sig-block"))return ""'));
+t("next read tiles are not nested inside the row button", ui.includes('<div class="fl-bits">') && ui.includes("overflow-x:hidden") && !ui.includes('<span class="fl-bits">'));
 t("the feed title is the name with a number sign", ui.includes("function readTitle(card)") && ui.includes("html(readTitle(card)"));
 t("the key names no Arrow or Flame label", !client.includes(">Arrow<") && !client.includes(">Flame<"));
 

@@ -4494,6 +4494,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-card .open-data{justify-content:center;padding:0 20px;border-radius:14px;background:var(--gold);color:#1a1407;text-decoration:none}
   .feed-list{margin:18px 0 8px}.feed-list h3{margin:0 0 8px;font:600 16px/1.2 var(--sans);color:var(--dim)}
   .fl-scroll{display:flex;flex-direction:column;gap:8px;max-height:min(560px,70dvh);overflow-y:auto;padding-right:2px;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}
+  .fl-item{display:flex;flex-direction:column;gap:6px;width:100%;min-width:0}
   .fl-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:inherit;text-align:left;font:inherit;cursor:pointer}
   .fl-bits{flex:1 1 100%;min-width:0;max-width:100%}
   .fl-brand{display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#d9b779,#a8854a)!important;color:#1a1407;font:700 18px/1 Georgia,serif}
@@ -4553,7 +4554,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-slide .read-nav button{pointer-events:auto;min-width:44px;width:44px;flex:0 0 44px;padding:0;background:transparent;border-color:transparent;color:var(--gold);font:600 34px/1 var(--sans);opacity:.9}
   .feed-slide .read-nav.hint button{opacity:.4}
   .read-pos{margin:0;color:var(--dim);font:600 13px/1.3 var(--sans);text-align:center}
-  .feed-slide{position:relative;overflow:hidden;flex:1 1 auto;min-width:0}
+  .feed-slide{position:relative;overflow-x:hidden;overflow-y:visible;flex:1 1 auto;min-width:0}
   .feed-slide .feed-card{width:100%}
   .feed-card.is-enter-next{animation:feedInNext 200ms ease}
   .feed-card.is-enter-prev{animation:feedInPrev 200ms ease}
@@ -5986,7 +5987,7 @@ function flRow(row, i){
   const ch=Number(row.change7);
   const chg=row.change7!=null&&row.change7!==""&&Number.isFinite(ch)?'<span class="'+(ch>0?"up":ch<0?"down":"")+'">7D '+(ch>0?"+":"")+ch+'%</span>':"";
   const bits=typeof signalLead==="function"?signalLead(row):"";
-  return '<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph fl-brand" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M9 15l2-2 2 1.5 2-3"/></svg></span>')+'<span class="fl-name">'+html(name)+"</span>"+(bits?'<span class="fl-bits">'+bits+"</span>":"")+'<span class="fl-num"><b>'+price+"</b>"+chg+"</span></button>";
+  return '<div class="fl-item"><button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph fl-brand" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M9 15l2-2 2 1.5 2-3"/></svg></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+"</b>"+chg+'</span></button>'+(bits?'<div class="fl-bits">'+bits+"</div>":"")+"</div>";
 }
 async function fillList(list, index){
   const total=totalReads();
@@ -6005,7 +6006,7 @@ async function fillList(list, index){
     const ch=Number(row.change7);
     const chg=Number.isFinite(ch)&&row.change7!==null&&row.change7!==""?'<span class="'+(ch>0?"up":ch<0?"down":"")+'">'+(ch>0?"+":"")+ch+'%</span>':"";
     const bits=typeof signalLead==="function"?signalLead(row):"";
-    html2+='<button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph"></span>')+'<span class="fl-name">'+html(name)+"</span>"+(bits?'<span class="fl-bits">'+bits+"</span>":"")+'<span class="fl-num"><b>'+price+"</b>"+chg+"</span></button>";
+    html2+='<div class="fl-item"><button type="button" class="fl-row" data-i="'+i+'">'+(thumb||'<span class="fl-ph"></span>')+'<span class="fl-name">'+html(name)+'</span><span class="fl-num"><b>'+price+"</b>"+chg+'</span></button>'+(bits?'<div class="fl-bits">'+bits+"</div>":"")+"</div>";
   }
   if(!html2) return;
   list.innerHTML='<h3>Next reads</h3><div class="fl-scroll">'+html2+'</div>';
