@@ -131,8 +131,8 @@ export function normalizeEmailRead(row) {
     if (!chip || chip.kind === "dash" || chip.dir === "dash") continue;
     const text = scrub(chip.text || chip.word || chip.badge || chip.tag || "", sealed);
     if (!text || /price being checked/i.test(text) || /\b(sold|sales)\b/i.test(text)) continue;
-    const strength = Math.round(Number(chip.strength));
-    chips.push({ text, strength: strength >= 1 && strength <= 5 ? strength : 0 });
+    // No strength dots. The site shows data bars on the chip itself.
+    chips.push({ text });
     if (chips.length >= 4) break;
   }
   const id = String(row.readId || "").trim();
@@ -174,17 +174,8 @@ export function attachFeed(rows, feedReads) {
   });
 }
 
-function dots(n) {
-  if (!(n >= 1)) return "";
-  const bits = [1, 2, 3, 4, 5].map((i) => {
-    const color = i <= n ? "#8a6a2f" : "#e6d3a8";
-    return `<span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:${color};margin:0 2px 0 0;"></span>`;
-  }).join("");
-  return `<span style="display:inline-block;margin-left:6px;vertical-align:middle;">${bits}</span>`;
-}
-
 function chipHtml(chip) {
-  return `<span style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}${dots(chip.strength)}</span>`;
+  return `<span style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}</span>`;
 }
 
 function button(href, label, light = false) {
@@ -234,7 +225,7 @@ ${stop}
 export function readsEmailText({ lead, day, reads, stopUrl }) {
   const parts = [lead || readsSubject(day)];
   for (const read of reads || []) {
-    const chips = (read.chips || []).map((chip) => chip.strength ? `${chip.text} (${chip.strength} of 5)` : chip.text).join(", ");
+    const chips = (read.chips || []).map((chip) => chip.text).join(", ");
     const lines = [read.headline, chips, read.blurb, read.href, read.tcgUrl ? "Buy on TCGplayer" : "", read.ebayUrl ? "Buy on eBay" : ""].filter(Boolean);
     if (read.tcgUrl || read.ebayUrl) lines.push(SHOP_NOTE);
     parts.push(lines.join("\n"));

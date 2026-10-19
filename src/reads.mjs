@@ -4,7 +4,7 @@
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
-import { SIGNAL_CSS, chipForSample, iconKeyHtml, signalRowHtml } from "./signal-chips.mjs";
+import { SIGNAL_CSS, TILE_JS, chipForSample, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
 import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay } from "./reads-article.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
@@ -445,9 +445,6 @@ export function renderReadsPage(state = {}) {
   const sample = sampleRead(shown, lineMap);
   const chipDoc = state.preview?.chips && typeof state.preview.chips === "object" ? state.preview.chips : null;
   const matched = chipForSample(sample, chipDoc);
-  const kinds = (matched?.signals || []).map((chip) => chip.kind);
-  if ((matched?.signals || []).some((chip) => chip.strength >= 1 && chip.strength <= 5)) kinds.push("dots");
-  if (matched && matched.strength >= 1 && matched.strength <= 5) kinds.push("score");
   const blob = Object.values(lineMap).join("\n");
   const catalog = [];
   const asOf = chipDoc?.asOf || "";
@@ -498,7 +495,7 @@ ${sign}
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
 <style>${SIGNAL_CSS}</style>
 <div id="rd-chip">${matched ? signalRowHtml(matched, { href: "", light: true, asOf }) : ""}</div>
-${iconKeyHtml(chipDoc?.asOf || "", kinds)}
+<script>${TILE_JS}</script>
 <script type="application/json" id="rd-lines">${lineJson}</script>
 <script type="application/json" id="rd-chip-catalog">${catalogJson}</script>
 </section>
@@ -577,13 +574,6 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     }
     var host = document.getElementById("rd-chip");
     if (host) host.innerHTML = best ? best.html : "";
-    var seen = {};
-    if (host) host.querySelectorAll("[data-kind]").forEach(function (el) { seen[el.getAttribute("data-kind")] = 1; });
-    if (host && host.querySelector(".sig-strength")) seen.dots = 1;
-    if (host && host.querySelector(".sig-overall")) seen.score = 1;
-    document.querySelectorAll(".icon-key-row").forEach(function (row) {
-      row.hidden = !seen[row.getAttribute("data-icon")];
-    });
   }
   form.addEventListener("change", paint);
   function setAll(name, values){

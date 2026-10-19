@@ -70,7 +70,7 @@ const sealed = normalizeEmailRead({
   setName: "Prismatic Evolutions",
   readId: "sealed-tcgcsv-77",
 });
-t("held and price being checked never become reads", held === null && checking === null && good && good.chips.length === 1 && good.chips[0].strength === 3);
+t("held and price being checked never become reads", held === null && checking === null && good && good.chips.length === 1 && !("strength" in good.chips[0]));
 t("a sealed read drops NM", sealed && !/\bNM\b/.test(sealed.headline) && !/\bNM\b/.test(sealed.blurb) && sealed.href.includes("/feed/r/"));
 t("a read links to the feed page and the shops", good.href === "https://catchemtcg.com/feed/r/move-tcgcsv-9001" && good.tcgUrl.includes("tcgplayer.com/product/9001") && good.ebayUrl.includes("ebay.com"));
 
@@ -85,7 +85,7 @@ const html = readsEmailHtml({ lead: "Your weekly Catch'em read, Oct 18.", day: "
 const text = readsEmailText({ lead: "Your weekly Catch'em read, Oct 18.", day: "2026-10-18", reads: [good, sealed], stopUrl });
 t("the letter is branded and rounded", html.includes("Catch'em") && html.includes("border-radius:22px") && html.includes("min-height:44px") && html.includes("color:#8e8e93") && html.includes("Buy on TCGplayer") && html.includes("Buy on eBay") && html.includes("small commission"));
 t("the letter links each read and has a stop link", html.includes("https://catchemtcg.com/feed/r/move-tcgcsv-9001") && html.includes("https://catchemtcg.com/feed/r/sealed-tcgcsv-77") && html.includes("/reads/email/stop?id=" + ID) && html.includes("Unsubscribe"));
-t("the letter has strength dots and no dashes or forbidden words", html.includes("border-radius:999px") && html.includes("8a6a2f") && !/[\u2013\u2014]/.test(html) && !/\b(sold|sales)\b/i.test(text) && !/price being checked/i.test(html) && !html.includes(TO));
+t("the letter has rounded chips with no strength dots and no dashes or forbidden words", html.includes("border-radius:999px") && !/ of 5\)/.test(text) && !html.includes("width:8px;height:8px;border-radius:999px") && !/[\u2013\u2014]/.test(html) && !/\b(sold|sales)\b/i.test(text) && !/price being checked/i.test(html) && !html.includes(TO));
 t("the letter copy passes the checker", emailCopyOk(text) && readsSubject("2026-10-18") === "Your Catch'em reads, Oct 18, 2026" && !/[\u2013\u2014]/.test(readsSubject("2026-10-18")));
 
 const off = await deliverOutboxEmails({ store, env: { FEED_KV: store }, outbox: { day: "2026-10-18", members: [] }, fetchImpl, feedReads: [], articleCtx: null });
