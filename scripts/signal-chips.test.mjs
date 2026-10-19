@@ -85,5 +85,22 @@ t("bySku may point at a byId key", chipLookup({ byId: { r1: { tiles } }, bySku: 
 t("the feed title is the name with a number sign", ui.includes("function readTitle(card)") && ui.includes("html(readTitle(card)"));
 t("the key names no Arrow or Flame label", !client.includes(">Arrow<") && !client.includes(">Flame<"));
 
+// Seller tag and run stage: pills only when one fires, plain words on the back.
+const lbase = { word: "Draining", dir: "down", pct: 25, days: 7, spark: [52, 50, 47, 45, 42, 40, 39], band: null, from: "2026-10-12", to: "2026-10-18" };
+const plain = signalRowHtml({ tiles: { listings: lbase } });
+t("no tag or stage, no pill", !plain.includes("tl-tag") && !/Few sellers|Spread out|Building|Slowing|Stalled|Reversing/.test(plain));
+const fired = signalRowHtml({ tiles: { listings: { ...lbase,
+  tag: { word: "Few sellers hold most", share: 61, usual: 30, peers: 28, sellers: 5, date: "2026-10-18" },
+  stage: { word: "Building", dir: "up", days: 7, date: "2026-10-18", listings: "falling" } } } });
+t("a fired tag shows a pill on the front", fired.includes('<span class="tl-tag">Few sellers hold most</span>') && fired.includes("Building ▲"));
+t("the back explains the tag with shares", fired.includes("the top 2 sellers hold 61% of listings counted. This product usually sits near 30%, and similar products near 28%."));
+t("the back explains the stage", fired.includes("price has climbed over the last 7 days, and listings counted are falling."));
+t("the back names source and date", fired.includes("Source: eBay listings counted, Oct 18, 2026"));
+t("an unknown word never shows", !signalRowHtml({ tiles: { listings: { ...lbase, tag: { word: "Buy now", share: 1 }, stage: { word: "Moon", days: 7 } } } }).includes("tl-tag"));
+const single = signalRowHtml({ tiles: { price: { dir: "down", pct: 9.1, days: 7, from: 22, fromDate: "2026-10-11", spark: [22, 21.5, 21, 20.5, 20.2, 20, 20], source: "TCGplayer market", asOf: "2026-10-18",
+  stage: { word: "Reversing", dir: "down", days: 7, date: "2026-10-18" } } } });
+t("a single shows its stage on the price tile", single.includes("Reversing ▼") && single.includes("price turned down after moving up over the 7 days before."));
+t("stage copy has no dashes or sold words", !/[\u2013\u2014]| - |\bsold\b|\bsales\b/i.test(fired + single));
+
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("signal chips: all ok");

@@ -174,5 +174,11 @@ const live = await worker.fetch(new Request("https://catchemtcg.com/reads/email/
 const liveHtml = await live.text();
 t("the worker serves the stop page", live.status === 200 && liveHtml.includes("Not available") && !/[\u2013\u2014]/.test(liveHtml));
 
+const tiledMail = normalizeEmailRead({ headline: "Example Box listings counted", blurb: "Listings counted fell.", kind: "sealed", signals: [{ kind: "listings", text: "Listings -25% 7d" }],
+  tiles: { listings: { tag: { word: "Few sellers hold most" }, stage: { word: "Building" } } } });
+t("email lines carry the same tag and stage words", tiledMail.chips.map((c) => c.text).join("|") === "Few sellers hold most|Building|Listings -25% 7d");
+const oddMail = normalizeEmailRead({ headline: "Example Box", blurb: "Listings counted.", kind: "sealed", tiles: { listings: { tag: { word: "Buy now" } } } });
+t("email skips any other word", !oddMail.chips.length);
+
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("reads email ok");

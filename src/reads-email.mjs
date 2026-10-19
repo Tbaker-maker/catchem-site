@@ -127,6 +127,11 @@ export function normalizeEmailRead(row) {
   if (/[\u2013\u2014]/.test(headline + blurb)) return null;
   if (/\b(sold|sales)\b/i.test(blob)) return null;
   const chips = [];
+  // Same tag and stage words as the site tiles, only when one fired.
+  const tl = row.tiles && typeof row.tiles === "object" ? row.tiles : {};
+  for (const word of [tl.listings?.tag?.word, tl.listings?.stage?.word, tl.price?.stage?.word]) {
+    if (/^(Few sellers hold most|Spread out|Building|Slowing|Stalled|Reversing)$/.test(String(word || "")) && !chips.some((c) => c.text === word)) chips.push({ text: word });
+  }
   for (const chip of row.signals || row.chips || []) {
     if (!chip || chip.kind === "dash" || chip.dir === "dash") continue;
     const text = scrub(chip.text || chip.word || chip.badge || chip.tag || "", sealed);
@@ -170,6 +175,7 @@ export function attachFeed(rows, feedReads) {
       headline: row.headline || hit.headline || row.name || "",
       blurb: row.blurb || hit.blurb || row.line || "",
       signals: Array.isArray(hit.signals) ? hit.signals : row.signals,
+      tiles: hit.tiles && typeof hit.tiles === "object" ? hit.tiles : row.tiles,
     };
   });
 }
