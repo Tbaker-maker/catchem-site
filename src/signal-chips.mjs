@@ -69,6 +69,9 @@ export const SIGNAL_CSS = `
 .tl-bars i{display:block;width:7px;border-radius:3px;background:rgba(217,183,121,.22)}
 .tl-bars i.on{background:var(--gold,#d9b779)}
 .tl-sp{position:relative;display:block;width:100%;height:26px}.tl-spark{display:block;width:100%;height:26px;overflow:visible}.tl-dot{position:absolute;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:999px}
+.tl-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}.tl-tag{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;font:600 12px/1 var(--sans,"IBM Plex Sans",system-ui,sans-serif);border:1px solid #5a4724;background:#2a2216;color:#d9b779}.tl-tag.is-up{border-color:#2c5a3c;background:#16241b;color:#7fc79a}.tl-tag.is-down{border-color:#5e2c27;background:#2a1714;color:#e98b7c}
+.tl-p b{color:#f3ece0;font-weight:600}
+.sig-block.on-light .tl-tag{background:#f6efe1;border-color:#e3d3b0;color:#7a5a1c}.sig-block.on-light .tl-tag.is-up{background:#eaf6ee;border-color:#bfe0c9;color:#256b3c}.sig-block.on-light .tl-tag.is-down{background:#fbecea;border-color:#efc6c0;color:#a3352a}.sig-block.on-light .tl-p b{color:#1d1d1f}
 .tl-hint{grid-column:1/-1;margin:2px 0 0;text-align:center;font:500 12px/1.3 var(--sans,"IBM Plex Sans",system-ui,sans-serif);color:#8d8577}
 .is-fast .tl-hint{display:none}
 @media (prefers-reduced-motion:reduce){.tl-in{transition:none;transform:none!important}.tl-face{-webkit-backface-visibility:visible;backface-visibility:visible;transition:opacity .2s linear}.tl-back{transform:none;opacity:0}.tl[aria-pressed="true"] .tl-back{opacity:1}.tl[aria-pressed="true"] .tl-front{opacity:0}}
@@ -141,6 +144,44 @@ export function signalMarkup(card, escape, opts) {
     const dot = '<i class="tl-dot" style="left:' + x(last) + "%;top:" + (Number(y(list[last])) / H * 100).toFixed(1) + "%;background:" + color + '"></i>';
     return '<span class="tl-sp"><svg class="tl-spark" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" aria-hidden="true">' + rect + '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>' + dot + "</span>";
   }
+  const STAGES = { Building: 1, Slowing: 1, Stalled: 1, Reversing: 1 };
+  const TAGS = { "Few sellers hold most": 1, "Spread out": 1 };
+  function stageOf(x) {
+    return x && STAGES[x.word] === 1 && Number(x.days) > 0 ? x : null;
+  }
+  function tagOf(x) {
+    return x && TAGS[x.word] === 1 && Number(x.share) >= 0 ? x : null;
+  }
+  function stagePill(st) {
+    const dir = st.dir === "down" ? "down" : "up";
+    return '<span class="tl-tag is-' + dir + '">' + e(st.word + (dir === "down" ? " ▼" : " ▲")) + "</span>";
+  }
+  function stageWords(st, sealed) {
+    const n = Math.round(Number(st.days));
+    const way = st.dir === "down" ? "fallen" : "climbed";
+    const other = st.dir === "down" ? "up" : "down";
+    let line;
+    if (st.word === "Building") line = "price has " + way + " over the last " + n + " days";
+    else if (st.word === "Slowing") line = "price is still moving " + (st.dir === "down" ? "down" : "up") + ", but more slowly than the " + n + " days before";
+    else if (st.word === "Stalled") line = "price went flat after moving " + (st.dir === "down" ? "down" : "up") + " over the " + n + " days before";
+    else line = "price turned " + (st.dir === "down" ? "down" : "up") + " after moving " + other + " over the " + n + " days before";
+    if (sealed && st.listings === "falling") line += ", and listings counted are falling";
+    else if (sealed && st.listings === "rising") line += ", and listings counted are rising";
+    else if (sealed && st.listings === "flat") line += ", and listings counted are flat";
+    return st.word + ": " + line + ".";
+  }
+  function tagWords(tg) {
+    const share = Math.round(Number(tg.share));
+    const usual = Math.round(Number(tg.usual));
+    const peers = Math.round(Number(tg.peers));
+    const base = "the top 2 sellers hold " + share + "% of listings counted";
+    if (tg.word === "Spread out") return "Spread out: " + base + ", below this product's usual " + usual + "% and similar products near " + peers + "%.";
+    return "Few sellers hold most: " + base + ". This product usually sits near " + usual + "%, and similar products near " + peers + "%.";
+  }
+  function boldLead(text) {
+    const i = text.indexOf(":");
+    return i > 0 ? "<b>" + e(text.slice(0, i + 1)) + "</b>" + e(text.slice(i + 1)) : e(text);
+  }
   function tile(label, front, back, wide) {
     return '<button type="button" class="tl' + (wide ? " wide" : "") + '" aria-pressed="false" aria-label="' + e(label) + '"><span class="tl-in" aria-hidden="true"><span class="tl-face tl-front">' + front + '</span><span class="tl-face tl-back">' + back + '</span></span><span class="tl-i" aria-hidden="true">i</span></button>';
   }
@@ -179,10 +220,11 @@ export function signalMarkup(card, escape, opts) {
       const from = cash(price.from) && day(price.fromDate) ? "from " + cash(price.from) + ", " + day(price.fromDate) : "";
       const src = String(price.source || "TCGplayer market") + ", " + day(price.asOf, true);
       const said = dir === "flat" ? "flat" : dir + " " + Number(price.pct) + " percent";
+      const pst = stageOf(price.stage);
       out.push(tile(
-        "Price " + days + " days: " + said + (from ? ", " + from : "") + ". Green is up, red is down, grey is flat. " + src + ".",
-        '<span class="tl-k">Price ' + days + "D</span>" + '<span class="tl-v is-' + dir + '">' + e(pct) + "</span>" + spark(price.spark, null, color) + (from ? '<span class="tl-s">' + e(from) + "</span>" : ""),
-        '<span class="tl-k">Price ' + days + 'D</span><span class="tl-p">Green is up, red is down, grey is flat. The window is ' + days + " days.</span>" + '<span class="tl-s">' + e(src) + "</span>",
+        "Price " + days + " days: " + said + (from ? ", " + from : "") + ". " + (pst ? stageWords(pst, false) + " " : "Green is up, red is down, grey is flat. ") + src + ".",
+        '<span class="tl-k">Price ' + days + "D</span>" + '<span class="tl-v is-' + dir + '">' + e(pct) + "</span>" + spark(price.spark, null, color) + (from ? '<span class="tl-s">' + e(from) + "</span>" : "") + (pst ? '<span class="tl-tags">' + stagePill(pst) + "</span>" : ""),
+        '<span class="tl-k">Price ' + days + 'D</span>' + (pst ? '<span class="tl-p">' + boldLead(stageWords(pst, false)) + "</span>" : '<span class="tl-p">Green is up, red is down, grey is flat. The window is ' + days + " days.</span>") + '<span class="tl-s">' + e(src) + "</span>",
         false));
     }
     const listed = t && t.listings;
@@ -194,10 +236,16 @@ export function signalMarkup(card, escape, opts) {
       const band = Array.isArray(listed.band) && listed.band.length === 2;
       const src = "eBay listings counted, " + day(listed.from) + " to " + day(listed.to);
       const said = dir === "flat" ? "flat" : (dir === "down" ? "down " : "up ") + Number(listed.pct) + " percent";
+      const ltg = tagOf(listed.tag);
+      const lst = stageOf(listed.stage);
+      const pills = (ltg ? '<span class="tl-tag">' + e(ltg.word) + "</span>" : "") + (lst ? stagePill(lst) : "");
+      const extra = (ltg ? '<span class="tl-p">' + boldLead(tagWords(ltg)) + "</span>" : "") + (lst ? '<span class="tl-p">' + boldLead(stageWords(lst, true)) + "</span>" : "");
+      const when = day((ltg && ltg.date) || (lst && lst.date) || listed.to, true);
+      const backSrc = (ltg || lst) ? "Source: eBay listings counted, " + when : src;
       out.push(tile(
-        "Listings counted: " + word + ", " + said + " over " + days + " days. " + (band ? "The shaded band is this product's usual range. " : "") + src + ".",
-        '<span class="tl-k">Listings counted</span><span class="tl-v"><span class="tl-w">' + e(word) + '</span><span class="tl-n">' + e(arrow + Number(listed.pct) + "%") + '</span><span class="tl-d">' + days + "D</span></span>" + spark(listed.spark, band ? listed.band : null, "#d9b779"),
-        '<span class="tl-k">Listings counted</span><span class="tl-p">eBay listings counted each night.' + (band ? " The shaded band is this product's usual range." : "") + '</span><span class="tl-s">' + e(src) + "</span>",
+        "Listings counted: " + word + ", " + said + " over " + days + " days. " + (ltg ? tagWords(ltg) + " " : "") + (lst ? stageWords(lst, true) + " " : "") + (band ? "The shaded band is this product's usual range. " : "") + backSrc + ".",
+        '<span class="tl-k">Listings counted</span><span class="tl-v"><span class="tl-w">' + e(word) + '</span><span class="tl-n">' + e(arrow + Number(listed.pct) + "%") + '</span><span class="tl-d">' + days + "D</span></span>" + spark(listed.spark, band ? listed.band : null, "#d9b779") + (pills ? '<span class="tl-tags">' + pills + "</span>" : ""),
+        '<span class="tl-k">Listings counted</span>' + (extra || '<span class="tl-p">eBay listings counted each night.' + (band ? " The shaded band is this product's usual range." : "") + "</span>") + '<span class="tl-s">' + e(backSrc) + "</span>",
         true));
     }
     if (!out.length) return "";
