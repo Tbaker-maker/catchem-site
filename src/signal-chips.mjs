@@ -310,7 +310,9 @@ export function signalMarkup(card, escape, opts) {
     : href
       ? '<a class="sig-row" href="' + e(href) + '" aria-label="' + e(label) + '">' + bits + "</a>"
       : '<div class="sig-row" role="group" aria-label="' + e(label) + '">' + bits + tap + "</div>";
-  const blurb = String(card && card.blurb || "").trim();
+  const rawBlurb = String(card && card.blurb || "").trim();
+  // An era tag is a label, not a read line.
+  const blurb = /^Era tag is /i.test(rawBlurb) ? "" : rawBlurb;
   const line = blurb ? '<p class="sig-blurb">' + e(blurb) + "</p>" : "";
   const tapClass = tap ? " has-tap" : "";
   return '<div class="sig-block' + light + tapClass + '">' + row + line + "</div>";

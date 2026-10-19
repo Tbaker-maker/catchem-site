@@ -113,5 +113,17 @@ const single = signalRowHtml({ tiles: { price: { dir: "down", pct: 9.1, days: 7,
 t("a single shows its stage on the price tile", single.includes("Reversing ▼") && single.includes("price turned down after moving up over the 7 days before."));
 t("stage copy has no dashes or sold words", !/[\u2013\u2014]| - |\bsold\b|\bsales\b/i.test(fired + single));
 
+t("an era tag line never shows", !signalRowHtml({ blurb: "Era tag is Vintage.", signals: [{ kind: "era", tag: "Modern" }] }).includes("Era tag"));
+t("five data bars render as five", (signalRowHtml({ tiles: { data: { bars: 4, of: 5, prices: 150, recent: 18, since: "2025-01-01", through: "2026-10-19", span: "1.5 yrs", source: "TCGplayer market" } } }).match(/<i class="on"/g) || []).length === 4 && (signalRowHtml({ tiles: { data: { bars: 4, of: 5, prices: 150, recent: 18, since: "2025-01-01", through: "2026-10-19", span: "1.5 yrs", source: "TCGplayer market" } } }).match(/<i class="(on)?" style/g) || []).length === 5);
+t("a card with no art gets its own arrow row", ui.includes('slide.classList.toggle("no-art", !card.querySelector("img"))') && ui.includes(".feed-slide.no-art{padding-top:48px}"));
+{
+  const { splitName } = await import("../src/display-name.mjs");
+  const src = ui.slice(ui.indexOf("function readTitle(card){"), ui.indexOf("function cardEl(card, facts){"));
+  // The source sits in a template literal, so undo one level of escaping before running it.
+  const readTitle = new Function("splitName", src.replace(/\\\\/g, "\\") + "; return readTitle;")(splitName);
+  t("a name ending in its number keeps one copy", readTitle({ name: "Chansey ex (EX Ruby and Sapphire) 96/109", number: "96/109" }).split("96/109").length === 2);
+  t("the Pikachu title stays Pikachu #088", readTitle({ name: "Pikachu - 088" }) === "Pikachu #088");
+}
+
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("signal chips: all ok");
