@@ -23,6 +23,7 @@ t("a missing night is a gap, the soft line", at("2026-09-28")[2] === "g" && at("
 t("real points keep their source", at("2026-09-25")[2] === "f" && !at("2026-09-25")[3] && at("2026-09-26")[2] === "n");
 t("the client fades gap days and snaps hover to real days", /p\[2\]==="f"\|\|p\[2\]==="g"/.test(HISTORY_JS) && /snap==="real"/.test(HISTORY_JS));
 const fig = indexHistoryChart(pts, { label: "Singles index" });
+t("index charts open on 1M", fig.includes('data-default-days="31"') && /data-default-days/.test(HISTORY_JS) && readFileSync(new URL("../index.html", import.meta.url), "utf8").includes('data-default-days="31"'));
 t("range pills 1M through All", ["1M", "3M", "6M", "1Y", "All"].every((r) => fig.includes(`>${r}</button>`)) && fig.includes('data-snap="real"') && fig.includes('data-unit="index"'));
 
 const doc = {
