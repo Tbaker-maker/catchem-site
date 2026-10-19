@@ -2385,7 +2385,7 @@ function summaryStrip({ nm = false, prefix = "", price = "", year = null, listin
     const cls = year > 0 ? " up" : year < 0 ? " down" : "";
     bits.push(`<span class="sum-chip${cls}">1Y ${year > 0 ? "+" : ""}${year}%</span>`);
   }
-  if (listings && Number.isFinite(listings.n) && listings.day) {
+  if (listings && Number.isFinite(listings.n) && listings.n > 0 && listings.day) {
     const when = priceDay(listings.day);
     const pct = Number(listings.pct);
     const arrow = Number.isFinite(pct) && pct === 0 ? `<span class="sum-arrow" aria-label="Flat since ${esc(priceDay(listings.prevDay || "") || "the last count")}">\u2192 0%</span>` : Number.isFinite(pct) ? `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(Math.round(pct * 10) / 10)}% since ${esc(priceDay(listings.prevDay || "") || "the last count")}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(Math.round(pct * 10) / 10)}%</span>` : "";
@@ -3100,7 +3100,7 @@ export function renderCard(card, stamp, opts = {}) {
   const setBit = setMark + (card.setSlug
     ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || ""));
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager"');
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"');
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   if (!sealed) {
     return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries: held ? [] : priceSeries, rangeRow: held ? "" : rangeRow, img, setBit, held }), card.name, stamp, "", feedNav(opts));

@@ -43,11 +43,20 @@ export function pageImage(html, kind) {
   return ORIGIN + unesc(m[1]);
 }
 
+// The page's own dated price line, never a flip tile's "from" price.
+export function headerPriceHtml(html) {
+  const s = String(html || "");
+  const dd = s.match(/<dt>Price<\/dt><dd>([^<]*)<\/dd>/);
+  if (dd) return dd[1];
+  return s.replace(/<button\b[^>]*class="tl[" ][\s\S]*?<\/button>/g, "");
+}
+
 // Card and product pages: name plus the dated header price when the page shows one.
 export function pageDescription(html, kind, name) {
   const base = describePage(kind, name);
   if (kind !== "card" && kind !== "product") return base;
-  const m = String(html || "").match(/(\$[0-9][0-9,]*\.[0-9]{2})[\s\S]{0,200}?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
+  const src = headerPriceHtml(html);
+  const m = src.match(/(\$[0-9][0-9,]*\.[0-9]{2})[\s\S]{0,200}?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
   if (!m) return base;
   return `${name}: ${m[1]} TCGplayer market on ${m[2]}. Price chart and 12-month range on Catch'em.`;
 }
@@ -62,7 +71,7 @@ function brandedShare(html, kind, name, pic) {
     num = hash ? unesc(hash[1]).trim() : "";
   }
   if (/^not in the file$/i.test(num)) num = "";
-  const priceM = s.match(/\$([0-9][0-9,]*(?:\.[0-9]{2})?)/);
+  const priceM = headerPriceHtml(s).match(/\$([0-9][0-9,]*(?:\.[0-9]{2})?)/);
   const changeM = s.match(/\b30[dD]\s+([+-]?[0-9]+(?:\.[0-9]+)?)%/);
   const setM = s.match(/href="\/sets\/[^"]+">([^<]+)</);
   return shareCardUrl({
@@ -85,7 +94,8 @@ export function addShareMeta(html, pathname, kind) {
   const fullTitle = unesc(m[1]).trim();
   const name = fullTitle.replace(/\s*·\s*Catch'em\s*$/, "");
   const url = ORIGIN + canonicalPath(pathname);
-  const desc = pageDescription(s, kind, name);
+  const path = canonicalPath(pathname);
+  const desc = path === "/reads" ? "Pick the Pokémon cards, sets and sealed products you follow and get a dated read on them by email or Discord DM." : pageDescription(s, kind, name);
   const pic = pageImage(s, kind);
   const branded = kind === "card" || kind === "product" ? brandedShare(s, kind, name, pic) : "";
   const image = branded || pic || OG_IMAGE;
@@ -103,7 +113,7 @@ export function addShareMeta(html, pathname, kind) {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escAttr(fullTitle)}">
 <meta name="twitter:description" content="${escAttr(desc)}">
-<meta name="twitter:image" content="${escAttr(image)}">`;
+<meta name="twitter:image" content="${escAttr(image)}">${structuredData(s, path, kind, name, pic)}`;
   return s.replace(m[0], `${m[0]}\n${tags}`);
 }
 
@@ -113,4 +123,19 @@ export async function withShareMeta(response, pathname, kind) {
   if (!type.includes("text/html")) return response;
   const body = addShareMeta(await response.text(), pathname, kind);
   return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+// JSON-LD: WebSite on the home page, a breadcrumb on set, card and product pages.
+// No Product offers, prices or ratings: we do not sell, so nothing that reads as a store.
+export function structuredData(html, path, kind, name, pic) {
+  const ld = (o) => `\n<script type="application/ld+json">${JSON.stringify(o).replace(/</g, "\\u003c")}</script>`;
+  if (path === "/") return ld({ "@context": "https://schema.org", "@type": "WebSite", name: "Catch'em", url: `${ORIGIN}/`, potentialAction: { "@type": "SearchAction", target: `${ORIGIN}/search?q={q}`, "query-input": "required name=q" } });
+  if (kind !== "card" && kind !== "product" && kind !== "set") return "";
+  const items = [{ name: "Catch'em", item: `${ORIGIN}/` }, { name: "Sets", item: `${ORIGIN}/sets` }];
+  if (kind !== "set") {
+    const setM = String(html || "").match(/href="(\/sets\/[a-z0-9-]+)">([^<]+)</);
+    if (setM) items.push({ name: unesc(setM[2]).trim(), item: ORIGIN + setM[1] });
+  }
+  items.push({ name, item: ORIGIN + path });
+  return ld({ "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items.map((x, i) => ({ "@type": "ListItem", position: i + 1, name: x.name, item: x.item })) });
 }
