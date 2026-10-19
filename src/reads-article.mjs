@@ -8,6 +8,7 @@
 import { banGuard } from "./advice-rules.mjs";
 import { ebaySearchUrl, tcgStoreUrl, SHOP_NOTE } from "./pokemon.mjs";
 import { AFFILIATION, TCGPLAYER_ATTRIBUTION } from "./affiliation.mjs";
+import { stageFromChips, stageLine } from "./run-stage.mjs";
 
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
@@ -111,16 +112,8 @@ export function analyze(hist) {
   const jumpShare = total ? (big[1][1] - big[0][1]) / total : 0;
   // A single step of 100% or more is not trusted to lead; it gets quiet wording.
   const thin = pts.length < 5 || moving.length <= 1 || Math.abs(big[2]) >= 100;
-  // Run stage: needs eight points. Building, Slowing, Stalled or Reversing.
-  let stage = "";
-  if (pts.length >= 8 && Math.abs(change) >= 3) {
-    const recent = steps.slice(-3).reduce((a, s) => a + s[2], 0);
-    const before = steps.slice(-6, -3).reduce((a, s) => a + s[2], 0);
-    if (Math.sign(recent) && Math.sign(before) && Math.sign(recent) !== Math.sign(before) && Math.abs(recent) >= 2) stage = "Reversing";
-    else if (Math.abs(recent) < 0.5) stage = "Stalled";
-    else if (Math.sign(recent) === Math.sign(change) && Math.abs(recent) > Math.abs(before)) stage = "Building";
-    else if (Math.sign(recent) === Math.sign(change)) stage = "Slowing";
-  }
+  // Run stage is not worked out here. buildPool takes it from signal-chips.json.
+  const stage = "";
   return {
     pts, first: pts[0], last, start, change, streak, max, min, peakAt, lastStep, big, jumpShare, thin, stage,
     isHigh: last[1] >= max && pts.length >= 8 && change > 0,
@@ -179,6 +172,9 @@ export function buildPool(ctx) {
     if (!okCopy(row.name)) return;
     const a = analyze(row.hist);
     if (!a || a.junk) return;
+    const st = stageFromChips(ctx.chips, row.id);
+    a.stage = st?.word || "";
+    a.stageInfo = st;
     const home = sets.byBare.get(bareSet(row.set));
     const release = String(home?.release || "");
     seen.set(row.id, { ...row, name: cleanName(row.name), a, release, vintage: !!release && release < WOTC_END, image: imageFor(row.id) });
@@ -345,7 +341,7 @@ function meta(i) { return `${i.set ? i.set + " · " : ""}${money(i.a.start[1])} 
 
 function row(i, { more = "", deep = false } = {}) {
   const img = i.image ? `<td width="52" valign="top" style="padding-right:12px"><img src="${esc(i.image)}" width="52" height="72" alt="" style="display:block;width:52px;height:72px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : "";
-  const extra = deep && i.a.stage ? ` · Run stage: ${i.a.stage}` : "";
+  const extra = deep && i.a.stageInfo ? ` · Run stage: ${i.a.stage} ${i.a.stageInfo.dir === "down" ? "▼" : "▲"}` : "";
   const moreLink = more ? `<br><a href="${esc(more)}" class="ce-ink" style="color:${C.ink};font-weight:600;text-decoration:underline;display:inline-block;min-height:24px">Read more</a>` : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
 <a href="${esc(i.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(i.name)}</a>
@@ -431,7 +427,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     body.push(card(h2("Three moves") + moves.map((i, n) => row(i, { more: anchor(n === 0 ? "top-move" : "move-" + i.id) })).join("") + (doc.supply[0] ? `<p class="ce-dim" style="margin:12px 0 0;font:400 14px/1.45 ${FONT};color:${C.dim}">Supply: ${esc(doc.supply[0].name)} ${esc(doc.supply[0].word.toLowerCase())}, ${doc.supply[0].prev} to ${doc.supply[0].n} listings counted (${esc(day(doc.supply[0].prevDate))} to ${esc(day(doc.supply[0].date))}).</p>` : "")));
   } else {
     const img = t.image ? `<td width="88" valign="top" style="padding-right:12px"><img src="${esc(t.image)}" width="88" height="122" alt="" style="display:block;width:88px;height:122px;object-fit:cover;border-radius:14px;background:${C.line}"></td>` : "";
-    const why = L === "deep" ? [t.a.stage ? `Run stage: ${t.a.stage}. ${t.a.stage === "Building" ? "The last few price days moved more than the ones before." : t.a.stage === "Slowing" ? "Still moving the same way, but the last few price days were smaller." : t.a.stage === "Stalled" ? "The last few price days barely moved." : "The last few price days went the other way."}` : "", t.vintage ? "This card is from the WOTC era, before mid 2003." : "", `Window: ${day(t.a.start[0])} to ${day(t.a.last[0])}, TCGplayer market.`].filter(Boolean) : [];
+    const why = L === "deep" ? [t.a.stageInfo ? `Run stage: ${stageLine(t.a.stageInfo)}` : "", t.vintage ? "This card is from the WOTC era, before mid 2003." : "", `Window: ${day(t.a.start[0])} to ${day(t.a.last[0])}, TCGplayer market.`].filter(Boolean) : [];
     body.push(card(h2("Top move") + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}<td valign="middle"><a href="${esc(t.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(t.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(t))}</p></td><td width="76" align="right" valign="middle">${pill(t.a.change)}</td></tr></table>` + barChart(t.a) + para(t.story) + (L === "deep" && why.length ? `<p class="ce-ink" style="margin:14px 0 0;font:600 14px/1.3 ${FONT};color:${C.ink}">Why it matters</p>` + why.map((w) => para(w)).join("") : "") + shopButtons(t) + `<p style="margin:10px 0 0"><a href="${esc(t.href)}" class="ce-ink" style="display:inline-block;min-height:44px;line-height:44px;font:600 15px/44px ${FONT};color:${C.ink};text-decoration:underline">See the read</a></p>`, "top-move"));
     if (doc.tiles.length) body.push(card(h2(doc.path === "default" ? "The whole group today" : doc.label + " today") + tilesHtml(doc.tiles) + para(`Price change over each item's latest 7 days on file, up to ${when}. Listings counted are the last two nights.`, ";font-size:13px")));
     if (doc.ups.length) body.push(card(h2("Also moving up") + doc.ups.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-up"));
@@ -508,7 +504,7 @@ export function followFromPlan(plan, sendDay = "") {
 export async function loadContext(fetchImpl = fetch) {
   const { loadJson } = await import("./data.mjs");
   const get = (f) => loadJson(f, fetchImpl).catch(() => null);
-  const [reads, hold, movers, listings, sets] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json")]);
+  const [reads, hold, movers, listings, sets, chips] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json")]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
   const bags = new Map();
   const spark = async (id) => {
@@ -518,7 +514,7 @@ export async function loadContext(fetchImpl = fetch) {
     const doc = bags.get(b);
     return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
   };
-  return { reads, holdIds, movers, listings, sets, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
+  return { reads, holdIds, movers, listings, sets, chips, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
 // Watched items get their own 30 day history from the sparks file.
