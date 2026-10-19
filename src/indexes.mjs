@@ -4,6 +4,7 @@
 import { esc } from "./ui.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 import { cleanName } from "./card-rating.mjs";
+import { indexHistoryChart, indexHistoryPoints } from "./history-chart.mjs";
 
 const cash = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cash0 = (n) => "$" + Math.round(Number(n)).toLocaleString("en-US");
@@ -19,6 +20,7 @@ export const INDEX_CSS = `.ix-list{display:grid;gap:12px;margin:16px 0}.ix-era{m
 .ix-members{list-style:none;margin:0;padding:0;display:grid;gap:8px}.ix-members a{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;color:inherit;text-decoration:none;padding:6px 8px;border-radius:14px;border:1px solid var(--line)}.ix-members img,.ix-members .tile{width:44px;max-width:44px;height:auto;border-radius:6px}.ix-members .m{display:grid;gap:2px;font-size:13px;min-width:0}.ix-members .m b{font-weight:600;overflow-wrap:anywhere}.ix-members .m span{font-size:12px;opacity:.65}.ix-members .p{text-align:right;font-weight:600;font-size:13px}.ix-members .p small{display:block;font-weight:400;opacity:.6;font-size:11px}
 .ix-changes{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}.ix-changes li{padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
 .ix-about{margin:18px 0;border:1px solid var(--line);border-radius:16px;padding:10px 14px}.ix-about summary{cursor:pointer;font-weight:600;font-size:14px}.ix-about p,.ix-about li{font-size:13px;line-height:1.5}.ix-about ul{padding-left:18px}.ix-about a{color:var(--gold)}.ix-more{margin-top:8px;font-size:13px}.ix-more summary{cursor:pointer}
+.ix-long .hc{margin:8px 0 0;padding:0;border:0;background:none;box-shadow:none}.ix-long .hc-svg{height:100%}.ix-about summary{min-height:44px;display:flex;align-items:center}
 @media(max-width:600px){.ix-chart svg{height:120px}.ix-stat b{font-size:18px}}`;
 
 function line(points, col, color) {
@@ -67,7 +69,21 @@ function linePath(pts, t0, t1, mn, mx, W, H, P) {
 
 // Sitewide singles index. Solid line is our own days. A faded line is drawn
 // only from an earlier series already on the file, and only before our first day.
+// Long history on file (indexes.json "history"): one chart with range pills, the
+// soft line on fan-site days and gaps, hover on real days only, and an About box.
+function longIndexChart(doc, side, title) {
+  const hist = doc?.history && typeof doc.history === "object" ? doc.history : null;
+  const pts = indexHistoryPoints(hist?.[side], hist?.weeklyUntil || "");
+  if (pts.filter((p) => !p[3]).length < 2) return "";
+  const lines = (Array.isArray(hist[`${side}About`]) ? hist[`${side}About`] : []).filter(Boolean);
+  const asOf = shortDate(doc?.asOf);
+  const about = lines.length ? `<details class="ix-about"><summary>About this chart</summary><p>${esc(hist.method || "")}</p><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p>A factual record of prices on file, not advice.</p></details>` : "";
+  return `<div class="ix-chart ix-long" id="${side}-index"><h2>${esc(title)}</h2><p>Chain-linked index. TCGplayer market${asOf ? `, as of ${esc(asOf)}` : ""}. The number is a level, not a price.</p>${indexHistoryChart(pts, { label: title })}${about}</div>`;
+}
+
 export function singlesIndexChart(doc) {
+  const long = longIndexChart(doc, "singles", "Singles index");
+  if (long) return long + longIndexChart(doc, "sealed", "Sealed index");
   const own = seriesPts(doc?.singles);
   if (own.length < 2) return "";
   const fill = fillSeries(doc);

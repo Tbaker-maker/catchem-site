@@ -35,6 +35,7 @@ jobs:
       - run: node scripts/audit-feed.test.mjs
       - run: node scripts/method-private.test.mjs
       - run: node scripts/home-hero.test.mjs
+      - run: node scripts/index-history.test.mjs
       - run: node scripts/search-recent.test.mjs
       - run: node scripts/open-data.test.mjs
       - run: node scripts/post-office.test.mjs

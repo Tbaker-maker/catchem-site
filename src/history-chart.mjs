@@ -7,6 +7,7 @@ const isoOf = (n) => new Date(n * DAY).toISOString().slice(0, 10);
 
 // Long series is "epochDay:price,..." (change-only, 7-day heartbeat). Own nightly series wins.
 // fillTo: our first own day when the data build added earlier fan-site days; those days are tagged "f".
+// An index gap day (no price file) is tagged "g" and is the soft line too.
 export function mergeHistory(own, longPacked, fillTo = "") {
   const mine = (own || []).filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0).map((p) => [String(p[0]), Number(p[1]), fillTo && String(p[0]) < fillTo ? "f" : "n"]);
   const firstOwn = mine.length ? mine[0][0] : "9999-12-31";
@@ -41,6 +42,44 @@ export function fillDaily(points, opts = {}) {
     out.push([p[0], p[1], p[2]]);
   }
   return out;
+}
+
+// Sitewide index long history: real points [day, level, source] from the data file.
+// Days between two real points hold the last level ([day, level, tag, lastRealDay]).
+// A weekly archive step (7 days, on or before weeklyUntil) keeps its source tag and stays
+// solid. Any other missing day is a gap, tagged "g", and is the soft line.
+export function indexHistoryPoints(raw, weeklyUntil = "") {
+  const rows = (Array.isArray(raw) ? raw : [])
+    .filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0)
+    .map((p) => [String(p[0]), Number(p[1]), String(p[2] || "n")])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const out = [];
+  for (const p of rows) {
+    const last = out.at(-1);
+    if (last) {
+      const real = last[3] || last[0];
+      const to = Date.parse(p[0]);
+      const step = Math.round((to - Date.parse(real)) / DAY);
+      const weekly = step === 7 && weeklyUntil && p[0] <= weeklyUntil;
+      for (let t = Date.parse(last[0]) + DAY; t < to; t += DAY) out.push([new Date(t).toISOString().slice(0, 10), last[1], weekly ? last[2] : "g", real]);
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+export function indexHistoryChart(points, { color = "#d9b779", label = "Index level" } = {}) {
+  const real = points.filter((p) => !p[3]);
+  if (real.length < 2) return "";
+  const spanDays = (Date.parse(points.at(-1)[0]) - Date.parse(points[0][0])) / DAY;
+  const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
+  const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
+  return `<figure class="hc" data-unit="index" data-snap="real" data-pts="${esc(JSON.stringify(points))}" data-color="${esc(color)}">
+<p class="hc-sum">${esc(label)} from ${esc(real[0][0])} to ${esc(real.at(-1)[0])}.</p>
+<div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
+<div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${esc(label)}"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
+<div class="hc-axis muted"></div>
+</figure>`;
 }
 
 export function historyChart(points, { asOf = "", color = "#d9b779", ownLabel, unit = "price", snap = "all" } = {}) {
@@ -106,7 +145,7 @@ var t0=ms(view[0][0]),t1=ms(view[view.length-1][0])||t0+1;
 function X(d){return t1===t0?W/2:((ms(d)-t0)/(t1-t0))*W;}function Y(v){return PT+(1-(v-mn)/(mx-mn))*(H-PT-PB);}
 var segs=[],run=null;
 view.forEach(function(p){
-  var fade=p[2]==="f";
+  var fade=p[2]==="f"||p[2]==="g";
   var xy=[X(p[0]),Y(p[1])];
   if(!run||run.fade!==fade){
     if(run&&run.pts.length) run.pts.push(xy);
@@ -119,7 +158,7 @@ segs.forEach(function(seg){
   var s=seg.pts,op=seg.fade?".35":"1";
   if(s.length<2){body+='<circle cx="'+s[0][0].toFixed(1)+'" cy="'+s[0][1].toFixed(1)+'" r="2.5" fill="'+color+'" fill-opacity="'+op+'"/>';return;}
   var d=smooth(s);
-  if(!seg.fade) body+='<path d="'+d+" L"+s[s.length-1][0].toFixed(1)+","+(H-PB)+" L"+s[0][0].toFixed(1)+","+(H-PB)+' Z" fill="url(#'+gid+')" stroke="none"/>';
+  body+='<path d="'+d+" L"+s[s.length-1][0].toFixed(1)+","+(H-PB)+" L"+s[0][0].toFixed(1)+","+(H-PB)+' Z" fill="url(#'+gid+')"'+(seg.fade?' fill-opacity=".4"':'')+' stroke="none"/>';
   body+='<path d="'+d+'" fill="none" stroke="'+color+'" stroke-opacity="'+op+'" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
 });
 if(unit!=="count"){

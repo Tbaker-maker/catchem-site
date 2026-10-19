@@ -157,6 +157,10 @@ footer a{color:var(--gold)}
 .ix-read,.ix-note{margin:0;color:var(--soft);font-size:15px;line-height:1.45}
 .ix-read{margin:0 0 8px}
 .ix-note{margin:8px 0 0}
+.ix-about{margin:10px 0 0;border:1px solid var(--line);border-radius:16px;padding:0 14px}
+.ix-about summary{cursor:pointer;font-weight:600;font-size:14px;min-height:44px;display:flex;align-items:center}
+.ix-about p,.ix-about li{color:var(--soft);font-size:14px;line-height:1.5}
+.ix-about ul{padding-left:18px;margin:6px 0}
 .chart{height:180px;min-height:180px;overflow:hidden}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
 .filters button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:600 14px var(--sans);cursor:pointer}
@@ -409,15 +413,40 @@ footer a{color:var(--gold)}
         return span>=days;
       }).map(function(r){return '<button type="button" data-ix="'+which+'" data-range="'+r+'"'+(r==="All"?' aria-pressed="true"':"")+'>'+r+'</button>'}).join("");
     }
-    function fig(all){
+    // Long history from the data file: real points [day, level, source]. Days between
+    // two real points hold the last level. A weekly archive step stays solid; any
+    // other missing day is a gap and is the soft line. Hover lands on real days only.
+    function longPts(raw, weeklyUntil){
+      var rows=(Array.isArray(raw)?raw:[]).filter(function(p){return Array.isArray(p)&&/^\d{4}-\d{2}-\d{2}$/.test(String(p[0]))&&Number(p[1])>0}).map(function(p){return [String(p[0]),Number(p[1]),String(p[2]||"n")]}).sort(function(a,b){return a[0]<b[0]?-1:a[0]>b[0]?1:0});
+      var out=[];
+      rows.forEach(function(p){
+        var last=out.length?out[out.length-1]:null;
+        if(last){
+          var real=last[3]||last[0], from=Date.parse(real+"T00:00:00Z"), to=Date.parse(p[0]+"T00:00:00Z"), step=Math.round((to-from)/86400000);
+          var weekly=step===7&&weeklyUntil&&p[0]<=weeklyUntil;
+          for(var t=Date.parse(last[0]+"T00:00:00Z")+86400000;t<to;t+=86400000) out.push([new Date(t).toISOString().slice(0,10),last[1],weekly?last[2]:"g",real]);
+        }
+        out.push(p);
+      });
+      return out;
+    }
+    function about(lines, method){
+      var ls=(Array.isArray(lines)?lines:[]).filter(Boolean);
+      if(!ls.length) return "";
+      return '<details class="ix-about"><summary>About this chart</summary><p>'+text(method||"")+'</p><ul>'+ls.map(function(l){return "<li>"+text(l)+"</li>"}).join("")+'</ul><p>A factual record of prices on file, not advice.</p></details>';
+    }
+    function fig(all, long){
+      if(long&&long.length>=2) all=long.filter(function(p){return !p[3]}).map(function(p){return {d:p[0],v:p[1],n:0}});
       if(all.length<2) return '<p class="ix-note">No daily points yet.</p>';
-      var pts=all.map(function(p){return [p.d,p.v,"n"]});
+      var pts=long&&long.length>=2?long:all.map(function(p){return [p.d,p.v,"n"]});
       var span=spanOf(all);
       var rs=[["1M",31],["3M",92],["6M",183],["1Y",366],["All",0]].filter(function(r){return r[1]===0||span>r[1]*0.5});
       var pills=rs.map(function(r,i){return '<button type="button" class="hc-pill" data-days="'+r[1]+'" aria-pressed="'+(i===rs.length-1?"true":"false")+'">'+r[0]+'</button>'}).join("");
-      return '<figure class="hc" data-unit="index" data-snap="all" data-color="#d9b779" data-pts="'+text(JSON.stringify(pts))+'"><div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Index level"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div></figure>';
+      return '<figure class="hc" data-unit="index" data-snap="'+(long&&long.length>=2?"real":"all")+'" data-color="#d9b779" data-pts="'+text(JSON.stringify(pts))+'"><div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Index level"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div></figure>';
     }
-    box.innerHTML='<div class="ix"><h2>Singles index</h2>'+fig(singles)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div><div class="ix"><h2>Sealed index</h2>'+fig(sealed)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p></div>';
+    var hist=idx.history&&typeof idx.history==="object"?idx.history:{};
+    var longS=longPts(hist.singles, hist.weeklyUntil), longD=longPts(hist.sealed, hist.weeklyUntil);
+    box.innerHTML='<div class="ix"><h2>Singles index</h2>'+fig(singles, longS)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p>'+(longS.length>=2?about(hist.singlesAbout, hist.method):"")+'</div><div class="ix"><h2>Sealed index</h2>'+fig(sealed, longD)+'<p class="ix-note">Chain-linked index. TCGplayer market.'+stamp+' The number is a level, not a price.</p>'+(longD.length>=2?about(hist.sealedAbout, hist.method):"")+'</div>';
     if(window.catchemHistoryMount) window.catchemHistoryMount();
   }).catch(function(){});
   var menuBtn=document.querySelector(".menu-btn"), siteNav=document.getElementById("site-nav");
