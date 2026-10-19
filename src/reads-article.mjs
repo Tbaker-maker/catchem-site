@@ -151,6 +151,12 @@ export function storyFor(item) {
 
 // ---------- pool ----------
 
+// Rarities and eras a member can pick on /reads. Era comes from sets.json.
+export const CHASE_RARITIES = ["Special Illustration Rare", "Illustration Rare", "Ultra Rare"];
+export function eraLabel(era) { return String(era || "").replace(/\s*&\s*/g, " and ").trim(); }
+export const GENERATION_LABEL = { ME: "Mega Evolution" };
+export function generationName(g) { return GENERATION_LABEL[g] || (g ? "Generation " + g : ""); }
+
 function setIndex(setsDoc) {
   const bySlug = new Map();
   const byBare = new Map();
@@ -177,7 +183,9 @@ export function buildPool(ctx) {
     a.stageInfo = st;
     const home = sets.byBare.get(bareSet(row.set));
     const release = String(home?.release || "");
-    seen.set(row.id, { ...row, name: cleanName(row.name), a, release, vintage: !!release && release < WOTC_END, image: imageFor(row.id) });
+    const tag = ctx.tags?.byId?.[row.id] || {};
+    const rarity = row.kind === "single" ? String(tag.rarity || row.rarity || "") : "";
+    seen.set(row.id, { ...row, name: cleanName(row.name), a, release, vintage: !!release && release < WOTC_END, image: imageFor(row.id), rarity, era: eraLabel(home?.era), artist: row.kind === "single" ? String(tag.artist || "") : "", artistSlug: row.kind === "single" ? String(tag.artistSlug || "") : "", generation: row.kind === "single" ? String(tag.generation || "") : "" });
   };
   for (const kind of ["singles", "sealed"]) {
     for (const m of ctx.movers?.[kind] || []) {
@@ -186,12 +194,13 @@ export function buildPool(ctx) {
     }
   }
   for (const r of ctx.reads?.reads || []) {
+    const rTags = (r.tags || []).map(String);
     if (!/^tcgcsv-\d+$/.test(String(r.sku || "")) || stale.has(String(r.id)) || r.stale) continue;
     // Only daily price charts. Ratios, year ago and range charts are not prices.
     if (r.chart?.label && !/^TCGplayer market/.test(String(r.chart.label))) continue;
     const pts = (r.chart?.points || []).filter((p) => Date.parse(p[0] + "T00:00:00Z") >= Date.parse((ctx.reads?.asOf || "") + "T00:00:00Z") - 35 * DAY);
     const setName = (String(r.name || "").match(/\(([^)]+)\)\s*[\w/]*$/) || [])[1] || "";
-    add({ id: r.sku, name: r.name, set: setName, kind: "single", hist: pts, href: SITE + "/feed/r/" + encodeURIComponent(r.id) });
+    add({ id: r.sku, name: r.name, set: setName, kind: "single", rarity: CHASE_RARITIES.find((x) => rTags.includes(x)) || "", hist: pts, href: SITE + "/feed/r/" + encodeURIComponent(r.id) });
   }
   for (const w of ctx.watched || []) add(w);
   return [...seen.values()];
@@ -219,15 +228,52 @@ export function pathwayOf(follow) {
   const f = follow || {};
   if ((f.cards || []).length || (f.sealed || []).length) return "watchlist";
   if (f.focus === "vintage") return "vintage";
+  if ((f.artists || []).length) return "artist";
+  if ((f.generations || []).length) return "generation";
   if ((f.pokemon || []).length) return "pokemon";
   if ((f.sets || []).length) return "set";
   if (f.product === "sealed" && !(f.sets || []).length) return "sealed";
+  if ((f.rarities || []).length || (f.eras || []).length) return "picks";
   return "default";
 }
 
+// Saved rarity and era picks narrow every pathway except the watchlist.
+// Picking a rarity means singles only, since sealed has no rarity.
+export function picksTest(follow) {
+  const f = follow || {};
+  const rar = (f.rarities || []).map(String);
+  const eras = (f.eras || []).map(String);
+  if (!rar.length && !eras.length) return null;
+  return (i) => (!rar.length || (i.kind === "single" && rar.includes(i.rarity))) && (!eras.length || eras.includes(i.era));
+}
+export function picksLabel(follow) {
+  const f = follow || {};
+  const short = { "Special Illustration Rare": "Special Illustration Rares", "Illustration Rare": "Illustration Rares", "Ultra Rare": "Ultra Rares" };
+  return [...(f.rarities || []).map((r) => short[r] || r), ...(f.eras || [])].join(", ");
+}
+
 export function pathwayFilter(path, follow, ctx) {
+  const base = pathwayBase(path, follow, ctx);
+  const picks = path === "watchlist" ? null : picksTest(follow);
+  if (!picks) return base;
+  const extra = path === "picks" || path === "default" ? "" : picksLabel(follow);
+  return { ...base, test: (i) => base.test(i) && picks(i), label: extra ? `${base.label}, ${extra}` : base.label };
+}
+
+function pathwayBase(path, follow, ctx) {
   const f = follow || {};
   const sets = setIndex(ctx.sets);
+  if (path === "artist") {
+    const want = new Set((f.artists || []).map((a) => String(a).toLowerCase()));
+    const names = artistNames(f.artists, ctx);
+    return { test: (i) => !!i.artistSlug && want.has(i.artistSlug), label: "Art by " + names.join(", "), intro: `Cards illustrated by ${names.join(" and ")} that moved, from any set.` };
+  }
+  if (path === "generation") {
+    const want = new Set((f.generations || []).map(String));
+    const names = (f.generations || []).map(generationName);
+    return { test: (i) => i.kind === "single" && want.has(i.generation), label: names.join(", "), intro: `Singles from ${names.join(" and ")} that moved.` };
+  }
+  if (path === "picks") return { test: () => true, label: picksLabel(f), intro: `Only the ${picksLabel(f).replace(/, ([^,]*)$/, " and $1")} you picked.` };
   if (path === "watchlist") { const ids = new Set([...(f.cards || []), ...(f.sealed || [])]); return { test: (i) => ids.has(i.id), label: "Your watchlist", intro: "Here is how the items you watch moved." }; }
   if (path === "vintage") return { test: (i) => i.vintage, label: "Vintage, WOTC era", intro: "Cards from the Wizards of the Coast era, before mid 2003." };
   if (path === "pokemon") { const want = (f.pokemon || []).map((p) => String(p).toLowerCase()); return { test: (i) => want.some((w) => words(i.name).includes(w)), label: (f.pokemon || []).join(", "), intro: `Every ${(f.pokemon || []).join(" and ")} card that moved, from any set.` }; }
@@ -238,6 +284,24 @@ export function pathwayFilter(path, follow, ctx) {
   }
   if (path === "sealed") return { test: (i) => i.kind === "sealed", label: "Sealed", intro: "Boxes, tins and bundles that moved." };
   return { test: () => true, label: "A bit of everything", intro: "Top moves across singles and sealed, plus listings counted." };
+}
+
+function artistNames(slugs, ctx) {
+  const byId = ctx?.tags?.byId || {};
+  const names = new Map();
+  for (const row of Object.values(byId)) if (row?.artistSlug && !names.has(row.artistSlug)) names.set(row.artistSlug, row.artist);
+  return (slugs || []).map((s) => names.get(String(s).toLowerCase()) || String(s));
+}
+
+// Artists with enough tagged cards to fill a read, most cards first.
+export function artistChoices(tags, min = 8) {
+  const count = new Map();
+  for (const row of Object.values(tags?.byId || {})) {
+    if (!row?.artistSlug) continue;
+    const c = count.get(row.artistSlug) || { slug: row.artistSlug, name: row.artist, n: 0 };
+    c.n++; count.set(row.artistSlug, c);
+  }
+  return [...count.values()].filter((c) => c.n >= min).sort((a, b) => b.n - a.n || (a.name < b.name ? -1 : 1));
 }
 
 // ---------- the article ----------
@@ -254,6 +318,14 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     path = "default";
     filter = pathwayFilter("default", follow, ctx);
     mine = pool;
+    const picks = picksTest(follow);
+    const narrow = picks ? pool.filter(picks) : [];
+    if (picks && narrow.filter((i) => !i.a.thin).length >= 2 && pathwayOf(follow) !== "picks") {
+      fallback = `${pathwayBase(pathwayOf(follow), follow, ctx).label} had a quiet day, so here are all your ${picksLabel(follow)}.`;
+      path = "picks";
+      filter = pathwayFilter("picks", follow, ctx);
+      mine = narrow;
+    }
   }
   const strong = (i) => (i.a.thin ? 0.25 : 1) * Math.abs(i.a.change);
   const ranked = [...mine].sort((x, y) => strong(y) - strong(x));
@@ -276,7 +348,7 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
   const patternRead = readsAll.find((r) => /^pattern-/.test(String(r.readKind)) && okCopy(r.headline) && tie(r.headline) && !(ctx.holdIds || {})[r.sku]);
   const rotationRead = (path === "default" || path === "set") ? readsAll.find((r) => r.readKind === "rotation" && okCopy(r.headline) && tie(r.headline)) : null;
   const newsRead = readsAll.find((r) => r.readKind === "newsline" && okCopy(r.headline) && /^https:\/\//.test(String(r.href || "")) && tie(r.headline));
-  const vintage = path === "default" ? pool.filter((i) => i.vintage && !i.a.thin && i !== top).sort((x, y) => strong(y) - strong(x))[0] : null;
+  const vintage = path === "default" && !picksTest(follow) ? pool.filter((i) => i.vintage && !i.a.thin && i !== top).sort((x, y) => strong(y) - strong(x))[0] : null;
   // Deep dive: set comparison across the sets in this read.
   const bySet = new Map();
   for (const i of mine) {
@@ -490,6 +562,10 @@ export function followFromPlan(plan, sendDay = "") {
   return {
     sets: Array.isArray(p.sets) ? p.sets : [],
     pokemon: Array.isArray(p.pokemon) ? p.pokemon : [],
+    rarities: Array.isArray(p.rarities) ? p.rarities.filter((r) => CHASE_RARITIES.includes(r)) : [],
+    eras: Array.isArray(p.eras) ? p.eras.map(String).slice(0, 6) : [],
+    artists: Array.isArray(p.artists) ? p.artists.map((a) => String(a).toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 60)).filter(Boolean).slice(0, 5) : [],
+    generations: Array.isArray(p.generations) ? p.generations.map(String).filter((g) => /^([1-9]|ME)$/.test(g)).slice(0, 3) : [],
     cards,
     sealed,
     names,
@@ -500,11 +576,16 @@ export function followFromPlan(plan, sendDay = "") {
   };
 }
 
+// Artist, generation and chase rarity per single, from Catchem-data.
+export const PATH_TAGS = "data/path-tags.json";
+
 // Public dated files, loaded once per run. Sparks load lazily per bucket.
 export async function loadContext(fetchImpl = fetch) {
   const { loadJson } = await import("./data.mjs");
   const get = (f) => loadJson(f, fetchImpl).catch(() => null);
-  const [reads, hold, movers, listings, sets, chips] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json")]);
+  const { fetchRepo } = await import("./data.mjs");
+  const getTags = () => fetchRepo(PATH_TAGS, fetchImpl).then((r) => (r && r.ok ? r.json() : null)).catch(() => null);
+  const [reads, hold, movers, listings, sets, chips, tags] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags()]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
   const bags = new Map();
   const spark = async (id) => {
@@ -514,7 +595,7 @@ export async function loadContext(fetchImpl = fetch) {
     const doc = bags.get(b);
     return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
   };
-  return { reads, holdIds, movers, listings, sets, chips, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
+  return { reads, holdIds, movers, listings, sets, chips, tags, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
 // Watched items get their own 30 day history from the sparks file.

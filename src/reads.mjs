@@ -21,6 +21,22 @@ export const SET_CHOICES = [
   { slug: "sv10-destined-rivals", name: "SV10: Destined Rivals" },
   { slug: "sv-black-bolt", name: "SV: Black Bolt" },
 ];
+// Illustrators with the most credited cards in data/path-tags.json (Oct 19).
+export const ARTIST_CHOICES = [
+  { slug: "5ban-graphics", name: "5ban Graphics" },
+  { slug: "ken-sugimori", name: "Ken Sugimori" },
+  { slug: "mitsuhiro-arita", name: "Mitsuhiro Arita" },
+  { slug: "kagemaru-himeno", name: "Kagemaru Himeno" },
+  { slug: "kouki-saitou", name: "Kouki Saitou" },
+  { slug: "masakazu-fukuda", name: "Masakazu Fukuda" },
+  { slug: "ryo-ueda", name: "Ryo Ueda" },
+  { slug: "toyste-beach", name: "Toyste Beach" },
+  { slug: "atsuko-nishida", name: "Atsuko Nishida" },
+  { slug: "naoki-saito", name: "Naoki Saito" },
+  { slug: "shin-nagasawa", name: "Shin Nagasawa" },
+  { slug: "keiji-kinebuchi", name: "Keiji Kinebuchi" },
+];
+export const GENERATIONS = [["1", "Gen 1"], ["2", "Gen 2"], ["3", "Gen 3"], ["4", "Gen 4"], ["5", "Gen 5"], ["6", "Gen 6"], ["7", "Gen 7"], ["8", "Gen 8"], ["9", "Gen 9"], ["ME", "Mega Evolution"]];
 export const POKEMON_CHOICES = ["Pikachu", "Charizard", "Eevee", "Umbreon", "Mew"];
 const FREE_CAP = 1;
 const PREMIUM_CAP = 25;
@@ -31,6 +47,8 @@ export function blankPlan() {
     pokemon: [],
     rarities: [],
     eras: [],
+    artists: [],
+    generations: [],
     sealed: false,
     singles: false,
     watch: [],
@@ -81,8 +99,10 @@ export function followCount(plan) {
   if (!plan) return 0;
   return (plan.sets?.length || 0)
     + (plan.pokemon?.length || 0)
-    + (plan.rarities?.length || 0)
-    + (plan.eras?.length || 0)
+    // Rarity and era picks narrow a read, so together they count as one follow.
+    + ((plan.rarities?.length || plan.eras?.length) ? 1 : 0)
+    + (plan.artists?.length || 0)
+    + (plan.generations?.length || 0)
     + (plan.sealed ? 1 : 0)
     + (plan.singles ? 1 : 0)
     + (plan.watch?.length || 0);
@@ -95,6 +115,8 @@ export function gatePlan(plan, { premium = false } = {}) {
   next.pokemon = cleanList(plan?.pokemon);
   next.rarities = cleanList(plan?.rarities).filter((name) => RARITIES.includes(name));
   next.eras = cleanList(plan?.eras).filter((name) => ERAS.includes(name));
+  next.artists = cleanList(plan?.artists).filter((slug) => ARTIST_CHOICES.some((a) => a.slug === slug));
+  next.generations = cleanList(plan?.generations).filter((g) => GENERATIONS.some((row) => row[0] === g));
   next.sealed = plan?.sealed === true;
   next.singles = plan?.singles === true;
   next.watch = [];
@@ -125,8 +147,9 @@ export function gatePlan(plan, { premium = false } = {}) {
   const full = followCount(next);
   while (followCount(next) > cap) {
     if (next.watch.length) next.watch.pop();
-    else if (next.eras.length) next.eras.pop();
-    else if (next.rarities.length) next.rarities.pop();
+    else if (next.generations.length) next.generations.pop();
+    else if (next.artists.length) next.artists.pop();
+    else if (next.eras.length || next.rarities.length) { next.eras = []; next.rarities = []; }
     else if (next.pokemon.length) next.pokemon.pop();
     else if (next.sets.length) next.sets.pop();
     else if (next.singles) next.singles = false;
@@ -193,12 +216,16 @@ export function planFromFields(fields) {
   const product = String(get("product") || "singles") === "sealed" ? "sealed" : "singles";
   const rarities = all("rarity");
   const eras = all("era");
-  const other = chipSets.length || chipPokemon.length || rarities.some(Boolean) || eras.some(Boolean) || watch.length;
+  const artists = all("artist").map(String).filter(Boolean);
+  const generations = all("generation").map(String).filter(Boolean);
+  const other = chipSets.length || chipPokemon.length || rarities.some(Boolean) || eras.some(Boolean) || artists.length || generations.length || watch.length;
   return {
     sets: chipSets.length ? chipSets : get("sets"),
     pokemon: chipPokemon.length ? chipPokemon : get("pokemon"),
     rarities,
     eras,
+    artists,
+    generations,
     sealed: product === "sealed" && !other,
     singles: product === "singles" && !other,
     watch,
@@ -374,6 +401,8 @@ export function planToFollow(discordId, plan) {
     pokemon: plan?.pokemon || [],
     rarities: plan?.rarities || [],
     eras: plan?.eras || [],
+    artists: plan?.artists || [],
+    generations: plan?.generations || [],
     frequency: plan?.frequency || "weekly",
     product,
     news: plan?.addons?.news === true || plan?.addons?.all === true,
@@ -512,6 +541,11 @@ ${sign}
 <div class="rd-chips">${RARITIES.map((name) => choice("rarity", name, name, (shown.rarities || []).includes(name))).join("")}</div>
 <h2>Era</h2>
 <div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}${choice("focus", "vintage", "Vintage, WOTC era", shown.focus === "vintage")}</div>
+<h2>Generation</h2>
+<div class="rd-chips">${GENERATIONS.map((row) => choice("generation", row[0], row[1], (shown.generations || []).includes(row[0]))).join("")}</div>
+<h2>Artist</h2>
+<p class="rd-note">Only cards with an illustrator credit on file show up here.</p>
+<div class="rd-chips">${ARTIST_CHOICES.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div>
 <h2>Singles or sealed</h2>
 <div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
 ${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}
@@ -585,9 +619,9 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     for (var i = 0; i < nodes.length; i++) if (nodes[i].value === value && !nodes[i].disabled) nodes[i].checked = true;
   }
   var presets = {
-    sealed: function(){ pickOne("product", "sealed"); setAll("rarity", []); setAll("focus", []); pickOne("length", "standard"); },
+    sealed: function(){ pickOne("product", "sealed"); setAll("rarity", []); setAll("era", []); setAll("artist", []); setAll("generation", []); setAll("focus", []); pickOne("length", "standard"); },
     chase: function(){ pickOne("product", "singles"); setAll("rarity", ["Special Illustration Rare", "Illustration Rare"]); setAll("focus", []); pickOne("length", "glance"); },
-    vintage: function(){ pickOne("product", "singles"); setAll("focus", ["vintage"]); },
+    vintage: function(){ pickOne("product", "singles"); setAll("rarity", []); setAll("era", []); setAll("focus", ["vintage"]); },
     completer: function(){ pickOne("product", "singles"); setAll("focus", []); pickOne("length", "standard"); pickOne("length", "deep"); }
   };
   var dayButtons = form.querySelectorAll("[data-days]");
