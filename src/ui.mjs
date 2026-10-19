@@ -4553,6 +4553,8 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .feed-slide .read-nav{position:absolute;left:0;right:0;top:72px;z-index:2;justify-content:space-between;pointer-events:none;gap:0}
   .feed-slide .read-nav button{pointer-events:auto;min-width:44px;width:44px;flex:0 0 44px;padding:0;background:transparent;border-color:transparent;color:var(--gold);font:600 34px/1 var(--sans);opacity:.9}
   .feed-slide .read-nav.hint button{opacity:.4}
+  .feed-slide.no-art{padding-top:48px}
+  .feed-slide.no-art .read-nav{top:0}
   .read-pos{margin:0;color:var(--dim);font:600 13px/1.3 var(--sans);text-align:center}
   .feed-slide{position:relative;overflow-x:hidden;overflow-y:visible;flex:1 1 auto;min-width:0}
   .feed-slide .feed-card{width:100%}
@@ -5558,6 +5560,8 @@ function readTitle(card){
   var t=sn.title.replace(re,"").trim();
   var num=String(sn.num||(hm?hm[1]:"")).trim();
   var vars=(sn.variants||[]).filter(function(v){ return v && v!==num; });
+  // A name that already ends in its number ("... 96/109") keeps one copy.
+  if(num && t.length>num.length && t.slice(-num.length)===num && /[\\s#]$/.test(t.slice(0,-num.length))) t=t.slice(0,-num.length).replace(/[\\s#]+$/,"");
   return (t+(num?" #"+num:"")+(vars.length?" ("+vars.join(", ")+")":"")).replace(/\\s+-\\s+/g,", ").replace(/\\s+/g," ").trim();
 }
 function cardEl(card, facts){
@@ -6936,6 +6940,9 @@ async function showFlat(index, dir){
   nav.classList.toggle("hint", wantHint());
   const bar=stage.querySelector(".news-bar");
   if(nav.parentElement!==slide) slide.appendChild(nav);
+  // Side arrows sit beside the card art. A card with no art gets its own arrow
+  // row above it, so an arrow never lands on a chip or a line.
+  slide.classList.toggle("no-art", !card.querySelector("img"));
   if(bar) bar.remove();
   bindSwipe(card);
   commitReadUrl(row);
