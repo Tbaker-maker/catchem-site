@@ -3100,7 +3100,12 @@ export function renderCard(card, stamp, opts = {}) {
   const setBit = setMark + (card.setSlug
     ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || ""));
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"');
+  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"').replace(/<img\b([^>]*?)\ssrc="(\/data\/editor\/tcg\/[a-z0-9]+\/[A-Za-z0-9._-]+_hires\.png)"/, (m, pre, hi) => {
+    const pid = /^tcgcsv-(\d+)$/.exec(String(card.id || card.sku || ""));
+    if (!pid || card.kind === "sealed") return m;
+    const small = `/api/card-hero?pid=${pid[1]}&amp;fb=${hi}`;
+    return `<img${pre} src="${small}" srcset="${small} 431w, ${hi} 733w" sizes="(max-width: 600px) 240px, 280px"`;
+  });
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   if (!sealed) {
     return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries: held ? [] : priceSeries, rangeRow: held ? "" : rangeRow, img, setBit, held }), card.name, stamp, "", feedNav(opts));
