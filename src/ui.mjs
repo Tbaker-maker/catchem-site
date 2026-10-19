@@ -18,7 +18,7 @@ import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
-import { SIGNAL_CSS, SIGNAL_CLIENT, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
+import { SIGNAL_CSS, SIGNAL_CLIENT, TILE_JS, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -1645,7 +1645,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
-<style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
 ${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
 </nav></header>
@@ -4636,7 +4636,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-dir" aria-label="Direction"><option value="">Up or down</option><option value="up">Up</option><option value="down">Down</option></select>
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
-${page !== "read" ? feedToolsHtml(bundle?.asOf || "") : ""}
+${page !== "read" ? feedToolsHtml() : ""}
 <div id="feed-one"><div class="skel-card" aria-hidden="true"></div></div>
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
@@ -5546,6 +5546,19 @@ function deepEl(card){
   return el;
 }
 ${SIGNAL_CLIENT}
+${splitName.toString()}
+// "Pikachu - 088" or "Pikachu #088" shows as "Pikachu #088". No spaced hyphen in a title.
+function readTitle(card){
+  var n=String(card&&card.name||"").trim();
+  if(!n) return "";
+  var sn=splitName(n, card.number||card.num||"");
+  var re=/\\s+#\\s*([A-Za-z]{0,6}\\d+[A-Za-z]?(?:\\/[A-Za-z]{0,6}\\d+)?)\\s*$/;
+  var hm=sn.title.match(re);
+  var t=sn.title.replace(re,"").trim();
+  var num=String(sn.num||(hm?hm[1]:"")).trim();
+  var vars=(sn.variants||[]).filter(function(v){ return v && v!==num; });
+  return (t+(num?" #"+num:"")+(vars.length?" ("+vars.join(", ")+")":"")).replace(/\\s+-\\s+/g,", ").replace(/\\s+/g," ").trim();
+}
 function cardEl(card, facts){
   if(card && card.waveItem) return waveEl(card);
   if(card && (card.readKind==="deep" || card.kind==="deep")) return deepEl(card);
@@ -5566,7 +5579,7 @@ function cardEl(card, facts){
   const shown=sameSentence||line;
   const run=printRunLine(card);
   const runHtml=run?'<p class="print-run">'+html(run)+' <a href="/rotation">Rotation and print runs</a>.</p>':"";
-  const title=html(card.name||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
+  const title=html(readTitle(card)||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
   const pid=productIdOf(card);
   const h2=pageMode==="read"?"<h2>"+title+"</h2>":(pid?'<h2><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h2>":'<h2><a href="'+readHref+'">'+title+"</a></h2>");
   const open='<p><a class="open-data" href="'+html(openDataHref(card))+'">Open the data</a></p>';

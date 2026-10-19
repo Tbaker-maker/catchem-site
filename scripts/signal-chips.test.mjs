@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { preSend } from "../src/reads.mjs";
-import { ICON_LINES, ICON_SOURCE, attachSignals, signalRowHtml } from "../src/signal-chips.mjs";
+import { ICON_LINES, ICON_SOURCE, TILE_JS, attachSignals, chipLookup, signalRowHtml } from "../src/signal-chips.mjs";
 import { renderFeed } from "../src/ui.mjs";
 
 let fail = 0;
@@ -45,39 +45,45 @@ const joined = attachSignals({ reads: [{ id: "a", name: "A" }, { id: "b", signal
 t("chips attach without replacing a row that already has them", joined.reads[0].signals.length === 4 && joined.reads[1].signals[0].kind === "era");
 
 const page = renderFeed({ reads: [{ id: "fake-all", name: "Umbreon ex", headline: "A read.", signals: all.signals.slice(0, 4), blurb: all.blurb, asOf: "2026-10-17", source: "TCGplayer market" }] }, "", "Oct 17");
-t("the feed has fast mode and the icon key", page.includes("id=\"fast-mode\"") && page.includes("What the icons mean") && page.includes("catchem-fast") && page.includes("sig-row"));
-t("feed copy for the key stays clean", ICON_LINES.every(([, line]) => preSend(line).ok));
+t("the feed has fast mode and no icon key box", page.includes("id=\"fast-mode\"") && !page.includes("What the icons mean") && !page.includes("icon-key") && !page.includes("catchem-icon-key") && page.includes("catchem-fast") && page.includes("sig-row"));
+t("feed copy for the chip lines stays clean", ICON_LINES.every(([, line]) => preSend(line).ok) && !ICON_LINES.some(([id]) => id === "dots"));
 const opened = renderFeed({ reads: [{ id: "fake-all", name: "Umbreon ex", headline: "A read.", href: "/c/tcgcsv-1", signals: [{ kind: "art", badge: "SIR", label: "Special Illustration Rare" }], blurb: "Art type is Special Illustration Rare.", asOf: "2026-10-17" }] }, "fake-all", "Oct 17", { page: "read" });
 t("the deep read header shows the chip", opened.includes("sig-block") && opened.includes("SIR") && opened.includes(">Read</h1>"));
 
 const dotted = all.signals.map((chip) => ({ ...chip, strength: chip.kind === "move" ? 2 : 3 }));
 for (const chip of dotted) {
-  const html = signalRowHtml({ signals: [chip], blurb: all.blurb });
-  t("dots on " + chip.kind, (html.match(/class="sig-strength"/g) || []).length === 1 && !html.includes("sig-overall"));
+  const html = signalRowHtml({ signals: [chip], blurb: all.blurb, strength: 4 });
+  t("no strength dots or score on " + chip.kind, !html.includes("sig-strength") && !html.includes("sig-overall") && !html.includes("of 5"));
 }
-const down = signalRowHtml({
-  signals: [{ kind: "move", dir: "down", text: "5% 7D", label: "Price down 5 percent over 7 days", strength: 2 }],
-  blurb: all.blurb,
-  strength: 4,
-});
-t("the score sits on top and the dots are not a direction class", down.includes("sig-overall") && down.indexOf("sig-overall") < down.indexOf("sig-row") && down.includes("is-down") && !/class="sig-strength[^"]*is-/.test(down));
 const css = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
-t("dots stay one colour in either direction", css.includes(".sig.is-down .sig-strength") && css.includes(".sig.is-up .sig-strength") && css.includes(".sig-strength{display:inline-flex;gap:3px;align-items:center;margin-left:2px;color:#d9b779}") && !css.includes(".sig-strength{color:#e0675b") && !css.includes(".sig-strength{color:#7fc79a"));
-t("fast mode keeps the dots and the score", css.includes(".is-fast .sig-blurb") && !css.includes(".is-fast .sig-overall") && !css.includes(".is-fast .sig-strength"));
-t("the score row can wrap and stays a 44px tap", css.includes(".sig-overall{display:flex;flex-wrap:wrap") && css.includes(".sig-overall{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;min-width:0;min-height:44px"));
-const dashDots = signalRowHtml({ signals: [{ kind: "move", dir: "dash", text: "", label: "Price being checked", strength: 5 }], blurb: "Price being checked." });
-t("a grey dash has no dots and no score", dashDots.includes("is-dash") && !dashDots.includes("sig-strength") && !dashDots.includes("sig-overall") && !dashDots.includes("%"));
-const quiet = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "18%", label: "Listings counted down 18 percent", strength: 2 }], blurb: "Listings counted are down 18%, as of Oct 17." });
-t("no proven score stays off the row", !quiet.includes("sig-overall") && quiet.includes("sig-strength") && !/\bNM\b|Near Mint/.test(quiet));
-t("the strength line passes the copy rules", preSend("Signal strength, Oct 17.").ok && preSend("One dot is a quiet reading. Five dots is an unusual reading.").ok && preSend("eBay listings counted, Oct 18.").ok);
-const gone = signalRowHtml({ signals: [{ kind: "gone", dots: 2, word: "Steady", label: "Listings gone, steady", strength: 2 }] });
-t("gone uses a speed word, not a second dot scale", gone.includes("Steady") && !gone.includes("sig-dots") && (gone.match(/class="sig-strength"/g) || []).length === 1);
-const lead = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "Listings -18% 7d · Draining · Many sellers · Slowing", label: "Listings counted down 18 percent over 7 days. Draining. Many sellers. Slowing", strength: 4 }], blurb: "Listings counted are down 18% over 7 days, as of Oct 18." }, { asOf: "2026-10-18" });
-t("the supply chip is the prominent line", lead.includes("is-lead") && lead.includes("Listings -18% 7d") && lead.includes("Many sellers") && lead.includes("eBay listings counted, Oct 18.") && !lead.includes("is-amber") && preSend("Listings counted are down 18% over 7 days, as of Oct 18.").ok && preSend("eBay listings counted, Oct 18.").ok);
+t("the dots meter and key styles are gone", !css.includes(".sig-strength") && !css.includes(".sig-overall") && !css.includes(".icon-key") && !css.includes("paintIconKey"));
+const lead = signalRowHtml({ signals: [{ kind: "listings", dir: "down", text: "Listings -18% 7d · Draining", label: "Listings counted down 18 percent over 7 days. Draining", strength: 4 }], blurb: "Listings counted are down 18% over 7 days, as of Oct 18." }, { asOf: "2026-10-18" });
+t("the supply pill still leads when a read has no tiles", lead.includes("is-lead") && lead.includes("Listings -18% 7d") && lead.includes("eBay listings counted, Oct 18.") && preSend("eBay listings counted, Oct 18.").ok);
+
+// Flip tiles
+const tiles = {
+  data: { bars: 3, of: 3, prices: 225, recent: 17, since: "2024-03-14", through: "2026-10-18", span: "2.5 yrs", source: "TCGplayer market" },
+  price: { dir: "up", pct: 7.2, days: 7, from: 19.32, fromDate: "2026-10-11", spark: [19.32, 19.19, 19.39, 19.88, 19.59, 19.53, 20.09, 20.71], source: "TCGplayer market", asOf: "2026-10-18" },
+};
+const tiled = signalRowHtml({ signals: all.signals, tiles }, { href: "/feed/r/x" });
+t("a read with tiles shows the Data and Price tiles", (tiled.match(/class="tl[ "]/g) || []).length === 2 && tiled.includes("Price 7D") && tiled.includes("▲ 7.2%") && tiled.includes("from $19.32, Oct 11") && tiled.includes("2.5 yrs on file"));
+t("the data tile back shows counts, source and dates only", tiled.includes("225 prices on file, 17 in the last 30 days.") && tiled.includes("TCGplayer market, Mar 14, 2024 to Oct 18, 2026") && !/cutoff|threshold|flatAbs|minAbsPct/i.test(tiled));
+t("tiles are buttons with aria-pressed and a full label", (tiled.match(/<button type="button" class="tl/g) || []).length === 2 && (tiled.match(/aria-pressed="false"/g) || []).length === 2 && tiled.includes('aria-label="Data on file: 3 of 3 bars'));
+t("tiles never sit inside a link", !/<a [^>]*>[^]*class="tl/.test(tiled));
+t("tiles replace the pills and the dots", !tiled.includes("sig-row") && !tiled.includes("sig-strength"));
+t("no listings tile without listings counted", !tiled.includes("Listings counted"));
+const box = signalRowHtml({ tiles: { ...tiles, listings: { word: "Draining", dir: "down", pct: 12, days: 7, spark: [41, 41, 40, 39, 38, 37, 36], band: [38, 41], from: "2026-10-12", to: "2026-10-18" } } });
+t("a product with listings counted gets a wide listings tile with a band", box.includes("tl wide") && box.includes("Draining") && box.includes("▼ 12%") && box.includes("7D") && box.includes("<rect") && box.includes("eBay listings counted, Oct 12 to Oct 18"));
+t("the listings tile has no seller tag or stage pips", !/sellers|Building|Slowing|Stalled|Reversing/.test(box));
+t("tile copy passes the rules", !/[\u2013\u2014]| - |\bsold\b|\bsales\b|\bNM\b/i.test(box.replace(/<[^>]+>/g, " ")));
+t("tile css: rounded, 44px plus, no layout shift, reduced motion", css.includes(".tl-face{grid-area:1/1") && css.includes("min-height:112px") && css.includes("border-radius:20px") && css.includes("prefers-reduced-motion:reduce") && css.includes(".tl-back{transform:none;opacity:0}"));
+t("one guarded listener flips tiles and Escape flips back", TILE_JS.includes("__ceTiles") && TILE_JS.includes("Escape") && TILE_JS.includes("aria-pressed"));
 const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 const client = readFileSync(new URL("../src/signal-chips.mjs", import.meta.url), "utf8");
-t("chips load for a signed out visitor", ui.includes('"/data/signal-chips.json"') && client.includes("function signalJoin") && !client.includes("premium"));
-t("the key names no Arrow or Flame label", !client.includes(">Arrow<") && !client.includes(">Flame<") && client.includes("icon-key-row") && client.includes("color:#efe9de"));
+t("chips and tiles load for a signed out visitor", ui.includes('"/data/signal-chips.json"') && client.includes("function signalJoin") && client.includes("next.tiles=hit.tiles") && !client.includes("premium"));
+t("bySku may point at a byId key", chipLookup({ byId: { r1: { tiles } }, bySku: { "tcgcsv-1": "r1" } }, "move-tcgcsv-1-7")?.tiles === tiles);
+t("the feed title is the name with a number sign", ui.includes("function readTitle(card)") && ui.includes("html(readTitle(card)"));
+t("the key names no Arrow or Flame label", !client.includes(">Arrow<") && !client.includes(">Flame<"));
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("signal chips: all ok");
