@@ -74,6 +74,10 @@ export const SIGNAL_CSS = `
 .sig-block.on-light .tl-tag{background:#f6efe1;border-color:#e3d3b0;color:#7a5a1c}.sig-block.on-light .tl-tag.is-up{background:#eaf6ee;border-color:#bfe0c9;color:#256b3c}.sig-block.on-light .tl-tag.is-down{background:#fbecea;border-color:#efc6c0;color:#a3352a}.sig-block.on-light .tl-p b{color:#1d1d1f}
 .tl-hint{grid-column:1/-1;margin:2px 0 0;text-align:center;font:500 12px/1.3 var(--sans,"IBM Plex Sans",system-ui,sans-serif);color:#8d8577}
 .is-fast .tl-hint{display:none}
+.is-fast .tiles{display:grid}
+.sig-block.is-compact .tl,.sig-block.is-compact .tl-in,.sig-block.is-compact .tl-face,.is-fast .tl,.is-fast .tl-in,.is-fast .tl-face{min-height:64px}
+.sig-block.is-compact .tl-v,.is-fast .tl-v{font-size:16px}
+.sig-block.is-compact .tl-hint{display:none}
 @media (prefers-reduced-motion:reduce){.tl-in{transition:none;transform:none!important}.tl-face{-webkit-backface-visibility:visible;backface-visibility:visible;transition:opacity .2s linear}.tl-back{transform:none;opacity:0}.tl[aria-pressed="true"] .tl-back{opacity:1}.tl[aria-pressed="true"] .tl-front{opacity:0}}
 .sig-block.on-light .tl-face{background:#fff;border-color:#e5e5ea;color:#1c1c1e}
 .sig-block.on-light .tl-back{background:#fff8ee;border-color:#e6d3a8}
@@ -284,8 +288,9 @@ export function signalMarkup(card, escape, opts) {
     return "";
   }
   const light = opts && opts.light ? " on-light" : "";
+  const compact = opts && opts.compact ? " is-compact" : "";
   const tiled = card && card.tiles && typeof card.tiles === "object" && !(opts && opts.pills) ? tilesHtml(card.tiles) : "";
-  if (tiled) return '<div class="sig-block' + light + '">' + tiled + "</div>";
+  if (tiled) return '<div class="sig-block' + light + compact + '">' + tiled + "</div>";
   const chips = Array.isArray(card && card.signals) ? card.signals.slice(0, 4) : [];
   if (!chips.length) return "";
   const href = opts && opts.href ? String(opts.href) : "";
@@ -323,25 +328,121 @@ function withAsOf(doc, hit) {
   return { ...hit, signalAsOf: asOf };
 }
 
-function usable(row) {
-  return !!(row && ((Array.isArray(row.signals) && row.signals.length) || (row.tiles && typeof row.tiles === "object")));
+function hasTiles(row) {
+  const t = row && row.tiles;
+  return !!(t && typeof t === "object" && (t.data || t.price || t.listings));
 }
 
-// bySku values are byId keys (older files held the entry itself).
+function usable(row) {
+  return !!(row && ((Array.isArray(row.signals) && row.signals.length) || hasTiles(row)));
+}
+
+// One sku map for the whole file. Exact id still wins when that row has tiles.
+function skuIndex(doc) {
+  if (!doc || typeof doc !== "object") return {};
+  if (doc.__skuIndex) return doc.__skuIndex;
+  const idx = {};
+  function put(key, hit) {
+    if (!key || !usable(hit)) return;
+    const prev = idx[key];
+    if (!prev || (hasTiles(hit) && !hasTiles(prev))) idx[key] = hit;
+  }
+  const by = doc.byId || {};
+  for (const id of Object.keys(by)) {
+    const hit = by[id];
+    put(id, hit);
+    if (hit && hit.sku) put(String(hit.sku), hit);
+    const m = String(id).match(/tcgcsv-\d+/);
+    if (m) put(m[0], hit);
+  }
+  const sku = doc.bySku || {};
+  for (const key of Object.keys(sku)) {
+    const raw = sku[key];
+    put(key, typeof raw === "string" ? by[raw] : raw);
+  }
+  try { Object.defineProperty(doc, "__skuIndex", { value: idx, enumerable: false }); }
+  catch (err) { doc.__skuIndex = idx; }
+  return idx;
+}
+
 function skuHit(doc, key) {
-  const raw = doc && doc.bySku ? doc.bySku[key] : null;
-  if (typeof raw === "string") return doc.byId ? doc.byId[raw] || null : null;
-  return raw || null;
+  return skuIndex(doc)[key] || null;
 }
 
 export function chipLookup(doc, id) {
   const key = String(id || "");
   if (!doc || !key) return null;
-  if (doc.byId && usable(doc.byId[key])) return withAsOf(doc, doc.byId[key]);
-  if (usable(skuHit(doc, key))) return withAsOf(doc, skuHit(doc, key));
+  const exact = doc.byId ? doc.byId[key] : null;
+  const idx = skuIndex(doc);
+  const keys = [];
   const sku = (key.match(/tcgcsv-\d+/) || [])[0];
-  if (sku && usable(skuHit(doc, sku))) return withAsOf(doc, skuHit(doc, sku));
-  return null;
+  if (sku) keys.push(sku);
+  if (key !== sku) keys.push(key);
+  let alt = null;
+  for (const one of keys) {
+    const hit = idx[one];
+    if (!usable(hit) || hit === exact) continue;
+    if (!alt || (hasTiles(hit) && !hasTiles(alt))) alt = hit;
+    if (hasTiles(hit)) break;
+  }
+  const hit = hasTiles(exact) ? exact : hasTiles(alt) ? alt : usable(exact) ? exact : usable(alt) ? alt : null;
+  return hit ? withAsOf(doc, hit) : null;
+}
+
+// Joins tiles onto a feed card. The card id, its sku, or the tcgcsv id inside either one.
+export function signalJoin(card, doc) {
+  if (!card) return card;
+  if (hasTiles(card) || !doc) return card;
+  const id = String(card.id || "");
+  const exact = doc.byId && id ? doc.byId[id] : null;
+  const idx = skuIndex(doc);
+  const keys = [];
+  if (card.sku) keys.push(String(card.sku));
+  const href = String(card.href || "");
+  const hm = href.match(/\/(?:c|p)\/([^/?#]+)/);
+  if (hm) keys.push(decodeURIComponent(hm[1]));
+  const tm = id.match(/tcgcsv-\d+/);
+  if (tm) keys.push(tm[0]);
+  let alt = null;
+  for (const key of keys) {
+    const row = idx[key];
+    if (!usable(row) || row === exact) continue;
+    if (!alt || (hasTiles(row) && !hasTiles(alt))) alt = row;
+    if (hasTiles(row)) break;
+  }
+  const hit = hasTiles(exact) ? exact : hasTiles(alt) ? alt : usable(exact) ? exact : usable(alt) ? alt : null;
+  if (!hit) return card;
+  const next = {};
+  for (const k in card) next[k] = card[k];
+  if (!(Array.isArray(card.signals) && card.signals.length) && Array.isArray(hit.signals) && hit.signals.length) {
+    next.signals = hit.signals;
+    if (hit.blurb) next.blurb = hit.blurb;
+  }
+  if (hasTiles(hit)) next.tiles = hit.tiles;
+  return next;
+}
+
+export function signalLeadMarkup(card, doc, escape) {
+  const row = signalJoin(card, doc);
+  if (!row) return "";
+  if (hasTiles(row)) return signalMarkup(row, escape, { tap: false, compact: true });
+  if (!Array.isArray(row.signals) || !row.signals.length) return "";
+  return signalMarkup({ signals: row.signals.slice(0, 1) }, escape, { tap: false, pills: true });
+}
+
+export function signalBitsMarkup(card, doc, escape) {
+  const row = signalJoin(card, doc);
+  const href = "/feed/r/" + encodeURIComponent((row && row.id) || "");
+  const htmlOut = signalMarkup(row, escape, { href, asOf: (doc && doc.asOf) || "" });
+  if (typeof pageMode !== "undefined" && pageMode === "read" && typeof document !== "undefined") {
+    const blocks = document.querySelectorAll("main .sig-block");
+    for (let i = 0; i < blocks.length; i++) {
+      if (blocks[i].closest && blocks[i].closest("article")) continue;
+      if (htmlOut) blocks[i].remove();
+    }
+    if (!htmlOut) return "";
+  }
+  return htmlOut;
 }
 
 export function chipForSample(sample, doc) {
@@ -358,7 +459,7 @@ export function chipForSample(sample, doc) {
 // One listener for every flip tile on the page. Tap or Enter flips, Escape flips back.
 export const TILE_JS = `(function(){if(window.__ceTiles)return;window.__ceTiles=1;function set(b,on){b.setAttribute("aria-pressed",on?"true":"false");}document.addEventListener("click",function(ev){var b=ev.target&&ev.target.closest?ev.target.closest(".tl"):null;if(!b)return;ev.preventDefault();ev.stopPropagation();set(b,b.getAttribute("aria-pressed")!=="true");},true);document.addEventListener("keydown",function(ev){if(ev.key!=="Escape")return;var b=document.activeElement;if(b&&b.classList&&b.classList.contains("tl"))set(b,false);});})();`;
 
-export const SIGNAL_CLIENT = `${signalMarkup.toString()}\n${mountSignalTools.toString()}\n${TILE_JS}\nvar signalDoc=null;\nfunction signalHitOk(h){return !!(h&&((Array.isArray(h.signals)&&h.signals.length)||(h.tiles&&typeof h.tiles==="object")));}\nfunction signalJoin(card){if(!card)return card;if(card.tiles)return card;var doc=signalDoc;if(!doc)return card;var hit=doc.byId&&card.id?doc.byId[card.id]:null;if(!signalHitOk(hit)&&doc.bySku){hit=null;var keys=[];if(card.sku)keys.push(String(card.sku));var href=String(card.href||"");var hm=href.match(/\\/(?:c|p)\\/([^/?#]+)/);if(hm)keys.push(decodeURIComponent(hm[1]));var tm=String(card.id||"").match(/tcgcsv-\\d+/);if(tm)keys.push(tm[0]);for(var i=0;i<keys.length;i++){var h=keys[i]?doc.bySku[keys[i]]:null;if(typeof h==="string")h=doc.byId?doc.byId[h]:null;if(signalHitOk(h)){hit=h;break;}}}if(!signalHitOk(hit))return card;var next={};for(var k in card)next[k]=card[k];if(!(Array.isArray(card.signals)&&card.signals.length)&&Array.isArray(hit.signals)&&hit.signals.length){next.signals=hit.signals;if(hit.blurb)next.blurb=hit.blurb;}if(hit.tiles)next.tiles=hit.tiles;return next;}\nfunction signalLead(card){var row=signalJoin(card);if(!row||!Array.isArray(row.signals)||!row.signals.length)return "";return signalMarkup({signals:row.signals.slice(0,1)}, html, {tap:false, pills:true});}\nfunction signalBits(card){if(pageMode==="read"&&document.querySelector("main .sig-block"))return "";var row=signalJoin(card);var href="/feed/r/"+encodeURIComponent(row&&row.id||"");return signalMarkup(row, html, {href:href, asOf:(signalDoc&&signalDoc.asOf)||""});}\n`;
+export const SIGNAL_CLIENT = `${signalMarkup.toString()}\n${mountSignalTools.toString()}\n${hasTiles.toString()}\n${usable.toString()}\n${skuIndex.toString()}\n${signalJoin.toString()}\n${signalLeadMarkup.toString()}\n${signalBitsMarkup.toString()}\n${TILE_JS}\nvar signalDoc=null;\nfunction signalLead(card){return signalLeadMarkup(card, signalDoc, html);}\nfunction signalBits(card){return signalBitsMarkup(card, signalDoc, html);}\n`;
 
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&" + "amp;").replace(/</g, "&" + "lt;").replace(/>/g, "&" + "gt;").replace(/"/g, "&" + "quot;");
@@ -371,20 +472,19 @@ export function feedToolsHtml() {
 
 
 export function attachSignals(bundle, doc) {
-  const byId = doc && doc.byId && typeof doc.byId === "object" ? doc.byId : null;
-  if (!bundle || !byId) return bundle;
+  if (!bundle || !doc || !doc.byId) return bundle;
   const reads = (bundle.reads || []).map((row) => {
     if (!row || !row.id) return row;
-    const hit = byId[row.id];
-    if (!usable(hit)) return row;
+    const hit = chipLookup(doc, row.id);
+    if (!hit) return row;
     const hasChips = Array.isArray(row.signals) && row.signals.length;
-    if (hasChips && (row.tiles || !hit.tiles)) return row;
+    if (hasChips && (hasTiles(row) || !hasTiles(hit))) return row;
     const next = { ...row };
     if (!hasChips && Array.isArray(hit.signals) && hit.signals.length) {
       next.signals = hit.signals.slice(0, 4);
       next.blurb = hit.blurb || row.blurb || "";
     }
-    if (hit.tiles && !row.tiles) next.tiles = hit.tiles;
+    if (hasTiles(hit) && !hasTiles(row)) next.tiles = hit.tiles;
     return next;
   });
   return { ...bundle, reads };
