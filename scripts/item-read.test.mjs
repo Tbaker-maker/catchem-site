@@ -22,7 +22,7 @@ const h = itemReadBlock(itemLine(shard, "tcgcsv-1"));
 t("7/30/90/1Y changes", ["7-day -2.5%", "30-day -22.3%", "90-day -31.1%", "1Y -30.8%"].every((x) => h.includes(x)));
 t("high/low, days since high, rank", h.includes("503 days since the last high") && h.includes("No. 8 of 244"));
 t("listings counted with change", h.includes("12 listings counted, Oct 14, 1-day +20% from Oct 13"));
-t("pattern and set momentum", h.includes("vs 20.8% normally") && h.includes("singles index -18.3%"));
+t("pattern and set momentum", h.includes("1.2x more likely than usual to rise and finish above the usual move within 7 days") && h.includes("25% of 3,503 past cases vs 20.8% for all items.") && h.includes("singles index -18.3%") && !/\bright\b/i.test(h.replace(/<[^>]+>/g, " ")));
 t("what-we-see line", h.includes("44% under its high"));
 t("no invented Near Mint label", !h.includes("(Near Mint)") && !h.includes("NM $"));
 t("Rip and rotation skipped when the page already has them", !itemReadBlock(row, { skipRip: true, skipRotation: true }).includes("Rip value") && !itemReadBlock(row, { skipRotation: true }).includes("Mark I"));

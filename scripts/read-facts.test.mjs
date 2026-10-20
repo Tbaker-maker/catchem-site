@@ -29,7 +29,7 @@ t("eBay vs TCGplayer gap", h.includes("eBay ask $50.00 vs TCGplayer $47.36 (+5.6
 t("hero uses tonight's dated price, not the old high", h.includes("$47.36 TCGplayer, Oct 14, 2026") && !h.includes("NM $47.36") && !h.includes("$84.45 TCGplayer"));
 t("high, low, days since high, rank", h.includes("High $84.54 on May 29, 2025") && h.includes("503 days since the last high, now 44% under it") && h.includes("No. 8 of 244"));
 t("percent facts are not scaled twice", h.includes("singles index +0.6%"));
-t("pattern shows rate vs base and n", h.includes("right 25% of the time 7 days later, vs 20.8% normally. Based on 3,503 past cases") && h.includes("set 1 to 3 years old"));
+t("pattern shows rate vs base and n", h.includes("1.2x more likely than usual to rise and finish above the usual move within 7 days") && h.includes("25% of 3,503 past cases vs 20.8% for all items.") && h.includes("Why it matches: set 1 to 3 years old, previous era, still in Standard.") && h.includes("Our nightly files, Oct 14.") && !/\bright\b/i.test(h.replace(/<[^>]+>/g, " ")));
 t("bands, variants, similar with thumbnail", h.includes("Rarity band") && h.includes("Artist band") && h.includes("Reverse Holofoil $55.00") && h.includes('src="/img/sv10/240"'));
 t("rotation chip", h.includes("Mark I · Standard"));
 t("clean title", cleanTitle("Misty's Psyduck - 193/182") === "Misty's Psyduck" && cleanTitle("Mew ex") === "Mew ex");

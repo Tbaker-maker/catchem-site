@@ -9,6 +9,7 @@ import { banGuard } from "./advice-rules.mjs";
 import { ebaySearchUrl, tcgStoreUrl, SHOP_NOTE } from "./pokemon.mjs";
 import { AFFILIATION, TCGPLAYER_ATTRIBUTION } from "./affiliation.mjs";
 import { stageFromChips, stageLine } from "./run-stage.mjs";
+import { patternBarsEmail, patternFromGate } from "./pattern-track.mjs";
 
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
@@ -366,7 +367,7 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     ups: ups.map((i) => ({ ...i, story: storyFor(i) })),
     downs: downs.map((i) => ({ ...i, story: storyFor(i) })),
     supply, vintage: vintage ? { ...vintage, story: storyFor(vintage) } : null,
-    pattern: patternRead ? { text: patternRead.headline, href: SITE + (String(patternRead.href || "/feed").startsWith("/") ? patternRead.href : "/feed"), asOf: patternRead.asOf } : null,
+    pattern: patternEmail(patternRead),
     rotation: rotationRead ? { text: rotationRead.headline, asOf: rotationRead.asOf } : null,
     news: newsRead ? { text: newsRead.headline, href: newsRead.href, source: String(newsRead.source || "").split(",")[0] } : null,
     setCompare,
@@ -481,6 +482,16 @@ function windowRow(r) {
 </td><td width="76" align="right" valign="middle" style="padding-left:8px">${tag}</td></tr></table>`;
 }
 
+
+function patternEmail(patternRead) {
+  if (!patternRead) return null;
+  const href = SITE + (String(patternRead.href || "/feed").startsWith("/") ? patternRead.href : "/feed");
+  const asOf = patternRead.asOf;
+  const copy = patternFromGate(patternRead.receipt && patternRead.receipt.gate);
+  if (!copy) return { text: patternRead.headline, href, asOf };
+  return { text: copy.lead, small: copy.small, bars: patternBarsEmail(copy), href, asOf };
+}
+
 function reportCard(rep, L) {
   const head = rep.firstRead ? `Your watchlist since ${day(rep.since)}` : `Your watchlist since your last read, ${day(rep.since)}`;
   const up = rep.rows.filter((r) => r.change >= 0.5).length;
@@ -526,7 +537,12 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     if (doc.building?.length) body.push(buildingCard(doc.building));
     if (L === "deep" && doc.setCompare.length) body.push(card(h2("Set by set") + doc.setCompare.map((r) => `<p class="ce-dim" style="margin:0 0 8px;font:400 14px/1.4 ${FONT};color:${C.dim}"><b class="ce-ink" style="color:${C.ink}">${esc(r.set)}</b>: ${r.up} up, ${r.down} down, of ${r.n} in this read.</p>`).join(""), "sets"));
     if (doc.vintage) body.push(card(h2("Vintage note") + row(doc.vintage, { deep: L === "deep" }), "vintage"));
-    if (doc.pattern) body.push(card(h2("Pattern to know") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.pattern.text)}</p><p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.35 ${FONT};color:${C.soft}">Pattern as of ${esc(day(doc.pattern.asOf))}. TCGplayer market.</p>`, "pattern"));
+    if (doc.pattern) {
+      const foot = doc.pattern.small
+        ? `<p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.45 ${FONT};color:${C.soft}">${esc(doc.pattern.small)} Our nightly files, ${esc(day(doc.pattern.asOf))}.</p>`
+        : `<p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.35 ${FONT};color:${C.soft}">Pattern as of ${esc(day(doc.pattern.asOf))}. TCGplayer market.</p>`;
+      body.push(card(h2("Pattern to know") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.pattern.text)}</p>${doc.pattern.bars || ""}${foot}`, "pattern"));
+    }
     if (doc.rotation) body.push(card(h2("Rotation") + `<p class="ce-dim" style="margin:0;font:400 15px/1.45 ${FONT};color:${C.dim}">${esc(doc.rotation.text)}</p>`, "rotation"));
   }
   if (doc.news && L !== "glance") body.push(card(h2("News") + `<p class="ce-ink" style="margin:0;font:600 15px/1.35 ${FONT};color:${C.ink}">${esc(doc.news.text)}</p><p class="ce-soft" style="margin:6px 0 0;font:400 13px/1.35 ${FONT}"><a href="${esc(doc.news.href)}" style="color:${C.soft};text-decoration:underline">${esc(doc.news.source || "Source")}</a></p>`, "news"));

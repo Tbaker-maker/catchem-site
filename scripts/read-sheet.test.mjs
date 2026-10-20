@@ -50,7 +50,7 @@ const html = readSheet(read, {
 t("hero has the photo, number, logo, rarity, artist, and NM price", html.includes("rd-face") && html.includes(">Ho-Oh<") && html.includes("001/017") && html.includes("/img/pop5/logo.png") && html.includes("Holo Rare") && html.includes("Ken Sugimori") && html.includes("NM $35.00"));
 t("eBay ask keeps its condition", html.includes("eBay ask $40.00 (any condition), Oct 13, 2026"));
 t("chips scroll and keep the dated changes", html.includes("rd-chips") && html.includes("30-day +12.5%, Sep 12, 2026 to Oct 13, 2026") && html.includes("Mark H · Standard, as of Aug 24, 2026") && html.includes("Holo") && html.includes("eBay ask is $5.00 above the TCGplayer price"));
-t("pattern sentence uses the gate numbers", patternSentence(read).text === "This pattern was right 55.7% of the time vs 45% normally, over 509 cases, looking 30 days ahead." && html.includes("Held in every era on file"));
+t("pattern sentence uses the gate numbers", patternSentence(read).text === "1.2x more likely than usual to rise and finish above the usual move within 30 days" && html.includes("55.7% of 509 past cases vs 45% for all items.") && html.includes("Held in every era on file") && !/\bright\b/.test(patternSentence(read).text));
 t("staircase stays off until it passes", patternSentence({ receipt: { pattern: "staircase", stage: "forming", gate: { n: 10, horizon: 30, rate: 40, baseRate: 20 } } }) === null);
 t("context cards and a similar thumbnail", html.includes("Set momentum") && html.includes("Rarity band") && html.includes("Artist band") && html.includes("Release cycle") && html.includes("Similar cards") && html.includes("002/017"));
 t("a thin read draws nothing", readSheet({ id: "x" }) === "");
