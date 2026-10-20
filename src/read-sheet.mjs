@@ -73,21 +73,23 @@ export function priceBits(read) {
   const rows = Array.isArray(read?.prices) ? read.prices : [];
   const tcg = rows.find((row) => row && String(row.source || "").toLowerCase() === "tcgplayer" && Number(row.amount) > 0);
   const ebay = rows.find((row) => row && String(row.source || "").toLowerCase() === "ebay" && Number(row.amount) > 0);
+  const sealed = read?.kind === "sealed" || read?.item?.kind === "sealed";
   const out = [];
   if (tcg) {
-    const nm = read?.kind !== "sealed" && read?.item?.kind !== "sealed" && /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
+    const nm = !sealed && /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
     const when = dayLabel(tcg.date);
     out.push(`${nm ? "NM " : ""}${money(tcg.amount)} TCGplayer${when ? `, ${when}` : ""}`);
   }
   if (ebay) {
-    const cond = String(ebay.label || ebay.condition || "").trim();
+    const cond = sealed ? "" : String(ebay.label || ebay.condition || "").trim();
     const when = dayLabel(ebay.date);
-    out.push(`eBay ask ${money(ebay.amount)}${cond ? ` (${cond})` : ""}${when ? `, ${when}` : ""}`);
+    const label = sealed ? "Median ask" : "eBay ask";
+    out.push(`${label} ${money(ebay.amount)}${cond ? ` (${cond})` : ""}${when ? `, ${when}` : ""}`);
   }
   let gap = "";
   if (tcg && ebay && tcg.date && ebay.date) {
     const diff = Math.round((Number(ebay.amount) - Number(tcg.amount)) * 100) / 100;
-    if (diff !== 0) gap = `eBay ask is ${money(Math.abs(diff))} ${diff > 0 ? "above" : "under"} the TCGplayer price`;
+    if (diff !== 0) gap = `${sealed ? "Median ask" : "eBay ask"} is ${money(Math.abs(diff))} ${diff > 0 ? "above" : "under"} ${sealed ? "the TCGplayer market" : "the TCGplayer price"}`;
   }
   return { line: out.join(". "), gap };
 }
@@ -214,7 +216,14 @@ export function factChips(f) {
   if (c.d30 && dayLabel(c.d30.from)) out.push(chip(`30-day ${pp(c.d30.pct)}, ${shortDay(c.d30.from)} to ${shortDay(c.d30.to)}`));
   if (c.y1 && dayLabel(c.y1.from)) out.push(chip(`1Y ${pp(c.y1.pct)}, ${dayLabel(c.y1.from)} to ${dayLabel(c.y1.to)}`));
   const g = f.gap;
-  if (g && g.ebay > 0 && g.tcg > 0 && g.diff && dayLabel(g.ebayDate)) out.push(chip(`eBay ask ${money(g.ebay)} vs TCGplayer ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+  const sealed = f.kind === "sealed" || f.item?.kind === "sealed";
+  if (g && g.ebay > 0 && g.tcg > 0 && g.diff && dayLabel(g.ebayDate)) {
+    if (sealed) {
+      const n = Number(g.ebayCount);
+      const mid = Number.isInteger(n) && n >= 1 ? ` Middle price of ${n} eBay listings counted.` : "";
+      out.push(chip(`Median ask ${money(g.ebay)}.${mid} TCGplayer market ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+    } else out.push(chip(`eBay ask ${money(g.ebay)} vs TCGplayer ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+  }
   return out.filter(Boolean);
 }
 

@@ -10,9 +10,9 @@ const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const short = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(iso || "") ? `${months[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}` : "");
 const pp = (n) => (Number(n) > 0 ? "+" : "") + Math.round(Number(n) * 10) / 10 + "%";
 
-export function itemReadBlock(f, { skipRip = false, skipRotation = false, skipWindows = false } = {}) {
+export function itemReadBlock(f, { skipRip = false, skipRotation = false, skipWindows = false, kind = "" } = {}) {
   if (!f || typeof f !== "object") return "";
-  const doc = { ...f, id: f.id || "item", asOf: f.asOf || f.item?.priceAsOf || "" };
+  const doc = { ...f, id: f.id || "item", asOf: f.asOf || f.item?.priceAsOf || "", kind: kind || f.kind || f.item?.kind || "" };
   if (skipRip) delete doc.rip;
   const chips = factChips({ ...doc, change: { ...(doc.change || {}), d30: undefined, y1: undefined } });
   const ch = doc.change || {};
