@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 import { createRank } from "../src/catalog-rank.mjs";
+import { homeFinderSource } from "../src/home-finder.mjs";
 import { renderSearch } from "../src/ui.mjs";
 import worker from "../src/index.mjs";
 
@@ -66,6 +68,14 @@ t("home search has a button, a suggestion list, and still offers the feed", home
 t("the catalogue index is not requested until the box is focused", home.indexOf("feed/search/manifest") > home.indexOf("function manifest") && home.includes('addEventListener("focus"'));
 t("home suggestions do not add another feed link", (home.match(/href="\/feed"/g) || []).length === 4);
 t("no em dash in the new search copy", !/\u2014|\u2013/.test(home.slice(home.indexOf("hero-search"), home.indexOf("hero-search") + 2500)));
+const finderAt = home.indexOf("catchem-finder");
+const finderScript = home.slice(finderAt, home.indexOf("</script>", finderAt));
+t("home finder defines the name helper before the ranker", finderScript.includes("function __name") && finderScript.indexOf("function __name") < finderScript.indexOf("function createRank"));
+const probed = homeFinderSource().replace("function createRank() {", "function createRank() {\n__name(function(){}, \"probe\");");
+let finderRan = true;
+try { vm.runInNewContext(probed, { document: { getElementById() { return null; } } }); }
+catch { finderRan = false; }
+t("home finder runs when the bundle calls __name", finderRan);
 
 if (fail) process.exit(1);
 console.log("search open ok");
