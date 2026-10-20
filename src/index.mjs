@@ -49,7 +49,24 @@ import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
-import { renderPromos } from "./promos.mjs";
+import { flagForItem } from "./premium-ratio.mjs";
+
+async function withPremium(card, fetchImpl) {
+  if (!card) return card;
+  try {
+    const doc = await loadJson("premium-ratio.json", fetchImpl);
+    const flag = flagForItem({
+      id: card.id,
+      sku: card.id,
+      set: card.set,
+      kind: card.kind === "sealed" ? "sealed" : "single",
+      href: card.kind === "sealed" ? "/p/" + card.id : "/c/" + card.id,
+    }, doc);
+    return flag ? { ...card, premiumFlag: flag } : card;
+  } catch {
+    return card;
+  }
+}
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   status,
@@ -739,7 +756,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           const pic = officialSrc({ id: hit.id, kind: "single" }, images);
           const reads = await cardReadSplit(hit.id, fetchImpl);
           const conditionNote = await conditionNoteFor(fetchImpl);
-          return html(renderCard(row, stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
+          return html(renderCard(await withPremium(row, fetchImpl), stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
@@ -922,7 +939,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(card, stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    return html(renderCard(await withPremium(card, fetchImpl), stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);

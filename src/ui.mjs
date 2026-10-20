@@ -2939,6 +2939,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <div class="cp-id">
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
+${premiumFlagLine(card)}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
 ${opts.comesFrom ? `<p class="comes-from">Comes from <a href="/p/${esc(opts.comesFrom.id)}">${esc(opts.comesFrom.name)}</a></p>` : ""}
@@ -3087,6 +3088,14 @@ function ripValueBlock(rip) {
   return `<section class="sealed-rip"><h2>Rip value</h2><dl>${bits.join("")}</dl>${src ? `<p class="muted">${esc(src)}</p>` : ""}</section>`;
 }
 
+function premiumFlagLine(card) {
+  const word = card?.premiumFlag === "below" ? "Below its usual premium" : card?.premiumFlag === "above" ? "Above its usual premium" : "";
+  if (!word) return "";
+  const bg = card.premiumFlag === "below" ? "#123d22" : "#3a2f0c";
+  const fg = card.premiumFlag === "below" ? "#8ee0a8" : "#f6dc86";
+  return `<p class="prem-flag" style="display:inline-block;margin:8px 0;border-radius:999px;padding:3px 10px;background:${bg};color:${fg};font:600 13px/1.4 var(--sans)">${esc(word)}</p>`;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
@@ -3203,6 +3212,7 @@ export function renderCard(card, stamp, opts = {}) {
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
+${premiumFlagLine(card)}
 ${card.exclusive === "Costco" ? `<p class="muted">Costco exclusive${card.region ? ` · ${esc(card.region)}` : ""}</p>` : ""}
 ${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
