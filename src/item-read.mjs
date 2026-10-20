@@ -34,4 +34,7 @@ const CSS = `.item-read{display:grid;gap:12px;margin:16px 0;padding:16px;border-
 .item-read .rd-chip{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
 .item-read .rd-pattern,.item-read .rd-card{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
 .item-read .rd-card h3,.item-read .rd-pattern h3{margin:0 0 6px;font-size:15px}.item-read .rd-card p,.item-read .rd-pattern p{margin:0 0 6px}
+.item-read a.rd-mom{display:block;color:inherit;text-decoration:none;min-height:44px}
+.item-read a.rd-mom:focus-visible{outline:2px solid #d9b779;outline-offset:3px}
+.item-read .rd-spark{display:block;width:100%;height:72px;min-height:72px;max-width:100%;margin:2px 0 8px}
 .item-read .rd-cards{display:grid;gap:10px}@media(min-width:800px){.item-read .rd-cards{grid-template-columns:1fr 1fr}}`;

@@ -23,6 +23,7 @@ jobs:
       - run: node scripts/reads-phase2.test.mjs
       - run: node scripts/reads-picks.test.mjs
       - run: node scripts/item-read.test.mjs
+      - run: node scripts/set-spark.test.mjs
       - run: node scripts/price-hold.test.mjs
       - run: node scripts/condition-chips.test.mjs
       - run: node scripts/art-type.test.mjs

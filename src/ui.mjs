@@ -1353,6 +1353,9 @@ function catchemMount(root){
     fig.innerHTML='<div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="'+caption.replace(/"/g,"")+'"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div>';
     var capEl=box!==host&&box.querySelector("p.muted:not(.chart-note):not(.chart-readout)");
     if(capEl&&capEl.textContent.trim()){ var cap=document.createElement("p"); cap.className="hc-cap"; cap.style.cssText="margin:0 0 6px;font:600 13px/1.2 var(--sans);opacity:.75"; cap.textContent=capEl.textContent.trim(); fig.insertBefore(cap, fig.firstChild); }
+    if(host.id) fig.id=host.id;
+    if(host.id && typeof location!=="undefined" && location.hash==="#"+host.id) fig.setAttribute("data-default-days","31");
+    fig.style.scrollMarginTop="72px";
     box.replaceWith(fig);
     if(window.catchemHistoryMount) window.catchemHistoryMount();
   });
