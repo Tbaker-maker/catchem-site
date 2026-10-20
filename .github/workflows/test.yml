@@ -39,6 +39,7 @@ jobs:
       - run: node scripts/home-hero.test.mjs
       - run: node scripts/index-history.test.mjs
       - run: node scripts/search-recent.test.mjs
+      - run: node scripts/search-open.test.mjs
       - run: node scripts/open-data.test.mjs
       - run: node scripts/post-office.test.mjs
       - run: node scripts/editor-image.test.mjs

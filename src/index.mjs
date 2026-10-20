@@ -18,10 +18,16 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { homeFinderSource } from "./home-finder.mjs";
 const withChartKit = (page) => {
-  const html = String(page);
-  if (html.includes("function mount(fig)")) return html;
-  return html.replace("</body>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></body>`);
+  let html = String(page);
+  if (!html.includes("function mount(fig)")) {
+    html = html.replace("</body>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></body>`);
+  }
+  if (html.includes('class="hero-search"') && !html.includes("catchem-finder")) {
+    html = html.replace("</body>", `<script>/* catchem-finder */\n${homeFinderSource()}</script></body>`);
+  }
+  return html;
 };
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
