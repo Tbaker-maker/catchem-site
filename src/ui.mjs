@@ -1819,6 +1819,7 @@ function setRotationBlock(slug) {
 
 export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1 id="title">Set</h1>
+${opts.meterHtml || ""}
 <p class="muted" id="completion"></p>
 ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(slug)}
 ${opts.setValueHtml || ""}

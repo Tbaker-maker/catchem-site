@@ -11,6 +11,7 @@ import { AFFILIATION, TCGPLAYER_ATTRIBUTION } from "./affiliation.mjs";
 import { stageFromChips, stageLine } from "./run-stage.mjs";
 import { patternBarsEmail, patternFromGate } from "./pattern-track.mjs";
 import { flagForItem, flagWord } from "./premium-ratio.mjs";
+import { meterEmailBlock, meterPlainLine } from "./market-meter.mjs";
 
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
@@ -397,6 +398,10 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
   doc.away = history.awaySince ? catchUp(reportPool, history.awaySince, top.id) : null;
   doc.quiet = isQuiet(mine, supply);
   doc.building = doc.quiet && length !== "glance" ? buildingQuietly(mine) : [];
+  const live = ctx.meter;
+  if (live && live.published !== false && live.market && live.market.mood != null && live.market.heat != null) {
+    doc.meter = { asOf: String(live.asOf || ""), ...live.market };
+  }
   return doc;
 }
 
@@ -551,6 +556,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   if (doc.emptyPremium) {
     const body = [];
     body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
+    if (doc.meter) { const block = meterEmailBlock(doc.meter); if (block) body.push(block); }
     if (doc.report) body.push(reportCard(doc.report, L));
     else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">No reads match this premium filter today.</p>`));
     const footer = [
@@ -564,6 +570,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   const anchor = (id) => (more ? more + "#" + id : "");
   const body = [];
   body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
+  if (doc.meter) { const block = meterEmailBlock(doc.meter); if (block) body.push(block); }
   const sub = `${LENGTH_NAME[L]} · ${when} · ${doc.label}`;
   body.push(card(`<p class="ce-ink" style="margin:0 0 6px;font:700 21px/1.3 ${FONT};color:${C.ink}">${esc(doc.lead)}</p><p class="ce-soft" style="margin:0;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sub)}</p>${L !== "glance" ? para(doc.intro) : ""}${doc.fallback ? para(doc.fallback, ";font-style:italic") : ""}`));
   if (doc.report) body.push(reportCard(doc.report, L));
@@ -608,13 +615,14 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
 }
 
 export function articleText(doc, { unsubscribe = "", more = "", suggest = null } = {}) {
+  const meterLine = doc.meter ? meterPlainLine(doc.meter) : "";
   if (doc.emptyPremium) {
-    const out = [doc.report ? "Your watchlist." : "No reads match this premium filter today."];
+    const out = [meterLine, doc.report ? "Your watchlist." : "No reads match this premium filter today."].filter((l) => l !== undefined && l !== "");
     if (doc.report) out.push(...doc.report.rows.map((r) => [r.name, flagWord(r.premiumFlag)].filter(Boolean).join(". ")));
     out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads");
     return out.filter((l) => l !== undefined).join("\n");
   }
-  const out = [doc.lead, doc.intro];
+  const out = [meterLine, doc.lead, doc.intro].filter((l) => l !== undefined && l !== "");
   if (doc.fallback) out.push(doc.fallback);
   const w = (r) => `${r.name}: ${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])} (${pct(r.change)})`;
   if (doc.report) out.push("", "Watchlist report card, since " + day(doc.report.since), ...doc.report.rows.map(w));
@@ -672,7 +680,7 @@ export async function loadContext(fetchImpl = fetch) {
   const get = (f) => loadJson(f, fetchImpl).catch(() => null);
   const { fetchRepo } = await import("./data.mjs");
   const getTags = () => fetchRepo(PATH_TAGS, fetchImpl).then((r) => (r && r.ok ? r.json() : null)).catch(() => null);
-  const [reads, hold, movers, listings, sets, chips, tags, premium] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags(), get("premium-ratio.json")]);
+  const [reads, hold, movers, listings, sets, chips, tags, premium, meter] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags(), get("premium-ratio.json"), get("market-meter.json")]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
   const bags = new Map();
   const spark = async (id) => {
@@ -682,7 +690,7 @@ export async function loadContext(fetchImpl = fetch) {
     const doc = bags.get(b);
     return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
   };
-  return { reads, holdIds, movers, listings, sets, chips, tags, premium, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
+  return { reads, holdIds, movers, listings, sets, chips, tags, premium, meter, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
 // Watched items get their own 30 day history from the sparks file.
