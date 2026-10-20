@@ -14,6 +14,7 @@ import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForI
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
+import { createRank } from "./catalog-rank.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
@@ -3864,18 +3865,21 @@ ${err}
 
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
-<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
-<style>.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
+<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finder" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select><div id="finder" class="finder" role="listbox" hidden></div></div>
+<style>.filters{position:relative}.finder{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:8px;background:#1a1815;border:1px solid #2f2b26;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.45);max-height:min(70vh,420px);overflow:auto;padding:6px}.finder[hidden]{display:none}.finder-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:12px;color:inherit;text-decoration:none}.finder-opt[aria-selected="true"],.finder-opt:hover{background:rgba(255,255,255,.06)}.finder-opt img{width:36px;height:50px;object-fit:contain;border-radius:6px;background:#12100e;flex:none}.finder-copy{min-width:0;display:flex;flex-direction:column}.finder-copy b,.finder-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.finder-copy span{color:var(--dim);font:500 13px/1.2 var(--sans)}.finder-type{margin-left:auto;flex:none;font:600 12px/1 var(--sans);color:var(--gold);background:rgba(217,183,121,.12);border-radius:999px;padding:6px 8px}.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
-import * as search from "/data/search-rank.mjs";
-const rankCatalog=search.rankCatalog;
+const rankApi=(${createRank.toString()})();
+const rankCatalog=rankApi.rankCatalog;
+const searchCatalog=rankApi.searchCatalog;
+const pickTarget=rankApi.pickTarget;
+const expandQuery=rankApi.expandQuery;
+const typeLabel=rankApi.typeLabel;
 const ebayQuery=${ebayQuery.toString()};
 const AFF=${JSON.stringify(getAffiliateConfig()).replace(/</g, "\\u003c")};
 const affTcg=${affTcg.toString()};
 const affEbay=${affEbay.toString()};
 const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
-const searchCatalog=search.searchCatalog;
 ${artType.toString()}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
@@ -3988,7 +3992,7 @@ async function ensureRows(q){
     }
     manifest=await res.json();
   }
-  var ids=queryShardIds(q).filter(function(id){ return manifest.shards && manifest.shards[id]; });
+  var ids=queryShardIds(expandQuery(q)).filter(function(id){ return manifest.shards && manifest.shards[id]; });
   await Promise.all(ids.map(function(id){
     if(shardCache[id]) return Promise.resolve();
     return fetch("/data/feed/search/shards/"+id+".json").then(function(r){ return r.ok?r.json():[]; }).then(function(body){ shardCache[id]=body; }).catch(function(){ shardCache[id]=[]; });
@@ -3996,6 +4000,25 @@ async function ensureRows(q){
   var seen={};
   rows=[];
   ids.forEach(function(id){ (shardCache[id]||[]).forEach(function(row){ if(row && !seen[row[0]]){ seen[row[0]]=1; rows.push(row); } }); });
+}
+
+let finderActive=-1;
+function paintFinder(hits){
+  var box=document.getElementById("finder");
+  var qi=document.getElementById("q");
+  if(!box||!qi) return;
+  var list=(hits||[]).slice(0,8);
+  if(!list.length){ box.hidden=true; box.innerHTML=""; qi.setAttribute("aria-expanded","false"); qi.removeAttribute("aria-activedescendant"); finderActive=-1; return; }
+  if(finderActive>=list.length) finderActive=-1;
+  box.hidden=false;
+  qi.setAttribute("aria-expanded","true");
+  box.innerHTML=list.map(function(r,i){
+    var href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
+    var pid=String(r[0]||"").match(/(\d+)$/);
+    var img=pid?'<img alt="" width="36" height="50" src="/api/card-img?pid='+pid[1]+'" onerror="this.remove()">':"";
+    var on=i===finderActive;
+    return '<a class="finder-opt" role="option" id="finder-opt-'+i+'" href="'+href+'" aria-selected="'+(on?"true":"false")+'">'+img+'<span class="finder-copy"><b>'+html(r[1])+'</b><span>'+html(r[2]||"")+'</span></span><span class="finder-type">'+html(typeLabel(r))+'</span></a>';
+  }).join("");
 }
 async function draw(){
   const n=++drawN;
@@ -4005,7 +4028,7 @@ async function draw(){
   const art=artOn?String(artOn.getAttribute("data-art")||""):"";
   const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
   const hasArt=function(r){return !art || (r[5]!=="sealed" && artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:Array.isArray(r[9])?r[9]:[]})===art);};
-  if(q.length<2 && !vtag && !art){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant or an art type.";return}
+  if(q.length<2 && !vtag && !art){document.getElementById("list").innerHTML="";paintFinder([]);document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant or an art type.";return}
   document.getElementById("list").innerHTML='<div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div>';
   if(q.length<2 && (vtag || art)){
     try{ await ensureBags(); if(!usedLite){ rows=await (await fetch("/data/search-lite.json")).json(); usedLite=true; } }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
@@ -4026,6 +4049,7 @@ async function draw(){
   hits=rankCatalog(q, rows, limit+1, codes);
   found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, limit+1):{hits:rankCatalog(q, rows, limit+1),nearest:[]}); }
   buildTwins(found.hits);
+  paintFinder((found.hits&&found.hits.length?found.hits:found.nearest)||[]);
   const more=found.hits.length>limit;
   const shown=take(found.hits);
   const near=take(found.nearest);
@@ -4052,7 +4076,34 @@ async function draw(){
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("")+(more?'<p><button type="button" id="s-more" class="win" style="min-height:44px;padding:0 18px;border-radius:12px">Show 40 more</button></p>':"");
   const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
-document.getElementById("q").addEventListener("input",function(){ limit=40; draw(); });
+document.getElementById("q").addEventListener("input",function(){ limit=40; finderActive=-1; draw(); });
+document.getElementById("q").addEventListener("keydown",function(ev){
+  var box=document.getElementById("finder");
+  var opts=box?[].slice.call(box.querySelectorAll(".finder-opt")):[];
+  if(ev.key==="Escape"){ paintFinder([]); return; }
+  if((ev.key==="ArrowDown"||ev.key==="ArrowUp") && opts.length){
+    ev.preventDefault();
+    var cur=opts.findIndex(function(a){return a.getAttribute("aria-selected")==="true";});
+    var next=ev.key==="ArrowDown"?cur+1:cur-1;
+    if(next<0) next=opts.length-1;
+    if(next>=opts.length) next=0;
+    finderActive=next;
+    opts.forEach(function(a,i){a.setAttribute("aria-selected", i===next?"true":"false");});
+    document.getElementById("q").setAttribute("aria-activedescendant", opts[next].id);
+    return;
+  }
+  if(ev.key!=="Enter") return;
+  var chosen=opts.filter(function(a){return a.getAttribute("aria-selected")==="true";})[0];
+  if(chosen){ ev.preventDefault(); location.href=chosen.getAttribute("href"); return; }
+  ev.preventDefault();
+  var qv=document.getElementById("q").value.trim();
+  if(qv.length<2) return;
+  draw().then(function(){
+    var pick=pickTarget(qv, rows, 8, codes);
+    if(pick.mode==="page" && pick.href) location.href=pick.href;
+    else paintFinder([]);
+  });
+});
 document.getElementById("q").addEventListener("focus",function(){
   if(manifest||usedLite) return;
   fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
