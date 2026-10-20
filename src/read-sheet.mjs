@@ -1,6 +1,8 @@
 // Read-page deep sheet. Every figure comes from the read or a field passed in.
 // A missing figure is left out. No invented prices.
 
+import { sparkSvg } from "./set-spark.mjs";
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "\u0026amp;", "<": "\u0026lt;", ">": "\u0026gt;", '"': "\u0026quot;", "'": "\u0026#39;" }[c]));
 
 function money(n) {
@@ -227,6 +229,17 @@ export function factChips(f) {
   return out.filter(Boolean);
 }
 
+function momentumCard(m) {
+  const text = `${m.set} ${m.kind} index ${pp(m.pct)}, ${shortDay(m.from)} to ${shortDay(m.to)}.`;
+  if (!String(text).trim() || /[\u2014\u2013]/.test(text)) return "";
+  const svg = sparkSvg(m.series, { from: m.from, to: m.to, pct: m.pct });
+  const slug = /^[a-z0-9-]+$/.test(String(m.slug || "")) ? m.slug : "";
+  const hash = m.kind === "sealed" ? "sealed-chart" : "single-chart";
+  const inner = `<h3>Set momentum</h3><p>${esc(text)}</p>${svg}<p class="muted">${esc("Chain-linked TCGplayer market index")}</p>`;
+  if (slug) return `<a class="rd-card rd-mom" href="/sets/${slug}#${hash}">${inner}</a>`;
+  return `<article class="rd-card">${inner}</article>`;
+}
+
 export function factCards(f) {
   const none = { range: "", pattern: "", cards: [], similar: "" };
   if (!f || typeof f !== "object") return none;
@@ -248,7 +261,7 @@ export function factCards(f) {
   }
   const cards = [];
   const m = f.setMomentum;
-  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) cards.push(card("Set momentum", `${m.set} ${m.kind} index ${pp(m.pct)}, ${shortDay(m.from)} to ${shortDay(m.to)}.`, "Chain-linked TCGplayer market index"));
+  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) cards.push(momentumCard(m));
   const rb = f.rarityBand;
   if (rb && rb.n > 0) cards.push(card("Rarity band", `${rb.n} ${rb.rarity} cards in ${rb.set}: median ${pp(rb.median)} over 30 days, ${rb.up} up, ${rb.down} down.`, `TCGplayer market, ${shortDay(rb.from)} to ${shortDay(rb.to)}`));
   const ab = f.artistBand;
@@ -279,6 +292,9 @@ const SHEET_CSS = `<style>
 .rd-sim{display:flex;gap:8px;align-items:center;min-height:44px;color:inherit;text-decoration:none}
 .rd-sim img{width:44px;height:62px;object-fit:contain;border-radius:8px;background:#141416}
 .rd-sim small{display:block;color:var(--dim);font-weight:500;font-size:14px}
+a.rd-mom{display:block;color:inherit;text-decoration:none;min-height:44px}
+a.rd-mom:focus-visible{outline:2px solid #d9b779;outline-offset:3px}
+.rd-spark{display:block;width:100%;height:72px;min-height:72px;max-width:100%;margin:2px 0 8px}
 @media(min-width:800px){.rd-cards{grid-template-columns:1fr 1fr}.rd-sims{flex-direction:row;flex-wrap:wrap}}
 </style>`;
 

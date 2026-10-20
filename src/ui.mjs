@@ -1353,6 +1353,9 @@ function catchemMount(root){
     fig.innerHTML='<div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="'+caption.replace(/"/g,"")+'"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div>';
     var capEl=box!==host&&box.querySelector("p.muted:not(.chart-note):not(.chart-readout)");
     if(capEl&&capEl.textContent.trim()){ var cap=document.createElement("p"); cap.className="hc-cap"; cap.style.cssText="margin:0 0 6px;font:600 13px/1.2 var(--sans);opacity:.75"; cap.textContent=capEl.textContent.trim(); fig.insertBefore(cap, fig.firstChild); }
+    if(host.id) fig.id=host.id;
+    if(host.id && typeof location!=="undefined" && location.hash==="#"+host.id) fig.setAttribute("data-default-days","31");
+    fig.style.scrollMarginTop="72px";
     box.replaceWith(fig);
     if(window.catchemHistoryMount) window.catchemHistoryMount();
   });
@@ -3022,6 +3025,15 @@ function listingHref(url) {
   return `${raw}${join}mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${camp}&toolid=10001&mkevt=1`;
 }
 
+function ebayAskLine(ask) {
+  const amount = Number(ask?.amount);
+  const day = String(ask?.asOf || "").slice(0, 10);
+  const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const when = day && day <= today ? priceDay(day) : "";
+  if (!(amount > 0) || !when) return "";
+  return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">eBay</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0"><div><dt>Ask</dt><dd>${money(amount)}</dd></div><div><dt>Date</dt><dd>${esc(when)}</dd></div></dl></section>`;
+}
+
 function sealedAskBox(ask) {
   const day = String(ask?.asOf || "").slice(0, 10);
   const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -3199,7 +3211,7 @@ ${rangeRow}</section>
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}
-${sealedAskBox(opts.ebayAsk)}
+${sealed ? sealedAskBox(opts.ebayAsk) : ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
 ${itemRankHtml(card)}
