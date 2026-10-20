@@ -3,6 +3,7 @@ import { queryShardIds } from "./search-shards.mjs";
 
 export function homeFinderSource() {
   return `(function(){
+function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}
 var rankApi=(${createRank.toString()})();
 var queryShardIds=${queryShardIds.toString()};
 var input=document.getElementById("home-q");
