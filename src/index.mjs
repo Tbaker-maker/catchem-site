@@ -50,6 +50,7 @@ import {
   renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
+import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 
 async function withPremium(card, fetchImpl) {
   if (!card) return card;
@@ -145,6 +146,7 @@ export function pageKind(pathname) {
   if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
   if (path === "/premium") return "premium";
+  if (path === "/meter") return "meter";
   if (path === "/collection") return "collection";
   if (path === "/alerts") return "alerts";
   if (path === "/me") return "account";
@@ -216,6 +218,24 @@ export function addFeedEntry(html) {
     '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Open the Feed</a>',
   );
   return out;
+}
+
+async function withMeter(html, fetchImpl) {
+  try {
+    const doc = await loadJson("market-meter.json", fetchImpl);
+    const block = gaugeHtml(doc?.market, { href: "/meter", asOf: doc?.asOf, published: doc?.published !== false });
+    if (!block || String(html).includes('id="market-meter"')) return html;
+    let out = String(html);
+    const anchor = '<p class="beta" id="fresh">';
+    if (out.includes(anchor)) {
+      const at = out.indexOf("</p>", out.indexOf(anchor));
+      if (at > 0) return out.slice(0, at + 4) + block + out.slice(at + 4);
+    }
+    if (out.includes("<footer>")) return out.replace("<footer>", block + "<footer>");
+    return out;
+  } catch {
+    return html;
+  }
 }
 
 async function withToday(html, fetchImpl) {
@@ -660,12 +680,20 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderSets(sets, stamp, pageOpts));
   }
   if (kind === "promos") return html(pageChrome("Promos", renderPromos(), "Promos", stamp, "", pageOpts.feed));
+  if (kind === "meter") {
+    const doc = await loadJson("market-meter.json", fetchImpl).catch(() => null);
+    const range = opts.range === "all" ? "all" : "1m";
+    const set = String(opts.set || "");
+    return html(pageChrome("", renderMeterPage(doc, { range, set }), "Market meter", stamp, "", pageOpts.feed));
+  }
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
       const setDoc = await loadJson(`sets/${slug}.json`, fetchImpl);
       const extra = await setFeatureHtml(slug, fetchImpl);
-      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name, ...extra }));
+      const meterDoc = await loadJson("market-meter.json", fetchImpl).catch(() => null);
+      const meterHtml = gaugeHtml(meterDoc?.sets?.[slug], { href: `/meter?set=${encodeURIComponent(slug)}`, asOf: meterDoc?.asOf, published: meterDoc?.published !== false, kicker: setDoc?.name || "Set" });
+      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name, meterHtml, ...extra }));
     } catch {
       if (SET_PAIRS[slug]) {
         const valueDoc = await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
@@ -1347,7 +1375,7 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
@@ -1377,7 +1405,7 @@ const worker = {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(withChartKit(await withToday(addFeedEntry(await asset.text()), fetchImpl))), { status: asset.status, headers });
+        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(addFeedEntry(await asset.text()), fetchImpl), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -1389,7 +1417,7 @@ const worker = {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
       const raw = await asset.text();
-      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(raw, fetchImpl)) : raw;
+      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(await withMeter(raw, fetchImpl), fetchImpl)) : raw;
       return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });

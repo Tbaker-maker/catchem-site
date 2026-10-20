@@ -66,3 +66,4 @@ jobs:
       - run: node scripts/email-dark.test.mjs
       - run: node scripts/premium-ratio-email.test.mjs
       - run: node scripts/pattern-track.test.mjs
+      - run: node scripts/market-meter.test.mjs
