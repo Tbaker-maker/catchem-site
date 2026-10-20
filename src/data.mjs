@@ -78,6 +78,91 @@ export function resetJsonCache() {
   resetDataBase();
 }
 
+export function parseIndexPrefix(text) {
+  const raw = String(text || "");
+  const cut = raw.indexOf('"items"');
+  const head = cut >= 0 ? raw.slice(0, cut) : raw;
+  return {
+    singleIndex: extractJsonArray(head, "singleIndex") || [],
+    sealedIndex: extractJsonArray(head, "sealedIndex") || [],
+  };
+}
+
+function extractJsonArray(text, key) {
+  const at = text.indexOf(`"${key}"`);
+  if (at < 0) return null;
+  const start = text.indexOf("[", at);
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i += 1) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "[") depth += 1;
+    else if (c === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          const arr = JSON.parse(text.slice(start, i + 1));
+          return Array.isArray(arr) ? arr : null;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Indexes sit before "items" in the set file. Read only that prefix.
+// A full set file is about 2 MB. The product page must not download it.
+async function readUntilItems(res, cap = 65536) {
+  if (!res || !res.body || typeof res.body.getReader !== "function") {
+    const text = res ? await res.text() : "";
+    const cut = text.indexOf('"items"');
+    return (cut >= 0 ? text.slice(0, cut) : text).slice(0, cap);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let text = "";
+  try {
+    while (text.length < cap) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += dec.decode(value, { stream: true });
+      const cut = text.indexOf('"items"');
+      if (cut >= 0) return text.slice(0, cut);
+    }
+  } finally {
+    try { await reader.cancel(); } catch { /* closed */ }
+  }
+  const cut = text.indexOf('"items"');
+  return cut >= 0 ? text.slice(0, cut) : text;
+}
+
+export async function loadSetIndexes(slug, fetchImpl = fetch) {
+  const clean = String(slug || "");
+  if (!/^[a-z0-9-]+$/.test(clean)) return null;
+  return cached(`set-index:${clean}`, async () => {
+    const res = await fetchRepo(`research/assets/public/sets/${clean}.json`, fetchImpl, {
+      headers: { Range: "bytes=0-65535" },
+      cf: { cacheTtl: 300 },
+    });
+    if (!res || (!res.ok && res.status !== 206)) throw new Error(`set-index ${clean} ${res && res.status}`);
+    const head = await readUntilItems(res);
+    const parsed = parseIndexPrefix(head);
+    if (!parsed.singleIndex.length && !parsed.sealedIndex.length) throw new Error(`set-index ${clean} empty`);
+    return parsed;
+  });
+}
+
 export async function loadJson(rel, fetchImpl = fetch) {
   return cached(rel, async () => {
     const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
