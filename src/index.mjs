@@ -767,10 +767,20 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         const dive = await loadDive(sealedId, fetchImpl);
         listingSeries = Array.isArray(dive?.series) ? dive.series : [];
         const latest = dive?.latest && typeof dive.latest === "object" ? dive.latest : null;
-        const amount = Number(latest?.priceMedian);
+        const amount = Number(latest?.ebayMedianAsk || latest?.askMedian || latest?.priceMedian);
+        const count = Number(latest?.ebayMedianCount || latest?.askRobustCount || latest?.listingCount);
         const asOf = String(latest?.lastSeen || "").slice(0, 10);
         const source = String(latest?.source || "").trim();
-        if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = { amount, asOf, source };
+        const cheap = latest?.cheapestReal;
+        if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = {
+          amount,
+          count: Number.isInteger(count) && count >= 1 ? count : null,
+          asOf,
+          source,
+          cheapest: cheap && Number(cheap.price) > 0 && cheap.url ? cheap : null,
+          tcgListed: Number(latest?.tcgListedMedian) > 0 ? Number(latest.tcgListedMedian) : null,
+          tcgMarket: Number(card?.price) > 0 ? Number(card.price) : null,
+        };
       } catch { listingSeries = []; }
     }
     const productReads = card ? await itemReadsTop(cardId, fetchImpl) : [];
@@ -869,7 +879,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (card && card.setSlug) {
       const itemRaw = await loadItemRead(card.setSlug, card.id, fetchImpl);
       const itemRead = itemRaw && itemRaw.setMomentum ? applySetSpark(itemRaw, card.setSlug, setIndexP ? await setIndexP : null) : itemRaw;
-      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true });
+      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true, kind: card.kind });
       if (block) itemReadHtml = block;
       const l = itemRead?.listings;
       if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date, pct: Number.isFinite(l.pct) ? l.pct : null, prevDay: l.prevDate || "" };

@@ -2706,7 +2706,7 @@ function conditionLine(note) {
 function ebayBlock(read) {
   if (!read) return "";
   const bits = priceBits(read);
-  const ask = String(bits.line || "").split(". ").find((part) => part.startsWith("eBay ask"));
+  const ask = String(bits.line || "").split(". ").find((part) => part.startsWith("eBay ask") || part.startsWith("Median ask"));
   return [ask, bits.gap].filter(Boolean).map((part) => `<p class="cp-gap">${esc(part)}</p>`).join("");
 }
 
@@ -3016,15 +3016,50 @@ export function readYearChart(card, asOf = "") {
   return `<div class="read-year"><style>${HISTORY_CSS}</style>${historyChart(series, { asOf: String(asOf || "").slice(0, 10), snap: "real" })}</div>`;
 }
 
+function listingHref(url) {
+  const raw = String(url || "").trim();
+  if (!/^https:\/\/www\.ebay\.com\/itm\/[0-9]+/.test(raw)) return "";
+  const camp = getAffiliateConfig().epn;
+  if (!/^[0-9]{6,12}$/.test(String(camp || ""))) return raw;
+  const join = raw.includes("?") ? "&" : "?";
+  return `${raw}${join}mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${camp}&toolid=10001&mkevt=1`;
+}
+
 function ebayAskLine(ask) {
   const amount = Number(ask?.amount);
   const day = String(ask?.asOf || "").slice(0, 10);
-  // A date after today is a bad stamp; never show a future day.
   const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const when = day && day <= today ? priceDay(day) : "";
   if (!(amount > 0) || !when) return "";
-  const src = String(ask?.source || "").trim();
   return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">eBay</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0"><div><dt>Ask</dt><dd>${money(amount)}</dd></div><div><dt>Date</dt><dd>${esc(when)}</dd></div></dl></section>`;
+}
+
+function sealedAskBox(ask) {
+  const day = String(ask?.asOf || "").slice(0, 10);
+  const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const when = day && day <= today ? priceDay(day) : "";
+  if (!when) return "";
+  const median = Number(ask?.amount);
+  const count = Number(ask?.count);
+  const rows = [];
+  const cheap = ask?.cheapest;
+  const cheapPrice = Number(cheap?.price);
+  const href = listingHref(cheap?.url);
+  if (href && cheapPrice > 0 && !(median > 0 && cheapPrice < median * 0.5)) {
+    rows.push(`<div><dt>Cheapest real listing</dt><dd><a href="${esc(href)}" rel="sponsored noopener">${money(cheapPrice)}</a> <small class="paid-note">${esc(PAID_NOTE)}</small></dd></div>`);
+  }
+  if (median > 0) {
+    const note = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "";
+    rows.push(`<div><dt>Median ask</dt><dd>${money(median)}${note ? `<span class="muted"> ${esc(note)}</span>` : ""}</dd></div>`);
+  }
+  if (Number(ask?.tcgListed) > 0) {
+    rows.push(`<div><dt>TCGplayer listed median</dt><dd>${money(ask.tcgListed)}<span class="muted"> Middle price of TCGplayer listings</span></dd></div>`);
+  }
+  if (Number(ask?.tcgMarket) > 0) {
+    rows.push(`<div><dt>TCGplayer market</dt><dd>${money(ask.tcgMarket)}<span class="muted"> recent TCGplayer sales</span></dd></div>`);
+  }
+  if (!rows.length) return "";
+  return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">Prices</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0">${rows.join("")}</dl><p class="muted">${esc(when)}</p></section>`;
 }
 
 function ripValueBlock(rip) {
@@ -3176,7 +3211,7 @@ ${rangeRow}</section>
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}
-${ebayAskLine(opts.ebayAsk)}
+${sealed ? sealedAskBox(opts.ebayAsk) : ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
 ${itemRankHtml(card)}
@@ -3191,7 +3226,7 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (Median ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p><button type="button" id="paid">Report a price I paid</button></p>
@@ -4375,12 +4410,18 @@ export function renderDive(doc, stamp, opts = {}) {
       url: "https://catchemtcg.com/feed",
     });
   }
-  const series = Array.isArray(doc.series) ? doc.series : [];
-  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const latest = doc.latest || {};
+  const median = Number(latest.ebayMedianAsk || latest.askMedian || latest.priceMedian);
+  const series = (Array.isArray(doc.series) ? doc.series : []).filter((row) => {
+    const price = Number(row?.price);
+    return !(median > 0 && price > 0 && price < median * 0.3);
+  });
+  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
-  const price = money(latest.priceMedian);
+  const price = money(median || latest.priceMedian);
+  const count = Number(latest.ebayMedianCount || latest.askRobustCount || latest.listingCount);
+  const medianNote = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask";
   const listingsHtml = latest.listingCount != null ? esc(String(latest.listingCount)) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
@@ -4404,11 +4445,11 @@ export function renderDive(doc, stamp, opts = {}) {
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
-<p class="muted">eBay Browse ask median · ${listingsHtml} active listings (asks, not solds)</p>
+<p class="muted">Median ask. ${esc(medianNote)}. ${listingsHtml} eBay listings counted.</p>
 ${buyoutLine}
-${chartBox(hist, "eBay Browse ask median, daily")}
+${chartBox(hist, "Median ask, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
-<thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<thead><tr><th align="left">Date</th><th align="left">Median ask</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
 <tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
 </table>
 ${volumeLine}
@@ -4420,7 +4461,7 @@ ${catalog}
   const diveDesc = [
     latest.set || "",
     latest.subtype || "",
-    price ? `eBay Browse ask median ${price}` : "eBay Browse ask series",
+    price ? `Median ask ${price}` : "Median ask series",
     "asks, not solds",
   ].filter(Boolean).join(" · ");
   return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
