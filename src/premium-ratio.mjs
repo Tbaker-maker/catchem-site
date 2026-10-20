@@ -10,7 +10,7 @@ export function foldSet(name) {
   return String(name || "")
     .toLowerCase()
     .replace(/&/g, " and ")
-    .replace(/^(?:swsh|sv|sm|me|xy|bw|dp|hgss|ex)\d*\s*:\s*/, "")
+    .replace(/^(?:swsh|sv|sm|me|xy|bw|dp|hgss|ex)\d*\s*[:\-]\s*/, "")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

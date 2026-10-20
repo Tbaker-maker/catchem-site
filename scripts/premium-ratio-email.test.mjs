@@ -45,6 +45,10 @@ t("a single does not inherit an ETB flag", flagForItem({ id: "tcgcsv-3", set: "S
 t("a base set single inherits that set booster box", flagForItem({ id: "tcgcsv-9", set: "SV01: Scarlet & Violet Base Set", kind: "single", href: "/c/tcgcsv-9" }, { bySet: { "scarlet and violet": { flag: "below" } }, byProduct: {}, sealed: [] }) === "below");
 t("151 does not inherit the base set box", flagForItem({ id: "tcgcsv-8", set: "SV: Scarlet & Violet 151", kind: "single", href: "/c/tcgcsv-8" }, { bySet: { "scarlet and violet": { flag: "below" } }, byProduct: {}, sealed: [] }) === "");
 t("an ETB keeps its own flag and is not the single fallback", flagForItem({ id: "tcgcsv-77", set: "SV: Prismatic Evolutions", kind: "sealed", href: "/p/tcgcsv-77" }, premium) === "above");
+t("umbreon stays below only because bySet has the box", flagForItem({ id: "tcgcsv-246723", set: "SWSH07: Evolving Skies", kind: "single", href: "/c/tcgcsv-246723" }, premium) === "below");
+t("the same single is empty when bySet is empty even if an ETB and a tin are flagged", flagForItem({ id: "tcgcsv-246723", set: "SWSH07: Evolving Skies", kind: "single", href: "/c/tcgcsv-246723" }, { bySet: {}, byProduct: { "tcgcsv-77": "above", "tcgcsv-88": "below" }, sealed: ["tcgcsv-77", "tcgcsv-88"] }) === "");
+t("a dash era single uses the booster box key, not a tin", flagForItem({ id: "tcgcsv-4", set: "SM - Team Up", kind: "single", href: "/c/tcgcsv-4" }, { bySet: { "team up": { flag: "below", boxId: "tcgcsv-12" } }, byProduct: { "tcgcsv-90": "above" }, sealed: ["tcgcsv-90"] }) === "below");
+t("prismatic evolutions stays empty", flagForItem({ id: "tcgcsv-610528", set: "SV: Prismatic Evolutions", kind: "single", href: "/c/tcgcsv-610528" }, { bySet: {}, byProduct: { "tcgcsv-77": "above" }, sealed: ["tcgcsv-77"] }) === "");
 
 const none = buildArticle({
   follow: followFromPlan({ premiumRatio: "below" }),
