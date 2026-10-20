@@ -12,7 +12,7 @@ const fetchFor = (doc) => async (url) => {
   if (u.includes("sitemap-00.xml")) return new Response(SITEMAP, { status: 200, headers: { "content-type": "application/xml" } });
   return { ok: false, status: 404, headers: new Headers(), json: async () => null, text: async () => "" };
 };
-const get = async (path, doc) => { resetJsonCache(); const res = await renderPath(path, fetchFor(doc), {}); return { status: res.status, body: await res.text(), robots: res.headers.get("x-robots-tag") || "" }; };
+const get = async (path, doc, opts = {}) => { resetJsonCache(); const res = await renderPath(path, fetchFor(doc), opts); return { status: res.status, body: await res.text(), robots: res.headers.get("x-robots-tag") || "" }; };
 const mainOf = (body) => body.slice(body.indexOf("<main"), body.indexOf("</main>"));
 const footOf = (body) => body.slice(body.indexOf('<footer class="site-foot"'));
 const doc = (scored, extra = {}) => {
@@ -37,7 +37,7 @@ for (const [label, d] of [["9 scored", doc(9)], ["59 scored", doc(59)], ["public
 }
 {
   const d = doc(59);
-  const prem = await get("/premium", d);
+  const prem = await get("/premium", d, { premiumMode: "live" });
   const main = mainOf(prem.body);
   t("closed: premium proof keeps the 383 count", main.includes("383"));
   t("closed: no track record link on /premium", !main.includes('href="/track-record"'));
@@ -56,7 +56,7 @@ for (const n of [60, 120]) {
   t(`open ${n}: full page renders`, page.status === 200 && main.includes(`Of ${n} reads in 90 days`) && main.includes("Past moves don") && main.includes("tr-row") && !main.includes("goes live once"));
   t(`open ${n}: indexable`, !page.robots.includes("noindex"));
   t(`open ${n}: page hides the scoring method`, !main.includes("scored so far") && !main.includes("14 days") && !main.includes("too early"));
-  const prem = await get("/premium", d);
+  const prem = await get("/premium", d, { premiumMode: "live" });
   t(`open ${n}: premium link back`, mainOf(prem.body).includes('href="/track-record"') && mainOf(prem.body).includes("383"));
   t(`open ${n}: footer link back`, footOf(prem.body).includes('href="/track-record"'));
   const map = await get("/sitemap-00.xml", d);

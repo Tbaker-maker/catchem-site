@@ -51,6 +51,8 @@ import {
 } from "./ui.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
+import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
 async function withPremium(card, fetchImpl) {
   if (!card) return card;
@@ -1014,6 +1016,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") {
+    if (premiumMode({ PREMIUM_MODE: opts.premiumMode }) !== "live") {
+      return html(renderWaitlistPage({ feed: pageOpts.feed === true }));
+    }
     const proof = await loadJson("premium-proof.json", fetchImpl).catch(() => null);
     return html(renderPremium(stamp, { ...pageOpts, proof }));
   }
@@ -1134,6 +1139,8 @@ const worker = {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    const premiumHit = await handlePremiumRequest(request, env, fetchImpl);
+    if (premiumHit) return premiumHit;
     if (url.pathname === "/reads/brief") return handleBrief(request, env, { fetchImpl });
     if (url.pathname === "/reads/email/length") return handleLengthLink(request, env);
     if (url.pathname === "/reads/email/confirm" || url.pathname === "/reads/email/stop") {
@@ -1331,7 +1338,15 @@ const worker = {
       const back = url.searchParams.get("premium");
       const here = norm(url.pathname);
       if ((here === "/" || here === "/premium") && (back === "success" || back === "cancel")) {
-        return html(renderPremiumResult(back));
+        if (premiumMode(env) === "live") {
+          if (back === "success") {
+            const sid = String(url.searchParams.get("session_id") || "");
+            if (sid) {
+              try { await noteConverted(env, sid, fetchImpl); } catch { /* a return page still renders */ }
+            }
+          }
+          return html(renderPremiumResult(back));
+        }
       }
       if (!feed && gatedFeedPath(url.pathname)) return home302();
       const dest = redirectPath(url.pathname);
@@ -1380,14 +1395,14 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }
       }
       if (kind === "data") {
-        try { return await renderPath(url.pathname, fetchImpl, { feed, waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }); }
+        try { return await renderPath(url.pathname, fetchImpl, { feed, premiumMode: premiumMode(env), waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }); }
         catch { return new Response("Not found", { status: 404 }); }
       }
     }
@@ -1410,7 +1425,7 @@ const worker = {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(addFeedEntry(await asset.text()), fetchImpl), fetchImpl))), { status: asset.status, headers });
+        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(addFeedEntry(paintPublicHtml(await asset.text(), url.pathname, env)), fetchImpl), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -1421,7 +1436,7 @@ const worker = {
     if (type.includes("text/html")) {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
-      const raw = await asset.text();
+      const raw = paintPublicHtml(await asset.text(), url.pathname, env);
       const body = norm(url.pathname) === "/" ? withChartKit(await withToday(await withMeter(raw, fetchImpl), fetchImpl)) : raw;
       return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
