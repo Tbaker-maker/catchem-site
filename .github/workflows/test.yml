@@ -64,3 +64,4 @@ jobs:
       - run: node scripts/perf-budget.mjs
       - run: node scripts/a11y-check.mjs --static
       - run: node scripts/email-dark.test.mjs
+      - run: node scripts/pattern-track.test.mjs

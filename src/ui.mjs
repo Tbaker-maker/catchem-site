@@ -2633,6 +2633,11 @@ const SINGLE_CSS = `
 .cp-pattern{margin:12px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
 .cp-pattern p{margin:0;font:500 16px/1.4 var(--sans)}
 .cp-pattern .muted{margin-top:6px;font-size:14px}
+.cp-pattern .rd-bars{display:grid;gap:6px;margin:8px 0 2px;min-height:44px}
+.cp-pattern .rd-bar{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center;min-height:18px}
+.cp-pattern .rd-bar span{font-size:12px;color:#c4baab}
+.cp-pattern .rd-bar i{display:block;height:8px;border-radius:999px;background:#8a8175}
+.cp-pattern .rd-bar.is-pat i{background:#7fc79a}
 .cp-pattern .rd-era{display:inline-flex;align-items:center;min-height:32px;margin-top:8px;padding:0 10px;border-radius:999px;color:#d9b779;background:rgba(217,183,121,.12)}
 .card-page .win{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06)}
 .cp-charts{margin:8px 0 18px}
@@ -2715,7 +2720,10 @@ function patternBlock(read) {
   if (!hit) return "";
   const when = priceDay(hit.asOf);
   const note = [hit.source, when].filter(Boolean).join(" · ");
-  return `<section class="cp-pattern"><p>${esc(hit.text)}</p>${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
+  const top = Math.max(Number(hit.rate) || 0, Number(hit.base) || 0);
+  const bar = (label, rate, cls) => top > 0 ? `<div class="rd-bar ${cls}"><span>${esc(label)}</span><i style="width:${Math.max(4, Math.round((Number(rate) / top) * 100))}%"></i></div>` : "";
+  const bars = top > 0 ? `<div class="rd-bars" aria-hidden="true">${bar("This pattern", hit.rate, "is-pat")}${bar("Usual", hit.base, "is-base")}</div>` : "";
+  return `<section class="cp-pattern"><p class="rd-lead">${esc(hit.text)}</p>${bars}${hit.small ? `<p class="muted">${esc(hit.small)}</p>` : ""}${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
 }
 
 function readLink(card) {

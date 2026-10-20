@@ -34,6 +34,14 @@ const CSS = `.item-read{display:grid;gap:12px;margin:16px 0;padding:16px;border-
 .item-read .rd-chip{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
 .item-read .rd-pattern,.item-read .rd-card{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
 .item-read .rd-card h3,.item-read .rd-pattern h3{margin:0 0 6px;font-size:15px}.item-read .rd-card p,.item-read .rd-pattern p{margin:0 0 6px}
+.item-read .rd-lead{font-weight:650;font-size:16px;line-height:1.35}
+.item-read .rd-small{font-size:13px;color:#c4baab}
+.item-read .rd-bars{display:grid;gap:6px;margin:8px 0 4px;min-height:44px}
+.item-read .rd-bar{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center;min-height:18px}
+.item-read .rd-bar span{font-size:12px;color:#c4baab}
+.item-read .rd-bar i{display:block;height:8px;border-radius:999px;background:#8a8175}
+.item-read .rd-bar.is-pat i{background:#7fc79a}
+.item-read .rd-pattern,.item-read .rd-card{overflow:hidden}
 .item-read a.rd-mom{display:block;color:inherit;text-decoration:none;min-height:44px}
 .item-read a.rd-mom:focus-visible{outline:2px solid #d9b779;outline-offset:3px}
 .item-read .rd-spark{display:block;width:100%;height:72px;min-height:72px;max-width:100%;margin:2px 0 8px}
