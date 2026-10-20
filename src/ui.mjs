@@ -1791,7 +1791,7 @@ export function renderSets(index, stamp, opts = {}) {
 <div class="sb-head"><h1>Sets</h1>
 <input id="q" class="sb-search" type="search" aria-label="Find a set" placeholder="Search ${sets.length} sets" autocomplete="off">
 <div class="sb-row sb-chips" role="group" aria-label="Sort"><span class="sb-label">Sort</span><button type="button" class="sb-chip" data-sort="new" aria-pressed="true">Newest</button><button type="button" class="sb-chip" data-sort="az" aria-pressed="false">A-Z</button>${hasValue ? `<button type="button" class="sb-chip" data-sort="value" aria-pressed="false">Set value</button>` : ""}</div>
-<div class="sb-row sb-chips" role="group" aria-label="Filter"><span class="sb-label">Filter</span><select id="era-filter" class="sb-chip" aria-label="Era"><option value="">All eras</option>${eras.map((era) => `<option value="${esc(era)}">${esc(era)}</option>`).join("")}</select>${hasSealed ? `<button type="button" class="sb-chip" id="has-sealed" aria-pressed="false">Has sealed</button>` : ""}</div>
+<div class="sb-row sb-chips" role="group" aria-label="Filter"><span class="sb-label">Filter</span><select id="era-filter" class="sb-chip" aria-label="Era"><option value="">All eras</option>${eras.map((era) => `<option value="${esc(era)}">${esc(era)}</option>`).join("")}</select>${hasSealed ? `<button type="button" class="sb-chip" id="has-sealed" aria-pressed="false">Has sealed</button>` : ""}<a class="sb-chip" href="/search?q=costco">Costco exclusive</a></div>
 </div>
 <nav class="sb-jump sb-chips" aria-label="Jump to an era">${eras.map((era) => `<a class="sb-chip" href="#${esc(eraId(era))}">${esc(era)}</a>`).join("")}</nav>
 ${eras.map((era, eraIdx) => {
@@ -3114,6 +3114,13 @@ export function renderCard(card, stamp, opts = {}) {
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
+  const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
+  const priceSource = askFallback ? "eBay asking prices" : "TCGplayer market price";
+  const priceHtml = price
+    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+    : (askFallback
+      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${infoTap(`${priceSource}${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+      : `<p class="px">Price being checked</p>`);
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}
@@ -3150,12 +3157,14 @@ export function renderCard(card, stamp, opts = {}) {
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
+${card.exclusive === "Costco" ? `<p class="muted">Costco exclusive${card.region ? ` · ${esc(card.region)}` : ""}</p>` : ""}
+${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${readLink(card)}
 ${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<section class="cp-sec" id="promos-inside"><h2>Promos inside</h2><ul class="cp-facts">${opts.promosInside.map((row) => `<li><a href="/c/${esc(row.id)}">${esc(row.name)}${row.num ? ` #${esc(row.num)}` : ""}</a></li>`).join("")}</ul></section>` : ""}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>` : ""}
+${priceHtml}
 ${sealedStrip}
 <!--jump-->
 <section id="price">${changeHtml}
@@ -3864,7 +3873,7 @@ ${err}
 }
 
 export function renderSearch(opts = {}) {
-  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle. <a href="/search?q=costco">Costco exclusive</a></p>
 <div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finder" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select><div id="finder" class="finder" role="listbox" hidden></div></div>
 <style>.filters{position:relative}.finder{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:8px;background:#1a1815;border:1px solid #2f2b26;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.45);max-height:min(70vh,420px);overflow:auto;padding:6px}.finder[hidden]{display:none}.finder-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:12px;color:inherit;text-decoration:none}.finder-opt[aria-selected="true"],.finder-opt:hover{background:rgba(255,255,255,.06)}.finder-opt img{width:36px;height:50px;object-fit:contain;border-radius:6px;background:#12100e;flex:none}.finder-copy{min-width:0;display:flex;flex-direction:column}.finder-copy b,.finder-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.finder-copy span{color:var(--dim);font:500 13px/1.2 var(--sans)}.finder-type{margin-left:auto;flex:none;font:600 12px/1 var(--sans);color:var(--gold);background:rgba(217,183,121,.12);border-radius:999px;padding:6px 8px}.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
