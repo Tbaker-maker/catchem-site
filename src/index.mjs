@@ -629,7 +629,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     const soldOn = await soldFileExists(fetchImpl);
     const liveNews = await loadFeedNews(fetchImpl);
-    const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews };
+    let leadIds = [];
+    try {
+      const order = await loadJson("feed/lead-order.json", fetchImpl);
+      if (Array.isArray(order?.ids)) leadIds = order.ids.filter((id) => typeof id === "string");
+    } catch { leadIds = []; }
+    const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews, leadIds };
     if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
     if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {

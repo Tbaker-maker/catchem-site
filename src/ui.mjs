@@ -17,6 +17,7 @@ import { queryShardIds } from "./search-shards.mjs";
 import { createRank } from "./catalog-rank.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
+import { glanceChips, interestScore, listingsWording, pinIds, rankLead, readMove } from "./feed-rank.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 import { SIGNAL_CSS, SIGNAL_CLIENT, TILE_JS, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
@@ -139,7 +140,10 @@ export function isVolumeRow(row) {
   if (!Number.isInteger(s.count30d) || s.count30d <= 0) return false;
   const w = s.window30d || {};
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(w.from || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(w.to || ""))) return false;
-  return String(row.headline || row.path || "").includes(s.count30d + " Near Mint cop");
+  const head = String(row.headline || row.path || "");
+  const sourceOk = s.source === "TCGplayer sales via PokemonPriceTracker" || s.source === "TCGplayer listings counted via PokemonPriceTracker";
+  const countOk = head.includes(s.count30d + " Near Mint cop") || head.includes(s.count30d + " Near Mint listing");
+  return sourceOk && countOk;
 }
 
 export function shapeCash(n) {
@@ -160,9 +164,9 @@ export function isShapeRow(row) {
   const rec = row.receipt;
   if (!path || !rec || typeof rec !== "object") return false;
   const has = (clause) => why.includes(clause) || path.includes(clause);
-  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && has("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
+  if (kind === "quiet") return (path.includes("No TCGplayer sales recorded in " + rec.days + " days.") || path.includes("No TCGplayer listings counted in " + rec.days + " days.")) && has("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
   if (kind === "mix") {
-    if (!has("This is the mix of copies that sold, not the copy in your hand.")) return false;
+    if (!has("This is the mix of copies that sold, not the copy in your hand.") && !has("This is the mix of listings counted, not the copy in your hand.")) return false;
     if (!Array.isArray(rec.conditions) || rec.conditions.length < 2) return false;
     for (let i = 0; i < rec.conditions.length; i += 1) {
       const bit = rec.conditions[i];
@@ -172,11 +176,11 @@ export function isShapeRow(row) {
   }
   if (kind === "conditions") return has("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
   if (kind === "soldflat" || kind === "still") return false;
-  if (kind === "solddown") return has("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
-  if (kind === "setshare") return has("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
-  if (kind === "spread") return has("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
-  if (kind === "askmove") return has("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
-  if (kind === "mktmove") return has("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
+  if (kind === "solddown") return (has("Sales and a price change in the same window. Not a cause.") || has("Listings counted and a price change in the same window. Not a cause.")) && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
+  if (kind === "setshare") return (has("Share of copies sold. Not share of dollars.") || has("Share of listings counted. Not share of dollars.")) && path.includes(String(rec.top)) && path.includes(String(rec.total));
+  if (kind === "spread") return (has("Asking prices from the search. Not sold prices.") || has("Asking prices from the search. Not completed prices.")) && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
+  if (kind === "askmove") return (has("The ask changed. The market price did not. Asks are not sales.") || has("The ask changed. The market price did not. Asks are not listings gone.")) && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
+  if (kind === "mktmove") return (has("The market price changed. The ask did not. Asks are not sales.") || has("The market price changed. The ask did not. Asks are not listings gone.")) && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
   return false;
 }
 
@@ -212,8 +216,8 @@ export function shownRead(card) {
     if (low > 0 && high > 0) {
       const dollars = (n) => "$" + Math.round(n).toLocaleString("en-US");
       line = name
-        ? "Asks on eBay for " + name + " range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales)."
-        : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales).";
+        ? "Asks on eBay for " + name + " range from " + dollars(low) + " to " + dollars(high) + " (listings, not listings gone)."
+        : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not listings gone).";
     }
   }
   if (card.kind === "sealed" || card.readKind === "sealed") {
@@ -226,11 +230,13 @@ export function shownRead(card) {
   line = line.replace(/^[,.\s]+/, "").trim();
   if (name && line && !line.includes(name) && !line.includes(String(name).split(" - ")[0].trim())) line = name + ": " + line;
   if (!line) return "";
+  line = listingsWording(line);
   return line.charAt(0).toUpperCase() + line.slice(1);
 }
 
 export function soldSafeText(row, text) {
-  return isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+  const raw = isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+  return listingsWording(raw);
 }
 
 
@@ -4542,7 +4548,9 @@ export function leadWithStory(reads) {
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {
-  const reads = leadWithStory(feedReads(bundle));
+  const base = feedReads(bundle);
+  const packed = pinIds(base, opts.leadIds) || rankLead(base);
+  const reads = packed.lead.concat(packed.rest);
   const first = inlineFeedReads(reads, startId);
   const lead = JSON.stringify(first).replace(/</g, "\\u003c");
   const restCfg = JSON.stringify({ total: reads.length, url: reads.length > first.length ? FEED_REST_URL : "", sold: opts.soldOn === true });
@@ -4612,7 +4620,15 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .news-go{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
   .feed-card h2{font:600 22px/1.25 var(--serif);margin:0}
   .feed-card h2 a{min-height:44px;display:inline-flex;align-items:center}
-  .one-line{margin:0}
+  .one-line{margin:0;max-width:100%;overflow-wrap:break-word}
+  .qrow{display:flex;flex-wrap:wrap;gap:6px;max-width:100%;min-width:0;margin:0}
+  .qchip{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;min-height:44px;max-width:100%;padding:0 12px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#efe9de;font:600 13px/1.15 var(--sans);overflow:hidden}
+  .qchip svg{flex:0 0 auto}
+  .qchip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qchip.is-up{color:#7fc79a}
+  .qchip.is-down{color:#e0675b}
+  .is-fast .qrow,.is-fast .one-line{display:flex}
+  .is-fast .one-line{display:block}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
   .means b{display:block;margin:0 0 6px}
@@ -4772,6 +4788,7 @@ ${page !== "read" ? feedToolsHtml() : ""}
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
+<script type="application/json" id="feed-lead-order">${JSON.stringify(Array.isArray(opts.leadIds) ? opts.leadIds : []).replace(/</g, "\\u003c")}</script>
 <script type="application/json" id="dive-map">${diveLead}</script>
 <script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
@@ -5078,6 +5095,12 @@ ${isShapeRow.toString()}
 ${isSealedProductRow.toString()}
 ${dropInventedNm.toString()}
 ${shownRead.toString()}
+${listingsWording.toString()}
+${readMove.toString()}
+${interestScore.toString()}
+${rankLead.toString()}
+${pinIds.toString()}
+${glanceChips.toString()}
 ${cardIdentity.toString()}
 function setLine(card){
   const set=String(card&&card.set||"").trim();
@@ -5672,7 +5695,7 @@ function deepEl(card){
     return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
   }).join("");
   const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(openDataHref(card))+'">Open it</a></p>':"";
-  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p>'+signalBits(card)+'<h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
+  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p>'+glanceChips(card)+signalBits(card)+'<h2>'+html(card.headline||card.name||"")+'</h2>'+(card.headline?'<p class="one-line">'+html(listingsWording(card.headline))+'</p>':"")+'<details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
   return el;
 }
@@ -5709,7 +5732,7 @@ function cardEl(card, facts){
   const headline=String(card.headline||"").trim();
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
-  const shown=sameSentence||line;
+  const shown=listingsWording(sameSentence||line||headline||pathText);
   const run=printRunLine(card);
   const runHtml=run?'<p class="print-run">'+html(run)+' <a href="/rotation">Rotation and print runs</a>.</p>':"";
   const title=html(readTitle(card)||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
@@ -5720,7 +5743,8 @@ function cardEl(card, facts){
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
   const vchips=(card.tags||[]).length?'<div class="vchips sm" aria-label="Variant">'+card.tags.map(function(t){return '<a class="vchip" href="/search?tag='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</div>':"";
-  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+signalBits(card)+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
+  const glance=glanceChips(card);
+  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+glance+signalBits(card)+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){
@@ -6759,22 +6783,11 @@ function buildFlat(){
     const visitSeed=freshSeed();
     const seenNow=readSeen(window.localStorage);
     const wordRnd=freshRandom(visitSeed ^ 0x9e3779b9);
-    flat=freshOrder(rows,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
-    // Open on a story, not a plain price move.
-    const PLAIN_KIND={single:1,sealed:1,streak:1,mover:1,price:1,askmove:1,mktmove:1};
-    const plainish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return !r || r.pending || PLAIN_KIND[k] || k.indexOf("pokemon")===0; };
-    const newsish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return k==="news" || k==="newsline" || k==="wave" || !!(r && r.waveItem); };
-    if(flat.length && newsish(flat[0])){
-      let k=-1;
-      for(let n=1;n<flat.length;n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
-      if(k<0){ for(let n=1;n<flat.length;n++){ if(!newsish(flat[n])){ k=n; break; } } }
-      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
-    } else if(flat.length && plainish(flat[0])){
-      let k=-1;
-      for(let n=1;n<Math.min(flat.length,60);n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
-      if(k<0){ for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } } }
-      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
-    }
+    const leadOrder=(function(){ try { return JSON.parse(document.getElementById("feed-lead-order").textContent)||[]; } catch(e){ return []; } })();
+    const ordered=pinIds(rows, leadOrder) || rankLead(rows);
+    const tail=freshOrder(ordered.rest,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
+    flat=ordered.lead.concat(tail);
+    // Interest leads the feed. A tiny move does not open it.
     markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
     return;
   }
@@ -6964,7 +6977,7 @@ async function showFlat(index, dir){
     host.innerHTML="";
     const p=document.createElement("p");
     p.className="muted";
-    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
     let msg=shapeEmpty[loopFilter]||"";
     if(!msg && loopFilter==="sealed") msg="No sealed reads tonight.";
     else if(!msg && loopFilter==="set" && !wantedSet) msg="Choose a set to see its reads.";
@@ -7469,7 +7482,7 @@ async function boot(){
       if(!loopEl) return;
       const have={};
       Array.prototype.forEach.call(loopEl.options, function(o){ have[o.value]=1; });
-      const soldPairs=[["volume","Volume"],["quiet","No sales"],["mix","Condition mix"],["soldflat","Sold, price flat"],["solddown","Sold, price down"]];
+      const soldPairs=[["volume","Volume"],["quiet","No count"],["mix","Condition mix"],["soldflat","Price flat"],["solddown","Price down"]];
       const anchor=Array.prototype.find.call(loopEl.options, function(o){ return o.value==="conditions"; });
       let added=false;
       soldPairs.forEach(function(pair){
@@ -7509,7 +7522,7 @@ boot();
   const feedTitle = page === "read" ? "Read" : (focusTitle || "The Feed");
   const feedDesc = page === "read"
     ? "One market read from Catch'em. TCGplayer market prices stay labeled separately from eBay asks."
-    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks are not solds.";
+    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks stay apart from the market price.";
   const feedUrl = page === "read" && startId
     ? `https://catchemtcg.com/feed?id=${encodeURIComponent(startId)}`
     : "https://catchemtcg.com/feed";

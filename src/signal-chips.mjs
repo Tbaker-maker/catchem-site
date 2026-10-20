@@ -41,7 +41,7 @@ export const SIGNAL_CSS = `
 .sig-dots i{width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.25)}
 .sig-dots i.on{background:currentColor}
 .sig-blurb{margin:0;max-width:100%;font:400 15px/1.4 var(--sans,"IBM Plex Sans",system-ui,sans-serif);color:var(--dim,#c4baab);overflow-wrap:anywhere}
-.is-fast .sig-blurb,.is-fast .one-line,.is-fast .print-run{display:none}
+.is-fast .sig-blurb,.is-fast .print-run{display:none}
 .feed-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;max-width:100%;margin:0 0 8px}
 .fast-toggle{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;border:1px solid var(--line,#2f2b26);background:#1a1815;color:var(--txt,#efe9de);font:600 14px/1 var(--sans,"IBM Plex Sans",system-ui,sans-serif);cursor:pointer}
 .fast-toggle[aria-pressed="true"]{background:var(--gold,#d9b779);color:#1a1407;border-color:transparent}
@@ -495,6 +495,8 @@ export function attachSignals(bundle, doc) {
 export function mountSignalTools() {
   var page = document.querySelector(".feed-page");
   var btn = document.getElementById("fast-mode");
+  // Off until a reader turns it on. A stored "1" is their choice, not the default.
+  // Fast mode still shows the one-line lead and the quick chips.
   var on = false;
   try { on = localStorage.getItem("catchem-fast") === "1"; } catch (err) { on = false; }
   function paint() {

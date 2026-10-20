@@ -636,7 +636,7 @@ const volume = {
   href: "/c/tcgcsv-662182",
   sold: { condition: "Near Mint", printing: "Holofoil", count30d: 815, window30d: { from: "2026-09-05", to: "2026-10-04" }, count7d: 133, window7d: { from: "2026-09-28", to: "2026-10-04" }, source: "TCGplayer sales via PokemonPriceTracker" },
 };
-t("a verified volume row is kept and keeps its sold sentence", isVolumeRow(volume) && keepFeedRead(volume) && soldSafeText(volume, volume.path) === volume.path);
+t("a verified volume row is kept and its sentence drops sold wording", isVolumeRow(volume) && keepFeedRead(volume) && soldSafeText(volume, volume.path).includes("815 Near Mint listings counted") && !/\b(sold|sales)\b/i.test(soldSafeText(volume, volume.path)));
 const forged = { ...volume, id: "volume-forged", sold: { ...volume.sold, source: "eBay" } };
 const mismatch = { ...volume, id: "volume-mismatch", sold: { ...volume.sold, count30d: 900 } };
 const noWindow = { ...volume, id: "volume-nowindow", sold: { ...volume.sold, window30d: {} } };
@@ -648,7 +648,7 @@ t("prices filter leaves volume out", buildFeedLoop([priced, volume], volBrowse, 
 t("default mix includes the volume read", buildFeedLoop([priced], volBrowse, {}).some((r) => r.id === "volume-tcgcsv-662182"));
 t("no volume shelf means no volume rows", volumeReads({ filters: {} }, []).length === 0 && buildFeedLoop([priced], flagBrowse, { filter: "volume" }).length === 0);
 const volAll = renderAll({ asOf: "2026-10-06", reads: [volume, { id: "only-sold", headline: "Sales volume is 40 copies sold.", price: 10 }] }, "");
-t("all reads keeps the attributed volume line and drops the bare sold claim", volAll.includes("815 Near Mint copies sold on TCGplayer") && !volAll.includes("Sales volume is 40"));
+t("all reads keeps the attributed volume line and drops the bare sold claim", volAll.includes("815 Near Mint listings counted on TCGplayer") && !volAll.includes("Sales volume is 40") && !volAll.includes("copies sold"));
 
 const quiet = {
   id: "quiet-tcgcsv-1",
@@ -665,7 +665,7 @@ const quiet = {
   receipt: { days: 7, price: 2.03, from: "2026-09-28", to: "2026-10-04" },
 };
 const quietForged = { ...quiet, id: "quiet-forged", path: "No sales. Scarce.", headline: "No sales. Scarce.", why: "No sales. Scarce.", receipt: { days: 7, price: 2.03 } };
-t("a shape row keeps its sentence only with the clause and the price", isShapeRow(quiet) && keepFeedRead(quiet) && soldSafeText(quiet, quiet.path) === quiet.path && !isShapeRow(quietForged) && soldSafeText(quietForged, "12 copies sold.") === "");
+t("a shape row keeps its sentence only with the clause and the price", isShapeRow(quiet) && keepFeedRead(quiet) && soldSafeText(quiet, quiet.path).includes("No TCGplayer listings counted in 7 days.") && !/\b(sold|sales)\b/i.test(soldSafeText(quiet, quiet.path)) && !isShapeRow(quietForged) && soldSafeText(quietForged, "12 copies sold.") === "");
 const shapeBrowse = { ...flagBrowse, filters: { ...flagBrowse.filters, quiet: { items: [quiet, quietForged], empty: "No quiet Near Mint window is on file." } } };
 t("the quiet filter returns the verified row only", buildFeedLoop([priced], shapeBrowse, { filter: "quiet" }).map((r) => r.id).join() === "quiet-tcgcsv-1");
 t("prices filter leaves a shape row out", buildFeedLoop([priced, quiet], shapeBrowse, { filter: "prices" }).every((r) => r.readKind !== "quiet"));
@@ -706,7 +706,7 @@ const spreadCard = {
 };
 const shownLines = [conditionCard, marketCard, mixCard, spreadCard].map(shownRead);
 t("a shown read keeps the name and does not say for on or for went", shownLines.every((line) => line && !line.includes("for on") && !line.includes("for went") && !line.startsWith(",") && !line.startsWith(" ")) && shownRead(conditionCard).includes("Carracosta GX") && shownRead(marketCard).includes("Pitch Black Booster Pack") && shownRead(mixCard).startsWith("Persian") && shownRead(spreadCard).includes("Unified Minds Booster Box"));
-t("an ask spread is a plain asking range from the receipt", shownRead(spreadCard) === "Asks on eBay for Unified Minds Booster Box range from $3,250 to $6,934 (listings, not sales).");
+t("an ask spread is a plain asking range from the receipt", shownRead(spreadCard) === "Asks on eBay for Unified Minds Booster Box range from $3,250 to $6,934 (listings, not listings gone).");
 t("every shown read starts with a capital", shownLines.every((line) => /^[A-Z]/.test(line)) && shownRead({ name: "Abra", path: "abra latest price rose from $1.00 on Sep 3 to $1.10 on Oct 3.", kind: "single", readKind: "price" }).startsWith("Abra"));
 t("a missing name is put back and a leading comma is not a sentence", shownRead({ name: "Persian", path: ", Sep 29–Oct 5: 7 Near Mint.", readKind: "price", kind: "single" }).startsWith("Persian") && !shownRead({ name: "Persian", path: ", Sep 29–Oct 5: 7 Near Mint.", readKind: "price", kind: "single" }).startsWith(","));
 
@@ -766,7 +766,7 @@ t("a supply row is the listing total, and a missing total stays out", isSupplyRo
 t("two files that disagree on price or listings leave the product out", filesDisagree({ id: "tcgcsv-1", price: 10, listings: 5 }, { price: 11, listings: 5 }) && filesDisagree({ listings: 4 }, { listings: 9 }) && !filesDisagree({ price: 10 }, { price: 10 }) && !filesDisagree({ price: 10 }, { listings: 4 }));
 const built = renderFeed({ asOf: "2026-10-03", reads: [priced, fact, lag, lagHalf, supply, supplyBlank] }, "", "", {});
 const builtLead = JSON.parse(built.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
-t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "lag-prismatic,move-tcgcsv-10-7,pokemon-duraludon,supply-one");
+t("the feed build keeps a move, a lag, a supply line, and a fact", builtLead.map((r) => r.id).join(",") === "move-tcgcsv-10-7,lag-prismatic,pokemon-duraludon,supply-one");
 t("the feed build has no volume line", !built.includes("No sales count yet") && !built.includes("Sales volume") && !builtLead.some((r) => r.id === "lag-half" || r.id === "supply-blank"));
 
 
@@ -800,7 +800,7 @@ const staleFetch = async (url) => {
 resetJsonCache();
 const staleHtml = await (await renderPath("/feed", staleFetch, { feed: true })).text();
 const staleLead = JSON.parse(staleHtml.match(/id="feed-lead">([\s\S]*?)<\/script>/)[1]);
-t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price from priceStaleIds", staleLead.map((r) => r.id).join(",") === "pokemon-gyarados,move-tcgcsv-684406-7");
+t("the feed keeps Talonflame and the Gyarados fact, and drops the older Gyarados price from priceStaleIds", staleLead.map((r) => r.id).join(",") === "move-tcgcsv-684406-7,pokemon-gyarados");
 t("the feed asks the card file before it shows that price", staleHtml.includes("function readStaleAgainstCard") && staleHtml.includes("function stalePrice"));
 
 // ── every inline client script must parse ──

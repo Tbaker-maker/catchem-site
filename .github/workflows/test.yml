@@ -16,6 +16,7 @@ jobs:
       - run: node scripts/rebuild.test.mjs
       - run: node scripts/reads.test.mjs
       - run: node scripts/signal-chips.test.mjs
+      - run: node scripts/feed-first.test.mjs
       - run: node scripts/reads-pipe.test.mjs
       - run: node scripts/reads-email.test.mjs
       - run: node scripts/reads-article.test.mjs
