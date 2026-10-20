@@ -89,6 +89,7 @@ export function blankPlan() {
     length: "standard",
     lengthByDay: {},
     focus: "",
+    premiumRatio: "",
   };
 }
 
@@ -189,6 +190,8 @@ export function gatePlan(plan, { premium = false } = {}) {
   next.length = cleanLength(plan?.length, premium === true);
   if (String(plan?.length || "") === "deep" && next.length !== "deep") notes.push("Deep dive is in Premium, so this read is Standard.");
   next.focus = plan?.focus === "vintage" ? "vintage" : "";
+  const askedRatio = String(plan?.premiumRatio || "");
+  next.premiumRatio = askedRatio === "below" || askedRatio === "above" ? askedRatio : "";
   next.lengthByDay = cleanLengthByDay(plan?.lengthByDay, premium === true);
   if (!premium && Object.values(plan?.lengthByDay || {}).includes("deep")) notes.push("Deep dive days are in Premium, so those days are Standard.");
   return { plan: next, notes };
@@ -265,6 +268,7 @@ export function planFromFields(fields) {
     length: String(get("length") || "standard"),
     lengthByDay: Object.fromEntries(WEEKDAYS.map((w) => [w, String(get("len_" + w) || "")]).filter((row) => row[1])),
     focus: all("focus").includes("vintage") ? "vintage" : "",
+    premiumRatio: String(get("premiumRatio") || ""),
   };
 }
 
@@ -435,6 +439,7 @@ export function planToFollow(discordId, plan) {
     product,
     news: plan?.addons?.news === true || plan?.addons?.all === true,
     games: plan?.addons?.games === true || plan?.addons?.all === true,
+    premiumRatio: plan?.premiumRatio === "below" || plan?.premiumRatio === "above" ? plan.premiumRatio : "",
     savedAt: String(plan?.savedAt || ""),
   };
 }
@@ -576,6 +581,9 @@ ${sign}
 <p class="rd-note">Only cards with an illustrator credit on file show up here.</p>
 <div class="rd-chips">${ARTIST_CHOICES.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div>
 <details class="rd-more"${ARTIST_MORE.some((row) => (shown.artists || []).includes(row.slug)) ? " open" : ""}><summary>More artists</summary><div class="rd-chips">${ARTIST_MORE.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div></details>
+<h2>Premium ratio</h2>
+<div class="rd-chips">${radio("premiumRatio", "all", "All", shown.premiumRatio !== "below" && shown.premiumRatio !== "above", false)}${radio("premiumRatio", "below", "Below its usual premium only", shown.premiumRatio === "below", false)}${radio("premiumRatio", "above", "Above its usual premium only", shown.premiumRatio === "above", false)}</div>
+<p class="rd-note">All keeps every read. The other two keep only reads with that flag. A single uses its set booster box. A set with no booster box stays out of both.</p>
 <h2>Singles or sealed</h2>
 <div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
 ${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}

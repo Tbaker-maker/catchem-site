@@ -10,6 +10,7 @@ import { ebaySearchUrl, tcgStoreUrl, SHOP_NOTE } from "./pokemon.mjs";
 import { AFFILIATION, TCGPLAYER_ATTRIBUTION } from "./affiliation.mjs";
 import { stageFromChips, stageLine } from "./run-stage.mjs";
 import { patternBarsEmail, patternFromGate } from "./pattern-track.mjs";
+import { flagForItem, flagWord } from "./premium-ratio.mjs";
 
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
@@ -186,7 +187,8 @@ export function buildPool(ctx) {
     const release = String(home?.release || "");
     const tag = ctx.tags?.byId?.[row.id] || {};
     const rarity = row.kind === "single" ? String(tag.rarity || row.rarity || "") : "";
-    seen.set(row.id, { ...row, name: cleanName(row.name), a, release, vintage: !!release && release < WOTC_END, image: imageFor(row.id), rarity, era: eraLabel(home?.era), artist: row.kind === "single" ? String(tag.artist || "") : "", artistSlug: row.kind === "single" ? String(tag.artistSlug || "") : "", generation: row.kind === "single" ? String(tag.generation || "") : "" });
+    const premiumFlag = flagForItem({ id: row.id, set: row.set, kind: row.kind === "sealed" ? "sealed" : "single", href: row.href }, ctx.premium);
+    seen.set(row.id, { ...row, name: cleanName(row.name), a, release, vintage: !!release && release < WOTC_END, image: imageFor(row.id), rarity, era: eraLabel(home?.era), artist: row.kind === "single" ? String(tag.artist || "") : "", artistSlug: row.kind === "single" ? String(tag.artistSlug || "") : "", generation: row.kind === "single" ? String(tag.generation || "") : "", premiumFlag });
   };
   for (const kind of ["singles", "sealed"]) {
     for (const m of ctx.movers?.[kind] || []) {
@@ -328,10 +330,28 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
       mine = narrow;
     }
   }
+  const want = follow.premiumRatio === "below" || follow.premiumRatio === "above" ? follow.premiumRatio : "";
+  let reportPool = pool;
+  if (want) {
+    const keep = (i) => i.premiumFlag === want;
+    mine = mine.filter(keep);
+    reportPool = pool.filter(keep);
+  }
   const strong = (i) => (i.a.thin ? 0.25 : 1) * Math.abs(i.a.change);
   const ranked = [...mine].sort((x, y) => strong(y) - strong(x));
   const top = ranked.find((i) => !i.a.thin) || ranked[0];
-  if (!top) return null;
+  if (!top) {
+    if (!want) return null;
+    const report = watchReport(follow, reportPool, history.sinceDay, asOf || ctx.asOf);
+    const empty = {
+      asOf, length, path, label: filter.label, intro: "", fallback: "",
+      lead: report ? "Your watchlist." : "No reads match this premium filter today.",
+      emptyPremium: true, top: null, ups: [], downs: [], supply: [], tiles: [],
+      vintage: null, pattern: null, rotation: null, news: null, setCompare: [],
+      report, away: null, quiet: true, building: [],
+    };
+    return empty;
+  }
   // Solid moves first. A thin or single step move only fills an empty slot.
   const side = (dir) => {
     const list = ranked.filter((i) => i !== top && (dir > 0 ? i.a.change > 0.5 : i.a.change < -0.5));
@@ -349,7 +369,7 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
   const patternRead = readsAll.find((r) => /^pattern-/.test(String(r.readKind)) && okCopy(r.headline) && tie(r.headline) && !(ctx.holdIds || {})[r.sku]);
   const rotationRead = (path === "default" || path === "set") ? readsAll.find((r) => r.readKind === "rotation" && okCopy(r.headline) && tie(r.headline)) : null;
   const newsRead = readsAll.find((r) => r.readKind === "newsline" && okCopy(r.headline) && /^https:\/\//.test(String(r.href || "")) && tie(r.headline));
-  const vintage = path === "default" && !picksTest(follow) ? pool.filter((i) => i.vintage && !i.a.thin && i !== top).sort((x, y) => strong(y) - strong(x))[0] : null;
+  const vintage = path === "default" && !picksTest(follow) ? reportPool.filter((i) => i.vintage && !i.a.thin && i !== top).sort((x, y) => strong(y) - strong(x))[0] : null;
   // Deep dive: set comparison across the sets in this read.
   const bySet = new Map();
   for (const i of mine) {
@@ -373,8 +393,8 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     setCompare,
   };
   // Phase 2. Each part hides when it has nothing real to show.
-  doc.report = watchReport(follow, pool, history.sinceDay, asOf || ctx.asOf);
-  doc.away = history.awaySince ? catchUp(pool, history.awaySince, top.id) : null;
+  doc.report = watchReport(follow, reportPool, history.sinceDay, asOf || ctx.asOf);
+  doc.away = history.awaySince ? catchUp(reportPool, history.awaySince, top.id) : null;
   doc.quiet = isQuiet(mine, supply);
   doc.building = doc.quiet && length !== "glance" ? buildingQuietly(mine) : [];
   return doc;
@@ -388,6 +408,15 @@ const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Ar
 function pill(change) {
   const up = change > 0;
   return `<span class="${up ? "ce-up" : "ce-dn"}" style="display:inline-block;border-radius:999px;padding:3px 10px;font:600 13px/1.4 ${FONT};background:${up ? C.upBg : C.dnBg};color:${up ? C.up : C.dn};white-space:nowrap">${esc(pct(change))}</span>`;
+}
+
+const PREM = { below: { fg: "#0d6b32", bg: "#e5f6ea" }, above: { fg: "#6b4e00", bg: "#fff4cc" } };
+export function premiumPill(flag) {
+  const word = flagWord(flag);
+  if (!word) return "";
+  const tone = PREM[flag];
+  const cls = flag === "below" ? "ce-prem-below" : "ce-prem-above";
+  return `<span class="${cls}" style="display:inline-block;margin-top:6px;border-radius:999px;padding:3px 10px;font:600 12px/1.4 ${FONT};background:${tone.bg};color:${tone.fg}">${esc(word)}</span>`;
 }
 
 // A small bar chart built from table cells, since Gmail drops SVG.
@@ -420,6 +449,7 @@ function row(i, { more = "", deep = false } = {}) {
 <a href="${esc(i.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(i.name)}</a>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(i) + extra)}</p>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(i.story)}${moreLink}</p>
+${premiumPill(i.premiumFlag)}
 ${deep ? barChart(i.a, { height: 36 }) : ""}
 </td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(i.a.change)}</td></tr></table>`;
 }
@@ -444,13 +474,15 @@ function tilesHtml(tiles) {
 
 // Brand dark look (catchemtcg.com): used when the reader's app is in dark mode.
 // Same rules go under prefers-color-scheme and Outlook's [data-ogsc]/[data-ogsb] hooks.
-export const DARK = { page: "#12100e", card: "#1a1815", tile: "#211e1a", ink: "#efe9de", dim: "#cfc6b6", soft: "#a89f90", gold: "#d9b779", goldInk: "#1a1407", line: "#2c2823", up: "#7fd99a", upBg: "#123d22", dn: "#ff9a90", dnBg: "#4a1714" };
+export const DARK = { page: "#12100e", card: "#1a1815", tile: "#211e1a", ink: "#efe9de", dim: "#cfc6b6", soft: "#a89f90", gold: "#d9b779", goldInk: "#1a1407", line: "#2c2823", up: "#7fd99a", upBg: "#123d22", dn: "#ff9a90", dnBg: "#4a1714", premBelow: "#8ee0a8", premBelowBg: "#123d22", premAbove: "#f6dc86", premAboveBg: "#3a2f0c" };
 function darkRules(t, b) {
   const D = DARK;
   return [
     `${b}.ce-page{background:${D.page} !important}`, `${b}.ce-card{background:${D.card} !important}`, `${b}.ce-tile{background:${D.tile} !important}`,
     `${t}.ce-ink{color:${D.ink} !important}`, `${t}.ce-dim{color:${D.dim} !important}`, `${t}.ce-soft,${t}.ce-soft a{color:${D.soft} !important}`, `${t}.ce-brand{color:${D.gold} !important}`,
     `${b}.ce-up{background:${D.upBg} !important}`, `${t}.ce-up{color:${D.up} !important}`, `${b}.ce-dn{background:${D.dnBg} !important}`, `${t}.ce-dn{color:${D.dn} !important}`,
+    `${b}.ce-prem-below{background:${D.premBelowBg} !important}`, `${t}.ce-prem-below{color:${D.premBelow} !important}`,
+    `${b}.ce-prem-above{background:${D.premAboveBg} !important}`, `${t}.ce-prem-above{color:${D.premAbove} !important}`,
     `${b}.ce-btn-dark{background:${D.gold} !important;border-color:${D.gold} !important}`, `${t}.ce-btn-dark{color:${D.goldInk} !important}`,
     `${b}.ce-btn-light{background:${D.card} !important;border-color:${D.gold} !important}`, `${t}.ce-btn-light{color:${D.ink} !important}`,
     `${b}.ce-line{border-color:${D.line} !important}`, `${b}.ce-img{background:${D.tile} !important}`,
@@ -479,6 +511,7 @@ function windowRow(r) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${img}<td valign="middle" style="padding:8px 0">
 <a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a>
 <p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(`${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])}`)}</p>
+${premiumPill(r.premiumFlag)}
 </td><td width="76" align="right" valign="middle" style="padding-left:8px">${tag}</td></tr></table>`;
 }
 
@@ -507,7 +540,7 @@ function awayCard(away) {
 }
 
 function buildingCard(rows) {
-  return card(h2("What's building quietly") + para("A quiet day. These are slow, steady moves that are easy to miss.", ";margin-top:0;font-size:13px") + rows.map((r) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" class="ce-img" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : ""}<td valign="middle" style="padding:8px 0"><a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(r.line)}</p></td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(r.change)}</td></tr></table>`).join(""), "building");
+  return card(h2("What's building quietly") + para("A quiet day. These are slow, steady moves that are easy to miss.", ";margin-top:0;font-size:13px") + rows.map((r) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-line" style="border-top:1px solid ${C.line}"><tr>${r.image ? `<td width="44" valign="top" style="padding-right:12px"><img src="${esc(r.image)}" width="44" height="60" alt="" class="ce-img" style="display:block;width:44px;height:60px;object-fit:cover;border-radius:10px;background:${C.line}"></td>` : ""}<td valign="middle" style="padding:8px 0"><a href="${esc(r.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(r.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(r.line)}</p>${premiumPill(r.premiumFlag)}</td><td width="76" align="right" valign="middle" style="padding-left:8px">${pill(r.change)}</td></tr></table>`).join(""), "building");
 }
 
 const LENGTH_NAME = { glance: "Glance", standard: "Daily read", deep: "Deep dive" };
@@ -515,6 +548,19 @@ const LENGTH_NAME = { glance: "Glance", standard: "Daily read", deep: "Deep dive
 export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null } = {}) {
   const L = doc.length;
   const when = day(doc.asOf);
+  if (doc.emptyPremium) {
+    const body = [];
+    body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
+    if (doc.report) body.push(reportCard(doc.report, L));
+    else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">No reads match this premium filter today.</p>`));
+    const footer = [
+      "Prices are TCGplayer market on the dates shown. Listings counted are eBay listings on the dates shown. A listing is not a sale.",
+      SHOP_NOTE,
+      page ? "" : `You follow this read. <a href="${esc(manage)}" style="color:${C.soft}">Change what you follow</a>${unsubscribe ? ` or <a href="${esc(unsubscribe)}" style="color:${C.soft}">unsubscribe</a>` : ""}.`,
+      AFFILIATION + " " + TCGPLAYER_ATTRIBUTION,
+    ].filter(Boolean).map((l, i) => (i === 2 ? l : esc(l))).join("<br>");
+    return shell(`Your Catch'em reads, ${when}`, doc.lead, body.join("\n"), footer);
+  }
   const anchor = (id) => (more ? more + "#" + id : "");
   const body = [];
   body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
@@ -529,7 +575,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   } else {
     const img = t.image ? `<td width="88" valign="top" style="padding-right:12px"><img src="${esc(t.image)}" width="88" height="122" alt="" class="ce-img" style="display:block;width:88px;height:122px;object-fit:cover;border-radius:14px;background:${C.line}"></td>` : "";
     const why = L === "deep" ? [t.a.stageInfo ? `Run stage: ${stageLine(t.a.stageInfo)}` : "", t.vintage ? "This card is from the WOTC era, before mid 2003." : "", `Window: ${day(t.a.start[0])} to ${day(t.a.last[0])}, TCGplayer market.`].filter(Boolean) : [];
-    body.push(card(h2("Top move") + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}<td valign="middle"><a href="${esc(t.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(t.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(t))}</p></td><td width="76" align="right" valign="middle">${pill(t.a.change)}</td></tr></table>` + barChart(t.a) + para(t.story) + (L === "deep" && why.length ? `<p class="ce-ink" style="margin:14px 0 0;font:600 14px/1.3 ${FONT};color:${C.ink}">Why it matters</p>` + why.map((w) => para(w)).join("") : "") + shopButtons(t) + `<p style="margin:10px 0 0"><a href="${esc(t.href)}" class="ce-ink" style="display:inline-block;min-height:44px;line-height:44px;font:600 15px/44px ${FONT};color:${C.ink};text-decoration:underline">See the read</a></p>`, "top-move"));
+    body.push(card(h2("Top move") + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}<td valign="middle"><a href="${esc(t.href)}" class="ce-ink" style="text-decoration:none;color:${C.ink};font:600 15px/1.25 ${FONT}">${esc(t.name)}</a><p class="ce-dim" style="margin:2px 0 0;font:400 13px/1.35 ${FONT};color:${C.dim}">${esc(meta(t))}</p>${premiumPill(t.premiumFlag)}</td><td width="76" align="right" valign="middle">${pill(t.a.change)}</td></tr></table>` + barChart(t.a) + para(t.story) + (L === "deep" && why.length ? `<p class="ce-ink" style="margin:14px 0 0;font:600 14px/1.3 ${FONT};color:${C.ink}">Why it matters</p>` + why.map((w) => para(w)).join("") : "") + shopButtons(t) + `<p style="margin:10px 0 0"><a href="${esc(t.href)}" class="ce-ink" style="display:inline-block;min-height:44px;line-height:44px;font:600 15px/44px ${FONT};color:${C.ink};text-decoration:underline">See the read</a></p>`, "top-move"));
     if (doc.tiles.length) body.push(card(h2(doc.path === "default" ? "The whole group today" : doc.label + " today") + tilesHtml(doc.tiles) + para(`Price change over each item's latest 7 days on file, up to ${when}. Listings counted are the last two nights.`, ";font-size:13px")));
     if (doc.ups.length) body.push(card(h2("Also moving up") + doc.ups.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-up"));
     if (doc.downs.length) body.push(card(h2("Moving down") + doc.downs.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-down"));
@@ -562,13 +608,19 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
 }
 
 export function articleText(doc, { unsubscribe = "", more = "", suggest = null } = {}) {
+  if (doc.emptyPremium) {
+    const out = [doc.report ? "Your watchlist." : "No reads match this premium filter today."];
+    if (doc.report) out.push(...doc.report.rows.map((r) => [r.name, flagWord(r.premiumFlag)].filter(Boolean).join(". ")));
+    out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads");
+    return out.filter((l) => l !== undefined).join("\n");
+  }
   const out = [doc.lead, doc.intro];
   if (doc.fallback) out.push(doc.fallback);
   const w = (r) => `${r.name}: ${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])} (${pct(r.change)})`;
   if (doc.report) out.push("", "Watchlist report card, since " + day(doc.report.since), ...doc.report.rows.map(w));
   if (doc.away) out.push("", "While you were away, since " + day(doc.away.since), ...doc.away.rows.map(w));
-  out.push("", "Top move: " + doc.top.name + " " + pct(doc.top.a.change), doc.top.story, doc.top.href, "");
-  for (const i of [...doc.ups, ...doc.downs].slice(0, doc.length === "glance" ? 2 : 6)) out.push(i.name + " " + pct(i.a.change), i.story, "");
+  out.push("", "Top move: " + doc.top.name + " " + pct(doc.top.a.change), [flagWord(doc.top.premiumFlag), doc.top.story].filter(Boolean).join(" "), doc.top.href, "");
+  for (const i of [...doc.ups, ...doc.downs].slice(0, doc.length === "glance" ? 2 : 6)) out.push([i.name, pct(i.a.change), flagWord(i.premiumFlag)].filter(Boolean).join(" "), i.story, "");
   for (const r of doc.supply.slice(0, doc.length === "glance" ? 1 : 3)) out.push(`${r.name}: ${r.word.toLowerCase()}, ${r.prev} to ${r.n} listings counted (${day(r.prevDate)} to ${day(r.date)}).`);
   if (doc.building?.length && doc.length !== "glance") out.push("", "What's building quietly", ...doc.building.map((r) => r.name + ": " + r.line));
   if (more) out.push("", "Read the full version: " + more);
@@ -605,6 +657,7 @@ export function followFromPlan(plan, sendDay = "") {
     names,
     product: p.product === "sealed" || p.sealed === true ? "sealed" : "singles",
     focus: p.focus === "vintage" ? "vintage" : "",
+    premiumRatio: p.premiumRatio === "below" || p.premiumRatio === "above" ? p.premiumRatio : "",
     length: pickLength.length,
     weekday: pickLength.weekday,
   };
@@ -619,7 +672,7 @@ export async function loadContext(fetchImpl = fetch) {
   const get = (f) => loadJson(f, fetchImpl).catch(() => null);
   const { fetchRepo } = await import("./data.mjs");
   const getTags = () => fetchRepo(PATH_TAGS, fetchImpl).then((r) => (r && r.ok ? r.json() : null)).catch(() => null);
-  const [reads, hold, movers, listings, sets, chips, tags] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags()]);
+  const [reads, hold, movers, listings, sets, chips, tags, premium] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags(), get("premium-ratio.json")]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
   const bags = new Map();
   const spark = async (id) => {
@@ -629,7 +682,7 @@ export async function loadContext(fetchImpl = fetch) {
     const doc = bags.get(b);
     return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
   };
-  return { reads, holdIds, movers, listings, sets, chips, tags, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
+  return { reads, holdIds, movers, listings, sets, chips, tags, premium, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
 // Watched items get their own 30 day history from the sparks file.
@@ -716,7 +769,7 @@ export function watchReport(follow, pool, sinceDay, asOf) {
     if (!i) continue;
     const w = windowMove(i.a, since);
     if (!w) continue;
-    rows.push({ id, name: i.name, kind: i.kind, image: i.image, href: i.href, ...w });
+    rows.push({ id, name: i.name, kind: i.kind, image: i.image, href: i.href, premiumFlag: i.premiumFlag || "", ...w });
   }
   if (!rows.length) return null;
   rows.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
@@ -731,7 +784,7 @@ export function catchUp(pool, sinceDay, skipId = "") {
     if (i.id === skipId) continue;
     const w = windowMove(i.a, sinceDay);
     if (!w || w.points < 3 || w.bigStep >= 100 || Math.abs(w.change) < 5) continue;
-    rows.push({ id: i.id, name: i.name, kind: i.kind, image: i.image, href: i.href, ...w });
+    rows.push({ id: i.id, name: i.name, kind: i.kind, image: i.image, href: i.href, premiumFlag: i.premiumFlag || "", ...w });
   }
   if (!rows.length) return null;
   rows.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
@@ -765,7 +818,7 @@ export function buildingQuietly(items) {
     const line = run >= 4
       ? `${run} price days in a row ${dir === "up" ? "up" : "down"}, in small steps: ${money(recent[0][1])} on ${day(recent[0][0])} to ${money(recent[recent.length - 1][1])} on ${day(recent[recent.length - 1][0])}.`
       : `A slow drift ${dir}, no step over 3%: ${money(recent[0][1])} on ${day(recent[0][0])} to ${money(recent[recent.length - 1][1])} on ${day(recent[recent.length - 1][0])}.`;
-    out.push({ id: i.id, name: i.name, image: i.image, href: i.href, change: drift, line, score: run * 2 + Math.abs(drift) });
+    out.push({ id: i.id, name: i.name, image: i.image, href: i.href, premiumFlag: i.premiumFlag || "", change: drift, line, score: run * 2 + Math.abs(drift) });
   }
   return out.sort((x, y) => y.score - x.score).slice(0, 3);
 }
