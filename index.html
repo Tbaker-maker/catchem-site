@@ -341,10 +341,11 @@ footer a{color:var(--gold)}
       return "<b>"+n.toLocaleString("en-US")+"<span>"+text(b[1])+"</span></b>";
     }).join("");
     var line=document.getElementById("fresh-line");
-    if(c.updatedAt){
-      var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(c.updatedAt));
+    var tu=Date.parse(c.updatedAt||""), ta=/^\d{4}-\d{2}-\d{2}$/.test(String(c.asOf||""))?Date.parse(c.asOf+"T08:00:00Z"):NaN;
+    if(Number.isFinite(tu) && !(ta>tu)){
+      var clock=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(tu));
       line.textContent="Updated "+clock+" PT";
-    } else if(c.asOf) line.textContent="Updated "+c.asOf;
+    } else if(Number.isFinite(ta)) line.textContent="Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric"}).format(new Date(ta));
   }).catch(function(){});
   fetch("/data/feed/" + "catal" + "ogue.json").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(doc){
     var rows=[];
