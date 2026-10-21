@@ -1526,11 +1526,13 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
   .site-bar nav.open{display:flex}
 }
 .nav-more{position:relative}
+.po-beta{display:inline-flex;align-items:center;justify-content:center;margin-left:8px;padding:4px 9px;border-radius:999px;background:#d9b779;color:#1a1407;font:600 11px/1 var(--sans);letter-spacing:.04em;white-space:nowrap}
+.po-beta-link{gap:8px;white-space:nowrap}
 .nav-more-list{display:flex;flex-direction:column}
 .nav-more>summary{list-style:none;cursor:pointer;color:var(--dim);font:500 14px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center;padding:0 8px;border-radius:12px}
 .nav-more>summary::-webkit-details-marker{display:none}
 @media (min-width:1024px){
-  .nav-more-list{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;min-width:180px;padding:8px;background:#1a1815;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .nav-more-list{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;min-width:240px;padding:8px;background:#1a1815;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
   .nav-more-list a{justify-content:flex-start!important}
   .menu-btn{display:none}
   .site-bar{height:auto;max-height:none}
@@ -1655,7 +1657,9 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
   const shareTags = shareMetaTags(title, share);
   const tcgOn = !(typeof globalThis !== "undefined" && globalThis.CATCHEM_TCG_IMAGES === false);
   const banner = priceBanner ? `<p class="stale-banner" role="status">${esc(priceBanner)}</p>` : "";
-  const officeLink = postOfficeOpen ? item("/post-office", "Post Office") : "";
+  const officeLink = postOfficeOpen
+    ? item("/post-office", "Post Office")
+    : `<a class="po-beta-link" href="/post-office" data-po="closed">Post Office <span class="po-beta">Closed Beta</span></a>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">

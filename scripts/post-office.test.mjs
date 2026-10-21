@@ -73,7 +73,7 @@ const fetchImpl = async (url) => {
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("a closed post office is the coming soon page", post.includes("Coming soon") && post.includes("We're rebuilding this. Email and social tools are coming back better.") && post.includes('name="robots" content="noindex"') && !post.includes('src="/post-office/app') && !post.includes("Post Office editor") && !post.includes('href="/post-office"') && !post.includes("SHOW") && !post.includes("The full catalog:") && !post.includes('id="fresh"'));
+t("a closed post office is the coming soon page", post.includes("Coming soon") && post.includes("We're rebuilding this. Email and social tools are coming back better.") && post.includes('name="robots" content="noindex"') && !post.includes('src="/post-office/app') && !post.includes("/post-office/app") && !post.includes("Post Office editor") && post.includes('href="/post-office"') && post.includes("Closed Beta") && !post.includes("SHOW") && !post.includes("The full catalog:") && !post.includes('id="fresh"'));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
 t("catalog spelling stays off this page", !post.includes("The full catalog:") && !post.includes("catalogue"));
 t("browser helpers define printingRank", clientHelpers().includes("function printingRank"));

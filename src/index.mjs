@@ -49,7 +49,7 @@ import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
   renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
-import { postOfficeOn } from "./post-office-flag.mjs";
+import { postOfficeOn, paintHomePostOffice } from "./post-office-flag.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
@@ -1435,7 +1435,7 @@ const worker = {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(addFeedEntry(paintPublicHtml(await asset.text(), url.pathname, env)), fetchImpl), fetchImpl))), { status: asset.status, headers });
+        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(paintHomePostOffice(addFeedEntry(paintPublicHtml(await asset.text(), url.pathname, env)), postOfficeOn(env)), fetchImpl), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
     }
@@ -1460,7 +1460,8 @@ const worker = {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
       const raw = paintPublicHtml(await asset.text(), url.pathname, env);
-      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(await withMeter(raw, fetchImpl), fetchImpl)) : raw;
+      const homed = norm(url.pathname) === "/" ? paintHomePostOffice(raw, postOfficeOn(env)) : raw;
+      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(await withMeter(homed, fetchImpl), fetchImpl)) : homed;
       return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
