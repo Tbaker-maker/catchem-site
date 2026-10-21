@@ -38,7 +38,7 @@ t("card share meta uses the branded card and price", meta.includes("og:image\" c
 const set = addShareMeta(`<html><head><title>ME06: Delta Reign · Catch'em</title></head><body></body></html>`, "/sets/me06-delta-reign", "set");
 t("set share meta has its own title and description", set.includes('og:title" content="ME06: Delta Reign · Catch\'em"') && set.includes("in ME06: Delta Reign"));
 const signin = fs.readFileSync(new URL("../src/auth.mjs", import.meta.url), "utf8");
-t("sign in has a description", /<meta name="description" content="Sign in/.test(signin));
+t("sign in has a description", signin.includes('name="description"') && signin.includes("Sign in to Catch'em with Discord.") && signin.includes("Sign in to Catch'em with Discord to use Post Office Ideas."));
 
 // Legal pages. The banned-word copy check skips only these three pages (legal text exception).
 const { renderLegal, LEGAL_PATHS, LEGAL_UPDATED } = await import("../src/legal.mjs");

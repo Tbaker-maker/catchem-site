@@ -100,7 +100,10 @@ const browse = await callback("/collection");
 const sessionCookie = (browse.headers.get("set-cookie") || "");
 t("browse sign-in does not need Post Office approval", browse.status === 302 && browse.headers.get("location") === "/collection" && sessionCookie.includes("ce_session="));
 const office = await callback("/post-office");
-t("Post Office still refuses an unapproved member", office.status === 200 && (await office.text()).includes("on the list") && !(office.headers.get("set-cookie") || "").includes("ce_session="));
+t("a closed Post Office does not hold the seat", office.status === 302 && office.headers.get("location") === "/post-office" && (office.headers.get("set-cookie") || "").includes("ce_session="));
+discordEnv.POST_OFFICE = "on";
+const officeHeld = await callback("/post-office");
+t("an open Post Office still refuses an unapproved member", officeHeld.status === 200 && (await officeHeld.text()).includes("on the list") && !(officeHeld.headers.get("set-cookie") || "").includes("ce_session="));
 
 const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 t("device list uses the same 25", ui.includes("cur.slice(0,25)") && ui.includes("function mergeLocalWatch()"));

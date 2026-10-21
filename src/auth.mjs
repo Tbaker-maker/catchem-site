@@ -2,9 +2,14 @@
 // If Discord is not configured, the page is one line and has no button.
 
 import { avatarUrl, ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
+import { postOfficeOn } from "./post-office-flag.mjs";
 
 export const DISCORD_INVITE = "https://discord.gg/fUSjxDX4Hy";
 export const INVITE_LINE = "Post Office is invite-only for now. Join Discord to get on the list.";
+
+function officeHome(env) {
+  return postOfficeOn(env) ? "/post-office" : "/";
+}
 
 // Comma-separated Discord user ids (POST_OFFICE_ALLOWLIST). Tyler's id goes first.
 // Missing or empty stays open so a blank var does not lock the Post Office.
@@ -52,10 +57,15 @@ function json(obj, status = 200) {
 export function signInDocument(env) {
   const ready = discordReady(env);
   const line = ideasSignInLine(ready);
+  const back = officeHome(env);
+  const backLabel = postOfficeOn(env) ? "Back to Post Office" : "Back to Catch'em";
+  const about = postOfficeOn(env)
+    ? "Sign in to Catch'em with Discord to use Post Office Ideas."
+    : "Sign in to Catch'em with Discord.";
   const link = ready
-    ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a> to use Ideas. A free seat is 3 a day.</p>`
+    ? `<p><a href="/auth/discord?next=${back}">Sign in with Discord</a> to use Ideas. A free seat is 3 a day.</p>`
     : `<p>${line}</p>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="description" content="Sign in to Catch'em with Discord to use Post Office Ideas."><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Sign in · Catch'em</title></head><body style="margin:24px;font:16px/1.5 sans-serif;background:#12100e;color:#efe9de">${link}<p><a href="/post-office">Back to Post Office</a></p><footer><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops.</p></footer></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="description" content="${about}"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Sign in · Catch'em</title></head><body style="margin:24px;font:16px/1.5 sans-serif;background:#12100e;color:#efe9de">${link}<p><a href="${back}">${backLabel}</a></p><footer><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops.</p></footer></body></html>`;
 }
 
 export async function sessionView(request, env) {
@@ -87,7 +97,7 @@ export function handleSignIn(request, env) {
 export function beginDiscord(request, env) {
   if (!discordReady(env)) return html(signInDocument(env));
   const url = new URL(request.url);
-  const next = url.searchParams.get("next") || "/post-office";
+  const next = url.searchParams.get("next") || officeHome(env);
   const state = crypto.randomUUID();
   const redirect = "https://discord.com/oauth2/authorize?" + new URLSearchParams({
     response_type: "code",
@@ -116,9 +126,9 @@ export async function finishDiscord(request, env, fetchImpl = fetch) {
   const saved = cookieValue(request.headers.get("cookie"), "ce_oauth");
   const cut = saved.indexOf("|");
   const savedState = cut >= 0 ? saved.slice(0, cut) : "";
-  const next = cut >= 0 ? saved.slice(cut + 1) : "/post-office";
+  const next = cut >= 0 ? saved.slice(cut + 1) : officeHome(env);
   if (!code || !state || state !== savedState) {
-    return html(`<p>Discord did not finish. <a href="/auth/discord?next=/post-office">Sign in with Discord</a> to try again.</p>`);
+    return html(`<p>Discord did not finish. <a href="/auth/discord?next=${officeHome(env)}">Sign in with Discord</a> to try again.</p>`);
   }
   const tokenRes = await fetchImpl("https://discord.com/api/oauth2/token", {
     method: "POST",
@@ -139,8 +149,8 @@ export async function finishDiscord(request, env, fetchImpl = fetch) {
   if (!meRes.ok) return html(`<p>Discord did not finish. <a href="/signin">Back</a></p>`);
   const me = await meRes.json();
   if (!me || !me.id) return html(`<p>Discord did not finish. <a href="/signin">Back</a></p>`);
-  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/post-office";
-  const office = dest === "/post-office" || dest.startsWith("/post-office/");
+  const dest = next.startsWith("/") && !next.startsWith("//") ? next : officeHome(env);
+  const office = postOfficeOn(env) && (dest === "/post-office" || dest.startsWith("/post-office/"));
   let premium = false;
   if (env.ACCESS_API_URL && env.ACCESS_API_SECRET) {
     let access = null;
@@ -169,12 +179,12 @@ export async function finishDiscord(request, env, fetchImpl = fetch) {
   return new Response(null, { status: 302, headers });
 }
 
-export function logout(request) {
-  let dest = "/post-office";
+export function logout(request, env) {
+  let dest = officeHome(env);
   try {
     const next = new URL(request?.url || "https://catchemtcg.com/auth/logout").searchParams.get("next") || "";
     if (next.startsWith("/") && !next.startsWith("//")) dest = next;
-  } catch { /* keep the Post Office return */ }
+  } catch { /* keep the return */ }
   const headers = new Headers({ location: dest, "cache-control": "no-store" });
   headers.append("set-cookie", "ce_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
   return new Response(null, { status: 302, headers });
