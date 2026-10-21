@@ -8,6 +8,7 @@ import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
@@ -1607,6 +1608,10 @@ export function trackRecordIsOpen(doc) {
 export function setTrackRecordOpen(open) {
   trackOpen = open === true;
 }
+let postOfficeOpen = false;
+export function setPostOfficeOpen(open) {
+  postOfficeOpen = open === true;
+}
 export function trackRecordOpenNow() {
   return trackOpen;
 }
@@ -1650,6 +1655,7 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
   const shareTags = shareMetaTags(title, share);
   const tcgOn = !(typeof globalThis !== "undefined" && globalThis.CATCHEM_TCG_IMAGES === false);
   const banner = priceBanner ? `<p class="stale-banner" role="status">${esc(priceBanner)}</p>` : "";
+  const officeLink = postOfficeOpen ? item("/post-office", "Post Office") : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -1657,7 +1663,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
 <style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item("/premium", "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}</div></details>${item("/premium", "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -4302,11 +4308,16 @@ export function renderRetired(kind, opts = {}) {
 
 export function renderOfficeGate(opts = {}) {
   const invite = INVITE_LINE.replace("Join Discord", `<a href="${esc(DISCORD)}">Join Discord</a>`);
-  const sign = opts.ready && !opts.signedIn
+  const sign = postOfficeOpen && opts.ready && !opts.signedIn
     ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a></p>`
     : "";
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
   return chrome("Post Office", body, "Post Office", "", "", feedNav(opts));
+}
+
+export function renderPostClosed(opts = {}) {
+  const body = `<main id="main" tabindex="-1" class="wrap"><section class="po-soon" style="max-width:560px;margin:32px auto;padding:28px 22px;border-radius:22px;background:#1c1a17;border:1px solid rgba(217,183,121,.4)"><p style="margin:0 0 8px;letter-spacing:.08em;text-transform:uppercase;color:#d9b779;font:600 12px/1.2 'IBM Plex Sans',sans-serif">Post Office</p><h1 style="margin:0 0 12px;font:600 34px/1.15 Fraunces,Georgia,serif">Coming soon</h1><p style="margin:0;font:17px/1.5 'IBM Plex Sans',sans-serif">${POST_OFFICE_LINE}</p></section></main>`;
+  return chrome("", body, "Post Office", "", "", feedNav(opts));
 }
 
 export function renderPost(stamp, mark = "", opts = {}) {

@@ -47,8 +47,9 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
+import { postOfficeOn } from "./post-office-flag.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
@@ -606,7 +607,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   const trackOpen = trackRecordIsOpen(trackDoc);
   setTrackRecordOpen(trackOpen);
-  const pageOpts = { ...opts, asOf };
+  const pageOpts = { ...opts, asOf, postOffice: opts.postOffice === true || postOfficeOn(opts) };
+  setPostOfficeOpen(pageOpts.postOffice);
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
@@ -614,8 +616,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return proxyPublic(rel, fetchImpl);
   }
   if (kind === "sitemap") {
-    if (path !== "/sitemap-00.xml") return withTrackInSitemap(await proxyPublic(path.slice(1), fetchImpl), trackOpen, false);
-    return withTrackInSitemap(await withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl)), trackOpen, true);
+    const first = path === "/sitemap-00.xml";
+    let map = await proxyPublic(path.slice(1), fetchImpl);
+    if (first) map = await withReleasesInSitemap(map);
+    map = await withTrackInSitemap(map, trackOpen, first);
+    return withoutPostOfficeInSitemap(map, pageOpts.postOffice === true);
   }
   if (kind === "feed") {
     const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
@@ -1013,6 +1018,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
+    if (!pageOpts.postOffice) return noindex(html(renderPostClosed(pageOpts)));
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") {
@@ -1168,6 +1174,10 @@ const worker = {
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
     if (readPage && url.pathname === "/post-office/app") {
+      if (!postOfficeOn(env)) {
+        setPostOfficeOpen(false);
+        return noindex(html(renderPostClosed({})));
+      }
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);
@@ -1182,7 +1192,7 @@ const worker = {
     if (request.method === "GET" && url.pathname === "/signin") return handleSignIn(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord") return beginDiscord(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord/callback") return finishDiscord(request, env, fetchImpl);
-    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout(request);
+    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout(request, env);
     if (request.method === "GET" && url.pathname === POCKET_PATH) {
       try {
         const body = await pocketDocument(fetchImpl);
@@ -1395,7 +1405,7 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env) });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
@@ -1428,6 +1438,19 @@ const worker = {
         return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(addFeedEntry(paintPublicHtml(await asset.text(), url.pathname, env)), fetchImpl), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/robots.txt" && !postOfficeOn(env) && env?.ASSETS?.fetch) {
+      const robot = await env.ASSETS.fetch(request);
+      if (robot.ok) {
+        let text = await robot.text();
+        if (!/Disallow:\s*\/post-office/i.test(text)) {
+          text = text.replace(/\s*$/, "\n") + "Disallow: /post-office\nDisallow: /build\n";
+        }
+        const headers = new Headers(robot.headers);
+        headers.set("content-type", "text/plain; charset=utf-8");
+        headers.set("cache-control", "no-store");
+        return new Response(request.method === "HEAD" ? null : text, { status: robot.status, headers });
+      }
     }
     const asset = await env.ASSETS.fetch(request);
     if (asset.status === 404 && wantsHtml(request, url.pathname)) return notFoundPage(feedEnabled(env));
@@ -1548,6 +1571,14 @@ export async function withTrackInSitemap(res, open, first) {
   const loc = "<url><loc>https://catchemtcg.com/track-record</loc></url>";
   text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/track-record\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
   if (open && first && text.includes("</urlset>")) text = text.replace("</urlset>", loc + "\n</urlset>");
+  return new Response(text, { status: res.status, headers: res.headers });
+}
+
+export async function withoutPostOfficeInSitemap(res, open) {
+  if (!res || !res.ok || open) return res;
+  let text = await res.text();
+  text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/post-office\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
+  text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/build\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
   return new Response(text, { status: res.status, headers: res.headers });
 }
 
