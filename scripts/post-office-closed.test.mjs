@@ -18,7 +18,8 @@ const TOOL = /post-office\/app|Post Office editor|id="prompts"|Pin two cards|dat
 t("the flag is off unless the value is on", postOfficeOn({}) === false && postOfficeOn({ POST_OFFICE: "" }) === false && postOfficeOn({ POST_OFFICE: "off" }) === false && postOfficeOn({ POST_OFFICE: "ON" }) === true);
 
 const home = await readFile(join(root, "index.html"), "utf8");
-t("the home page has no Post Office link", !home.includes("/post-office") && !home.includes(">Post Office<") && !home.includes("Post Office is open"));
+const homeHrefs = [...home.matchAll(/href="([^"]*post-office[^"]*)"/g)].map((m) => m[1]);
+t("a closed home shows Closed Beta and links only to the coming soon page", home.includes("Closed Beta") && home.includes("Email and social tools, rebuilt. Closed beta.") && homeHrefs.length >= 2 && homeHrefs.every((href) => href === "/post-office") && !home.includes("/post-office/app") && !home.includes("Post Office editor") && !home.includes("Post Office is open"));
 
 const fetchImpl = async (url) => {
   const u = String(url);
@@ -38,14 +39,14 @@ for (const path of routes) {
   }
   const res = await renderPath(path, fetchImpl);
   const body = await res.text();
-  const closed = body.includes(LINE) && body.includes("Coming soon") && body.includes('content="noindex"') && !TOOL.test(body) && !body.includes('href="/post-office"');
+  const closed = body.includes(LINE) && body.includes("Coming soon") && body.includes('content="noindex"') && !TOOL.test(body) && !body.includes("/post-office/app") && body.includes('href="/post-office"') && body.includes("Closed Beta");
   t("render " + path + " does not show the tools", closed);
 }
 
 const sets = await (await renderPath("/sets", fetchImpl)).text();
-t("set pages do not link the tools", !sets.includes('href="/post-office"') && !sets.includes(">Post Office<"));
+t("set pages link the coming soon page, not the editor", sets.includes('href="/post-office"') && sets.includes("Closed Beta") && !sets.includes("/post-office/app") && !sets.includes("Post Office editor"));
 const setsOn = await (await renderPath("/sets", fetchImpl, { POST_OFFICE: "on" })).text();
-t("the nav link returns only when the flag is on", setsOn.includes('href="/post-office">Post Office'));
+t("the plain nav link returns only when the flag is on", setsOn.includes('href="/post-office">Post Office') && !setsOn.includes("Closed Beta"));
 
 const open = await (await renderPath("/post-office", fetchImpl, { POST_OFFICE: "on" })).text();
 t("the flag on restores the editor", open.includes('src="/post-office/app?v=') && open.includes("Post Office editor") && !open.includes(LINE));
@@ -73,6 +74,15 @@ t("the sitemap drops the tools", !mapText.includes("/post-office") && !mapText.i
 const opened = await worker.fetch(new Request("https://catchemtcg.com/post-office/app"), { ...env, POST_OFFICE: "on" });
 const openedHtml = await opened.text();
 t("the app route opens with the flag", opened.status === 503 || openedHtml.includes("Pin two cards") || openedHtml.includes("The editor did not load"));
+
+const homeAssets = {
+  fetch: async () => new Response(home, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }),
+};
+const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets })).text();
+const homeOffHrefs = [...homeOff.matchAll(/href="([^"]*post-office[^"]*)"/g)].map((m) => m[1]);
+t("served home stays Closed Beta and never reaches the editor", homeOff.includes("Closed Beta") && homeOff.includes("Email and social tools, rebuilt. Closed beta.") && homeOffHrefs.length >= 2 && homeOffHrefs.every((href) => href === "/post-office") && !homeOff.includes("/post-office/app") && !homeOff.includes("Post Office editor"));
+const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, POST_OFFICE: "on" })).text();
+t("an open home has no Closed Beta text", !homeOn.includes("Closed Beta") && !homeOn.includes("Email and social tools, rebuilt. Closed beta.") && homeOn.includes('href="/post-office">Post Office') && homeOn.includes("Every card and every artist. Pick one and the post is ready for X or Facebook.") && !homeOn.includes('class="po-beta"'));
 
 const notes = await readFile(join(root, "docs/post-office-show-causes.md"), "utf8");
 for (const name of ["All", "Compare", "IR / SIR first", "30th Celebration", "Connecting art", "Gold Star", "SIR", "Futuristic", "BWR"]) {

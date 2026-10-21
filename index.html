@@ -107,6 +107,9 @@ h2{font:500 clamp(26px,3.6vw,32px)/1.15 var(--serif);letter-spacing:-.015em;marg
 .tag{align-self:flex-start;font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;
   padding:6px 9px;border-radius:999px;border:1px solid var(--line-2);color:var(--faint)}
 .tag.open{color:var(--green);border-color:rgba(127,199,154,.45)}
+.po-beta{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;border-radius:999px;background:var(--gold);color:var(--gold-ink);font:600 11px/1 var(--sans);letter-spacing:.04em;white-space:nowrap}
+.po-beta-link{gap:8px;white-space:nowrap}
+.tile.post .more{min-height:44px;display:inline-flex;align-items:center;align-self:flex-start;border-radius:12px}
 .tile ul{margin:2px 0 0;padding:0;list-style:none;color:var(--soft);font-size:16px}
 .tile li{padding-left:18px;position:relative}
 .tile li::before{content:"";position:absolute;left:2px;top:.72em;width:6px;height:6px;border-radius:2px;border:1.5px solid var(--blue)}
@@ -195,6 +198,7 @@ footer a{color:var(--gold)}
     <a href="/rip">Rip value</a>
     <a href="/artists">Artists</a>
     <a href="/search">Search</a>
+    <a class="po-beta-link" href="/post-office" data-po="closed">Post Office <span class="po-beta">Closed Beta</span></a>
     <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
   </nav>
 </header>
@@ -235,6 +239,14 @@ footer a{color:var(--gold)}
       <p>Daily market reads.</p>
       <p>Weekly and monthly wraps, built with the community.</p>
       <a class="more" href="/feed">Open the Feed <span aria-hidden="true">→</span></a>
+    </article>
+    <article class="tile post" id="po-beta-tile">
+      <div class="ttl">
+        <h3>Post Office</h3>
+        <span class="po-beta">Closed Beta</span>
+      </div>
+      <p>Email and social tools, rebuilt. Closed beta.</p>
+      <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
     </article>
     <article class="tile disc">
       <span class="tag open">Open now</span>
