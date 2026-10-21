@@ -23,11 +23,10 @@
   // (custom-reads:follows and custom-reads:outbox). Namespace "catchem-feed".
   // It lives here so every Workers Builds deploy keeps the binding.
   "kv_namespaces": [
-    { "binding": "FEED_KV", "id": "390cb142f21947d4af9f4d10df12f61d" }
-    // PREMIUM_WAITLIST is a separate namespace for waitlist rows (email, confirm
-    // token, place). Do not invent an id here. Create the namespace, then add:
-    // { "binding": "PREMIUM_WAITLIST", "id": "<namespace id>" }
-    // Until that binding exists, signup returns not-ready and writes nowhere else.
+    { "binding": "FEED_KV", "id": "390cb142f21947d4af9f4d10df12f61d" },
+    // PREMIUM_WAITLIST holds waitlist rows (email, confirm token, place).
+    // Namespace "premium-waitlist", created Oct 20 2026.
+    { "binding": "PREMIUM_WAITLIST", "id": "7f304b36b2b741cda2907036afeb378b" }
   ],
   "assets": {
     "directory": "./site-public",
