@@ -10,6 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: node scripts/home-updated.test.mjs
       - run: node scripts/advice-rules.test.mjs
       - run: node scripts/jp-news.test.mjs
       - run: node scripts/feed-news-live.test.mjs

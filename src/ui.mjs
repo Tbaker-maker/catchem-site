@@ -1069,6 +1069,28 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
   return out;
 }
 
+// Newest published stamp across sources. A date-only asOf counts as the start of that day PT
+// that day, so one stale source (eBay sealed) can never hold the label back.
+export function newestStamp(...vals) {
+  let best = null;
+  for (const v of vals.flat()) {
+    const raw = String(v || "");
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+    const t = dateOnly ? Date.parse(`${raw}T08:00:00Z`) : Date.parse(raw);
+    if (!Number.isFinite(t)) continue;
+    if (!best || t > best.t) best = { t, raw, dateOnly };
+  }
+  return best;
+}
+
+export function freshLabel(...vals) {
+  const best = newestStamp(...vals);
+  if (!best) return "";
+  if (!best.dateOnly) return clockLabel(best.raw);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(new Date(best.t));
+  return `Updated ${day}`;
+}
+
 export function clockLabel(iso) {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return "";

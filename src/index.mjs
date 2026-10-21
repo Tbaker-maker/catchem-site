@@ -40,7 +40,7 @@ import { ripBody } from "./rip.mjs";
 import { renderScanner, renderWeekly } from "./weekly.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
-import { pageChrome } from "./ui.mjs";
+import { pageChrome, freshLabel, newestStamp } from "./ui.mjs";
 import { attachSignals, chipLookup, signalRowHtml } from "./signal-chips.mjs";
 import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
@@ -586,9 +586,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   let countsDoc = null;
   try {
     countsDoc = await loadJson("counts.json", fetchImpl);
-    stamp = clockLabel(countsDoc.updatedAt);
+    stamp = freshLabel(countsDoc.updatedAt, countsDoc.asOf);
     asOf = countsDoc.asOf || "";
-    setPriceBanner(priceBannerLine(countsDoc.updatedAt));
+    const newest = newestStamp(countsDoc.updatedAt, countsDoc.asOf);
+    setPriceBanner(priceBannerLine(newest ? new Date(newest.t).toISOString() : ""));
   } catch {
     stamp = "";
     setPriceBanner("");
