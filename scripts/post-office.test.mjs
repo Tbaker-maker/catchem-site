@@ -162,26 +162,28 @@ const opened = await worker.fetch(new Request("https://catchemtcg.com/video/stud
 t("query string is not the gate", opened.status === 200);
 const badScan = await worker.fetch(new Request("https://catchemtcg.com/data/editor/tcg/not-a-set"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("card scan proxy rejects a bad path", badScan.status === 400);
-const openOffice = { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE: "on" };
-const build = await worker.fetch(new Request("https://catchemtcg.com/build"), openOffice);
+const LIST = "user-1, pro, 111";
+const build = await worker.fetch(new Request("https://catchemtcg.com/build"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE: "on" });
 const buildHtml = await build.text();
-t("build is the editor", build.status === 200 && !build.headers.get("location") && buildHtml.includes('src="/post-office/app?v=') && buildHtml.includes("Post Office editor"));
-const buildHead = await worker.fetch(new Request("https://catchemtcg.com/build", { method: "HEAD" }), openOffice);
-const buildHeadHtml = await buildHead.text();
-t("build head is the editor", buildHead.status === 200 && !buildHead.headers.get("location") && buildHeadHtml.includes('src="/post-office/app?v='));
-const slash = await worker.fetch(new Request("https://catchemtcg.com/post-office/"), openOffice);
-const slashHtml = await slash.text();
-t("post office slash is the editor", slash.status === 200 && !slash.headers.get("location") && slashHtml.includes('src="/post-office/app?v=dev"'));
-const officeHead = await worker.fetch(new Request("https://catchemtcg.com/post-office", { method: "HEAD" }), openOffice);
-t("post office head is the editor", officeHead.status === 200 && (await officeHead.text()).includes("Post Office editor"));
+t("build is invite only without a list", build.status === 403 && buildHtml.includes("This tool is invite only.") && !buildHtml.includes("Post Office editor"));
+const buildHead = await worker.fetch(new Request("https://catchemtcg.com/build", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE: "on" });
+t("build head is invite only without a list", buildHead.status === 403);
+const slash = await worker.fetch(new Request("https://catchemtcg.com/post-office/"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE: "on" });
+t("post office slash is invite only without a list", slash.status === 403 && (await slash.text()).includes("This tool is invite only."));
+const officeHead = await worker.fetch(new Request("https://catchemtcg.com/post-office", { method: "HEAD" }), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE: "on" });
+t("post office head is invite only without a list", officeHead.status === 403);
 const sneak = await worker.fetch(new Request("https://catchemtcg.com/feed?video=1"), { PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS });
 t("video query does not open the feed", sneak.status === 302 && new URL(sneak.headers.get("location"), "https://catchemtcg.com").pathname === "/");
 
 resetQuota();
 resetCatalogCache();
-const anon = await worker.fetch(new Request("https://catchemtcg.com/api/ideas", { method: "POST", body: "{}" }), { SESSION_SECRET: "test-secret", PUBLIC_FETCH: fetchImpl });
+const anon = await worker.fetch(new Request("https://catchemtcg.com/api/ideas", { method: "POST", body: "{}" }), { SESSION_SECRET: "test-secret", PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
 const anonBody = await anon.json();
-t("ideas require sign-in", anon.status === 401 && anonBody.card && anonBody.card.title && /Discord sign-in is not turned on yet/.test(anonBody.line) && anonBody.ready === false);
+t("api call without a session is refused", anon.status === 403 && anonBody.ok === false && anonBody.signedIn === false && !anonBody.ideas && anonBody.line === "This tool is invite only.");
+for (const route of ["/api/post-text", "/api/video/quota"]) {
+  const r = await worker.fetch(new Request("https://catchemtcg.com" + route, { method: "POST", body: "{}" }), { SESSION_SECRET: "test-secret", PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
+  t(route + " without a session is refused", r.status === 403);
+}
 const secret = "test-secret";
 const cookie = "ce_session=" + await signSession({ sub: "user-1", premium: false }, secret);
 let ideaHits = 0;
@@ -190,7 +192,7 @@ for (let i = 0; i < 4; i++) {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({ ids: ["tcgcsv-246723"] }),
-  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
   if (i < 3) {
     const body = await res.json();
     t("idea " + (i + 1) + " is from the catalog", res.status === 200 && body.ideas && body.ideas[0].includes("Umbreon") && body.ideas.join(" ").includes("TCGplayer market: $2,214.79 (2026-09-27)") && body.ideas.every((line) => line.includes("Pokémon")));
@@ -207,7 +209,7 @@ const text = await worker.fetch(new Request("https://catchemtcg.com/api/post-tex
   method: "POST",
   headers: { cookie, "content-type": "application/json" },
   body: JSON.stringify({ ids: ["tcgcsv-246723"], tone: "informative", platform: "x" }),
-}), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+}), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
 const textBody = await text.json();
 t("post text is three lines with the price", text.status === 200 && textBody.variations.length === 3 && textBody.variations.every((v) => v.includes("TCGplayer market: $2,214.79 (2026-09-27)")) && !/sells for|about 0|catalogue/i.test(textBody.variations.join(" ")));
 t("style prompt names the guide and the accent", STYLE_PROMPT.includes("POST-TEXT-STYLE-GUIDE.md") && STYLE_PROMPT.includes("Pokémon") && STYLE_PROMPT.includes("3"));
@@ -224,13 +226,13 @@ t("five sample posts stay inside the rules", samples.length === 5 && samples.eve
 const signPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), { PUBLIC_FETCH: fetchImpl });
 const signHtml = await signPage.text();
 t("signed out sign-in is one line and not a button", signPage.status === 200 && signHtml.includes("Discord sign-in is not turned on yet") && !signHtml.includes("<button") && !signHtml.includes("/auth/discord"));
-const sessionOff = await worker.fetch(new Request("https://catchemtcg.com/api/session"), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+const sessionOff = await worker.fetch(new Request("https://catchemtcg.com/api/session"), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
 const sessionOffBody = await sessionOff.json();
 t("session tells a signed-out visitor how to sign in", sessionOff.status === 200 && sessionOffBody.signedIn === false && sessionOffBody.ready === false && /not turned on yet/.test(sessionOffBody.line));
-const sessionOn = await worker.fetch(new Request("https://catchemtcg.com/api/session", { headers: { cookie } }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+const sessionOn = await worker.fetch(new Request("https://catchemtcg.com/api/session", { headers: { cookie } }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
 const sessionOnBody = await sessionOn.json();
 t("signed in session shows the free idea cap", sessionOn.status === 200 && sessionOnBody.signedIn === true && sessionOnBody.premium === false && sessionOnBody.ideas.cap === 3 && sessionOnBody.ideas.left === 0);
-const discordEnv = { SESSION_SECRET: secret, DISCORD_CLIENT_ID: "id", DISCORD_CLIENT_SECRET: "sec", PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS };
+const discordEnv = { SESSION_SECRET: secret, DISCORD_CLIENT_ID: "id", DISCORD_CLIENT_SECRET: "sec", PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE_ALLOWLIST: LIST };
 const readyPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), discordEnv);
 const readyHtml = await readyPage.text();
 t("configured sign-in does not link a closed Post Office", readyHtml.includes('href="/auth/discord?next=/"') && readyHtml.includes("Back to Catch'em") && !readyHtml.includes('href="/post-office"') && !readyHtml.includes("<button"));
@@ -249,7 +251,7 @@ for (let i = 0; i < 4; i++) {
     method: "POST",
     headers: { cookie: premium, "content-type": "application/json" },
     body: JSON.stringify({ ids: ["tcgcsv-517045"] }),
-  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl });
+  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
   if (res.status === 200) premiumOk++;
 }
 t("premium is not stuck at the free post cap", premiumOk === 4);
@@ -265,26 +267,25 @@ const gateEnv = {
 };
 const gate = await worker.fetch(new Request("https://catchemtcg.com/post-office"), gateEnv);
 const gateHtml = await gate.text();
-t("a set allowlist does not hide the editor", gate.status === 200 && !gate.headers.get("location") && gateHtml.includes('src="/post-office/app?v=') && gateHtml.includes("Post Office editor") && !gateHtml.includes("invite-only"));
-const gateHead = await worker.fetch(new Request("https://catchemtcg.com/post-office/", { method: "HEAD" }), gateEnv);
-const gateHeadHtml = await gateHead.text();
-t("head stays the editor when the list is set", gateHead.status === 200 && gateHeadHtml.includes("Post Office editor") && !gateHeadHtml.includes("invite-only"));
-const gateBuild = await worker.fetch(new Request("https://catchemtcg.com/build"), gateEnv);
-const gateBuildHtml = await gateBuild.text();
-t("build stays the editor when the list is set", gateBuild.status === 200 && gateBuildHtml.includes('src="/post-office/app?v=') && !gateBuildHtml.includes("invite-only"));
+t("signed out visitor gets the invite only screen", gate.status === 403 && gateHtml.includes("This tool is invite only.") && gateHtml.includes("Sign in with Discord") && !gateHtml.includes("Post Office editor") && !/[\u2013\u2014]/.test(gateHtml));
 const onList = "ce_session=" + await signSession({ sub: "d:111", premium: false }, secret);
 const allowedPage = await worker.fetch(new Request("https://catchemtcg.com/build", { headers: { cookie: onList } }), gateEnv);
 const allowedHtml = await allowedPage.text();
-t("allowlisted discord id gets the editor", allowedPage.status === 200 && allowedHtml.includes('src="/post-office/app?v=dev"') && allowedHtml.includes("Post Office editor"));
+t("allowed: listed discord id gets the editor", allowedPage.status === 200 && allowedHtml.includes('src="/post-office/app?v=dev"') && allowedHtml.includes("Post Office editor"));
+const allowedApp = await worker.fetch(new Request("https://catchemtcg.com/post-office/app", { headers: { cookie: onList } }), gateEnv);
+t("allowed: app url is the editor", allowedApp.status === 200 && (await allowedApp.text()).includes("Pin two cards. We make a picture."));
 const offList = "ce_session=" + await signSession({ sub: "d:222", premium: true }, secret);
 const deniedPage = await worker.fetch(new Request("https://catchemtcg.com/post-office", { headers: { cookie: offList } }), gateEnv);
 const deniedHtml = await deniedPage.text();
-t("a discord id off the list gets the editor", deniedHtml.includes('src="/post-office/app?v=') && deniedHtml.includes("Post Office editor") && !deniedHtml.includes("invite-only"));
-const gatedApp = await worker.fetch(new Request("https://catchemtcg.com/post-office/app"), gateEnv);
-const gatedAppHtml = await gatedApp.text();
-t("the app url is the editor", gatedApp.status === 200 && gatedAppHtml.includes("Pin two cards. We make a picture.") && !gatedAppHtml.includes("invite-only"));
-const blank = await worker.fetch(new Request("https://catchemtcg.com/post-office"), { ...gateEnv, POST_OFFICE_ALLOWLIST: "  " });
-t("a blank allowlist stays open", (await blank.text()).includes('src="/post-office/app?v=dev"'));
+t("not allowed: id off the list gets invite only", deniedPage.status === 403 && deniedHtml.includes("This tool is invite only.") && !deniedHtml.includes("Post Office editor"));
+const deniedApp = await worker.fetch(new Request("https://catchemtcg.com/post-office/app", { headers: { cookie: offList } }), gateEnv);
+t("not allowed: app url is closed", deniedApp.status === 403 && !(await deniedApp.text()).includes("Pin two cards"));
+for (const blankList of [undefined, "", "  ", " , "]) {
+  const e = { ...gateEnv, POST_OFFICE_ALLOWLIST: blankList };
+  const page = await worker.fetch(new Request("https://catchemtcg.com/post-office", { headers: { cookie: onList } }), e);
+  const api = await worker.fetch(new Request("https://catchemtcg.com/api/post-text", { method: "POST", headers: { cookie: onList, "content-type": "application/json" }, body: JSON.stringify({ ids: ["tcgcsv-246723"] }) }), e);
+  t("empty list lets nobody in (" + JSON.stringify(blankList) + ")", page.status === 403 && api.status === 403);
+}
 const faq = await worker.fetch(new Request("https://catchemtcg.com/faq"), gateEnv);
 const faqHtml = await faq.text();
 t("faq stays public", faq.status === 200 && faqHtml.includes("Questions") && !faqHtml.includes("invite-only"));
@@ -294,7 +295,7 @@ const blockedIdea = await worker.fetch(new Request("https://catchemtcg.com/api/i
   body: JSON.stringify({ ids: ["tcgcsv-246723"] }),
 }), gateEnv);
 const blockedBody = await blockedIdea.json();
-t("ideas follow the allowlist", blockedIdea.status === 403 && /invite-only/.test(blockedBody.line));
+t("not allowed: ideas api refuses", blockedIdea.status === 403 && blockedBody.line === "This tool is invite only." && !blockedBody.ideas);
 const gateSession = await worker.fetch(new Request("https://catchemtcg.com/api/session", { headers: { cookie: offList } }), gateEnv);
 const gateSessionBody = await gateSession.json();
 t("invite-only session matches the ideas line", gateSessionBody.line === blockedBody.line && gateSessionBody.signedIn === true);
@@ -313,8 +314,8 @@ const proText = await worker.fetch(new Request("https://catchemtcg.com/api/post-
 }), gateEnv);
 t("listed premium post text still runs", proText.status === 200);
 
-const quota = await worker.fetch(new Request("https://catchemtcg.com/api/video/quota", { method: "POST", body: JSON.stringify({ action: "status" }) }), { SESSION_SECRET: secret });
-t("video quota is sign-in, not a cookie bucket", quota.status === 401);
+const quota = await worker.fetch(new Request("https://catchemtcg.com/api/video/quota", { method: "POST", body: JSON.stringify({ action: "status" }) }), { SESSION_SECRET: secret, POST_OFFICE_ALLOWLIST: LIST });
+t("video quota is closed without a session", quota.status === 403);
 
 const looked = await factsFor(["tcgcsv-246723"], fetchImpl);
 t("fact pack uses the live row", looked.cards[0].price === "TCGplayer market: $2,214.79 (2026-09-27)");

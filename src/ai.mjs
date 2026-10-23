@@ -341,6 +341,9 @@ function json(obj, status = 200) {
 export async function handleVideoQuota(request, env) {
   const { readUser } = await import("./quota.mjs");
   const user = await readUser(request, env);
+  if (!officeAllowed(user, env)) {
+    return json({ ok: false, signedIn: !!user, line: INVITE_LINE, ready: discordReady(env) }, 403);
+  }
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const gate = peek(user, "video");

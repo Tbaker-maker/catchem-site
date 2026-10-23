@@ -8,7 +8,7 @@ import { applySetSpark } from "./set-spark.mjs";
 import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
-import { beginDiscord, finishDiscord, handleSession, handleSignIn, logout } from "./auth.mjs";
+import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
@@ -1174,6 +1174,14 @@ const worker = {
     const video = env?.VIDEO_ENABLED === "true";
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
+    const officeKind = pageKind(url.pathname);
+    // Closed (POST_OFFICE not on) shows the coming soon page to everyone. Open checks the allowlist.
+    if (postOfficeOn(env) && (url.pathname === "/post-office/app" || url.pathname.startsWith("/post-office/") || officeKind === "post" || officeKind === "build")) {
+      const officeUser = await readUser(request, env);
+      if (!officeAllowed(officeUser, env)) {
+        return new Response(request.method === "HEAD" ? null : inviteOnlyDocument(env, !!officeUser), { status: 403, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      }
+    }
     if (readPage && url.pathname === "/post-office/app") {
       if (!postOfficeOn(env)) {
         setPostOfficeOpen(false);
