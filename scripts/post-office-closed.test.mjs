@@ -73,7 +73,7 @@ const mapText = await map.text();
 t("the sitemap drops the tools", !mapText.includes("/post-office") && !mapText.includes("/build") && mapText.includes("https://catchemtcg.com/</loc>"));
 const opened = await worker.fetch(new Request("https://catchemtcg.com/post-office/app"), { ...env, POST_OFFICE: "on" });
 const openedHtml = await opened.text();
-t("the app route opens with the flag", opened.status === 503 || openedHtml.includes("Pin two cards") || openedHtml.includes("The editor did not load"));
+t("the app route opens with the flag only for the allowlist", opened.status === 403 && openedHtml.includes("This tool is invite only."));
 
 const homeAssets = {
   fetch: async () => new Response(home, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }),

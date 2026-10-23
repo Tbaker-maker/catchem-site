@@ -1175,7 +1175,8 @@ const worker = {
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
     const officeKind = pageKind(url.pathname);
-    if (url.pathname === "/post-office/app" || url.pathname.startsWith("/post-office/") || officeKind === "post" || officeKind === "build") {
+    // Closed (POST_OFFICE not on) shows the coming soon page to everyone. Open checks the allowlist.
+    if (postOfficeOn(env) && (url.pathname === "/post-office/app" || url.pathname.startsWith("/post-office/") || officeKind === "post" || officeKind === "build")) {
       const officeUser = await readUser(request, env);
       if (!officeAllowed(officeUser, env)) {
         return new Response(request.method === "HEAD" ? null : inviteOnlyDocument(env, !!officeUser), { status: 403, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
