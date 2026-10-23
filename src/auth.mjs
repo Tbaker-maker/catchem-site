@@ -4,10 +4,10 @@
 import { avatarUrl, ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
 
 export const DISCORD_INVITE = "https://discord.gg/fUSjxDX4Hy";
-export const INVITE_LINE = "Post Office is invite-only for now. Join Discord to get on the list.";
+export const INVITE_LINE = "This tool is invite only.";
 
-// Comma-separated Discord user ids (POST_OFFICE_ALLOWLIST). Tyler's id goes first.
-// Missing or empty stays open so a blank var does not lock the Post Office.
+// Comma-separated Discord user ids (POST_OFFICE_ALLOWLIST), set as a Worker secret.
+// The ids never live in this public repo. Missing or empty lets nobody in.
 export function officeAllowIds(env) {
   const ids = [];
   for (const part of String(env?.POST_OFFICE_ALLOWLIST || "").split(/[,\s]+/)) {
@@ -20,11 +20,27 @@ export function officeAllowIds(env) {
 
 export function officeAllowed(user, env) {
   const ids = officeAllowIds(env);
-  if (!ids.length) return true;
+  if (!ids.length) return false;
   if (!user || !user.sub) return false;
   const sub = String(user.sub);
   const id = sub.startsWith("d:") ? sub.slice(2) : sub;
   return !!id && ids.includes(id);
+}
+
+// Clean invite only screen for any Post Office page a visitor is not cleared for.
+export function inviteOnlyDocument(env, signedIn = false) {
+  const action = signedIn
+    ? `<a class="btn ghost" href="/auth/logout">Use another account</a>`
+    : discordReady(env)
+      ? `<a class="btn" href="/auth/discord?next=/post-office">Sign in with Discord</a>`
+      : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Invite only · Catch'em</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f5f7;color:#1d1d1f;font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;padding:24px}
+.card{background:#fff;border-radius:24px;box-shadow:0 8px 40px rgba(0,0,0,.08);padding:44px 36px;max-width:420px;width:100%;text-align:center}
+h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin:0 0 10px}p{color:#6e6e73;margin:0 0 28px}
+.btn{display:inline-block;background:#1d1d1f;color:#fff;text-decoration:none;border-radius:980px;padding:12px 24px;font-weight:500;margin:4px}
+.btn.ghost{background:#f5f5f7;color:#1d1d1f}a.back{display:block;margin-top:20px;color:#6e6e73;font-size:15px;text-decoration:none}
+</style></head><body><main class="card"><h1>${INVITE_LINE}</h1><p>Post Office is open to approved Discord members.</p>${action}<a class="back" href="/">Back to Catch'em</a></main></body></html>`;
 }
 
 export function discordReady(env) {
@@ -61,10 +77,8 @@ export function signInDocument(env) {
 export async function sessionView(request, env) {
   const ready = discordReady(env);
   const user = await readUser(request, env);
-  if (officeAllowIds(env).length && !officeAllowed(user, env)) {
-    return { signedIn: !!user, ready, line: INVITE_LINE, open: false };
-  }
-  if (!user) return { signedIn: false, ready, line: ideasSignInLine(ready) };
+  if (!user) return { signedIn: false, ready, line: ideasSignInLine(ready), open: false };
+  if (!officeAllowed(user, env)) return { signedIn: true, ready, line: INVITE_LINE, open: false };
   return {
     signedIn: true,
     ready: true,
