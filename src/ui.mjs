@@ -8,14 +8,17 @@ import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
+import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
+import { createRank } from "./catalog-rank.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
+import { glanceChips, interestScore, listingsWording, pinIds, rankLead, readMove } from "./feed-rank.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 import { SIGNAL_CSS, SIGNAL_CLIENT, TILE_JS, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
@@ -138,7 +141,10 @@ export function isVolumeRow(row) {
   if (!Number.isInteger(s.count30d) || s.count30d <= 0) return false;
   const w = s.window30d || {};
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(w.from || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(w.to || ""))) return false;
-  return String(row.headline || row.path || "").includes(s.count30d + " Near Mint cop");
+  const head = String(row.headline || row.path || "");
+  const sourceOk = s.source === "TCGplayer sales via PokemonPriceTracker" || s.source === "TCGplayer listings counted via PokemonPriceTracker";
+  const countOk = head.includes(s.count30d + " Near Mint cop") || head.includes(s.count30d + " Near Mint listing");
+  return sourceOk && countOk;
 }
 
 export function shapeCash(n) {
@@ -159,9 +165,9 @@ export function isShapeRow(row) {
   const rec = row.receipt;
   if (!path || !rec || typeof rec !== "object") return false;
   const has = (clause) => why.includes(clause) || path.includes(clause);
-  if (kind === "quiet") return path.includes("No TCGplayer sales recorded in " + rec.days + " days.") && has("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
+  if (kind === "quiet") return (path.includes("No TCGplayer sales recorded in " + rec.days + " days.") || path.includes("No TCGplayer listings counted in " + rec.days + " days.")) && has("That is not a scarcity claim.") && path.includes(shapeCash(rec.price));
   if (kind === "mix") {
-    if (!has("This is the mix of copies that sold, not the copy in your hand.")) return false;
+    if (!has("This is the mix of copies that sold, not the copy in your hand.") && !has("This is the mix of listings counted, not the copy in your hand.")) return false;
     if (!Array.isArray(rec.conditions) || rec.conditions.length < 2) return false;
     for (let i = 0; i < rec.conditions.length; i += 1) {
       const bit = rec.conditions[i];
@@ -171,11 +177,11 @@ export function isShapeRow(row) {
   }
   if (kind === "conditions") return has("Two condition prices. Not a grade result.") && path.includes(shapeCash(rec.nearMint)) && path.includes(shapeCash(rec.played)) && path.includes(String(rec.playedCondition || ""));
   if (kind === "soldflat" || kind === "still") return false;
-  if (kind === "solddown") return has("Sales and a price change in the same window. Not a cause.") && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
-  if (kind === "setshare") return has("Share of copies sold. Not share of dollars.") && path.includes(String(rec.top)) && path.includes(String(rec.total));
-  if (kind === "spread") return has("Asking prices from the search. Not sold prices.") && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
-  if (kind === "askmove") return has("The ask changed. The market price did not. Asks are not sales.") && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
-  if (kind === "mktmove") return has("The market price changed. The ask did not. Asks are not sales.") && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
+  if (kind === "solddown") return (has("Sales and a price change in the same window. Not a cause.") || has("Listings counted and a price change in the same window. Not a cause.")) && path.includes(String(rec.sold)) && path.includes(shapeCash(rec.fromPrice)) && path.includes(shapeCash(rec.toPrice));
+  if (kind === "setshare") return (has("Share of copies sold. Not share of dollars.") || has("Share of listings counted. Not share of dollars.")) && path.includes(String(rec.top)) && path.includes(String(rec.total));
+  if (kind === "spread") return (has("Asking prices from the search. Not sold prices.") || has("Asking prices from the search. Not completed prices.")) && path.includes(shapeCash(rec.low)) && path.includes(shapeCash(rec.high));
+  if (kind === "askmove") return (has("The ask changed. The market price did not. Asks are not sales.") || has("The ask changed. The market price did not. Asks are not listings gone.")) && path.includes(shapeCash(rec.askFrom)) && path.includes(shapeCash(rec.askTo)) && path.includes(shapeCash(rec.market));
+  if (kind === "mktmove") return (has("The market price changed. The ask did not. Asks are not sales.") || has("The market price changed. The ask did not. Asks are not listings gone.")) && path.includes(shapeCash(rec.marketFrom)) && path.includes(shapeCash(rec.marketTo)) && path.includes(shapeCash(rec.ask));
   return false;
 }
 
@@ -211,8 +217,8 @@ export function shownRead(card) {
     if (low > 0 && high > 0) {
       const dollars = (n) => "$" + Math.round(n).toLocaleString("en-US");
       line = name
-        ? "Asks on eBay for " + name + " range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales)."
-        : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not sales).";
+        ? "Asks on eBay for " + name + " range from " + dollars(low) + " to " + dollars(high) + " (listings, not listings gone)."
+        : "Asks on eBay range from " + dollars(low) + " to " + dollars(high) + " (listings, not listings gone).";
     }
   }
   if (card.kind === "sealed" || card.readKind === "sealed") {
@@ -225,11 +231,13 @@ export function shownRead(card) {
   line = line.replace(/^[,.\s]+/, "").trim();
   if (name && line && !line.includes(name) && !line.includes(String(name).split(" - ")[0].trim())) line = name + ": " + line;
   if (!line) return "";
+  line = listingsWording(line);
   return line.charAt(0).toUpperCase() + line.slice(1);
 }
 
 export function soldSafeText(row, text) {
-  return isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+  const raw = isVolumeRow(row) || isShapeRow(row) ? String(text ?? "").trim() : withoutSoldClaim(text);
+  return listingsWording(raw);
 }
 
 
@@ -1061,6 +1069,28 @@ export function buildFeedLoop(bundleReads, browse, opts = {}) {
   return out;
 }
 
+// Newest published stamp across sources. A date-only asOf counts as the start of that day PT
+// that day, so one stale source (eBay sealed) can never hold the label back.
+export function newestStamp(...vals) {
+  let best = null;
+  for (const v of vals.flat()) {
+    const raw = String(v || "");
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+    const t = dateOnly ? Date.parse(`${raw}T08:00:00Z`) : Date.parse(raw);
+    if (!Number.isFinite(t)) continue;
+    if (!best || t > best.t) best = { t, raw, dateOnly };
+  }
+  return best;
+}
+
+export function freshLabel(...vals) {
+  const best = newestStamp(...vals);
+  if (!best) return "";
+  if (!best.dateOnly) return clockLabel(best.raw);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(new Date(best.t));
+  return `Updated ${day}`;
+}
+
 export function clockLabel(iso) {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return "";
@@ -1352,6 +1382,9 @@ function catchemMount(root){
     fig.innerHTML='<div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">'+pills+'</div></div><div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="'+caption.replace(/"/g,"")+'"></svg><div class="hc-gls" aria-hidden="true"></div><div class="hc-tip" hidden></div></div><div class="hc-axis muted"></div>';
     var capEl=box!==host&&box.querySelector("p.muted:not(.chart-note):not(.chart-readout)");
     if(capEl&&capEl.textContent.trim()){ var cap=document.createElement("p"); cap.className="hc-cap"; cap.style.cssText="margin:0 0 6px;font:600 13px/1.2 var(--sans);opacity:.75"; cap.textContent=capEl.textContent.trim(); fig.insertBefore(cap, fig.firstChild); }
+    if(host.id) fig.id=host.id;
+    if(host.id && typeof location!=="undefined" && location.hash==="#"+host.id) fig.setAttribute("data-default-days","31");
+    fig.style.scrollMarginTop="72px";
     box.replaceWith(fig);
     if(window.catchemHistoryMount) window.catchemHistoryMount();
   });
@@ -1515,11 +1548,13 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
   .site-bar nav.open{display:flex}
 }
 .nav-more{position:relative}
+.po-beta{display:inline-flex;align-items:center;justify-content:center;margin-left:8px;padding:4px 9px;border-radius:999px;background:#d9b779;color:#1a1407;font:600 11px/1 var(--sans);letter-spacing:.04em;white-space:nowrap}
+.po-beta-link{gap:8px;white-space:nowrap}
 .nav-more-list{display:flex;flex-direction:column}
 .nav-more>summary{list-style:none;cursor:pointer;color:var(--dim);font:500 14px/1 var(--sans);min-height:44px;display:inline-flex;align-items:center;padding:0 8px;border-radius:12px}
 .nav-more>summary::-webkit-details-marker{display:none}
 @media (min-width:1024px){
-  .nav-more-list{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;min-width:180px;padding:8px;background:#1a1815;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .nav-more-list{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;min-width:240px;padding:8px;background:#1a1815;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
   .nav-more-list a{justify-content:flex-start!important}
   .menu-btn{display:none}
   .site-bar{height:auto;max-height:none}
@@ -1597,6 +1632,10 @@ export function trackRecordIsOpen(doc) {
 export function setTrackRecordOpen(open) {
   trackOpen = open === true;
 }
+let postOfficeOpen = false;
+export function setPostOfficeOpen(open) {
+  postOfficeOpen = open === true;
+}
 export function trackRecordOpenNow() {
   return trackOpen;
 }
@@ -1628,7 +1667,7 @@ const DOCK_ICON = {
   premium: '<path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
 };
 function dockNav(active, feed) {
-  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], ["/indexes", "Indexes", "indexes"], [DISCORD, "Premium", "premium", "Discord Premium"]];
+  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], ["/indexes", "Indexes", "indexes"], ["/premium", "Premium", "premium", "Discord Premium"]];
   return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
 }
 
@@ -1640,6 +1679,9 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
   const shareTags = shareMetaTags(title, share);
   const tcgOn = !(typeof globalThis !== "undefined" && globalThis.CATCHEM_TCG_IMAGES === false);
   const banner = priceBanner ? `<p class="stale-banner" role="status">${esc(priceBanner)}</p>` : "";
+  const officeLink = postOfficeOpen
+    ? item("/post-office", "Post Office")
+    : `<a class="po-beta-link" href="/post-office" data-po="closed">Post Office <span class="po-beta">Closed Beta</span></a>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Catch'em</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -1647,7 +1689,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
 <style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${item("/post-office", "Post Office")}</div></details>${item(DISCORD, "Discord Premium")}
+${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/rip", "Rip value")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}</div></details>${item("/premium", "Discord Premium")}
 </nav></header>
 ${banner}
 ${fresh}
@@ -1790,7 +1832,7 @@ export function renderSets(index, stamp, opts = {}) {
 <div class="sb-head"><h1>Sets</h1>
 <input id="q" class="sb-search" type="search" aria-label="Find a set" placeholder="Search ${sets.length} sets" autocomplete="off">
 <div class="sb-row sb-chips" role="group" aria-label="Sort"><span class="sb-label">Sort</span><button type="button" class="sb-chip" data-sort="new" aria-pressed="true">Newest</button><button type="button" class="sb-chip" data-sort="az" aria-pressed="false">A-Z</button>${hasValue ? `<button type="button" class="sb-chip" data-sort="value" aria-pressed="false">Set value</button>` : ""}</div>
-<div class="sb-row sb-chips" role="group" aria-label="Filter"><span class="sb-label">Filter</span><select id="era-filter" class="sb-chip" aria-label="Era"><option value="">All eras</option>${eras.map((era) => `<option value="${esc(era)}">${esc(era)}</option>`).join("")}</select>${hasSealed ? `<button type="button" class="sb-chip" id="has-sealed" aria-pressed="false">Has sealed</button>` : ""}</div>
+<div class="sb-row sb-chips" role="group" aria-label="Filter"><span class="sb-label">Filter</span><select id="era-filter" class="sb-chip" aria-label="Era"><option value="">All eras</option>${eras.map((era) => `<option value="${esc(era)}">${esc(era)}</option>`).join("")}</select>${hasSealed ? `<button type="button" class="sb-chip" id="has-sealed" aria-pressed="false">Has sealed</button>` : ""}<a class="sb-chip" href="/search?q=costco">Costco exclusive</a></div>
 </div>
 <nav class="sb-jump sb-chips" aria-label="Jump to an era">${eras.map((era) => `<a class="sb-chip" href="#${esc(eraId(era))}">${esc(era)}</a>`).join("")}</nav>
 ${eras.map((era, eraIdx) => {
@@ -1815,6 +1857,7 @@ function setRotationBlock(slug) {
 
 export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1 id="title">Set</h1>
+${opts.meterHtml || ""}
 <p class="muted" id="completion"></p>
 ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(slug)}
 ${opts.setValueHtml || ""}
@@ -2629,6 +2672,11 @@ const SINGLE_CSS = `
 .cp-pattern{margin:12px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
 .cp-pattern p{margin:0;font:500 16px/1.4 var(--sans)}
 .cp-pattern .muted{margin-top:6px;font-size:14px}
+.cp-pattern .rd-bars{display:grid;gap:6px;margin:8px 0 2px;min-height:44px}
+.cp-pattern .rd-bar{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center;min-height:18px}
+.cp-pattern .rd-bar span{font-size:12px;color:#c4baab}
+.cp-pattern .rd-bar i{display:block;height:8px;border-radius:999px;background:#8a8175}
+.cp-pattern .rd-bar.is-pat i{background:#7fc79a}
 .cp-pattern .rd-era{display:inline-flex;align-items:center;min-height:32px;margin-top:8px;padding:0 10px;border-radius:999px;color:#d9b779;background:rgba(217,183,121,.12)}
 .card-page .win{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06)}
 .cp-charts{margin:8px 0 18px}
@@ -2702,7 +2750,7 @@ function conditionLine(note) {
 function ebayBlock(read) {
   if (!read) return "";
   const bits = priceBits(read);
-  const ask = String(bits.line || "").split(". ").find((part) => part.startsWith("eBay ask"));
+  const ask = String(bits.line || "").split(". ").find((part) => part.startsWith("eBay ask") || part.startsWith("Median ask"));
   return [ask, bits.gap].filter(Boolean).map((part) => `<p class="cp-gap">${esc(part)}</p>`).join("");
 }
 
@@ -2711,7 +2759,10 @@ function patternBlock(read) {
   if (!hit) return "";
   const when = priceDay(hit.asOf);
   const note = [hit.source, when].filter(Boolean).join(" · ");
-  return `<section class="cp-pattern"><p>${esc(hit.text)}</p>${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
+  const top = Math.max(Number(hit.rate) || 0, Number(hit.base) || 0);
+  const bar = (label, rate, cls) => top > 0 ? `<div class="rd-bar ${cls}"><span>${esc(label)}</span><i style="width:${Math.max(4, Math.round((Number(rate) / top) * 100))}%"></i></div>` : "";
+  const bars = top > 0 ? `<div class="rd-bars" aria-hidden="true">${bar("This pattern", hit.rate, "is-pat")}${bar("Usual", hit.base, "is-base")}</div>` : "";
+  return `<section class="cp-pattern"><p class="rd-lead">${esc(hit.text)}</p>${bars}${hit.small ? `<p class="muted">${esc(hit.small)}</p>` : ""}${hit.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${note ? `<p class="muted">${esc(note)}</p>` : ""}</section>`;
 }
 
 function readLink(card) {
@@ -2927,6 +2978,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
 <div class="cp-id">
 <p class="cp-set">${setBit || esc(card.set || "")}${esc(numBit)}</p>
 <h1>${esc(card.name)}</h1>
+${premiumFlagLine(card)}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
 ${opts.comesFrom ? `<p class="comes-from">Comes from <a href="/p/${esc(opts.comesFrom.id)}">${esc(opts.comesFrom.name)}</a></p>` : ""}
@@ -3012,15 +3064,50 @@ export function readYearChart(card, asOf = "") {
   return `<div class="read-year"><style>${HISTORY_CSS}</style>${historyChart(series, { asOf: String(asOf || "").slice(0, 10), snap: "real" })}</div>`;
 }
 
+function listingHref(url) {
+  const raw = String(url || "").trim();
+  if (!/^https:\/\/www\.ebay\.com\/itm\/[0-9]+/.test(raw)) return "";
+  const camp = getAffiliateConfig().epn;
+  if (!/^[0-9]{6,12}$/.test(String(camp || ""))) return raw;
+  const join = raw.includes("?") ? "&" : "?";
+  return `${raw}${join}mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${camp}&toolid=10001&mkevt=1`;
+}
+
 function ebayAskLine(ask) {
   const amount = Number(ask?.amount);
   const day = String(ask?.asOf || "").slice(0, 10);
-  // A date after today is a bad stamp; never show a future day.
   const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const when = day && day <= today ? priceDay(day) : "";
   if (!(amount > 0) || !when) return "";
-  const src = String(ask?.source || "").trim();
   return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">eBay</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0"><div><dt>Ask</dt><dd>${money(amount)}</dd></div><div><dt>Date</dt><dd>${esc(when)}</dd></div></dl></section>`;
+}
+
+function sealedAskBox(ask) {
+  const day = String(ask?.asOf || "").slice(0, 10);
+  const today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const when = day && day <= today ? priceDay(day) : "";
+  if (!when) return "";
+  const median = Number(ask?.amount);
+  const count = Number(ask?.count);
+  const rows = [];
+  const cheap = ask?.cheapest;
+  const cheapPrice = Number(cheap?.price);
+  const href = listingHref(cheap?.url);
+  if (href && cheapPrice > 0 && !(median > 0 && cheapPrice < median * 0.5)) {
+    rows.push(`<div><dt>Cheapest real listing</dt><dd><a href="${esc(href)}" rel="sponsored noopener">${money(cheapPrice)}</a> <small class="paid-note">${esc(PAID_NOTE)}</small></dd></div>`);
+  }
+  if (median > 0) {
+    const note = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "";
+    rows.push(`<div><dt>Median ask</dt><dd>${money(median)}${note ? `<span class="muted"> ${esc(note)}</span>` : ""}</dd></div>`);
+  }
+  if (Number(ask?.tcgListed) > 0) {
+    rows.push(`<div><dt>TCGplayer listed median</dt><dd>${money(ask.tcgListed)}<span class="muted"> Middle price of TCGplayer listings</span></dd></div>`);
+  }
+  if (Number(ask?.tcgMarket) > 0) {
+    rows.push(`<div><dt>TCGplayer market</dt><dd>${money(ask.tcgMarket)}<span class="muted"> recent TCGplayer sales</span></dd></div>`);
+  }
+  if (!rows.length) return "";
+  return `<section class="ebay-card" style="margin:14px 0;padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26"><h2 style="margin:0 0 8px;font:600 16px/1.2 var(--sans)">Prices</h2><dl class="kv" style="margin:0;padding:0;background:none;border:0">${rows.join("")}</dl><p class="muted">${esc(when)}</p></section>`;
 }
 
 function ripValueBlock(rip) {
@@ -3038,6 +3125,14 @@ function ripValueBlock(rip) {
   if (!bits.length) return "";
   const src = [String(rip.priceSource || "").trim(), when].filter(Boolean).join(", ");
   return `<section class="sealed-rip"><h2>Rip value</h2><dl>${bits.join("")}</dl>${src ? `<p class="muted">${esc(src)}</p>` : ""}</section>`;
+}
+
+function premiumFlagLine(card) {
+  const word = card?.premiumFlag === "below" ? "Below its usual premium" : card?.premiumFlag === "above" ? "Above its usual premium" : "";
+  if (!word) return "";
+  const bg = card.premiumFlag === "below" ? "#123d22" : "#3a2f0c";
+  const fg = card.premiumFlag === "below" ? "#8ee0a8" : "#f6dc86";
+  return `<p class="prem-flag" style="display:inline-block;margin:8px 0;border-radius:999px;padding:3px 10px;background:${bg};color:${fg};font:600 13px/1.4 var(--sans)">${esc(word)}</p>`;
 }
 
 export function renderCard(card, stamp, opts = {}) {
@@ -3113,6 +3208,13 @@ export function renderCard(card, stamp, opts = {}) {
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
+  const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
+  const priceSource = askFallback ? "eBay asking prices" : "TCGplayer market price";
+  const priceHtml = price
+    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+    : (askFallback
+      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${infoTap(`${priceSource}${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+      : `<p class="px">Price being checked</p>`);
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}
@@ -3149,12 +3251,15 @@ export function renderCard(card, stamp, opts = {}) {
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
+${premiumFlagLine(card)}
+${card.exclusive === "Costco" ? `<p class="muted">Costco exclusive${card.region ? ` · ${esc(card.region)}` : ""}</p>` : ""}
+${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${readLink(card)}
 ${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<section class="cp-sec" id="promos-inside"><h2>Promos inside</h2><ul class="cp-facts">${opts.promosInside.map((row) => `<li><a href="/c/${esc(row.id)}">${esc(row.name)}${row.num ? ` #${esc(row.num)}` : ""}</a></li>`).join("")}</ul></section>` : ""}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${price ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>` : ""}
+${priceHtml}
 ${sealedStrip}
 <!--jump-->
 <section id="price">${changeHtml}
@@ -3163,7 +3268,7 @@ ${rangeRow}</section>
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}
-${ebayAskLine(opts.ebayAsk)}
+${sealed ? sealedAskBox(opts.ebayAsk) : ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
 ${itemRankHtml(card)}
@@ -3178,7 +3283,7 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (eBay ask series)</p>` : ""}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (Median ask series)</p>` : ""}
 <details><summary>See the math</summary>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p><button type="button" id="paid">Report a price I paid</button></p>
@@ -3863,19 +3968,22 @@ ${err}
 }
 
 export function renderSearch(opts = {}) {
-  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle.</p>
-<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select></div>
-<style>.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
+  const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle. <a href="/search?q=costco">Costco exclusive</a></p>
+<div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finder" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select><div id="finder" class="finder" role="listbox" hidden></div></div>
+<style>.filters{position:relative}.finder{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:8px;background:#1a1815;border:1px solid #2f2b26;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.45);max-height:min(70vh,420px);overflow:auto;padding:6px}.finder[hidden]{display:none}.finder-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:12px;color:inherit;text-decoration:none}.finder-opt[aria-selected="true"],.finder-opt:hover{background:rgba(255,255,255,.06)}.finder-opt img{width:36px;height:50px;object-fit:contain;border-radius:6px;background:#12100e;flex:none}.finder-copy{min-width:0;display:flex;flex-direction:column}.finder-copy b,.finder-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.finder-copy span{color:var(--dim);font:500 13px/1.2 var(--sans)}.finder-type{margin-left:auto;flex:none;font:600 12px/1 var(--sans);color:var(--gold);background:rgba(217,183,121,.12);border-radius:999px;padding:6px 8px}.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
-import * as search from "/data/search-rank.mjs";
-const rankCatalog=search.rankCatalog;
+const rankApi=(${createRank.toString()})();
+const rankCatalog=rankApi.rankCatalog;
+const searchCatalog=rankApi.searchCatalog;
+const pickTarget=rankApi.pickTarget;
+const expandQuery=rankApi.expandQuery;
+const typeLabel=rankApi.typeLabel;
 const ebayQuery=${ebayQuery.toString()};
 const AFF=${JSON.stringify(getAffiliateConfig()).replace(/</g, "\\u003c")};
 const affTcg=${affTcg.toString()};
 const affEbay=${affEbay.toString()};
 const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
-const searchCatalog=search.searchCatalog;
 ${artType.toString()}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
@@ -3988,7 +4096,7 @@ async function ensureRows(q){
     }
     manifest=await res.json();
   }
-  var ids=queryShardIds(q).filter(function(id){ return manifest.shards && manifest.shards[id]; });
+  var ids=queryShardIds(expandQuery(q)).filter(function(id){ return manifest.shards && manifest.shards[id]; });
   await Promise.all(ids.map(function(id){
     if(shardCache[id]) return Promise.resolve();
     return fetch("/data/feed/search/shards/"+id+".json").then(function(r){ return r.ok?r.json():[]; }).then(function(body){ shardCache[id]=body; }).catch(function(){ shardCache[id]=[]; });
@@ -3996,6 +4104,25 @@ async function ensureRows(q){
   var seen={};
   rows=[];
   ids.forEach(function(id){ (shardCache[id]||[]).forEach(function(row){ if(row && !seen[row[0]]){ seen[row[0]]=1; rows.push(row); } }); });
+}
+
+let finderActive=-1;
+function paintFinder(hits){
+  var box=document.getElementById("finder");
+  var qi=document.getElementById("q");
+  if(!box||!qi) return;
+  var list=(hits||[]).slice(0,8);
+  if(!list.length){ box.hidden=true; box.innerHTML=""; qi.setAttribute("aria-expanded","false"); qi.removeAttribute("aria-activedescendant"); finderActive=-1; return; }
+  if(finderActive>=list.length) finderActive=-1;
+  box.hidden=false;
+  qi.setAttribute("aria-expanded","true");
+  box.innerHTML=list.map(function(r,i){
+    var href=(r[5]==="sealed"?"/p/":"/c/")+encodeURIComponent(r[0]);
+    var pid=String(r[0]||"").match(/(\d+)$/);
+    var img=pid?'<img alt="" width="36" height="50" src="/api/card-img?pid='+pid[1]+'" onerror="this.remove()">':"";
+    var on=i===finderActive;
+    return '<a class="finder-opt" role="option" id="finder-opt-'+i+'" href="'+href+'" aria-selected="'+(on?"true":"false")+'">'+img+'<span class="finder-copy"><b>'+html(r[1])+'</b><span>'+html(r[2]||"")+'</span></span><span class="finder-type">'+html(typeLabel(r))+'</span></a>';
+  }).join("");
 }
 async function draw(){
   const n=++drawN;
@@ -4005,7 +4132,7 @@ async function draw(){
   const art=artOn?String(artOn.getAttribute("data-art")||""):"";
   const hasTag=function(r){return Array.isArray(r[9])&&r[9].indexOf(vtag)>=0;};
   const hasArt=function(r){return !art || (r[5]!=="sealed" && artType({kind:"single",name:r[1],num:r[3],rarity:r[8],tags:Array.isArray(r[9])?r[9]:[]})===art);};
-  if(q.length<2 && !vtag && !art){document.getElementById("list").innerHTML="";document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant or an art type.";return}
+  if(q.length<2 && !vtag && !art){document.getElementById("list").innerHTML="";paintFinder([]);document.getElementById("meta").textContent="Type at least 2 letters, or pick a variant or an art type.";return}
   document.getElementById("list").innerHTML='<div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div><div class="skel-row" aria-hidden="true"></div>';
   if(q.length<2 && (vtag || art)){
     try{ await ensureBags(); if(!usedLite){ rows=await (await fetch("/data/search-lite.json")).json(); usedLite=true; } }catch(e){ document.getElementById("meta").textContent="Search did not load."; return; }
@@ -4026,6 +4153,7 @@ async function draw(){
   hits=rankCatalog(q, rows, limit+1, codes);
   found=hits.length?{hits:hits,nearest:[]}:(typeof searchCatalog==="function"?searchCatalog(q, rows, limit+1):{hits:rankCatalog(q, rows, limit+1),nearest:[]}); }
   buildTwins(found.hits);
+  paintFinder((found.hits&&found.hits.length?found.hits:found.nearest)||[]);
   const more=found.hits.length>limit;
   const shown=take(found.hits);
   const near=take(found.nearest);
@@ -4052,7 +4180,34 @@ async function draw(){
   document.getElementById("list").innerHTML=shown.map(rowHtml).join("")+(more?'<p><button type="button" id="s-more" class="win" style="min-height:44px;padding:0 18px;border-radius:12px">Show 40 more</button></p>':"");
   const sm=document.getElementById("s-more"); if(sm) sm.onclick=function(){ limit+=40; draw(); };
 }
-document.getElementById("q").addEventListener("input",function(){ limit=40; draw(); });
+document.getElementById("q").addEventListener("input",function(){ limit=40; finderActive=-1; draw(); });
+document.getElementById("q").addEventListener("keydown",function(ev){
+  var box=document.getElementById("finder");
+  var opts=box?[].slice.call(box.querySelectorAll(".finder-opt")):[];
+  if(ev.key==="Escape"){ paintFinder([]); return; }
+  if((ev.key==="ArrowDown"||ev.key==="ArrowUp") && opts.length){
+    ev.preventDefault();
+    var cur=opts.findIndex(function(a){return a.getAttribute("aria-selected")==="true";});
+    var next=ev.key==="ArrowDown"?cur+1:cur-1;
+    if(next<0) next=opts.length-1;
+    if(next>=opts.length) next=0;
+    finderActive=next;
+    opts.forEach(function(a,i){a.setAttribute("aria-selected", i===next?"true":"false");});
+    document.getElementById("q").setAttribute("aria-activedescendant", opts[next].id);
+    return;
+  }
+  if(ev.key!=="Enter") return;
+  var chosen=opts.filter(function(a){return a.getAttribute("aria-selected")==="true";})[0];
+  if(chosen){ ev.preventDefault(); location.href=chosen.getAttribute("href"); return; }
+  ev.preventDefault();
+  var qv=document.getElementById("q").value.trim();
+  if(qv.length<2) return;
+  draw().then(function(){
+    var pick=pickTarget(qv, rows, 8, codes);
+    if(pick.mode==="page" && pick.href) location.href=pick.href;
+    else paintFinder([]);
+  });
+});
 document.getElementById("q").addEventListener("focus",function(){
   if(manifest||usedLite) return;
   fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
@@ -4179,11 +4334,16 @@ export function renderRetired(kind, opts = {}) {
 
 export function renderOfficeGate(opts = {}) {
   const invite = INVITE_LINE.replace("Join Discord", `<a href="${esc(DISCORD)}">Join Discord</a>`);
-  const sign = opts.ready && !opts.signedIn
+  const sign = postOfficeOpen && opts.ready && !opts.signedIn
     ? `<p><a href="/auth/discord?next=/post-office">Sign in with Discord</a></p>`
     : "";
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Post Office</h1><p>${invite}</p>${sign}</main>`;
   return chrome("Post Office", body, "Post Office", "", "", feedNav(opts));
+}
+
+export function renderPostClosed(opts = {}) {
+  const body = `<main id="main" tabindex="-1" class="wrap"><section class="po-soon" style="max-width:560px;margin:32px auto;padding:28px 22px;border-radius:22px;background:#1c1a17;border:1px solid rgba(217,183,121,.4)"><p style="margin:0 0 8px;letter-spacing:.08em;text-transform:uppercase;color:#d9b779;font:600 12px/1.2 'IBM Plex Sans',sans-serif">Post Office</p><h1 style="margin:0 0 12px;font:600 34px/1.15 Fraunces,Georgia,serif">Coming soon</h1><p style="margin:0;font:17px/1.5 'IBM Plex Sans',sans-serif">${POST_OFFICE_LINE}</p></section></main>`;
+  return chrome("", body, "Post Office", "", "", feedNav(opts));
 }
 
 export function renderPost(stamp, mark = "", opts = {}) {
@@ -4312,12 +4472,18 @@ export function renderDive(doc, stamp, opts = {}) {
       url: "https://catchemtcg.com/feed",
     });
   }
-  const series = Array.isArray(doc.series) ? doc.series : [];
-  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const latest = doc.latest || {};
+  const median = Number(latest.ebayMedianAsk || latest.askMedian || latest.priceMedian);
+  const series = (Array.isArray(doc.series) ? doc.series : []).filter((row) => {
+    const price = Number(row?.price);
+    return !(median > 0 && price > 0 && price < median * 0.3);
+  });
+  const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
-  const price = money(latest.priceMedian);
+  const price = money(median || latest.priceMedian);
+  const count = Number(latest.ebayMedianCount || latest.askRobustCount || latest.listingCount);
+  const medianNote = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask";
   const listingsHtml = latest.listingCount != null ? esc(String(latest.listingCount)) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
@@ -4341,11 +4507,11 @@ export function renderDive(doc, stamp, opts = {}) {
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
-<p class="muted">eBay Browse ask median · ${listingsHtml} active listings (asks, not solds)</p>
+<p class="muted">Median ask. ${esc(medianNote)}. ${listingsHtml} eBay listings counted.</p>
 ${buyoutLine}
-${chartBox(hist, "eBay Browse ask median, daily")}
+${chartBox(hist, "Median ask, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
-<thead><tr><th align="left">Date</th><th align="left">Ask median</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<thead><tr><th align="left">Date</th><th align="left">Median ask</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
 <tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
 </table>
 ${volumeLine}
@@ -4357,7 +4523,7 @@ ${catalog}
   const diveDesc = [
     latest.set || "",
     latest.subtype || "",
-    price ? `eBay Browse ask median ${price}` : "eBay Browse ask series",
+    price ? `Median ask ${price}` : "Median ask series",
     "asks, not solds",
   ].filter(Boolean).join(" · ");
   return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
@@ -4419,7 +4585,9 @@ export function leadWithStory(reads) {
 }
 
 export function renderFeed(bundle, startId, stamp, opts = {}) {
-  const reads = leadWithStory(feedReads(bundle));
+  const base = feedReads(bundle);
+  const packed = pinIds(base, opts.leadIds) || rankLead(base);
+  const reads = packed.lead.concat(packed.rest);
   const first = inlineFeedReads(reads, startId);
   const lead = JSON.stringify(first).replace(/</g, "\\u003c");
   const restCfg = JSON.stringify({ total: reads.length, url: reads.length > first.length ? FEED_REST_URL : "", sold: opts.soldOn === true });
@@ -4489,7 +4657,15 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .news-go{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--gold);color:#1a1407;text-decoration:none;font:600 16px/1 var(--sans)}
   .feed-card h2{font:600 22px/1.25 var(--serif);margin:0}
   .feed-card h2 a{min-height:44px;display:inline-flex;align-items:center}
-  .one-line{margin:0}
+  .one-line{margin:0;max-width:100%;overflow-wrap:break-word}
+  .qrow{display:flex;flex-wrap:wrap;gap:6px;max-width:100%;min-width:0;margin:0}
+  .qchip{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;min-height:44px;max-width:100%;padding:0 12px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#efe9de;font:600 13px/1.15 var(--sans);overflow:hidden}
+  .qchip svg{flex:0 0 auto}
+  .qchip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qchip.is-up{color:#7fc79a}
+  .qchip.is-down{color:#e0675b}
+  .is-fast .qrow,.is-fast .one-line{display:flex}
+  .is-fast .one-line{display:block}
   .card-meta{margin:0;color:var(--gold);font:600 14px/1.3 var(--sans)}
   .means{background:#211e1a;border-radius:14px;padding:12px 14px}
   .means b{display:block;margin:0 0 6px}
@@ -4649,6 +4825,7 @@ ${page !== "read" ? feedToolsHtml() : ""}
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
 <script type="application/json" id="feed-lead">${lead}</script>
+<script type="application/json" id="feed-lead-order">${JSON.stringify(Array.isArray(opts.leadIds) ? opts.leadIds : []).replace(/</g, "\\u003c")}</script>
 <script type="application/json" id="dive-map">${diveLead}</script>
 <script type="application/json" id="feed-news">${newsLead}</script>
 <script type="application/json" id="start">${JSON.stringify(startId || "")}</script>
@@ -4955,6 +5132,12 @@ ${isShapeRow.toString()}
 ${isSealedProductRow.toString()}
 ${dropInventedNm.toString()}
 ${shownRead.toString()}
+${listingsWording.toString()}
+${readMove.toString()}
+${interestScore.toString()}
+${rankLead.toString()}
+${pinIds.toString()}
+${glanceChips.toString()}
 ${cardIdentity.toString()}
 function setLine(card){
   const set=String(card&&card.set||"").trim();
@@ -5549,7 +5732,7 @@ function deepEl(card){
     return '<li class="deep-line">'+thumbs+"<span>"+html(l)+"</span></li>";
   }).join("");
   const go=card.href&&!/^https?:/.test(card.href)?'<p><a class="open-data" href="'+html(openDataHref(card))+'">Open it</a></p>':"";
-  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p>'+signalBits(card)+'<h2>'+html(card.headline||card.name||"")+'</h2><details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
+  el.innerHTML='<p class="news-kicker"><span class="k">DEEP READ</span></p>'+glanceChips(card)+signalBits(card)+'<h2>'+html(card.headline||card.name||"")+'</h2>'+(card.headline?'<p class="one-line">'+html(listingsWording(card.headline))+'</p>':"")+'<details class="deep-more"><summary>Tap for the full read</summary><ul class="deep-lines">'+lines+"</ul>"+deepChartSvg(card.chart)+'<p class="muted">'+html(card.source||"")+"</p></details>"+go;
   bindShare(el, card);
   return el;
 }
@@ -5586,7 +5769,7 @@ function cardEl(card, facts){
   const headline=String(card.headline||"").trim();
   const pathText=String(card.path||"").trim();
   const sameSentence=isFact(card) && headline && headline===pathText ? headline : "";
-  const shown=sameSentence||line;
+  const shown=listingsWording(sameSentence||line||headline||pathText);
   const run=printRunLine(card);
   const runHtml=run?'<p class="print-run">'+html(run)+' <a href="/rotation">Rotation and print runs</a>.</p>':"";
   const title=html(readTitle(card)||(isVolumeRow(card)||isShapeRow(card)?card.headline:withoutSoldClaim(card.headline))||"Read");
@@ -5597,7 +5780,8 @@ function cardEl(card, facts){
   const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
   const vchips=(card.tags||[]).length?'<div class="vchips sm" aria-label="Variant">'+card.tags.map(function(t){return '<a class="vchip" href="/search?tag='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</div>':"";
-  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+signalBits(card)+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
+  const glance=glanceChips(card);
+  const head=h2+vchips+(setName?'<p class="card-meta">'+html(setName)+"</p>":"")+glance+signalBits(card)+(shown?'<p class="one-line">'+html(shown)+"</p>":"")+runHtml+cut+(isFact(card)?factSourceLine(card):priceRow(card));
   if(pageMode!=="read"){
     el.innerHTML=head+open+diveLink;
     if(isFact(card)){
@@ -6636,22 +6820,11 @@ function buildFlat(){
     const visitSeed=freshSeed();
     const seenNow=readSeen(window.localStorage);
     const wordRnd=freshRandom(visitSeed ^ 0x9e3779b9);
-    flat=freshOrder(rows,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
-    // Open on a story, not a plain price move.
-    const PLAIN_KIND={single:1,sealed:1,streak:1,mover:1,price:1,askmove:1,mktmove:1};
-    const plainish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return !r || r.pending || PLAIN_KIND[k] || k.indexOf("pokemon")===0; };
-    const newsish=function(r){ const k=String(r&&(r.readKind||r.kind)||""); return k==="news" || k==="newsline" || k==="wave" || !!(r && r.waveItem); };
-    if(flat.length && newsish(flat[0])){
-      let k=-1;
-      for(let n=1;n<flat.length;n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
-      if(k<0){ for(let n=1;n<flat.length;n++){ if(!newsish(flat[n])){ k=n; break; } } }
-      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
-    } else if(flat.length && plainish(flat[0])){
-      let k=-1;
-      for(let n=1;n<Math.min(flat.length,60);n++){ if(!plainish(flat[n]) && !newsish(flat[n])){ k=n; break; } }
-      if(k<0){ for(let n=1;n<Math.min(flat.length,40);n++){ if(!plainish(flat[n])){ k=n; break; } } }
-      if(k>0){ const story=flat.splice(k,1)[0]; flat.unshift(story); }
-    }
+    const leadOrder=(function(){ try { return JSON.parse(document.getElementById("feed-lead-order").textContent)||[]; } catch(e){ return []; } })();
+    const ordered=pinIds(rows, leadOrder) || rankLead(rows);
+    const tail=freshOrder(ordered.rest,{seed:visitSeed,seen:seenNow}).map(function(r){ return pickWording(r, wordRnd); });
+    flat=ordered.lead.concat(tail);
+    // Interest leads the feed. A tiny move does not open it.
     markSeen(window.localStorage, flat.slice(0,10).map(function(r){ return String(r.id||""); }));
     return;
   }
@@ -6841,7 +7014,7 @@ async function showFlat(index, dir){
     host.innerHTML="";
     const p=document.createElement("p");
     p.className="muted";
-    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price sales window is on file.",solddown:"No falling-price sales window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
     let msg=shapeEmpty[loopFilter]||"";
     if(!msg && loopFilter==="sealed") msg="No sealed reads tonight.";
     else if(!msg && loopFilter==="set" && !wantedSet) msg="Choose a set to see its reads.";
@@ -7346,7 +7519,7 @@ async function boot(){
       if(!loopEl) return;
       const have={};
       Array.prototype.forEach.call(loopEl.options, function(o){ have[o.value]=1; });
-      const soldPairs=[["volume","Volume"],["quiet","No sales"],["mix","Condition mix"],["soldflat","Sold, price flat"],["solddown","Sold, price down"]];
+      const soldPairs=[["volume","Volume"],["quiet","No count"],["mix","Condition mix"],["soldflat","Price flat"],["solddown","Price down"]];
       const anchor=Array.prototype.find.call(loopEl.options, function(o){ return o.value==="conditions"; });
       let added=false;
       soldPairs.forEach(function(pair){
@@ -7386,7 +7559,7 @@ boot();
   const feedTitle = page === "read" ? "Read" : (focusTitle || "The Feed");
   const feedDesc = page === "read"
     ? "One market read from Catch'em. TCGplayer market prices stay labeled separately from eBay asks."
-    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks are not solds.";
+    : "Daily market reads for Pokémon TCG collectors. Singles and sealed stay apart; asks stay apart from the market price.";
   const feedUrl = page === "read" && startId
     ? `https://catchemtcg.com/feed?id=${encodeURIComponent(startId)}`
     : "https://catchemtcg.com/feed";

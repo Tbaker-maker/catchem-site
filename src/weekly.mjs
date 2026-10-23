@@ -1,5 +1,6 @@
 // Weekly changes and the scanner explainer. Every figure is a field on weekly.json.
 import { esc, pageChrome } from "./ui.mjs";
+import { patternCopy } from "./pattern-track.mjs";
 import { imageTag, officialSrc } from "./catalogue-image.mjs";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -39,10 +40,10 @@ export function parseWeeklyPattern(line) {
   const who = scope === "single" ? "singles" : scope === "sealed" ? "sealed" : "";
   const way = dir === "up" || dir === "down" ? dir : "";
   const where = [who, way].filter(Boolean).join(", ");
-  return {
-    name,
-    text: `${label}${where ? ` on ${where}` : ""}. This pattern was right ${rate}% of the time vs ${base}% normally, over ${Math.round(n)} cases, looking ${Math.round(days)} days ahead.`,
-  };
+  const copy = patternCopy({ rate, base, n, horizon: days, dir: way || "up" });
+  if (!copy) return null;
+  const named = `${label}${where ? ` on ${where}` : ""}`;
+  return { name, text: `${copy.lead}. ${named}. ${copy.small}` };
 }
 
 function face(row, images) {
@@ -124,7 +125,7 @@ export function scannerBody(doc) {
   const patterns = (doc?.patterns || []).map(parseWeeklyPattern).filter(Boolean);
   const list = patterns.map((row) => `<p class="wk-pat">${esc(row.text)}</p>`).join("");
   const when = asOf ? `<p class="muted">Passed patterns, ${esc(asOf)}.</p>` : "";
-  return `${subnav("Scanner")}<h1>Scanner</h1>${when}<p>These are the patterns that passed. The rate is how often the pattern was right, next to the usual rate, over the cases on file.</p>${list}`;
+  return `${subnav("Scanner")}<h1>Scanner</h1>${when}<p>These are the patterns that passed. Each line leads with the lift versus the usual outcome, over the cases on file.</p>${list}`;
 }
 
 export function renderWeekly(doc, stamp, opts = {}, images = {}) {

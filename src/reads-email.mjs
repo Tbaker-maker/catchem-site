@@ -4,7 +4,8 @@
 
 import { isClean } from "./advice-rules.mjs";
 import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
-import { WEEKDAY_NAMES, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, renderArticle } from "./reads-article.mjs";
+import { WEEKDAY_NAMES, darkCss, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, premiumPill, renderArticle } from "./reads-article.mjs";
+import { premiumMode } from "./premium-mode.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -153,6 +154,7 @@ export function normalizeEmailRead(row) {
     tcgUrl: /^https:\/\//.test(shops.tcg) ? shops.tcg : "",
     ebayUrl: /^https:\/\//.test(shops.ebay) ? shops.ebay : "",
     kind: sealed ? "sealed" : "card",
+    premium: row.premium === "below" || row.premium === "above" ? row.premium : "",
   };
 }
 
@@ -181,58 +183,59 @@ export function attachFeed(rows, feedReads) {
 }
 
 function chipHtml(chip) {
-  return `<span style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}</span>`;
+  return `<span class="ce-tile ce-ink" style="display:inline-block;min-height:32px;line-height:32px;padding:0 12px;margin:0 6px 6px 0;border-radius:999px;background:#f2f2f7;color:#1c1c1e;font:600 13px/32px Arial,Helvetica,sans-serif;">${esc(chip.text)}</span>`;
 }
 
 function button(href, label, light = false) {
   const bg = light ? "#f2f2f7" : "#1c1c1e";
   const color = light ? "#1c1c1e" : "#ffffff";
-  return `<a href="${esc(href)}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;margin:0 8px 8px 0;border-radius:999px;background:${bg};color:${color};text-decoration:none;font:600 15px/44px Arial,Helvetica,sans-serif;">${esc(label)}</a>`;
+  return `<a href="${esc(href)}" class="${light ? "ce-btn-light" : "ce-btn-dark"}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;margin:0 8px 8px 0;border-radius:999px;background:${bg};color:${color};text-decoration:none;font:600 15px/44px Arial,Helvetica,sans-serif;">${esc(label)}</a>`;
 }
 
-export function readsEmailHtml({ lead, day, reads, stopUrl }) {
+export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false }) {
   const when = readsDateLabel(day);
   const cards = (reads || []).map((read) => {
     const title = read.href
-      ? `<a href="${esc(read.href)}" style="color:#1c1c1e;text-decoration:none;">${esc(read.headline)}</a>`
+      ? `<a href="${esc(read.href)}" class="ce-ink" style="color:#1c1c1e;text-decoration:none;">${esc(read.headline)}</a>`
       : esc(read.headline);
     const open = read.href ? `<p style="margin:8px 0 0;">${button(read.href, "Open this read", true)}</p>` : "";
     const shops = [
       read.tcgUrl ? button(read.tcgUrl, "Buy on TCGplayer") : "",
       read.ebayUrl ? button(read.ebayUrl, "Buy on eBay") : "",
     ].join("");
-    const note = shops ? `<p style="margin:4px 0 0;color:#8e8e93;font:13px/1.4 Arial,Helvetica,sans-serif;">${esc(SHOP_NOTE)}</p>` : "";
-    const blurb = read.blurb ? `<p style="margin:8px 0 0;color:#3a3a3c;font:15px/1.45 Arial,Helvetica,sans-serif;">${esc(read.blurb)}</p>` : "";
+    const note = shops ? `<p class="ce-soft" style="margin:4px 0 0;color:#8e8e93;font:13px/1.4 Arial,Helvetica,sans-serif;">${esc(SHOP_NOTE)}</p>` : "";
+    const blurb = read.blurb ? `<p class="ce-dim" style="margin:8px 0 0;color:#3a3a3c;font:15px/1.45 Arial,Helvetica,sans-serif;">${esc(read.blurb)}</p>` : "";
     const chips = read.chips?.length ? `<p style="margin:10px 0 0;">${read.chips.map(chipHtml).join("")}</p>` : "";
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
+    const flag = premiumPill(read.premium);
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 class="ce-ink" style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${flag ? `<p style="margin:8px 0 0;">${flag}</p>` : ""}${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
   }).join("");
+  const emptyLine = !cards && empty
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:600 16px/1.45 Arial,Helvetica,sans-serif;color:#1c1c1e;">No reads match this premium filter today.</p></td></tr></table>`
+    : "";
   const stop = stopUrl
-    ? `<p style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
+    ? `<p class="ce-soft" style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
     : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(readsSubject(day))}</title>
-<style>
-@media (prefers-color-scheme: dark) {
-  .ce-bg { background:#12100e !important; }
-  .ce-card { background:#1c1916 !important; }
-  .ce-text, .ce-text a { color:#efe9de !important; }
-  .ce-muted { color:#c4baab !important; }
-}
+<style>:root{color-scheme:light dark;supported-color-schemes:light dark}
+${darkCss()}
 </style></head>
-<body class="ce-bg" style="margin:0;padding:0;background:#f2f2f7;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-bg" style="background:#f2f2f7;"><tr><td align="center" style="padding:16px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;"><tr><td class="ce-text" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-muted" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
-<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="background:#ffffff;border-radius:22px;margin:0 0 12px;"><tr><td style="padding:18px 16px;"><p class="ce-text" style="margin:0;font:700 22px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${esc(lead || readsSubject(day))}</p></td></tr></table>
-${cards}
+<body class="ce-page" style="margin:0;padding:0;background:#f2f2f7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-page" style="background:#f2f2f7;"><tr><td align="center" style="padding:16px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;"><tr><td class="ce-ink ce-brand" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-soft" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
+<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="background:#ffffff;border-radius:22px;margin:0 0 12px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:700 22px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${esc(lead || readsSubject(day))}</p></td></tr></table>
+${cards || emptyLine}
 ${stop}
 </td></tr></table>
 </td></tr></table></body></html>`;
 }
 
-export function readsEmailText({ lead, day, reads, stopUrl }) {
+export function readsEmailText({ lead, day, reads, stopUrl, empty = false }) {
   const parts = [lead || readsSubject(day)];
+  if (empty && !(reads || []).length) parts.push("No reads match this premium filter today.");
   for (const read of reads || []) {
     const chips = (read.chips || []).map((chip) => chip.text).join(", ");
-    const lines = [read.headline, chips, read.blurb, read.href, read.tcgUrl ? "Buy on TCGplayer" : "", read.ebayUrl ? "Buy on eBay" : ""].filter(Boolean);
+    const flag = read.premium === "below" ? "Below its usual premium" : read.premium === "above" ? "Above its usual premium" : "";
+    const lines = [read.headline, flag, chips, read.blurb, read.href, read.tcgUrl ? "Buy on TCGplayer" : "", read.ebayUrl ? "Buy on eBay" : ""].filter(Boolean);
     if (read.tcgUrl || read.ebayUrl) lines.push(SHOP_NOTE);
     parts.push(lines.join("\n"));
   }
@@ -616,8 +619,9 @@ export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin =
   const tip = suggestLength(stats, doc.length, plan?.deep === true);
   const tipHref = tip ? await lengthLink(env, origin, id, tip.to, doc.weekday || "") : "";
   const suggest = tip && tipHref ? { text: `${tip.why} ${LENGTH_LABEL[tip.to]} might suit you${doc.weekday ? ` on ${WEEKDAY_NAMES[doc.weekday]}s` : ""}.`, label: `Try ${LENGTH_LABEL[tip.to]}`, href: tipHref, to: tip.to } : null;
-  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest });
-  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest });
+  const mode = premiumMode(env);
+  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
+  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
   return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };
 }
 
@@ -671,10 +675,13 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
     if (letter && (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html))) letter = null;
     if (!letter) {
       const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
-      const reads = [...prepared, ...addonCards(member)];
-      if (!reads.length) { skipped++; continue; }
+      const want = plan?.premiumRatio === "below" || plan?.premiumRatio === "above" ? plan.premiumRatio : "";
+      const matched = want ? prepared.filter((read) => read.premium === want) : prepared;
+      const reads = [...matched, ...(want ? [] : addonCards(member))];
+      if (!reads.length && !(want && prepared.length)) { skipped++; continue; }
       const lead = scrub(member.lead || "") || readsSubject(day);
-      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl }), text: readsEmailText({ lead, day, reads, stopUrl }) };
+      const empty = want && prepared.length > 0 && matched.length === 0;
+      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty }), text: readsEmailText({ lead, day, reads, stopUrl, empty }) };
     }
     const { html, text } = letter;
     if (!emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }

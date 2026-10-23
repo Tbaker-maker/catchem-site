@@ -1,6 +1,9 @@
 // Read-page deep sheet. Every figure comes from the read or a field passed in.
 // A missing figure is left out. No invented prices.
 
+import { patternCopy } from "./pattern-track.mjs";
+import { sparkSvg } from "./set-spark.mjs";
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "\u0026amp;", "<": "\u0026lt;", ">": "\u0026gt;", '"': "\u0026quot;", "'": "\u0026#39;" }[c]));
 
 function money(n) {
@@ -56,13 +59,13 @@ export function patternSentence(read) {
   const name = String(rec.pattern || "").toLowerCase();
   const stage = String(rec.stage || "").toLowerCase();
   if (/stair|slow-climb|slowclimb|sealed-slow/.test(name) && stage !== "confirmed" && stage !== "passed") return null;
-  const rate = asPct(gate.rate);
-  const base = asPct(gate.baseRate);
-  const n = Number(gate.n);
-  const days = Number(gate.horizon);
-  if (rate == null || base == null || !(n > 0) || !(days > 0)) return null;
+  const copy = patternCopy({ rate: asPct(gate.rate), base: asPct(gate.baseRate ?? gate.base), n: gate.n, horizon: gate.horizon, dir: gate.dir, pass: gate.pass });
+  if (!copy) return null;
   return {
-    text: `This pattern was right ${rate}% of the time vs ${base}% normally, over ${Math.round(n)} cases, looking ${Math.round(days)} days ahead.`,
+    text: copy.lead,
+    small: copy.small,
+    rate: copy.rate,
+    base: copy.base,
     era: rec.eraHeld === true || rec.erasHeld === true,
     asOf: String(read.asOf || read.endDate || "").slice(0, 10),
     source: String(read.source || "").trim(),
@@ -73,21 +76,23 @@ export function priceBits(read) {
   const rows = Array.isArray(read?.prices) ? read.prices : [];
   const tcg = rows.find((row) => row && String(row.source || "").toLowerCase() === "tcgplayer" && Number(row.amount) > 0);
   const ebay = rows.find((row) => row && String(row.source || "").toLowerCase() === "ebay" && Number(row.amount) > 0);
+  const sealed = read?.kind === "sealed" || read?.item?.kind === "sealed";
   const out = [];
   if (tcg) {
-    const nm = read?.kind !== "sealed" && read?.item?.kind !== "sealed" && /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
+    const nm = !sealed && /near mint|^nm$/i.test(String(tcg.label || tcg.condition || ""));
     const when = dayLabel(tcg.date);
     out.push(`${nm ? "NM " : ""}${money(tcg.amount)} TCGplayer${when ? `, ${when}` : ""}`);
   }
   if (ebay) {
-    const cond = String(ebay.label || ebay.condition || "").trim();
+    const cond = sealed ? "" : String(ebay.label || ebay.condition || "").trim();
     const when = dayLabel(ebay.date);
-    out.push(`eBay ask ${money(ebay.amount)}${cond ? ` (${cond})` : ""}${when ? `, ${when}` : ""}`);
+    const label = sealed ? "Median ask" : "eBay ask";
+    out.push(`${label} ${money(ebay.amount)}${cond ? ` (${cond})` : ""}${when ? `, ${when}` : ""}`);
   }
   let gap = "";
   if (tcg && ebay && tcg.date && ebay.date) {
     const diff = Math.round((Number(ebay.amount) - Number(tcg.amount)) * 100) / 100;
-    if (diff !== 0) gap = `eBay ask is ${money(Math.abs(diff))} ${diff > 0 ? "above" : "under"} the TCGplayer price`;
+    if (diff !== 0) gap = `${sealed ? "Median ask" : "eBay ask"} is ${money(Math.abs(diff))} ${diff > 0 ? "above" : "under"} ${sealed ? "the TCGplayer market" : "the TCGplayer price"}`;
   }
   return { line: out.join(". "), gap };
 }
@@ -194,6 +199,13 @@ const KEY_WORDS = {
   "rotation_stage=current": "current era", "rotation_stage=previous": "previous era, still in Standard", "rotation_stage=rotated": "rotated out of Standard", "rotation_stage=older": "older era",
 };
 
+function siteBars(copy) {
+  if (!copy || !(copy.rate > 0) || !(copy.base > 0)) return "";
+  const top = Math.max(copy.rate, copy.base);
+  const row = (label, rate, cls) => `<div class="rd-bar ${cls}"><span>${esc(label)}</span><i style="width:${Math.max(4, Math.round((rate / top) * 100))}%"></i></div>`;
+  return `<div class="rd-bars" aria-hidden="true">${row("This pattern", copy.rate, "is-pat")}${row("Usual", copy.base, "is-base")}</div>`;
+}
+
 function card(title, text, note) {
   const t = String(text || "").trim();
   if (!t || /[\u2014\u2013]/.test(t)) return "";
@@ -214,8 +226,26 @@ export function factChips(f) {
   if (c.d30 && dayLabel(c.d30.from)) out.push(chip(`30-day ${pp(c.d30.pct)}, ${shortDay(c.d30.from)} to ${shortDay(c.d30.to)}`));
   if (c.y1 && dayLabel(c.y1.from)) out.push(chip(`1Y ${pp(c.y1.pct)}, ${dayLabel(c.y1.from)} to ${dayLabel(c.y1.to)}`));
   const g = f.gap;
-  if (g && g.ebay > 0 && g.tcg > 0 && g.diff && dayLabel(g.ebayDate)) out.push(chip(`eBay ask ${money(g.ebay)} vs TCGplayer ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+  const sealed = f.kind === "sealed" || f.item?.kind === "sealed";
+  if (g && g.ebay > 0 && g.tcg > 0 && g.diff && dayLabel(g.ebayDate)) {
+    if (sealed) {
+      const n = Number(g.ebayCount);
+      const mid = Number.isInteger(n) && n >= 1 ? ` Middle price of ${n} eBay listings counted.` : "";
+      out.push(chip(`Median ask ${money(g.ebay)}.${mid} TCGplayer market ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+    } else out.push(chip(`eBay ask ${money(g.ebay)} vs TCGplayer ${money(g.tcg)} (${pp(g.pct)}), ${shortDay(g.ebayDate)}`));
+  }
   return out.filter(Boolean);
+}
+
+function momentumCard(m) {
+  const text = `${m.set} ${m.kind} index ${pp(m.pct)}, ${shortDay(m.from)} to ${shortDay(m.to)}.`;
+  if (!String(text).trim() || /[\u2014\u2013]/.test(text)) return "";
+  const svg = sparkSvg(m.series, { from: m.from, to: m.to, pct: m.pct });
+  const slug = /^[a-z0-9-]+$/.test(String(m.slug || "")) ? m.slug : "";
+  const hash = m.kind === "sealed" ? "sealed-chart" : "single-chart";
+  const inner = `<h3>Set momentum</h3><p>${esc(text)}</p>${svg}<p class="muted">${esc("Chain-linked TCGplayer market index")}</p>`;
+  if (slug) return `<a class="rd-card rd-mom" href="/sets/${slug}#${hash}">${inner}</a>`;
+  return `<article class="rd-card">${inner}</article>`;
 }
 
 export function factCards(f) {
@@ -233,13 +263,17 @@ export function factCards(f) {
   }
   let pattern = "";
   const p = f.pattern;
-  if (p && p.rate > 0 && p.base > 0 && p.n > 0 && p.horizon > 0) {
+  const copy = patternCopy(p);
+  if (copy) {
     const when = (p.keys || []).map((k) => KEY_WORDS[k]).filter(Boolean).join(", ");
-    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p>${esc(`Items matching this pattern were right ${p.rate}% of the time ${p.horizon} days later, vs ${p.base}% normally. Based on ${Number(p.n).toLocaleString("en-US")} past cases.`)}</p>${when ? `<p>${esc(`Why it matches: ${when}.`)}</p>` : ""}<p class="muted">${esc(`Our nightly files, ${dayLabel(p.asOf)}`)}</p></section>`;
+    const bits = [copy.small];
+    if (when) bits.push(`Why it matches: ${when}.`);
+    if (shortDay(p.asOf)) bits.push(`Our nightly files, ${shortDay(p.asOf)}.`);
+    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p class="rd-lead">${esc(copy.lead)}</p>${siteBars(copy)}<p class="rd-small">${esc(bits.join(" "))}</p></section>`;
   }
   const cards = [];
   const m = f.setMomentum;
-  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) cards.push(card("Set momentum", `${m.set} ${m.kind} index ${pp(m.pct)}, ${shortDay(m.from)} to ${shortDay(m.to)}.`, "Chain-linked TCGplayer market index"));
+  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) cards.push(momentumCard(m));
   const rb = f.rarityBand;
   if (rb && rb.n > 0) cards.push(card("Rarity band", `${rb.n} ${rb.rarity} cards in ${rb.set}: median ${pp(rb.median)} over 30 days, ${rb.up} up, ${rb.down} down.`, `TCGplayer market, ${shortDay(rb.from)} to ${shortDay(rb.to)}`));
   const ab = f.artistBand;
@@ -264,12 +298,22 @@ const SHEET_CSS = `<style>
 .rd-chip{flex:none;min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
 .rd-pattern h3,.rd-card h3{margin:0 0 6px;font-size:15px}.rd-pattern p,.rd-card p{margin:0 0 6px}
 .rd-pattern,.rd-card{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
+.rd-lead{font-weight:650;font-size:16px;line-height:1.35}
+.rd-small{font-size:13px;color:#c4baab}
+.rd-bars{display:grid;gap:6px;margin:8px 0 4px;min-height:44px}
+.rd-bar{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center;min-height:18px}
+.rd-bar span{font-size:12px;color:#c4baab}
+.rd-bar i{display:block;height:8px;border-radius:999px;background:#8a8175}
+.rd-bar.is-pat i{background:#7fc79a}
 .rd-era{display:inline-flex;align-items:center;min-height:32px;margin-top:8px;padding:0 10px;border-radius:999px;color:#d9b779;background:rgba(217,183,121,.12)}
 .rd-cards{display:grid;gap:10px}
 .rd-sims{display:flex;flex-direction:column;gap:8px}
 .rd-sim{display:flex;gap:8px;align-items:center;min-height:44px;color:inherit;text-decoration:none}
 .rd-sim img{width:44px;height:62px;object-fit:contain;border-radius:8px;background:#141416}
 .rd-sim small{display:block;color:var(--dim);font-weight:500;font-size:14px}
+a.rd-mom{display:block;color:inherit;text-decoration:none;min-height:44px}
+a.rd-mom:focus-visible{outline:2px solid #d9b779;outline-offset:3px}
+.rd-spark{display:block;width:100%;height:72px;min-height:72px;max-width:100%;margin:2px 0 8px}
 @media(min-width:800px){.rd-cards{grid-template-columns:1fr 1fr}.rd-sims{flex-direction:row;flex-wrap:wrap}}
 </style>`;
 
@@ -296,7 +340,7 @@ export function readSheet(read, ctx = {}) {
   const chips = chipRow ? `<ul class="rd-chips">${chipRow}</ul>` : "";
   const pattern = patternSentence(read);
   const patternHtml = (!pattern && fc.pattern) ? fc.pattern : pattern
-    ? `<section class="rd-pattern"><p>${esc(pattern.text)}</p>${pattern.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${pattern.source || dayLabel(pattern.asOf) ? `<p class="muted">${esc([pattern.source, dayLabel(pattern.asOf)].filter(Boolean).join(" · "))}</p>` : ""}</section>`
+    ? `<section class="rd-pattern"><h3>Pattern track record</h3><p class="rd-lead">${esc(pattern.text)}</p>${siteBars(pattern)}${pattern.small ? `<p class="rd-small">${esc(pattern.small)}</p>` : ""}${pattern.era ? `<p class="rd-era">Held in every era on file</p>` : ""}${pattern.source || dayLabel(pattern.asOf) ? `<p class="muted">${esc([pattern.source, dayLabel(pattern.asOf)].filter(Boolean).join(" · "))}</p>` : ""}</section>`
     : "";
   const peers = Array.isArray(ctx.reads) ? ctx.reads : [];
   const setName = read.set || meta.set || "";

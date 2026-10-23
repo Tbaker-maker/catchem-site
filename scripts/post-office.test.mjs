@@ -73,8 +73,7 @@ const fetchImpl = async (url) => {
   return { ok: false, status: 404, json: async () => null, text: async () => "" };
 };
 const post = await (await renderPath("/post-office", fetchImpl)).text();
-t("editor is on the page", post.includes('src="/post-office/app?v=') && post.includes("Post Office editor") && !post.includes("The full catalog:") && !post.includes('id="fresh"'));
-t("post office footer names the build", post.includes('id="post-office-build"') && post.includes("Post Office build "));
+t("a closed post office is the coming soon page", post.includes("Coming soon") && post.includes("We're rebuilding this. Email and social tools are coming back better.") && post.includes('name="robots" content="noindex"') && !post.includes('src="/post-office/app') && !post.includes("/post-office/app") && !post.includes("Post Office editor") && post.includes('href="/post-office"') && post.includes("Closed Beta") && !post.includes("SHOW") && !post.includes("The full catalog:") && !post.includes('id="fresh"'));
 t("editor does not use the old paper file", !post.includes("paper-rows") && !post.includes("Opening soon") && !post.includes("sells for") && !post.includes("about 0"));
 t("catalog spelling stays off this page", !post.includes("The full catalog:") && !post.includes("catalogue"));
 t("browser helpers define printingRank", clientHelpers().includes("function printingRank"));
@@ -153,6 +152,7 @@ t("dock rule wins", feedVideoOff.lastIndexOf(".dock{display:none") > feedVideoOf
 
 const env = {
   VIDEO_ENABLED: "true",
+  POST_OFFICE: "on",
   PUBLIC_FETCH: fetchImpl,
   ASSETS: { fetch: async () => new Response("studio", { status: 200, headers: { "content-type": "text/html" } }) },
 };
@@ -235,7 +235,9 @@ t("signed in session shows the free idea cap", sessionOn.status === 200 && sessi
 const discordEnv = { SESSION_SECRET: secret, DISCORD_CLIENT_ID: "id", DISCORD_CLIENT_SECRET: "sec", PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE_ALLOWLIST: LIST };
 const readyPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), discordEnv);
 const readyHtml = await readyPage.text();
-t("configured sign-in is a Discord link", readyHtml.includes('href="/auth/discord?next=/post-office"') && readyHtml.includes("Sign in with Discord") && !readyHtml.includes("<button"));
+t("configured sign-in does not link a closed Post Office", readyHtml.includes('href="/auth/discord?next=/"') && readyHtml.includes("Back to Catch'em") && !readyHtml.includes('href="/post-office"') && !readyHtml.includes("<button"));
+const openSign = await worker.fetch(new Request("https://catchemtcg.com/signin"), { ...discordEnv, POST_OFFICE: "on" });
+t("an open Post Office sign-in still returns there", (await openSign.text()).includes('href="/auth/discord?next=/post-office"'));
 const start = await worker.fetch(new Request("https://catchemtcg.com/auth/discord?next=/post-office"), discordEnv);
 t("discord sign-in leaves for Discord", start.status === 302 && String(start.headers.get("location")).startsWith("https://discord.com/oauth2/authorize?") && String(start.headers.get("location")).includes("client_id=id"));
 const badCb = await worker.fetch(new Request("https://catchemtcg.com/auth/discord/callback?code=x&state=nope"), discordEnv);
@@ -260,6 +262,7 @@ const gateEnv = {
   DISCORD_CLIENT_SECRET: "sec",
   PUBLIC_FETCH: fetchImpl,
   ASSETS: env.ASSETS,
+  POST_OFFICE: "on",
   POST_OFFICE_ALLOWLIST: "111, pro",
 };
 const gate = await worker.fetch(new Request("https://catchemtcg.com/post-office"), gateEnv);

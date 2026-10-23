@@ -10,12 +10,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: node scripts/home-updated.test.mjs
       - run: node scripts/advice-rules.test.mjs
       - run: node scripts/jp-news.test.mjs
       - run: node scripts/feed-news-live.test.mjs
       - run: node scripts/rebuild.test.mjs
       - run: node scripts/reads.test.mjs
       - run: node scripts/signal-chips.test.mjs
+      - run: node scripts/feed-first.test.mjs
       - run: node scripts/reads-pipe.test.mjs
       - run: node scripts/reads-email.test.mjs
       - run: node scripts/reads-article.test.mjs
@@ -23,6 +25,7 @@ jobs:
       - run: node scripts/reads-phase2.test.mjs
       - run: node scripts/reads-picks.test.mjs
       - run: node scripts/item-read.test.mjs
+      - run: node scripts/set-spark.test.mjs
       - run: node scripts/price-hold.test.mjs
       - run: node scripts/condition-chips.test.mjs
       - run: node scripts/art-type.test.mjs
@@ -32,6 +35,7 @@ jobs:
       - run: node scripts/feed-live.test.mjs
       - run: node scripts/feed-groups.test.mjs
       - run: node scripts/premium-page.test.mjs
+      - run: node scripts/premium-waitlist.test.mjs
       - run: node scripts/audit-oct16.test.mjs
       - run: node scripts/audit-chips.test.mjs
       - run: node scripts/audit-feed.test.mjs
@@ -39,8 +43,10 @@ jobs:
       - run: node scripts/home-hero.test.mjs
       - run: node scripts/index-history.test.mjs
       - run: node scripts/search-recent.test.mjs
+      - run: node scripts/search-open.test.mjs
       - run: node scripts/open-data.test.mjs
       - run: node scripts/post-office.test.mjs
+      - run: node scripts/post-office-closed.test.mjs
       - run: node scripts/editor-image.test.mjs
       - run: node scripts/sealed-pid.test.mjs
       - run: node scripts/ebay-query.test.mjs
@@ -61,3 +67,7 @@ jobs:
       - run: node scripts/no-side-scroll.test.mjs
       - run: node scripts/perf-budget.mjs
       - run: node scripts/a11y-check.mjs --static
+      - run: node scripts/email-dark.test.mjs
+      - run: node scripts/premium-ratio-email.test.mjs
+      - run: node scripts/pattern-track.test.mjs
+      - run: node scripts/market-meter.test.mjs

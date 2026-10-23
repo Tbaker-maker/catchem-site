@@ -4,7 +4,8 @@ import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
+import { applySetSpark } from "./set-spark.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -18,10 +19,16 @@ import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.
 import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { homeFinderSource } from "./home-finder.mjs";
 const withChartKit = (page) => {
-  const html = String(page);
-  if (html.includes("function mount(fig)")) return html;
-  return html.replace("</body>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></body>`);
+  let html = String(page);
+  if (!html.includes("function mount(fig)")) {
+    html = html.replace("</body>", `<style>${HISTORY_CSS}</style><script>${HISTORY_JS}</script></body>`);
+  }
+  if (html.includes('class="hero-search"') && !html.includes("catchem-finder")) {
+    html = html.replace("</body>", `<script>/* catchem-finder */\n${homeFinderSource()}</script></body>`);
+  }
+  return html;
 };
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
@@ -33,16 +40,37 @@ import { ripBody } from "./rip.mjs";
 import { renderScanner, renderWeekly } from "./weekly.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
-import { pageChrome } from "./ui.mjs";
+import { pageChrome, freshLabel, newestStamp } from "./ui.mjs";
 import { attachSignals, chipLookup, signalRowHtml } from "./signal-chips.mjs";
 import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
-import { renderPromos } from "./promos.mjs";
+import { postOfficeOn, paintHomePostOffice } from "./post-office-flag.mjs";
+import { flagForItem } from "./premium-ratio.mjs";
+import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
+import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
+
+async function withPremium(card, fetchImpl) {
+  if (!card) return card;
+  try {
+    const doc = await loadJson("premium-ratio.json", fetchImpl);
+    const flag = flagForItem({
+      id: card.id,
+      sku: card.id,
+      set: card.set,
+      kind: card.kind === "sealed" ? "sealed" : "single",
+      href: card.kind === "sealed" ? "/p/" + card.id : "/c/" + card.id,
+    }, doc);
+    return flag ? { ...card, premiumFlag: flag } : card;
+  } catch {
+    return card;
+  }
+}
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   status,
@@ -121,6 +149,7 @@ export function pageKind(pathname) {
   if (path === "/creators") return "creators";
   if (path === "/post-office") return "post";
   if (path === "/premium") return "premium";
+  if (path === "/meter") return "meter";
   if (path === "/collection") return "collection";
   if (path === "/alerts") return "alerts";
   if (path === "/me") return "account";
@@ -192,6 +221,24 @@ export function addFeedEntry(html) {
     '<div class="actions">\n      <a class="btn btn-primary" href="/feed">Open the Feed</a>',
   );
   return out;
+}
+
+async function withMeter(html, fetchImpl) {
+  try {
+    const doc = await loadJson("market-meter.json", fetchImpl);
+    const block = gaugeHtml(doc?.market, { href: "/meter", asOf: doc?.asOf, published: doc?.published !== false });
+    if (!block || String(html).includes('id="market-meter"')) return html;
+    let out = String(html);
+    const anchor = '<p class="beta" id="fresh">';
+    if (out.includes(anchor)) {
+      const at = out.indexOf("</p>", out.indexOf(anchor));
+      if (at > 0) return out.slice(0, at + 4) + block + out.slice(at + 4);
+    }
+    if (out.includes("<footer>")) return out.replace("<footer>", block + "<footer>");
+    return out;
+  } catch {
+    return html;
+  }
 }
 
 async function withToday(html, fetchImpl) {
@@ -539,9 +586,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   let countsDoc = null;
   try {
     countsDoc = await loadJson("counts.json", fetchImpl);
-    stamp = clockLabel(countsDoc.updatedAt);
+    stamp = freshLabel(countsDoc.updatedAt, countsDoc.asOf);
     asOf = countsDoc.asOf || "";
-    setPriceBanner(priceBannerLine(countsDoc.updatedAt));
+    const newest = newestStamp(countsDoc.updatedAt, countsDoc.asOf);
+    setPriceBanner(priceBannerLine(newest ? new Date(newest.t).toISOString() : ""));
   } catch {
     stamp = "";
     setPriceBanner("");
@@ -560,7 +608,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   const trackOpen = trackRecordIsOpen(trackDoc);
   setTrackRecordOpen(trackOpen);
-  const pageOpts = { ...opts, asOf };
+  const pageOpts = { ...opts, asOf, postOffice: opts.postOffice === true || postOfficeOn(opts) };
+  setPostOfficeOpen(pageOpts.postOffice);
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
@@ -568,8 +617,11 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return proxyPublic(rel, fetchImpl);
   }
   if (kind === "sitemap") {
-    if (path !== "/sitemap-00.xml") return withTrackInSitemap(await proxyPublic(path.slice(1), fetchImpl), trackOpen, false);
-    return withTrackInSitemap(await withReleasesInSitemap(await proxyPublic(path.slice(1), fetchImpl)), trackOpen, true);
+    const first = path === "/sitemap-00.xml";
+    let map = await proxyPublic(path.slice(1), fetchImpl);
+    if (first) map = await withReleasesInSitemap(map);
+    map = await withTrackInSitemap(map, trackOpen, first);
+    return withoutPostOfficeInSitemap(map, pageOpts.postOffice === true);
   }
   if (kind === "feed") {
     const readId = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
@@ -585,7 +637,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     const soldOn = await soldFileExists(fetchImpl);
     const liveNews = await loadFeedNews(fetchImpl);
-    const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews };
+    let leadIds = [];
+    try {
+      const order = await loadJson("feed/lead-order.json", fetchImpl);
+      if (Array.isArray(order?.ids)) leadIds = order.ids.filter((id) => typeof id === "string");
+    } catch { leadIds = []; }
+    const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews, leadIds };
     if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
     if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
@@ -614,7 +671,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           rotation = { mark: row.mark || "", status: row.status || "", asOf, until: daysLeft != null && daysLeft >= 0 ? until : "", daysLeft: daysLeft != null && daysLeft >= 0 ? daysLeft : null };
         }
       }
-      const facts = await loadReadFacts(id, fetchImpl);
+      const factsP = loadReadFacts(id, fetchImpl);
+      const sparkP = /^[a-z0-9-]+$/.test(slug) ? loadSetIndexes(slug, fetchImpl).catch(() => null) : null;
+      let facts = await factsP;
+      if (facts && facts.setMomentum) facts = applySetSpark(facts, slug, sparkP ? await sparkP : null);
       if (!rotation && facts?.rotation && (facts.rotation.mark || facts.rotation.status)) rotation = { mark: facts.rotation.mark || "", status: facts.rotation.status || "", asOf: facts.rotation.asOf || "", until: "", daysLeft: null };
       return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation, facts }));
     }
@@ -633,12 +693,20 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderSets(sets, stamp, pageOpts));
   }
   if (kind === "promos") return html(pageChrome("Promos", renderPromos(), "Promos", stamp, "", pageOpts.feed));
+  if (kind === "meter") {
+    const doc = await loadJson("market-meter.json", fetchImpl).catch(() => null);
+    const range = opts.range === "all" ? "all" : "1m";
+    const set = String(opts.set || "");
+    return html(pageChrome("", renderMeterPage(doc, { range, set }), "Market meter", stamp, "", pageOpts.feed));
+  }
   if (kind === "set") {
     const slug = decodeURIComponent(path.slice("/sets/".length));
     try {
       const setDoc = await loadJson(`sets/${slug}.json`, fetchImpl);
       const extra = await setFeatureHtml(slug, fetchImpl);
-      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name, ...extra }));
+      const meterDoc = await loadJson("market-meter.json", fetchImpl).catch(() => null);
+      const meterHtml = gaugeHtml(meterDoc?.sets?.[slug], { href: `/meter?set=${encodeURIComponent(slug)}`, asOf: meterDoc?.asOf, published: meterDoc?.published !== false, kicker: setDoc?.name || "Set" });
+      return html(renderSetShell(slug, stamp, { ...pageOpts, title: setDoc?.name, meterHtml, ...extra }));
     } catch {
       if (SET_PAIRS[slug]) {
         const valueDoc = await loadJson(`set-value/${slug}.json`, fetchImpl).catch(() => null);
@@ -729,7 +797,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           const pic = officialSrc({ id: hit.id, kind: "single" }, images);
           const reads = await cardReadSplit(hit.id, fetchImpl);
           const conditionNote = await conditionNoteFor(fetchImpl);
-          return html(renderCard(row, stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
+          return html(renderCard(await withPremium(row, fetchImpl), stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
@@ -757,10 +825,20 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         const dive = await loadDive(sealedId, fetchImpl);
         listingSeries = Array.isArray(dive?.series) ? dive.series : [];
         const latest = dive?.latest && typeof dive.latest === "object" ? dive.latest : null;
-        const amount = Number(latest?.priceMedian);
+        const amount = Number(latest?.ebayMedianAsk || latest?.askMedian || latest?.priceMedian);
+        const count = Number(latest?.ebayMedianCount || latest?.askRobustCount || latest?.listingCount);
         const asOf = String(latest?.lastSeen || "").slice(0, 10);
         const source = String(latest?.source || "").trim();
-        if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = { amount, asOf, source };
+        const cheap = latest?.cheapestReal;
+        if (amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) ebayAsk = {
+          amount,
+          count: Number.isInteger(count) && count >= 1 ? count : null,
+          asOf,
+          source,
+          cheapest: cheap && Number(cheap.price) > 0 && cheap.url ? cheap : null,
+          tcgListed: Number(latest?.tcgListedMedian) > 0 ? Number(latest.tcgListedMedian) : null,
+          tcgMarket: Number(card?.price) > 0 ? Number(card.price) : null,
+        };
       } catch { listingSeries = []; }
     }
     const productReads = card ? await itemReadsTop(cardId, fetchImpl) : [];
@@ -785,6 +863,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     let rotationFact = "";
     let cycleHtml = "";
     let ratingHtml = "";
+    const setIndexP = card && /^[a-z0-9-]+$/.test(String(card.setSlug || "")) ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : null;
     if (card && card.setSlug) {
       const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
@@ -856,8 +935,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     let itemReadHtml = "";
     if (card && card.setSlug) {
-      const itemRead = await loadItemRead(card.setSlug, card.id, fetchImpl);
-      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true });
+      const itemRaw = await loadItemRead(card.setSlug, card.id, fetchImpl);
+      const itemRead = itemRaw && itemRaw.setMomentum ? applySetSpark(itemRaw, card.setSlug, setIndexP ? await setIndexP : null) : itemRaw;
+      const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true, kind: card.kind });
       if (block) itemReadHtml = block;
       const l = itemRead?.listings;
       if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date, pct: Number.isFinite(l.pct) ? l.pct : null, prevDay: l.prevDate || "" };
@@ -900,7 +980,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(card, stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    return html(renderCard(await withPremium(card, fetchImpl), stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -939,9 +1019,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
+    if (!pageOpts.postOffice) return noindex(html(renderPostClosed(pageOpts)));
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") {
+    if (premiumMode({ PREMIUM_MODE: opts.premiumMode }) !== "live") {
+      return html(renderWaitlistPage({ feed: pageOpts.feed === true }));
+    }
     const proof = await loadJson("premium-proof.json", fetchImpl).catch(() => null);
     return html(renderPremium(stamp, { ...pageOpts, proof }));
   }
@@ -1062,6 +1146,8 @@ const worker = {
     setAffiliateConfig(env);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    const premiumHit = await handlePremiumRequest(request, env, fetchImpl);
+    if (premiumHit) return premiumHit;
     if (url.pathname === "/reads/brief") return handleBrief(request, env, { fetchImpl });
     if (url.pathname === "/reads/email/length") return handleLengthLink(request, env);
     if (url.pathname === "/reads/email/confirm" || url.pathname === "/reads/email/stop") {
@@ -1096,6 +1182,10 @@ const worker = {
       }
     }
     if (readPage && url.pathname === "/post-office/app") {
+      if (!postOfficeOn(env)) {
+        setPostOfficeOpen(false);
+        return noindex(html(renderPostClosed({})));
+      }
       try {
         const counts = await loadJson("counts.json", fetchImpl);
         const mark = await liveStamp(fetchImpl);
@@ -1110,7 +1200,7 @@ const worker = {
     if (request.method === "GET" && url.pathname === "/signin") return handleSignIn(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord") return beginDiscord(request, env);
     if (request.method === "GET" && url.pathname === "/auth/discord/callback") return finishDiscord(request, env, fetchImpl);
-    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout(request);
+    if ((request.method === "POST" || request.method === "GET") && url.pathname === "/auth/logout") return logout(request, env);
     if (request.method === "GET" && url.pathname === POCKET_PATH) {
       try {
         const body = await pocketDocument(fetchImpl);
@@ -1266,7 +1356,15 @@ const worker = {
       const back = url.searchParams.get("premium");
       const here = norm(url.pathname);
       if ((here === "/" || here === "/premium") && (back === "success" || back === "cancel")) {
-        return html(renderPremiumResult(back));
+        if (premiumMode(env) === "live") {
+          if (back === "success") {
+            const sid = String(url.searchParams.get("session_id") || "");
+            if (sid) {
+              try { await noteConverted(env, sid, fetchImpl); } catch { /* a return page still renders */ }
+            }
+          }
+          return html(renderPremiumResult(back));
+        }
       }
       if (!feed && gatedFeedPath(url.pathname)) return home302();
       const dest = redirectPath(url.pathname);
@@ -1315,14 +1413,14 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
         }
       }
       if (kind === "data") {
-        try { return await renderPath(url.pathname, fetchImpl, { feed, waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }); }
+        try { return await renderPath(url.pathname, fetchImpl, { feed, premiumMode: premiumMode(env), waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }); }
         catch { return new Response("Not found", { status: 404 }); }
       }
     }
@@ -1345,9 +1443,22 @@ const worker = {
       if (type.includes("text/html")) {
         headers.set("cache-control", "no-store");
         headers.set("cdn-cache-control", "no-store");
-        return new Response(ensureAffiliation(withChartKit(await withToday(addFeedEntry(await asset.text()), fetchImpl))), { status: asset.status, headers });
+        return new Response(ensureAffiliation(withChartKit(await withToday(await withMeter(paintHomePostOffice(addFeedEntry(paintPublicHtml(await asset.text(), url.pathname, env)), postOfficeOn(env)), fetchImpl), fetchImpl))), { status: asset.status, headers });
       }
       return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/robots.txt" && !postOfficeOn(env) && env?.ASSETS?.fetch) {
+      const robot = await env.ASSETS.fetch(request);
+      if (robot.ok) {
+        let text = await robot.text();
+        if (!/Disallow:\s*\/post-office/i.test(text)) {
+          text = text.replace(/\s*$/, "\n") + "Disallow: /post-office\nDisallow: /build\n";
+        }
+        const headers = new Headers(robot.headers);
+        headers.set("content-type", "text/plain; charset=utf-8");
+        headers.set("cache-control", "no-store");
+        return new Response(request.method === "HEAD" ? null : text, { status: robot.status, headers });
+      }
     }
     const asset = await env.ASSETS.fetch(request);
     if (asset.status === 404 && wantsHtml(request, url.pathname)) return notFoundPage(feedEnabled(env));
@@ -1356,8 +1467,9 @@ const worker = {
     if (type.includes("text/html")) {
       headers.set("cache-control", "no-store");
       headers.set("cdn-cache-control", "no-store");
-      const raw = await asset.text();
-      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(raw, fetchImpl)) : raw;
+      const raw = paintPublicHtml(await asset.text(), url.pathname, env);
+      const homed = norm(url.pathname) === "/" ? paintHomePostOffice(raw, postOfficeOn(env)) : raw;
+      const body = norm(url.pathname) === "/" ? withChartKit(await withToday(await withMeter(homed, fetchImpl), fetchImpl)) : homed;
       return new Response(ensureAffiliation(body), { status: asset.status, statusText: asset.statusText, headers });
     }
     return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
@@ -1468,6 +1580,14 @@ export async function withTrackInSitemap(res, open, first) {
   const loc = "<url><loc>https://catchemtcg.com/track-record</loc></url>";
   text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/track-record\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
   if (open && first && text.includes("</urlset>")) text = text.replace("</urlset>", loc + "\n</urlset>");
+  return new Response(text, { status: res.status, headers: res.headers });
+}
+
+export async function withoutPostOfficeInSitemap(res, open) {
+  if (!res || !res.ok || open) return res;
+  let text = await res.text();
+  text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/post-office\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
+  text = text.replace(/<url>\s*<loc>https:\/\/catchemtcg\.com\/build\/?<\/loc>[\s\S]*?<\/url>\s*/g, "");
   return new Response(text, { status: res.status, headers: res.headers });
 }
 

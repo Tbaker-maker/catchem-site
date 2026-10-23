@@ -28,7 +28,7 @@ const doc = {
 };
 t("page kind", pageKind("/weekly") === "weekly" && pageKind("/scanner") === "scanner");
 t("forming and staircase stay off until they pass", parseWeeklyPattern(doc.patterns[1]) === null && parseWeeklyPattern(doc.patterns[2]) === null);
-t("a passed pattern is one sentence without the private rates", parseWeeklyPattern(doc.patterns[0]).text === "Breakaway on singles, up. This pattern was right 38.5% of the time vs 30.4% normally, over 692 cases, looking 7 days ahead.");
+t("a passed pattern is one sentence without the private rates", parseWeeklyPattern(doc.patterns[0]).text === "1.3x more likely than usual to rise and finish above the usual move within 7 days. Breakaway on singles, up. 38.5% of 692 past cases vs 30.4% for all items." && !/\bright\b/.test(parseWeeklyPattern(doc.patterns[0]).text) && !scannerBody(doc).toLowerCase().includes("right"));
 const body = weeklyBody(doc, {});
 t("movers keep the prices, the dates, and a card link", body.includes("Scizor ex") && body.includes("108/115") && body.includes("$45.99") && body.includes("$183.44") && body.includes("+298.9%") && body.includes('href="/c/tcgcsv-88967"') && body.includes("Oct 10, 2026") && body.includes("Oct 13, 2026") && !body.includes("Missing prices"));
 t("empty listings stay off", !body.includes("Listings counted") && !body.includes("stays empty"));

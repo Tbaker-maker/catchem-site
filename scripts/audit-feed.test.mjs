@@ -9,5 +9,5 @@ if (!ui.includes("feedDay && asOf>=feedDay) return false;")) { console.log("FAIL
 console.log("ok   same-night reads skip the bucket fetch");
 if (ui.includes("replace(/[\\s,;·]+$/") || !ui.includes("replace(/[ ,;]+$/,\"\")")) { console.log("FAIL feed source regex has no backslashes inside the inline script"); process.exit(1); }
 console.log("ok   feed source trim survives the template literal");
-if (!ui.includes("Open on a story, not a plain price move.")) { console.log("FAIL client feed opens on a story"); process.exit(1); }
-console.log("ok   client feed opens on a story");
+if (!ui.includes("Interest leads the feed. A tiny move does not open it.")) { console.log("FAIL client feed does not rank by interest"); process.exit(1); }
+console.log("ok   client feed opens on interest");
