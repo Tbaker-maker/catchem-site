@@ -12,6 +12,7 @@ import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
+import { SEALED_SHELF_CSS, shelfClientSource } from "./sealed-shelf.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
@@ -1862,7 +1863,8 @@ ${opts.meterHtml || ""}
 ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(slug)}
 ${opts.setValueHtml || ""}
 <style>.st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.st-tile{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none;min-width:0}.st-k{font:600 12px/1.2 var(--sans);color:var(--gold)}.st-tile b{font:650 20px/1.1 var(--sans)}.st-n{font:500 12px/1.3 var(--sans);opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:600px){.st-tiles{grid-template-columns:1fr 1fr}.st-tile:last-child{grid-column:1/-1}}.jump{position:sticky;top:56px;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:8px 0;margin:8px 0;background:#12100e;scrollbar-width:none}.jump a{flex:0 0 auto;padding:8px 16px;border-radius:999px;border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}</style>
-<div id="lines"></div><nav class="jump" aria-label="Jump to"><a href="#charts">Charts</a><a href="#set-filters">Cards</a><a href="#sections">Sections</a></nav><div id="charts"></div>
+<style>${SEALED_SHELF_CSS}</style>
+<div id="lines"></div><div id="seal-shelf"></div><nav class="jump" aria-label="Jump to"><a href="#charts">Charts</a><a href="#set-filters">Cards</a><a href="#sections">Sections</a></nav><div id="charts"></div>
 <div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters" id="set-filters"><button type="button" id="mine-toggle" aria-pressed="false">My set</button><select id="scope" aria-label="Set scope"><option value="">All</option><option value="master">Master set</option><option value="grand">Grand master</option><option value="base">Base set only</option></select>
 <select id="kind" aria-label="Kind"><option value="">Singles and sealed</option><option value="single">Singles</option><option value="sealed">Sealed</option></select>
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
@@ -1884,7 +1886,7 @@ function html(s){
     return "&"+"#39;";
   });
 }
-let rows=[], shown=48, setLogo="";
+let rows=[], shown=48, setLogo="", shelfIds={};
 ${artType.toString()}
 let catImages={};
 ${cataloguePath.toString()}
@@ -1898,6 +1900,7 @@ ${officialSrc.toString()}
 ${altAttr.toString()}
 ${nextImage.toString()}
 ${brandedTile.toString()}
+${shelfClientSource()}
 function miss(img){
   if(nextImage(img)) return;
   var d=document.createElement("div");
@@ -2002,6 +2005,7 @@ function draw(){
   const sort=document.getElementById("sort").value;
   let list=expand(rows, scope);
   list=list.filter(r=>!kind||r.kind===kind);
+  list=list.filter(r=>!(r.kind==="sealed" && shelfIds[r.id]));
   list=list.filter(r=>r.kind!=="sealed"||Number(r.price)>0);
   const vsel=document.getElementById("vtag");
   if(vsel && vsel.options.length===1){var seenT={};rows.forEach(function(r){(r.tags||[]).forEach(function(t){seenT[t]=(seenT[t]||0)+1;});});Object.keys(seenT).sort().forEach(function(t){var o=document.createElement("option");o.value=t;o.textContent=t+" ("+seenT[t]+")";vsel.appendChild(o);});}
@@ -2104,6 +2108,15 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   if(dc){ dc.setAttribute("data-chart", JSON.stringify(data.sealedIndex||[])); dc.setAttribute("data-release", data.release||""); }
   if(typeof catchemMount==="function") catchemMount(document.getElementById("charts"));
   rows=(data.items||[]).filter(r=>r&&r.name);
+  try {
+    var cdoc={products:[]};
+    var cutRes=await fetch("/data/sealed-cutouts.json");
+    if(cutRes.ok) cdoc=await cutRes.json();
+    var shelf=sealedShelfHtml(rows, cdoc, data.asOf||"");
+    shelfIds=(shelf&&shelf.ids)||{};
+    var shelfHost=document.getElementById("seal-shelf");
+    if(shelfHost) shelfHost.innerHTML=(shelf&&shelf.html)||"";
+  } catch(e) { shelfIds={}; }
   rowDay=(function(d){d=String(d||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return "";return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][Number(d.slice(5,7))-1]+" "+Number(d.slice(8,10));})(data.asOf);
   draw();
 }).catch(function(){
