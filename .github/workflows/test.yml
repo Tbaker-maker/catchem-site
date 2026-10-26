@@ -57,6 +57,7 @@ jobs:
       - run: node scripts/sealed-cutout-product.test.mjs
       - run: node scripts/set-logo.test.mjs
       - run: node scripts/share-card.test.mjs
+      - run: node scripts/return-visit.test.mjs
       - run: node scripts/finish.test.mjs
       - run: node scripts/edge-cache.test.mjs
       - run: node scripts/strip-index.test.mjs

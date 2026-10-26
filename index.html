@@ -66,7 +66,7 @@ a{color:var(--gold)}
 .brand{font:600 clamp(56px,15vw,104px)/.9 var(--serif);letter-spacing:-.035em;margin:0;max-width:100%;font-variation-settings:'opsz' 144}
 .brand span{color:var(--gold)}
 .kicker{font:600 12.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:0 0 16px}
-h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin:0 0 18px;max-width:22ch;text-wrap:balance;font-variation-settings:'opsz' 96}
+h1{font:500 clamp(31px,5.2vw,46px)/1.1 Georgia,'Times New Roman',serif;letter-spacing:-.02em;margin:0 0 18px;max-width:22ch}
 .lede{color:var(--soft);font-size:19px;margin:0 0 30px;max-width:38ch}
 .lede strong{color:var(--text);font-weight:500}
 .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
@@ -188,6 +188,18 @@ footer a{color:var(--gold)}
 }
 @media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
 @media (min-width:1280px){.site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}}
+.since{margin:18px 0 8px}
+.since-kicker{margin:0 0 10px;font:600 13px/1.2 var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--gold)}
+.since-list{display:grid;gap:10px}
+.since-row{display:flex;align-items:center;gap:8px;min-height:72px;padding:12px 12px 12px 16px;border-radius:22px;background:#1a1815;border:1px solid #2f2b26}
+.since-row a{flex:1;min-width:0;color:inherit;text-decoration:none;font:500 16px/1.45 var(--sans)}
+.since-note{margin:0;color:var(--soft);font:500 16px/1.45 var(--sans)}
+.since-skel{display:grid;gap:10px}
+.since-skel span{display:block;height:72px;border-radius:22px;background:#1a1815}
+.itap{display:inline-flex;position:relative;vertical-align:middle;min-width:44px;min-height:44px;align-items:center;justify-content:center;color:var(--soft);cursor:pointer;flex:none}
+.itap-i{width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;display:inline-flex;align-items:center;justify-content:center}
+.itap-pop{display:none;position:absolute;z-index:30;right:0;top:100%;width:max-content;max-width:min(260px,70vw);padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;color:var(--text);font:500 13px/1.4 var(--sans);text-align:left}
+.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}
 </style>
 </head>
 <body>
@@ -201,6 +213,7 @@ footer a{color:var(--gold)}
     <a href="/heatmap">Heatmap</a>
     <a href="/artists">Artists</a>
     <a href="/search">Search</a>
+    <a href="/watch">Watch</a>
     <a class="po-beta-link" href="/post-office" data-po="closed">Post Office <span class="po-beta">Closed Beta</span></a>
     <a href="https://discord.gg/fUSjxDX4Hy" rel="noopener">Discord Premium</a>
   </nav>
@@ -215,6 +228,11 @@ footer a{color:var(--gold)}
   <div>
     <p class="kicker">Built with the community</p>
     <h1>Know what every card and pack is doing.</h1>
+    <section id="since-visit" class="since" aria-live="polite" aria-busy="true">
+      <p class="since-kicker" id="since-kicker">Since your last visit</p>
+      <div class="since-skel" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div id="since-list"></div>
+    </section>
     <p class="lede">From Base Set to the latest drops.</p>
     <form class="hero-search" action="/search" method="get" role="search">
       <input id="home-q" name="q" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="home-finder" aria-label="Search every card and product" placeholder="Search a card, set or product" autocomplete="off">
@@ -483,6 +501,38 @@ footer a{color:var(--gold)}
         b.disabled=false; b.textContent="Join the list";
       })
       .catch(function(){ f.submit(); });
+  });
+})();
+</script>
+<noscript><style>#since-visit{display:none}</style></noscript>
+<script>
+(function(){
+  var box=document.getElementById("since-visit");
+  if(!box) return;
+  var KEY="catchem-visit-day";
+  var since="";
+  try{ since=localStorage.getItem(KEY)||""; }catch(e){}
+  var url="/api/return-visit"+(since?"?since="+encodeURIComponent(since):"");
+  function hide(){ box.hidden=true; box.removeAttribute("aria-busy"); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ if(c==="&")return "&"+"amp;"; if(c==="<")return "&"+"lt;"; if(c===">")return "&"+"gt;"; if(c==='"')return "&"+"quot;"; return "&"+"#39;"; }); }
+  fetch(url).then(function(res){ return res.ok?res.json():null; }).catch(function(){ return null; }).then(function(doc){
+    box.removeAttribute("aria-busy");
+    var skel=box.querySelector(".since-skel");
+    if(skel) skel.remove();
+    if(!doc || (!doc.lines || !doc.lines.length) && !doc.note){ hide(); return; }
+    var kicker=document.getElementById("since-kicker");
+    if(kicker) kicker.textContent=doc.title || "Since your last visit";
+    var list=document.getElementById("since-list");
+    var html="";
+    if(doc.note && (!doc.lines || !doc.lines.length)) html='<p class="since-note">'+esc(doc.note)+'</p>';
+    else html=(doc.lines||[]).map(function(row){
+      var know=row.know?'<span class="itap" tabindex="0" role="button" aria-label="How we know: '+esc(row.know)+'"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">'+esc(row.know)+'</span></span>':'';
+      return '<div class="since-row"><a href="'+esc(row.href||"/")+'">'+esc(row.text||"")+'</a>'+know+'</div>';
+    }).join("");
+    if(list) list.innerHTML=html;
+    if(doc.asOf && /^\d{4}-\d{2}-\d{2}$/.test(doc.asOf)){
+      try{ localStorage.setItem(KEY, doc.asOf); }catch(e){}
+    }
   });
 })();
 </script>

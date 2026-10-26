@@ -23,6 +23,7 @@ import { glanceChips, interestScore, listingsWording, pinIds, rankLead, readMove
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 import { SIGNAL_CSS, SIGNAL_CLIENT, TILE_JS, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
+import { RETURN_CSS, RETURN_BOOT, returnActions, watchDocument, howWeKnow } from "./return-visit.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -1698,9 +1699,9 @@ function chrome(active, body, title, stamp, extraFoot = "", feed = false, share 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
-<style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
+<style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}${RETURN_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/collection", "Collection")}${item("/heatmap", "Heatmap")}${item("/rip", "Rip value")}${item("/reads", "Reads")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/sets", "Sets")}${item("/search", "Search")}${item("/promos", "Promos")}${item("/indexes", "Indexes")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}${item("/premium", "Premium")}</div></details>
+${feedLink}${item("/collection", "Collection")}${item("/heatmap", "Heatmap")}${item("/rip", "Rip value")}${item("/reads", "Reads")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/sets", "Sets")}${item("/search", "Search")}${item("/watch", "Watch")}${item("/promos", "Promos")}${item("/indexes", "Indexes")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}${item("/premium", "Premium")}</div></details>
 </nav></header>
 ${banner}
 ${fresh}
@@ -1749,7 +1750,7 @@ window.cropCardEdge=function(img){
 };
 </script>
 <script>${CHART_JS}\n${HISTORY_JS}</script>
-<script>window.addEventListener("error",function(e){var body=JSON.stringify({message:String(e.message||""),source:String(e.filename||""),line:e.lineno||0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});window.addEventListener("unhandledrejection",function(e){var reason=e.reason;var message=reason&&reason.message?String(reason.message):String(reason||"");var body=JSON.stringify({message:message,source:"",line:0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});</script></body></html>`;
+<script>window.addEventListener("error",function(e){var body=JSON.stringify({message:String(e.message||""),source:String(e.filename||""),line:e.lineno||0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});window.addEventListener("unhandledrejection",function(e){var reason=e.reason;var message=reason&&reason.message?String(reason.message):String(reason||"");var body=JSON.stringify({message:message,source:"",line:0,at:new Date().toISOString()});try{navigator.sendBeacon("/api/client-log",new Blob([body],{type:"application/json"}))}catch(err){fetch("/api/client-log",{method:"POST",headers:{"content-type":"application/json"},body:body,keepalive:true})}});</script><script>${RETURN_BOOT}</script></body></html>`;
 }
 
 function spark(values) {
@@ -3011,7 +3012,8 @@ ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " +
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span></p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${infoTap(`${sourceLine(card) || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price"))}</p>`}`}
+${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span></p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${priceKnow(card, endDay, opts)}</p>`}`}
+${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : (view.selected ? Number(view.selected.amount) : Number(card.price)), track: opts.trackLine || "" })}
 ${view.html}
 ${held ? "" : chips}
 ${strip}
@@ -3061,6 +3063,19 @@ document.getElementById("paid-form").addEventListener("submit",function(ev){
 export function sourceLine(card) {
   const src = String(card && card.source || "TCGplayer market");
   return /^tcgcsv-/.test(String(card && card.id || "")) && !/tcgcsv/i.test(src) ? `${src} via TCGCSV` : src;
+}
+
+function priceKnow(card, endDay, opts, source) {
+  const src = source || sourceLine(card);
+  const text = howWeKnow({
+    source: src,
+    date: String(endDay || "").slice(0, 10),
+    track: opts && opts.trackLine || "",
+  });
+  if (text) return infoTap(text);
+  const when = priceDay(endDay);
+  const fallback = `${src || "TCGplayer market"} price${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`.replace(/price price/i, "price");
+  return infoTap(fallback);
 }
 
 // Chart series for a card: fan-site fill only before our first own night (and,
@@ -3234,11 +3249,10 @@ export function renderCard(card, stamp, opts = {}) {
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
   const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
-  const priceSource = askFallback ? "eBay asking prices" : "TCGplayer market price";
   const priceHtml = price
-    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${infoTap(`TCGplayer market price${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${priceKnow(card, endDay, opts)}</p>`
     : (askFallback
-      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${infoTap(`${priceSource}${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`
+      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${priceKnow(card, endDay, opts, "eBay asks")}</p>`
       : `<p class="px">Price being checked</p>`);
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
@@ -3285,6 +3299,7 @@ ${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<sec
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
 ${priceHtml}
+${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
 ${sealedStrip}
 <!--jump-->
 <section id="price">${changeHtml}
@@ -7608,6 +7623,13 @@ boot();
     description: feedDesc,
     url: feedUrl,
     ...(shareImage ? { image: shareImage, imageAlt: read.name || read.headline || "Catch'em read" } : {}),
+  });
+}
+
+export function renderWatch(stamp, opts = {}) {
+  return chrome("Watch", watchDocument(), "Watch", stamp, "", feedNav(opts), {
+    description: "Products you watch on this device. Changes use the dated TCGplayer market price.",
+    url: "https://catchemtcg.com/watch",
   });
 }
 
