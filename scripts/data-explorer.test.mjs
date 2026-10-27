@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { flagLine } from "../src/advice-rules.mjs";
 import {
   cleanText,
+  copyFlags,
+  isAskSource,
   dataExplorerResponse,
   explorerLog,
   money,
@@ -60,7 +62,8 @@ const docs = {
     summary: "Of 1 read in 90 days, 1 moved the way the read described.",
     rows: [
       { date: "2026-10-27", name: "151 Elite Trainer Box", said: "Recorded at $495.14.", priceThen: 495.14, priceNow: null, source: "TCGplayer market", priceDate: "2026-10-27", kind: "sealed", moved: null },
-      { date: "2026-10-01", name: "Heat Rotom", said: "Recorded at $10. Not a sold price.", priceThen: 10, priceNow: 12, source: "TCGplayer market", kind: "single", moved: true },
+      { date: "2026-10-01", name: "Heat Rotom", said: "Recorded at $10.", priceThen: 10, priceNow: 12, source: "TCGplayer market", kind: "single", moved: true },
+      { date: "2026-09-30", name: "Ask Box", said: "Recorded at $320.", priceThen: 300, priceNow: 350, source: "eBay asking prices", kind: "sealed", moved: false },
     ],
   },
 };
@@ -89,7 +92,12 @@ assert.equal(money(0), "No price");
 assert.equal(money(495.14), "$495.14");
 assert.equal(moveText(22.2), "Up \u25B2 +22.2%");
 assert.equal(moveText(-10), "Down \u25BC -10.0%");
-assert.equal(cleanText("A \u2014 B sold via Collectr"), "A - B listings counted via a price file");
+// Flags never rewrite words.
+assert.equal(cleanText("A \u2014 B sold via Collectr"), "A - B sold via Collectr");
+assert.deepEqual(copyFlags("A \u2014 B sold via Collectr"), ["em or en dash", "say listings counted", "no Collectr in public copy"]);
+assert.deepEqual(copyFlags("151 Elite Trainer Box"), []);
+assert.equal(isAskSource("eBay asking prices"), true);
+assert.equal(isAskSource("TCGplayer market"), false);
 
 const hub = renderExplorer("", docs, {});
 assert.ok(hub.includes("Catch'em"));
@@ -151,10 +159,21 @@ const reads = renderExplorer("reads", docs, {});
 assert.ok(reads.includes("Not scored yet."));
 assert.ok(reads.includes("Moved the way the read described."));
 assert.ok(reads.includes("No price"));
-assert.ok(reads.includes("listings counted"));
 assert.ok(!/\bsold\b/i.test(reads));
+// eBay asking prices never show as recorded prices.
+assert.equal(/\$3[025]0/.test(reads), false);
+assert.ok(reads.includes("No TCGplayer price on file for this read."));
+assert.ok(reads.includes("Listings counted on eBay"));
 assert.equal(/condition/i.test(textOf(reads)), false);
 assertClean(reads, "reads");
+
+// Default sort is by name, so a big outlier move never leads the page.
+for (const id of ["sealed", "singles", "history"]) {
+  assert.ok(renderExplorer(id, docs, {}).includes('<option value="name" selected>'), id + " default sort");
+}
+const hubCss = renderExplorer("", docs, {});
+assert.equal(/serif,Georgia|ui-serif/.test(hubCss), false, "sans-serif only");
+assert.ok(hubCss.includes("header.wrap{padding-bottom:0}"), "no gap under logo");
 
 const named = renderExplorer("sets", docs, { sort: "name" });
 const text = textOf(named);

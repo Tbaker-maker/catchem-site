@@ -50,6 +50,7 @@ jobs:
       - run: node scripts/editor-image.test.mjs
       - run: node scripts/sealed-pid.test.mjs
       - run: node scripts/ebay-query.test.mjs
+      - run: node scripts/data-explorer.test.mjs
       - run: node scripts/card-img.test.mjs
       - run: node scripts/set-logo.test.mjs
       - run: node scripts/share-card.test.mjs

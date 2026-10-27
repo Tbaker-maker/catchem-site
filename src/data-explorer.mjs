@@ -1,7 +1,8 @@
-// Data Explorer. Reads published Catchem-data files on main. No scraping.
+// Data Explorer. Reads published Catchem-data files through data.mjs. No scraping.
 // Attached from site-entry.mjs so src/index.mjs stays untouched.
 
-const ORIGIN = "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/";
+import { fetchRepo } from "./data.mjs";
+
 const FILES = {
   sets: "research/assets/public/sets.json",
   listings: "research/assets/public/listings-counted.json",
@@ -42,21 +43,33 @@ function esc(s) {
   });
 }
 
+// Copy rules flag, they never rewrite. cleanText only tidies whitespace.
+// Dashes in third-party product names show as a plain hyphen so no page
+// carries an em or en dash. Words are never swapped.
 export function cleanText(s) {
-  return String(s ?? "")
-    .replace(/\u2014/g, " - ")
-    .replace(/\u2013/g, " - ")
-    .replace(/\bsold\b/gi, "listings counted")
-    .replace(/\bCollectr\b/gi, "a price file")
-    .replace(/\s+/g, " ")
-    .trim();
+  return String(s ?? "").replace(/\s*[\u2013\u2014]\s*/g, " - ").replace(/\s+/g, " ").trim();
+}
+
+const FLAG_RULES = [
+  [/[\u2013\u2014]/, "em or en dash"],
+  [/\bsold\b/i, "say listings counted"],
+  [/\bCollectr\b/i, "no Collectr in public copy"],
+];
+
+export function copyFlags(s) {
+  const text = String(s ?? "");
+  return FLAG_RULES.filter(([re]) => re.test(text)).map(([, why]) => why);
+}
+
+// eBay asks are listings, not recorded prices. Only TCGplayer prices show.
+export function isAskSource(source) {
+  return /ebay/i.test(String(source || ""));
 }
 
 function sealedName(s) {
   return cleanText(s)
     .replace(/\b(NM|LP|MP|HP|DMG)\b/g, "")
     .replace(/\bnear mint\b/gi, "")
-    .replace(/\bcondition\b/gi, "")
     .replace(/\s+/g, " ")
     .replace(/\s+([,.)])/g, "$1")
     .trim();
@@ -326,12 +339,16 @@ function readRows(doc) {
     if (r.moved === true) { turned = "Moved the way the read described."; filter = "moved"; }
     else if (r.moved === false) { turned = "Did not move the way the read described."; filter = "not"; }
     const kind = r.kind === "sealed" ? "Sealed." : "Single.";
+    const ask = isAskSource(r.source);
+    const prices = ask
+      ? "No TCGplayer price on file for this read."
+      : "Price then " + money(r.priceThen) + ". Price now " + money(r.priceNow) + ".";
     return row({
       title: r.kind === "sealed" ? sealedName(r.name) : cleanText(r.name),
-      detail: kind + " " + (r.said || "") + " Price then " + money(r.priceThen) + ". Price now " + money(r.priceNow) + ". " + turned,
-      source: r.source || "",
+      detail: kind + " " + (ask ? "" : (r.said || "") + " ") + prices + " " + turned,
+      source: ask ? "Listings counted on eBay" : (r.source || ""),
       date: r.date || "",
-      price: num(r.priceNow),
+      price: ask ? null : num(r.priceNow),
       filter,
     }, i);
   });
@@ -369,8 +386,8 @@ export function logSpec(id, docs) {
       intro: movers ? "File date " + (movers.asOf || "No date") + ". Sealed only." : "This file did not load.",
       rows: movers ? sealedRows(movers) : [],
       filters: [["all", "All"], ["rising", "Rising"], ["falling", "Falling"]],
-      sorts: [["published", "As published"], ["name", "Name"], ["price", "Price"], ["move", "Change"]],
-      defSort: "published",
+      sorts: [["name", "Name"], ["published", "As published"], ["price", "Price"], ["move", "Change"]],
+      defSort: "name",
     };
   }
   if (id === "singles") {
@@ -379,8 +396,8 @@ export function logSpec(id, docs) {
       intro: movers ? "File date " + (movers.asOf || "No date") + "." : "This file did not load.",
       rows: movers ? singleRows(movers) : [],
       filters: [["all", "All"], ["rising", "Rising"], ["falling", "Falling"]],
-      sorts: [["published", "As published"], ["name", "Name"], ["price", "Price"], ["move", "Change"]],
-      defSort: "published",
+      sorts: [["name", "Name"], ["published", "As published"], ["price", "Price"], ["move", "Change"]],
+      defSort: "name",
     };
   }
   if (id === "listings") {
@@ -399,8 +416,8 @@ export function logSpec(id, docs) {
       intro: movers ? "First and last point on file. File date " + (movers.asOf || "No date") + "." : "This file did not load.",
       rows: movers ? historyRows(movers) : [],
       filters: [["all", "All"], ["single", "Singles"], ["sealed", "Sealed"]],
-      sorts: [["date", "Newest end date"], ["name", "Name"], ["move", "Change"]],
-      defSort: "date",
+      sorts: [["name", "Name"], ["date", "Newest end date"], ["move", "Change"]],
+      defSort: "name",
     };
   }
   if (id === "pulse") {
@@ -481,8 +498,8 @@ const CSS = [
   ":root{--bg:#12100e;--txt:#efe9de;--gold:#d9b779;--card:#1c1916;--line:rgba(239,233,222,.14);--muted:rgba(239,233,222,.72)}",
   "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:17px/1.45 ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}",
   "a{color:inherit}.wrap{max-width:880px;margin:0 auto;padding:20px 16px 64px}",
-  ".logo{font-family:ui-serif,Georgia,serif;font-size:22px;color:var(--gold);text-decoration:none;display:inline-flex;align-items:center;min-height:44px}",
-  "h1{font-family:ui-serif,Georgia,serif;font-weight:560;font-size:34px;letter-spacing:-.03em;margin:8px 0 8px}",
+  "header.wrap{padding-bottom:0}main.wrap{padding-top:4px}.logo{font-family:inherit;font-weight:700;letter-spacing:-.02em;font-size:22px;color:var(--gold);text-decoration:none;display:inline-flex;align-items:center;min-height:44px}",
+  "h1{font-family:inherit;font-weight:700;font-size:34px;letter-spacing:-.03em;margin:8px 0 8px}",
   ".sub,.meta{color:var(--muted)} .sub{margin:0 0 18px}",
   ".choice{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:14px 16px;background:var(--card);border-radius:18px;text-decoration:none;margin:0 0 10px}",
   ".choice b{display:block;font-size:18px}.choice span{color:var(--muted);font-size:14px}",
@@ -544,7 +561,7 @@ export async function loadDocs(fetchImpl = fetch) {
   if (cache && now - cacheAt < 5 * 60 * 1000) return cache;
   const entries = await Promise.all(Object.entries(FILES).map(async ([key, path]) => {
     try {
-      const res = await fetchImpl(ORIGIN + path);
+      const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: 300 } });
       if (!res || !res.ok) return [key, null];
       return [key, await res.json()];
     } catch {
