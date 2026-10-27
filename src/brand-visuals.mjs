@@ -208,7 +208,7 @@ export const BRAND_CSS = `
 .bv-hh{min-height:44px;display:flex;align-items:flex-end;color:${BRAND.dim};font:600 13px/1.2 ${BRAND.font}}
 .bv-hh:first-child{position:sticky;left:0;background:#1a1815;z-index:2}
 .bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2}
-.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.06)}
+.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.16)}
 .bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
 .bv-ph{width:36px;border-radius:8px;background:#2a2622}
 .bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px}
@@ -359,21 +359,19 @@ export function legacyPage(rows = PULSE_SAMPLE) {
 export function brandShareSvg(card) {
   const lines = card.lines || [];
   const hasImg = Boolean(card.imageUrl);
-  // Header and footer stay pinned. Hero + months sit in the middle band
-  // so the square never reads as an empty middle with a watermark ghost.
+  // Pack hero + months under the title. Four or more months go two-up.
+  // A light plate behind the product hides white CDN paper (Celebrations ETB).
   const col = lines.length >= 4;
   const monthRows = col ? Math.ceil(lines.length / 2) : Math.max(lines.length, 1);
   const monthBlock = monthRows * 52;
   const heroH = 150;
-  const gap = 36;
-  const blockH = heroH + gap + monthBlock;
-  const bandTop = 200;
-  const bandBot = 880;
-  const blockTop = bandTop + Math.max(0, Math.floor((bandBot - bandTop - blockH) / 2));
+  const gap = 28;
+  const blockTop = 210;
   const bigY = blockTop + heroH - 20;
   const lineStart = bigY + gap + 20;
+  const footY = Math.min(920, lineStart + monthRows * 52 + 100);
   const img = hasImg
-    ? `<defs><clipPath id="shareImg"><rect x="700" y="${blockTop}" width="280" height="280" rx="24"/></clipPath></defs><rect x="700" y="${blockTop}" width="280" height="280" rx="24" fill="#1a1815"/><image href="${esc(card.imageUrl)}" x="700" y="${blockTop}" width="280" height="280" preserveAspectRatio="xMidYMid meet" clip-path="url(#shareImg)"/>`
+    ? `<defs><clipPath id="shareImg"><rect x="700" y="${blockTop}" width="280" height="280" rx="24"/></clipPath></defs><rect x="700" y="${blockTop}" width="280" height="280" rx="24" fill="#cfc6b6"/><image href="${esc(card.imageUrl)}" x="700" y="${blockTop}" width="280" height="280" preserveAspectRatio="xMidYMid meet" clip-path="url(#shareImg)"/>`
     : "";
   const lineHtml = lines.map((line, i) => {
     const second = col && i >= Math.ceil(lines.length / 2);
@@ -391,9 +389,9 @@ export function brandShareSvg(card) {
 ${img}
 <text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="156">${esc(card.big)}</text>
 ${lineHtml}
-<text x="72" y="920" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.source)}</text>
-<text x="72" y="964" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.date)}</text>
-<text x="72" y="1014" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="30">${esc(String(card.href || "").replace("https://", ""))}</text>
+<text x="72" y="${footY}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.source)}</text>
+<text x="72" y="${footY + 44}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.date)}</text>
+<text x="72" y="${footY + 94}" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="30">${esc(String(card.href || "").replace("https://", ""))}</text>
 </svg>`;
 }
 

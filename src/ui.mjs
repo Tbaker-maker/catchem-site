@@ -72,6 +72,7 @@ export function feedFilterOptions(hasSoldFile) {
     ["conditions", "Condition prices"],
     ["setshare", "Set share"],
     ["mktmove", "Market moved"],
+    ["still", "Nothing moved"],
   ];
   if (hasSoldFile === true) {
     const at = rows.findIndex((row) => row[0] === "conditions");
@@ -4470,7 +4471,11 @@ export function renderDive(doc, stamp, opts = {}) {
     });
   }
   const latest = doc.latest || {};
-  const median = Number(latest.ebayMedianAsk || latest.askMedian || latest.priceMedian);
+  // eBay asks are listings counted, not sealed price. Never fall back to priceMedian as Median ask.
+  const ask = Number(latest.ebayMedianAsk || latest.askMedian);
+  const market = Number(latest.priceMedian);
+  const hasAsk = Number.isFinite(ask) && ask > 0;
+  const median = hasAsk ? ask : (Number.isFinite(market) && market > 0 ? market : NaN);
   const series = (Array.isArray(doc.series) ? doc.series : []).filter((row) => {
     const price = Number(row?.price);
     return !(median > 0 && price > 0 && price < median * 0.3);
@@ -4478,9 +4483,12 @@ export function renderDive(doc, stamp, opts = {}) {
   const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
-  const price = money(median || latest.priceMedian);
+  const price = money(median);
   const count = Number(latest.ebayMedianCount || latest.askRobustCount || latest.listingCount);
-  const medianNote = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask";
+  const priceLabel = hasAsk ? "Median ask" : "TCGplayer market";
+  const medianNote = hasAsk
+    ? (Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask")
+    : "TCGplayer market price";
   const listingsHtml = latest.listingCount != null ? esc(String(latest.listingCount)) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
@@ -4504,11 +4512,11 @@ export function renderDive(doc, stamp, opts = {}) {
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
-<p class="muted">Median ask. ${esc(medianNote)}. ${listingsHtml} eBay listings counted.</p>
+<p class="muted">${esc(priceLabel)}. ${esc(medianNote)}.${hasAsk ? ` ${listingsHtml} eBay listings counted.` : ""}</p>
 ${buyoutLine}
-${chartBox(hist, "Median ask, daily")}
+${chartBox(hist, hasAsk ? "Median ask, daily" : "TCGplayer market, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
-<thead><tr><th align="left">Date</th><th align="left">Median ask</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<thead><tr><th align="left">Date</th><th align="left">${esc(priceLabel)}</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
 <tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
 </table>
 ${volumeLine}
@@ -4520,8 +4528,8 @@ ${catalog}
   const diveDesc = [
     latest.set || "",
     latest.subtype || "",
-    price ? `Median ask ${price}` : "Median ask series",
-    "asks, not solds",
+    price ? `${priceLabel} ${price}` : (hasAsk ? "Median ask series" : "TCGplayer market series"),
+    hasAsk ? "asks, not solds" : "TCGplayer market",
   ].filter(Boolean).join(" · ");
   return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
     description: diveDesc,
