@@ -367,7 +367,8 @@ export function brandShareSvg(card) {
   const img = hasImg
     ? `<image href="${esc(card.imageUrl)}" x="700" y="140" width="300" height="300" preserveAspectRatio="xMidYMax meet"/>`
     : "";
-  const footY = Math.max(860, lineStart + lines.length * lineStep + 80);
+  // Keep the footer on the heels of the months so the square is packed, not hollow.
+  const footY = lineStart + Math.max(lines.length, 1) * lineStep + 100;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img">
 <title>${esc(card.title)}</title>
