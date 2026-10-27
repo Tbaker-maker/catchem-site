@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { gaugeHtml, renderMeterPage, meterEmailBlock, meterPlainLine, historyWindow, adviceFree } from "../src/market-meter.mjs";
 import { pageKind } from "../src/index.mjs";
 import { meterEmailBlock as blockAgain } from "../src/market-meter.mjs";
+import { runBrandVisualTests } from "./brand-visuals.test.mjs";
 
 let fail = 0;
 const t = (n, c) => { console.log(`${c ? "  ok " : "  FAIL"} ${n}`); if (!c) fail++; };
@@ -58,4 +59,5 @@ t("set page reserves the gauge slot", ui.includes("${opts.meterHtml || \"\"}"));
 t("/meter is a page", pageKind("/meter") === "meter");
 t("score 0 and 100 still render", gaugeHtml({ ...slice, mood: 0, moodBand: "Extreme fear" }).includes("--end:-90.0deg") && gaugeHtml({ ...slice, mood: 100, moodBand: "Extreme greed" }).includes("--end:90.0deg"));
 
+fail += runBrandVisualTests();
 if (fail) process.exit(1);
