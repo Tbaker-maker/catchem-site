@@ -356,19 +356,29 @@ export function legacyPage(rows = PULSE_SAMPLE) {
 
 export function brandShareSvg(card) {
   const lines = card.lines || [];
-  // Cluster the mark, title, big number, and months. No empty middle.
   const hasImg = Boolean(card.imageUrl);
-  const bigY = hasImg ? 340 : 300;
-  const lineStart = bigY + 70;
-  const lineStep = 42;
-  const lineHtml = lines.map((line, i) => {
-    return `<text x="72" y="${lineStart + i * lineStep}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="28">${esc(line)}</text>`;
-  }).join("");
+  // Header and footer stay pinned. Hero + months sit in the middle band
+  // so the square never reads as an empty middle with a watermark ghost.
+  const col = lines.length >= 4;
+  const monthRows = col ? Math.ceil(lines.length / 2) : Math.max(lines.length, 1);
+  const monthBlock = monthRows * 48;
+  const heroH = 150;
+  const gap = 36;
+  const blockH = heroH + gap + monthBlock;
+  const bandTop = 200;
+  const bandBot = 880;
+  const blockTop = bandTop + Math.max(0, Math.floor((bandBot - bandTop - blockH) / 2));
+  const bigY = blockTop + heroH - 20;
+  const lineStart = bigY + gap + 20;
   const img = hasImg
-    ? `<image href="${esc(card.imageUrl)}" x="700" y="140" width="300" height="300" preserveAspectRatio="xMidYMax meet"/>`
+    ? `<image href="${esc(card.imageUrl)}" x="680" y="${blockTop - 20}" width="320" height="320" preserveAspectRatio="xMidYMid meet"/>`
     : "";
-  // Keep the footer on the heels of the months so the square is packed, not hollow.
-  const footY = lineStart + Math.max(lines.length, 1) * lineStep + 100;
+  const lineHtml = lines.map((line, i) => {
+    const second = col && i >= Math.ceil(lines.length / 2);
+    const x = second ? 560 : 72;
+    const row = second ? i - Math.ceil(lines.length / 2) : i;
+    return `<text x="${x}" y="${lineStart + row * 48}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="30">${esc(line)}</text>`;
+  }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img">
 <title>${esc(card.title)}</title>
@@ -377,11 +387,11 @@ export function brandShareSvg(card) {
 <text x="72" y="100" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="34">${esc(BRAND.wordmark)}</text>
 <text x="72" y="168" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="32">${esc(card.title)}</text>
 ${img}
-<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="128">${esc(card.big)}</text>
+<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="140">${esc(card.big)}</text>
 ${lineHtml}
-<text x="72" y="${footY}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.source)}</text>
-<text x="72" y="${footY + 40}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.date)}</text>
-<text x="72" y="${footY + 90}" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="26">${esc(String(card.href || "").replace("https://", ""))}</text>
+<text x="72" y="920" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.source)}</text>
+<text x="72" y="960" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.date)}</text>
+<text x="72" y="1010" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="26">${esc(String(card.href || "").replace("https://", ""))}</text>
 </svg>`;
 }
 
