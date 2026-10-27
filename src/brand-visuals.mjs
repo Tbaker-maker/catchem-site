@@ -3,7 +3,7 @@
 
 import { ALLOWED_IMAGE_HOSTS, allowedImageUrl, BRAND } from "./brand.mjs";
 
-export const AS_OF = "2026-10-24";
+export const AS_OF = "2026-10-27";
 export const SOURCE = "TCGplayer market";
 export const BASELINE = 76;
 
@@ -36,8 +36,8 @@ function cell(month, pct, price, priceDate) {
 export const MARKET_MEDIAN = Object.freeze([
   { ym: "2026-07", pct: -0.5532 },
   { ym: "2026-08", pct: -1.1614 },
-  { ym: "2026-09", pct: -0.8145 },
-  { ym: "2026-10", pct: -1.055 },
+  { ym: "2026-09", pct: -0.8687 },
+  { ym: "2026-10", pct: -1.6587 },
 ]);
 
 // Four rows on file, including misses and a down month. Not a win list.
@@ -51,8 +51,8 @@ export const PULSE_SAMPLE = Object.freeze([
     cells: [
       cell("2026-07", -5.989, 2510.64, "2026-07-31"),
       cell("2026-08", -2.2592, 2453.92, "2026-08-31"),
-      cell("2026-09", -5.8343, 2310.75, "2026-09-29"),
-      cell("2026-10", -4.1463, 2214.94, "2026-10-24"),
+      cell("2026-09", -6.4146, 2296.51, "2026-09-30"),
+      cell("2026-10", -5.1195, 2178.94, "2026-10-27"),
     ],
   },
   {
@@ -64,8 +64,8 @@ export const PULSE_SAMPLE = Object.freeze([
     cells: [
       cell("2026-07", null, null, null),
       cell("2026-08", null, null, null),
-      cell("2026-09", null, 1450, "2026-09-29"),
-      cell("2026-10", 5.7441, 1533.29, "2026-10-24"),
+      cell("2026-09", null, null, null),
+      cell("2026-10", null, 1561.08, "2026-10-27"),
     ],
   },
   {
@@ -77,8 +77,8 @@ export const PULSE_SAMPLE = Object.freeze([
     cells: [
       cell("2026-07", -19.4703, 164.49, "2026-07-31"),
       cell("2026-08", -7.5202, 152.12, "2026-08-31"),
-      cell("2026-09", -8.204, 139.64, "2026-09-29"),
-      cell("2026-10", -10.2048, 125.39, "2026-10-24"),
+      cell("2026-09", -8.204, 139.64, "2026-09-30"),
+      cell("2026-10", -14.3011, 119.67, "2026-10-27"),
     ],
   },
   {
@@ -90,8 +90,8 @@ export const PULSE_SAMPLE = Object.freeze([
     cells: [
       cell("2026-07", -15.4902, 422.49, "2026-07-31"),
       cell("2026-08", -16.372, 353.32, "2026-08-31"),
-      cell("2026-09", 1.4463, 358.43, "2026-09-29"),
-      cell("2026-10", -6.4727, 335.23, "2026-10-24"),
+      cell("2026-09", 0.9963, 356.84, "2026-09-30"),
+      cell("2026-10", -6.4146, 333.95, "2026-10-27"),
     ],
   },
 ]);
@@ -160,7 +160,7 @@ function monthsOf(rows) {
   return seen;
 }
 
-export function heatmapHtml(rows = PULSE_SAMPLE) {
+export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
   const months = monthsOf(rows);
   const head = [`<div class="bv-hh">Product</div>`]
     .concat(months.map((m) => `<div class="bv-hh">${esc(monthLabel(m))}</div>`))
@@ -173,16 +173,19 @@ export function heatmapHtml(rows = PULSE_SAMPLE) {
       const up = c.direction === "up";
       const cls = up ? "bv-cell bv-up" : "bv-cell";
       const wash = up ? Math.min(0.4, Math.abs(Number(c.pct)) / 40).toFixed(2) : "0";
-      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + label)}">${esc(label)}</button>`;
+      const src = c.priceSource === "archived-market" ? " Mirrored." : "";
+      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + label + src)}">${esc(label)}</button>`;
     }).join("");
     return name + cells;
   }).join("");
-  const last = MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
+  const last = opts.median || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
+  const source = opts.source || SOURCE;
+  const asOf = opts.asOf || AS_OF;
   return `<section class="bv-card" id="heat">
     <div class="bv-scroll">
       <div class="bv-heat" style="--m:${months.length}">${head}${body}</div>
     </div>
-    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(SOURCE)}, ${esc(prettyDay(AS_OF))}. A blank month says No reading. These rows are on file. Not a full list.</p>
+    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(source)}, ${esc(prettyDay(asOf))}. A blank month says No reading. These rows are on file.</p>
   </section>`;
 }
 
@@ -219,15 +222,81 @@ export const BRAND_CSS = `
 .bv-shares svg{width:100%;height:auto;border-radius:${BRAND.radius}px}
 `.trim();
 
-export function brandPage(rows = PULSE_SAMPLE) {
-  const pulse = pulseShareCard();
-  const sealed = sealedShareCard();
+
+
+export const MIRROR_NOTE = "Mirrored history is labeled on each cell until Catch'em has a full year of its own. Each figure is listings counted.";
+
+export function rowsFromPulseDoc(doc) {
+  const rows = Array.isArray(doc && doc.rows) ? doc.rows : [];
+  return rows
+    .filter((r) => r && r.set && Array.isArray(r.cells) && r.cells.length)
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      set: r.set,
+      type: r.type || "etb",
+      tcgPlayerId: r.tcgPlayerId != null ? Number(r.tcgPlayerId) : null,
+      logo: r.logo || null,
+      about: r.about || null,
+      usedMirror: !!r.usedMirror,
+      cells: (r.cells || []).map((c) => {
+        const pct = c && c.pct != null && Number.isFinite(Number(c.pct)) ? Number(c.pct) : null;
+        const built = cell(c.month, pct, c.price != null ? Number(c.price) : null, c.priceDate || null);
+        built.priceSource = c.priceSource || null;
+        built.listingsCount = c.listingsCount != null ? c.listingsCount : null;
+        return built;
+      }),
+    }));
+}
+
+export function medianFromDoc(doc) {
+  const med = doc && doc.marketMedian;
+  if (!med || typeof med !== "object") return MARKET_MEDIAN;
+  return Object.keys(med)
+    .sort()
+    .map((ym) => ({ ym, pct: med[ym] }));
+}
+
+export function brandPageFromDoc(doc) {
+  const rows = rowsFromPulseDoc(doc);
+  const use = rows.length ? rows : PULSE_SAMPLE;
+  const asOf = (doc && doc.asOf) || AS_OF;
+  const source = (doc && doc.source) || SOURCE;
+  const about = (doc && doc.about) || "";
+  const medians = medianFromDoc(doc);
+  const last = medians[medians.length - 1] || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
+  const months = monthsOf(use);
+  // Prefer the latest months in view on phones: scroll script stays; note names the window.
+  const heat = heatmapHtml(use, { asOf, source, median: last, about });
+  const pulse = {
+    id: "pulse-median",
+    title: "Sealed market median",
+    big: pctLabel(last.pct),
+    sealed: true,
+    lines: medians.slice(-4).map((row) => monthLabel(row.ym) + " " + pctLabel(row.pct)),
+    source,
+    date: prettyDay(asOf),
+    href: "https://catchemtcg.com/sealed-pulse",
+  };
+  const lead = use[0];
+  const leadCell = lead && lead.cells ? lead.cells[lead.cells.length - 1] : null;
+  const sealed = {
+    id: "sealed-box",
+    title: lead ? lead.name : "Sealed",
+    big: money(leadCell && leadCell.price),
+    sealed: true,
+    lines: ["Month change " + pctLabel(leadCell && leadCell.pct)],
+    source,
+    date: prettyDay(asOf),
+    href: "https://catchemtcg.com/sealed-pulse",
+  };
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sealed Market Pulse</title><style>${BRAND_CSS}</style></head><body class="bv-page">
 <a class="bv-mark" href="https://catchemtcg.com/">${esc(BRAND.wordmark)}</a>
 <p class="bv-kicker">Sealed Market Pulse</p>
 <h1>Month end market.</h1>
-<p class="bv-src">${esc(SOURCE)}. ${esc(prettyDay(AS_OF))}.</p>
-${heatmapHtml(rows)}
+<p class="bv-src">${esc(source)}. ${esc(prettyDay(asOf))}.</p>
+${heat}
+<p class="bv-note">${esc(MIRROR_NOTE)}</p>
 <section class="bv-shares" id="shares">
   <h2>Share cards</h2>
   ${brandShareSvg(pulse)}
@@ -235,6 +304,10 @@ ${heatmapHtml(rows)}
 </section>
 <script>var s=document.querySelector(".bv-scroll");if(s)s.scrollLeft=s.scrollWidth;</script>
 </body></html>`;
+}
+
+export function brandPage(rows = PULSE_SAMPLE) {
+  return brandPageFromDoc({ asOf: AS_OF, source: SOURCE, marketMedian: Object.fromEntries(MARKET_MEDIAN.map((m) => [m.ym, m.pct])), rows });
 }
 
 export function legacyHeatmapHtml(rows = PULSE_SAMPLE) {
@@ -299,7 +372,7 @@ export function pulseShareCard() {
     lines: MARKET_MEDIAN.map((row) => monthLabel(row.ym) + " " + pctLabel(row.pct)),
     source: SOURCE,
     date: prettyDay(AS_OF),
-    href: "https://catchemtcg.com/meter",
+    href: "https://catchemtcg.com/sealed-pulse",
   };
 }
 
@@ -315,8 +388,24 @@ export function sealedShareCard() {
     lines: ["Month change " + pctLabel(oct.pct)],
     source: SOURCE,
     date: prettyDay(AS_OF),
-    href: "https://catchemtcg.com/meter",
+    href: "https://catchemtcg.com/sealed-pulse",
   };
 }
 
 export { ALLOWED_IMAGE_HOSTS };
+
+
+export async function sealedPulseResponse(request, env = {}) {
+  const { loadJson } = await import("./data.mjs");
+  const fetchImpl = env.PUBLIC_FETCH || fetch;
+  let doc = null;
+  try { doc = await loadJson("sealed-market-pulse.json", fetchImpl); } catch { doc = null; }
+  const html = brandPageFromDoc(doc || { asOf: AS_OF, source: SOURCE, marketMedian: Object.fromEntries(MARKET_MEDIAN.map((m) => [m.ym, m.pct])), rows: PULSE_SAMPLE });
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "public, max-age=300",
+    },
+  });
+}
