@@ -825,7 +825,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         const dive = await loadDive(sealedId, fetchImpl);
         listingSeries = Array.isArray(dive?.series) ? dive.series : [];
         const latest = dive?.latest && typeof dive.latest === "object" ? dive.latest : null;
-        const amount = Number(latest?.ebayMedianAsk || latest?.askMedian || latest?.priceMedian);
+        // eBay asks are listings counted, not a sealed price (2026-10-27).
+        // Never fall back to priceMedian: that is TCGplayer market.
+        const amount = Number(latest?.ebayMedianAsk || latest?.askMedian);
         const count = Number(latest?.ebayMedianCount || latest?.askRobustCount || latest?.listingCount);
         const asOf = String(latest?.lastSeen || "").slice(0, 10);
         const source = String(latest?.source || "").trim();

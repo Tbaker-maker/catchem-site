@@ -71,10 +71,7 @@ export function feedFilterOptions(hasSoldFile) {
     ["dive", "Dive"],
     ["conditions", "Condition prices"],
     ["setshare", "Set share"],
-    ["spread", "Ask spread"],
-    ["askmove", "Ask moved"],
     ["mktmove", "Market moved"],
-    ["still", "Nothing moved"],
   ];
   if (hasSoldFile === true) {
     const at = rows.findIndex((row) => row[0] === "conditions");
@@ -3283,7 +3280,7 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (Median ask series)</p>` : ""}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
 <details><summary>See the math</summary>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p><button type="button" id="paid">Report a price I paid</button></p>
@@ -7014,7 +7011,7 @@ async function showFlat(index, dir){
     host.innerHTML="";
     const p=document.createElement("p");
     p.className="muted";
-    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No TCGplayer market move is on file."};
     let msg=shapeEmpty[loopFilter]||"";
     if(!msg && loopFilter==="sealed") msg="No sealed reads tonight.";
     else if(!msg && loopFilter==="set" && !wantedSet) msg="Choose a set to see its reads.";
