@@ -1,5 +1,6 @@
 // Branded 1200x630 share card. SVG so the worker stays light: no raster
 // library, one cached response, the card photo is a same-origin path only.
+import { BRAND } from "./brand.mjs";
 const ORIGIN = "https://catchemtcg.com";
 const ERA_COLOR = {
   "mega evolution": "#7eb6ff",
@@ -17,7 +18,7 @@ const ERA_COLOR = {
   "ex": "#c8a2ff",
   original: "#e8c872",
   neo: "#9fd6c2",
-  "promos and extras": "#d4af37",
+  "promos and extras": BRAND.gold,
 };
 
 const xml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -101,34 +102,35 @@ export function shareSvg(search) {
   const img = safeImagePath(q.get("img"));
   const setName = clip(q.get("set"), 48);
   const era = clip(q.get("era"), 32);
-  const eraColor = ERA_COLOR[era.toLowerCase()] || "#d4af37";
+  const eraColor = ERA_COLOR[era.toLowerCase()] || BRAND.gold;
   const up = change.startsWith("+");
   const sealed = q.get("s") === "1";
-  const changeColor = !change ? "#b7b1a6" : up ? "#7fc79a" : "#e07a6a";
+  const changeColor = !change ? BRAND.dim : up ? BRAND.up : BRAND.dim;
   const photo = img
     ? `<image href="${xml(ORIGIN + img)}" x="56" y="78" width="280" height="392" preserveAspectRatio="xMidYMid meet" clip-path="url(#cardclip)"/>`
-    : `<text x="196" y="290" text-anchor="middle" fill="#d4af37" font-family="Georgia, serif" font-size="28">Catch'em</text>`;
+    : `<text x="196" y="290" text-anchor="middle" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="28">${BRAND.wordmark}</text>`;
   const badge = setName
-    ? `<g><rect x="390" y="118" width="${Math.min(520, 28 + setName.length * 16)}" height="44" rx="22" fill="none" stroke="${eraColor}" stroke-width="3"/><text x="412" y="148" fill="${eraColor}" font-family="system-ui, sans-serif" font-size="22" font-weight="600">${xml(setName)}</text></g>`
+    ? `<g><rect x="390" y="118" width="${Math.min(520, 28 + setName.length * 16)}" height="44" rx="22" fill="none" stroke="${eraColor}" stroke-width="3"/><text x="412" y="148" fill="${eraColor}" font-family="${BRAND.font}" font-size="22" font-weight="600">${xml(setName)}</text></g>`
     : "";
-  const numLine = num ? `<text x="390" y="250" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">${xml(num)}</text>` : "";
+  const numLine = num ? `<text x="390" y="250" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="28">${xml(num)}</text>` : "";
   const priceLine = price
-    ? `<text x="390" y="360" fill="#efe9de" font-family="Georgia, serif" font-size="72">${xml(price)}</text><text x="390" y="408" fill="#d4af37" font-family="system-ui, sans-serif" font-size="22">${sealed ? "" : (q.get("cond") === "NM" ? "NM · " : "")}TCGplayer market</text>`
-    : `<text x="390" y="360" fill="#b7b1a6" font-family="system-ui, sans-serif" font-size="28">No market price on file</text>`;
+    ? `<text x="390" y="360" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="72">${xml(price)}</text><text x="390" y="408" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="22">${sealed ? "" : (q.get("cond") === "NM" ? "NM · " : "")}TCGplayer market</text>`
+    : `<text x="390" y="360" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="28">No market price on file</text>`;
   const changeLine = change
-    ? `<text x="390" y="470" fill="${changeColor}" font-family="system-ui, sans-serif" font-size="36" font-weight="700">${xml(change)}</text>`
+    ? `<text x="390" y="470" fill="${changeColor}" font-family="${BRAND.font}" font-size="36" font-weight="700">${xml(change)}</text>`
     : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img">
 <title>${xml(name)}</title>
 <rect width="1200" height="630" rx="36" fill="#12100e"/>
-<rect x="18" y="18" width="1164" height="594" rx="28" fill="none" stroke="#2f2b26" stroke-width="2"/>
+<rect x="18" y="18" width="1164" height="594" rx="28" fill="none" stroke="${BRAND.gold}" stroke-width="6"/>
 <clipPath id="cardclip"><rect x="56" y="78" width="280" height="392" rx="18"/></clipPath>
 <rect x="56" y="78" width="280" height="392" rx="18" fill="#1a1815"/>
 ${photo}
-<text x="390" y="78" fill="#d4af37" font-family="Georgia, serif" font-size="28">Catch'em</text>
+<text x="600" y="590" text-anchor="middle" fill="${BRAND.ink}" fill-opacity="0.07" font-family="${BRAND.font}" font-size="96">${BRAND.wordmark}</text>
+<text x="390" y="78" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="28">${BRAND.wordmark}</text>
 ${badge}
-<text x="390" y="210" fill="#efe9de" font-family="Georgia, serif" font-size="42">${xml(name)}</text>
+<text x="390" y="210" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="42">${xml(name)}</text>
 ${numLine}
 ${priceLine}
 ${changeLine}
