@@ -10,8 +10,8 @@ export const BASELINE = 76;
 // Booster boxes are taller than ETBs. Both sit on BASELINE.
 export const KIND_HEIGHT = Object.freeze({
   "booster-box": 72,
-  "pc-etb": 50,
-  etb: 48,
+  "pc-etb": 58,
+  etb: 54,
   "booster-pack": 36,
 });
 
@@ -207,9 +207,9 @@ export const BRAND_CSS = `
 .bv-hh{min-height:44px;display:flex;align-items:flex-end;color:${BRAND.dim};font:600 13px/1.2 ${BRAND.font}}
 .bv-hh:first-child{position:sticky;left:0;background:#1a1815;z-index:2}
 .bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2}
-.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:64px}
-.bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:10px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
-.bv-ph{width:36px;border-radius:10px;background:#2a2622}
+.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.06)}
+.bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
+.bv-ph{width:36px;border-radius:8px;background:#2a2622}
 .bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px}
 .bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em}
 .bv-copy span{color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
@@ -356,27 +356,31 @@ export function legacyPage(rows = PULSE_SAMPLE) {
 
 export function brandShareSvg(card) {
   const lines = card.lines || [];
-  const lineStart = card.imageUrl ? 720 : 560;
+  // Cluster the mark, title, big number, and months. No empty middle.
+  const hasImg = Boolean(card.imageUrl);
+  const bigY = hasImg ? 340 : 300;
+  const lineStart = bigY + 70;
+  const lineStep = 42;
   const lineHtml = lines.map((line, i) => {
-    return `<text x="72" y="${lineStart + i * 44}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="30">${esc(line)}</text>`;
+    return `<text x="72" y="${lineStart + i * lineStep}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="28">${esc(line)}</text>`;
   }).join("");
-  const img = card.imageUrl
-    ? `<image href="${esc(card.imageUrl)}" x="720" y="200" width="280" height="280" preserveAspectRatio="xMidYMax meet"/>`
+  const img = hasImg
+    ? `<image href="${esc(card.imageUrl)}" x="700" y="140" width="300" height="300" preserveAspectRatio="xMidYMax meet"/>`
     : "";
-  const bigY = card.imageUrl ? 520 : 400;
+  const footY = Math.max(860, lineStart + lines.length * lineStep + 80);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img">
 <title>${esc(card.title)}</title>
 <rect width="1080" height="1080" rx="48" fill="${BRAND.paper}"/>
 <rect x="28" y="28" width="1024" height="1024" rx="36" fill="none" stroke="${BRAND.gold}" stroke-width="8"/>
-<text x="72" y="110" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="36">${esc(BRAND.wordmark)}</text>
-<text x="72" y="190" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="34">${esc(card.title)}</text>
+<text x="72" y="100" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="34">${esc(BRAND.wordmark)}</text>
+<text x="72" y="168" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="32">${esc(card.title)}</text>
 ${img}
-<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="112">${esc(card.big)}</text>
+<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="128">${esc(card.big)}</text>
 ${lineHtml}
-<text x="72" y="920" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.source)}</text>
-<text x="72" y="960" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.date)}</text>
-<text x="72" y="1010" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="26">${esc(String(card.href || "").replace("https://", ""))}</text>
+<text x="72" y="${footY}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.source)}</text>
+<text x="72" y="${footY + 40}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.date)}</text>
+<text x="72" y="${footY + 90}" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="26">${esc(String(card.href || "").replace("https://", ""))}</text>
 </svg>`;
 }
 
