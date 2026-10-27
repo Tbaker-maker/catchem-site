@@ -16,6 +16,9 @@ import {
   productImage,
   pulseShareCard,
   sealedShareCard,
+  rowsFromPulseDoc,
+  brandPageFromDoc,
+  MIRROR_NOTE,
 } from "../src/brand-visuals.mjs";
 
 const DASH = /[\u2014\u2013]/;
@@ -74,11 +77,11 @@ export function runBrandVisualTests() {
   const blocked = heatmapHtml([{ ...PULSE_SAMPLE[0], tcgPlayerId: null, image: "https://i.ebayimg.com/images/g/x.jpg", logo: "http://images.pokemontcg.io/swsh7/logo.png" }]);
   t("ebay and plain http never render", !blocked.includes("ebayimg") && !blocked.includes("<img") && !blocked.includes("http://images.pokemontcg.io"));
 
-  t("october box and a missing month stay the figures on file", heat.includes("-4.1%") && heat.includes("+5.7%") && heat.includes("No reading") && heat.includes("2214") === false);
-  t("median is the october figure", pctLabel(-1.055) === "-1.1%" && heat.includes("-1.1%"));
+  t("october box and a missing month stay the figures on file", heat.includes("-5.1%") && heat.includes("No reading") && heat.includes("2214") === false && heat.includes("-6.4%"));
+  t("median is the october figure", pctLabel(-1.6587) === "-1.7%" && heat.includes("-1.7%"));
   t("no em or en dash, no advice, no sold", !DASH.test(text) && !guard.test(text) && !SOLD.test(text));
   t("sealed share has no NM", sealed.sealed === true && pulse.sealed === true && !NM.test(sealedSvg) && !NM.test(pulseSvg) && !NM.test(visible(heat)));
-  t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/meter") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="120"'));
+  t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/sealed-pulse") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="120"'));
 
   const og = shareSvg(new URLSearchParams("n=Evolving%20Skies%20Booster%20Box&p=2214.94&s=1"));
   t("public share card uses the same gold and font", og.includes(BRAND.gold) && og.includes(BRAND.font) && og.includes("Catch'em") && !og.includes("#d4af37") && !og.includes("Georgia") && !NM.test(og));
@@ -88,6 +91,31 @@ export function runBrandVisualTests() {
   const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
   t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
   t("one date on the page", new Set(visible(page).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g)).size === 1);
+
+  const liveDoc = {
+    asOf: "2026-10-27",
+    source: "TCGplayer market",
+    about: "History before Oct 14 2026 comes from archived TCGplayer market prices.",
+    marketMedian: { "2026-09": -0.8687, "2026-10": -1.6587 },
+    rows: [
+      {
+        id: "swsh7-booster-box",
+        name: "Evolving Skies Booster Box",
+        set: "Evolving Skies",
+        type: "booster-box",
+        tcgPlayerId: "242436",
+        cells: [
+          { month: "2026-09", pct: -6.4146, price: 2296.51, priceDate: "2026-09-30", priceSource: "archived-market" },
+          { month: "2026-10", pct: -5.1195, price: 2178.94, priceDate: "2026-10-27", priceSource: "tcgcsv-daily" },
+        ],
+      },
+    ],
+  };
+  const liveRows = rowsFromPulseDoc(liveDoc);
+  t("live doc keeps Sep 30 archive month end", liveRows[0].cells[0].price === 2296.51 && liveRows[0].cells[0].priceDate === "2026-09-30" && liveRows[0].cells[0].priceSource === "archived-market");
+  t("live doc Oct is own print", liveRows[0].cells[1].price === 2178.94 && liveRows[0].cells[1].priceDate === "2026-10-27");
+  const livePage = brandPageFromDoc(liveDoc);
+  t("live page names the mirror note and sealed-pulse URL", livePage.includes(MIRROR_NOTE) && livePage.includes("sealed-pulse") && livePage.includes("-6.4%") && livePage.includes("-5.1%"));
 
   if (fail) console.log(`brand visuals: ${fail} failed`);
   else console.log("brand visuals: all passed");
