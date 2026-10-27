@@ -84,6 +84,11 @@ export function runBrandVisualTests() {
   t("public share card uses the same gold and font", og.includes(BRAND.gold) && og.includes(BRAND.font) && og.includes("Catch'em") && !og.includes("#d4af37") && !og.includes("Georgia") && !NM.test(og));
   t("before is the old equal square", legacy.includes("height:36px") && legacy.includes("#3ddc84") && legacy.includes("#ff7b72") && !legacy.includes(BRAND.gold) && !legacy.includes("data-h=\"72\""));
 
+  t("phone layout has no sticky column to overlap", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{grid-column:1\/-1;position:static/.test(page) && page.includes("min-width:0}"));
+  const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
+  t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
+  t("one date on the page", new Set(visible(page).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g)).size === 1);
+
   if (fail) console.log(`brand visuals: ${fail} failed`);
   else console.log("brand visuals: all passed");
   return fail;

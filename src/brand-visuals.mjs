@@ -123,7 +123,7 @@ export function prettyDay(iso) {
 
 function monthLabel(ym) {
   const [y, m] = String(ym).split("-");
-  return MONTHS[Number(m) - 1] + " " + String(y).slice(2);
+  return MONTHS[Number(m) - 1] + " " + String(y);
 }
 
 function esc(s) {
@@ -199,7 +199,7 @@ export const BRAND_CSS = `
 .bv-hh:first-child{position:sticky;left:0;background:#1a1815;z-index:2}
 .bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2}
 .bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:64px}
-.bv-stage img,.bv-ph{width:auto;display:block;object-fit:contain;object-position:center bottom}
+.bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:10px}
 .bv-ph{width:36px;border-radius:10px;background:#2a2622}
 .bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px}
 .bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em}
@@ -208,6 +208,14 @@ export const BRAND_CSS = `
 .bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.up}}
 .bv-note{margin:12px 0 0;color:${BRAND.dim};font:14px/1.4 ${BRAND.font}}
 .bv-shares{display:grid;gap:14px;margin-top:22px}
+@media (max-width:520px){
+.bv-scroll{overflow:visible}
+.bv-heat{grid-template-columns:repeat(var(--m),minmax(0,1fr));min-width:0}
+.bv-hh:first-child{display:none}
+.bv-hh{min-height:28px;justify-content:center}
+.bv-name{grid-column:1/-1;position:static;min-height:0;margin-top:8px}
+.bv-cell{font-size:14px;padding:8px 2px}
+}
 .bv-shares svg{width:100%;height:auto;border-radius:${BRAND.radius}px}
 `.trim();
 
@@ -303,10 +311,8 @@ export function sealedShareCard() {
     title: row.name,
     big: money(oct.price),
     sealed: true,
-    lines: [
-      prettyDay(oct.priceDate),
-      "Month change " + pctLabel(oct.pct),
-    ],
+    // One date per card: the file date in the footer.
+    lines: ["Month change " + pctLabel(oct.pct)],
     source: SOURCE,
     date: prettyDay(AS_OF),
     href: "https://catchemtcg.com/meter",
