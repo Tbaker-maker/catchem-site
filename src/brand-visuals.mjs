@@ -171,8 +171,9 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
       const c = (row.cells || []).find((item) => item.month === month) || { month, pct: null };
       const label = pctLabel(c.pct);
       const up = c.direction === "up";
-      const cls = up ? "bv-cell bv-up" : "bv-cell";
-      const wash = up ? Math.min(0.4, Math.abs(Number(c.pct)) / 40).toFixed(2) : "0";
+      const down = c.direction === "down";
+      const cls = up ? "bv-cell bv-up" : down ? "bv-cell bv-down" : "bv-cell";
+      const wash = (up || down) ? Math.min(0.45, Math.abs(Number(c.pct)) / 40).toFixed(2) : "0";
       const mirrored = c.priceSource === "archived-market" || c.mirrored === true;
       const readDay = c.readAt || c.priceDate || "";
       const srcBits = [];
@@ -207,7 +208,7 @@ export const BRAND_CSS = `
 .bv-hh{min-height:44px;display:flex;align-items:flex-end;color:${BRAND.dim};font:600 13px/1.2 ${BRAND.font}}
 .bv-hh:first-child{position:sticky;left:0;background:#1a1815;z-index:2}
 .bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2}
-.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.06)}
+.bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.16)}
 .bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
 .bv-ph{width:36px;border-radius:8px;background:#2a2622}
 .bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px}
@@ -215,6 +216,7 @@ export const BRAND_CSS = `
 .bv-copy span{color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
 .bv-cell{min-width:44px;min-height:44px;border:0;border-radius:14px;background:rgba(239,233,222,.06);color:${BRAND.dim};font-family:${BRAND.font};font-size:15px;font-weight:600;line-height:1.15;padding:8px 4px}
 .bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.up}}
+.bv-down{background:rgba(224,122,122,var(--wash));color:#e07a7a}
 .bv-note{margin:12px 0 0;color:${BRAND.dim};font:14px/1.4 ${BRAND.font}}
 .bv-foot{margin:28px 0 0;padding-top:14px;border-top:1px solid ${BRAND.line};color:${BRAND.dim};font:13px/1.4 ${BRAND.font}}
 .bv-shares{display:grid;gap:14px;margin-top:22px}
@@ -226,7 +228,7 @@ export const BRAND_CSS = `
 .bv-name{grid-column:1/-1;position:static;min-height:0;margin-top:8px}
 .bv-cell{font-size:14px;padding:8px 2px}
 }
-.bv-shares svg{width:100%;height:auto;border-radius:${BRAND.radius}px}
+.bv-shares svg{width:100%;height:auto;border-radius:${BRAND.radius}px;min-height:320px}
 `.trim();
 
 
@@ -357,41 +359,39 @@ export function legacyPage(rows = PULSE_SAMPLE) {
 export function brandShareSvg(card) {
   const lines = card.lines || [];
   const hasImg = Boolean(card.imageUrl);
-  // Header and footer stay pinned. Hero + months sit in the middle band
-  // so the square never reads as an empty middle with a watermark ghost.
+  // Pack hero + months under the title. Four or more months go two-up.
+  // A light plate behind the product hides white CDN paper (Celebrations ETB).
   const col = lines.length >= 4;
   const monthRows = col ? Math.ceil(lines.length / 2) : Math.max(lines.length, 1);
-  const monthBlock = monthRows * 48;
+  const monthBlock = monthRows * 52;
   const heroH = 150;
-  const gap = 36;
-  const blockH = heroH + gap + monthBlock;
-  const bandTop = 200;
-  const bandBot = 880;
-  const blockTop = bandTop + Math.max(0, Math.floor((bandBot - bandTop - blockH) / 2));
+  const gap = 28;
+  const blockTop = 210;
   const bigY = blockTop + heroH - 20;
   const lineStart = bigY + gap + 20;
+  const footY = Math.min(920, lineStart + monthRows * 52 + 100);
   const img = hasImg
-    ? `<image href="${esc(card.imageUrl)}" x="680" y="${blockTop - 20}" width="320" height="320" preserveAspectRatio="xMidYMid meet"/>`
+    ? `<defs><clipPath id="shareImg"><rect x="700" y="${blockTop}" width="280" height="280" rx="24"/></clipPath></defs><rect x="700" y="${blockTop}" width="280" height="280" rx="24" fill="#cfc6b6"/><image href="${esc(card.imageUrl)}" x="700" y="${blockTop}" width="280" height="280" preserveAspectRatio="xMidYMid meet" clip-path="url(#shareImg)"/>`
     : "";
   const lineHtml = lines.map((line, i) => {
     const second = col && i >= Math.ceil(lines.length / 2);
     const x = second ? 560 : 72;
     const row = second ? i - Math.ceil(lines.length / 2) : i;
-    return `<text x="${x}" y="${lineStart + row * 48}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="30">${esc(line)}</text>`;
+    return `<text x="${x}" y="${lineStart + row * 52}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="36">${esc(line)}</text>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img">
 <title>${esc(card.title)}</title>
 <rect width="1080" height="1080" rx="48" fill="${BRAND.paper}"/>
 <rect x="28" y="28" width="1024" height="1024" rx="36" fill="none" stroke="${BRAND.gold}" stroke-width="8"/>
-<text x="72" y="100" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="34">${esc(BRAND.wordmark)}</text>
-<text x="72" y="168" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="32">${esc(card.title)}</text>
+<text x="72" y="100" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="40">${esc(BRAND.wordmark)}</text>
+<text x="72" y="172" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="40">${esc(card.title)}</text>
 ${img}
-<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="140">${esc(card.big)}</text>
+<text x="72" y="${bigY}" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="156">${esc(card.big)}</text>
 ${lineHtml}
-<text x="72" y="920" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.source)}</text>
-<text x="72" y="960" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="26">${esc(card.date)}</text>
-<text x="72" y="1010" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="26">${esc(String(card.href || "").replace("https://", ""))}</text>
+<text x="72" y="${footY}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.source)}</text>
+<text x="72" y="${footY + 44}" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="30">${esc(card.date)}</text>
+<text x="72" y="${footY + 94}" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="30">${esc(String(card.href || "").replace("https://", ""))}</text>
 </svg>`;
 }
 

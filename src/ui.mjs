@@ -71,8 +71,6 @@ export function feedFilterOptions(hasSoldFile) {
     ["dive", "Dive"],
     ["conditions", "Condition prices"],
     ["setshare", "Set share"],
-    ["spread", "Ask spread"],
-    ["askmove", "Ask moved"],
     ["mktmove", "Market moved"],
     ["still", "Nothing moved"],
   ];
@@ -3283,7 +3281,7 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a> (Median ask series)</p>` : ""}
+${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
 <details><summary>See the math</summary>
 <p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
 <p><button type="button" id="paid">Report a price I paid</button></p>
@@ -4473,7 +4471,11 @@ export function renderDive(doc, stamp, opts = {}) {
     });
   }
   const latest = doc.latest || {};
-  const median = Number(latest.ebayMedianAsk || latest.askMedian || latest.priceMedian);
+  // eBay asks are listings counted, not sealed price. Never fall back to priceMedian as Median ask.
+  const ask = Number(latest.ebayMedianAsk || latest.askMedian);
+  const market = Number(latest.priceMedian);
+  const hasAsk = Number.isFinite(ask) && ask > 0;
+  const median = hasAsk ? ask : (Number.isFinite(market) && market > 0 ? market : NaN);
   const series = (Array.isArray(doc.series) ? doc.series : []).filter((row) => {
     const price = Number(row?.price);
     return !(median > 0 && price > 0 && price < median * 0.3);
@@ -4481,9 +4483,12 @@ export function renderDive(doc, stamp, opts = {}) {
   const hist = series.filter((r) => r && r.date && r.price != null).map((r) => [r.date, r.price]);
   const buyout = doc.buyout || null;
   const outlier = doc.outlier || null;
-  const price = money(median || latest.priceMedian);
+  const price = money(median);
   const count = Number(latest.ebayMedianCount || latest.askRobustCount || latest.listingCount);
-  const medianNote = Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask";
+  const priceLabel = hasAsk ? "Median ask" : "TCGplayer market";
+  const medianNote = hasAsk
+    ? (Number.isInteger(count) && count >= 1 ? `Middle price of ${count} eBay listings counted` : "Median ask")
+    : "TCGplayer market price";
   const listingsHtml = latest.listingCount != null ? esc(String(latest.listingCount)) : naChip();
   const browse = buyout && buyout.browseTotalNow != null ? String(buyout.browseTotalNow) : null;
   const rows = series.slice().reverse().map((r) => {
@@ -4507,11 +4512,11 @@ export function renderDive(doc, stamp, opts = {}) {
 ${imageTag(officialSrc({ id: doc.tcgcsvId, kind: "sealed", name: doc.name, subtype: latest.subtype }, null).src, "card", doc.name || "", { kind: "sealed", name: doc.name, subtype: latest.subtype, catalogueCrop: false })}
 <p class="muted">${esc(latest.set || "")} · ${esc(latest.subtype || "")} · as of ${esc(doc.asOf || "")}</p>
 <p class="price" style="font:600 28px/1 var(--serif);color:var(--gold)">${price || naChip()}</p>
-<p class="muted">Median ask. ${esc(medianNote)}. ${listingsHtml} eBay listings counted.</p>
+<p class="muted">${esc(priceLabel)}. ${esc(medianNote)}.${hasAsk ? ` ${listingsHtml} eBay listings counted.` : ""}</p>
 ${buyoutLine}
-${chartBox(hist, "Median ask, daily")}
+${chartBox(hist, hasAsk ? "Median ask, daily" : "TCGplayer market, daily")}
 <table style="width:100%;border-collapse:collapse;margin:16px 0">
-<thead><tr><th align="left">Date</th><th align="left">Median ask</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
+<thead><tr><th align="left">Date</th><th align="left">${esc(priceLabel)}</th><th align="left">Listings</th><th align="left">Source</th></tr></thead>
 <tbody>${rows || `<tr><td colspan="4" class="muted">No series points yet.</td></tr>`}</tbody>
 </table>
 ${volumeLine}
@@ -4523,8 +4528,8 @@ ${catalog}
   const diveDesc = [
     latest.set || "",
     latest.subtype || "",
-    price ? `Median ask ${price}` : "Median ask series",
-    "asks, not solds",
+    price ? `${priceLabel} ${price}` : (hasAsk ? "Median ask series" : "TCGplayer market series"),
+    hasAsk ? "asks, not solds" : "TCGplayer market",
   ].filter(Boolean).join(" · ");
   return chrome("", body, diveTitle, stamp, "", feedNav(opts), {
     description: diveDesc,
@@ -7014,7 +7019,7 @@ async function showFlat(index, dir){
     host.innerHTML="";
     const p=document.createElement("p");
     p.className="muted";
-    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No market move with a still ask is on file.",still:"No unchanged ask is on file."};
+    const shapeEmpty={quiet:"No quiet Near Mint window is on file.",mix:"No condition mix is on file.",conditions:"No pair of condition prices is on file.",soldflat:"No flat-price listings window is on file.",solddown:"No falling-price listings window is on file.",setshare:"No set share is on file.",spread:"No asking spread is on file.",askmove:"No ask move with a still market price is on file.",mktmove:"No TCGplayer market move is on file."};
     let msg=shapeEmpty[loopFilter]||"";
     if(!msg && loopFilter==="sealed") msg="No sealed reads tonight.";
     else if(!msg && loopFilter==="set" && !wantedSet) msg="Choose a set to see its reads.";
