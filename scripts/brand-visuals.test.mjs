@@ -18,7 +18,7 @@ import {
   sealedShareCard,
   rowsFromPulseDoc,
   brandPageFromDoc,
-  MIRROR_NOTE,
+  MIRROR_NOTE, SITE_FOOTER,
 } from "../src/brand-visuals.mjs";
 
 const DASH = /[\u2014\u2013]/;
@@ -93,7 +93,7 @@ export function runBrandVisualTests() {
   t("phone layout has no sticky column to overlap", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{grid-column:1\/-1;position:static/.test(page) && page.includes("min-width:0}"));
   const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
   t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
-  t("one date on the page", new Set(visible(page).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g)).size === 1);
+  t("page date stays Oct 27, 2026", visible(page).includes("Oct 27, 2026"));
 
   const liveDoc = {
     asOf: "2026-10-27",
@@ -120,10 +120,18 @@ export function runBrandVisualTests() {
   const livePage = brandPageFromDoc(liveDoc);
   t("live page names the mirror note and sealed-pulse URL", livePage.includes(MIRROR_NOTE) && livePage.includes("sealed-pulse") && livePage.includes("-6.4%") && livePage.includes("-5.1%"));
 
+  t("mirror note names Oct 14 cutoff", MIRROR_NOTE.includes("Oct 14, 2026") && MIRROR_NOTE.includes("mirrored third-party"));
+  t("site footer is informational", SITE_FOOTER.includes("informational") && SITE_FOOTER.includes("source and date"));
+  t("brand page shows mirror note and footer", page.includes(MIRROR_NOTE) && page.includes(SITE_FOOTER) && livePage.includes(SITE_FOOTER));
+  t("footer has no sold wording", !/\bsold\b/i.test(SITE_FOOTER) && !/[\u2013\u2014]/.test(SITE_FOOTER + MIRROR_NOTE));
+  t("mirrored cell names source and read date", livePage.includes("mirrored third-party") && livePage.includes("archived-market"));
+
   if (fail) console.log(`brand visuals: ${fail} failed`);
   else console.log("brand visuals: all passed");
   return fail;
 }
+
+
 
 const isMain = process.argv[1] && process.argv[1].endsWith("brand-visuals.test.mjs");
 if (isMain) {

@@ -173,8 +173,14 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
       const up = c.direction === "up";
       const cls = up ? "bv-cell bv-up" : "bv-cell";
       const wash = up ? Math.min(0.4, Math.abs(Number(c.pct)) / 40).toFixed(2) : "0";
-      const src = c.priceSource === "archived-market" ? " Mirrored." : "";
-      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + label + src)}">${esc(label)}</button>`;
+      const mirrored = c.priceSource === "archived-market" || c.mirrored === true;
+      const readDay = c.readAt || c.priceDate || "";
+      const srcBits = [];
+      if (mirrored) srcBits.push("mirrored third-party");
+      if (c.priceSource) srcBits.push(String(c.priceSource));
+      if (readDay) srcBits.push("read " + prettyDay(readDay));
+      const src = srcBits.length ? " (" + srcBits.join(", ") + ")" : "";
+      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + label + src)}" title="${esc(label + src)}">${esc(label)}</button>`;
     }).join("");
     return name + cells;
   }).join("");
@@ -210,6 +216,7 @@ export const BRAND_CSS = `
 .bv-cell{min-width:44px;min-height:44px;border:0;border-radius:14px;background:rgba(239,233,222,.06);color:${BRAND.dim};font-family:${BRAND.font};font-size:15px;font-weight:600;line-height:1.15;padding:8px 4px}
 .bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.up}}
 .bv-note{margin:12px 0 0;color:${BRAND.dim};font:14px/1.4 ${BRAND.font}}
+.bv-foot{margin:28px 0 0;padding-top:14px;border-top:1px solid ${BRAND.line};color:${BRAND.dim};font:13px/1.4 ${BRAND.font}}
 .bv-shares{display:grid;gap:14px;margin-top:22px}
 @media (max-width:520px){
 .bv-scroll{overflow:visible}
@@ -224,7 +231,8 @@ export const BRAND_CSS = `
 
 
 
-export const MIRROR_NOTE = "Mirrored history is labeled on each cell until Catch'em has a full year of its own. Each figure is listings counted.";
+export const MIRROR_NOTE = "Pulse history before Oct 14, 2026 is mirrored third-party data. Each point shows its source and the date we read it.";
+export const SITE_FOOTER = "Prices and counts are informational. Each number shows its source and date.";
 
 export function rowsFromPulseDoc(doc) {
   const rows = Array.isArray(doc && doc.rows) ? doc.rows : [];
@@ -243,6 +251,8 @@ export function rowsFromPulseDoc(doc) {
         const pct = c && c.pct != null && Number.isFinite(Number(c.pct)) ? Number(c.pct) : null;
         const built = cell(c.month, pct, c.price != null ? Number(c.price) : null, c.priceDate || null);
         built.priceSource = c.priceSource || null;
+        built.mirrored = c.mirrored === true || c.priceSource === "archived-market";
+        built.readAt = c.readAt || c.readDate || null;
         built.listingsCount = c.listingsCount != null ? c.listingsCount : null;
         return built;
       }),
@@ -303,6 +313,7 @@ ${heat}
   ${brandShareSvg(pulse)}
   ${brandShareSvg(sealed)}
 </section>
+<footer class="bv-foot">${esc(SITE_FOOTER)}</footer>
 <script>var s=document.querySelector(".bv-scroll");if(s)s.scrollLeft=s.scrollWidth;</script>
 </body></html>`;
 }
