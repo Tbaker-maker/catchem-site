@@ -1,4 +1,4 @@
-// Worker entry. /data-explorer and /sealed-pulse are served here so
+// Worker entry. /data-explorer and sealed pulse routes are served here so
 // src/index.mjs can stay unchanged while other open branches own that file.
 import worker from "./index.mjs";
 import { dataExplorerResponse } from "./data-explorer.mjs";
@@ -19,7 +19,7 @@ export default {
         });
       }
     }
-    if (path === "/sealed-pulse" || path === "/heat") {
+    if (path === "/sealed-pulse" || path === "/heat" || path === "/heatmap" || path === "/brand-visuals") {
       try {
         return await sealedPulseResponse(request, env);
       } catch {
