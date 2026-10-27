@@ -16,7 +16,7 @@
 // No SPA fallback: unknown paths 404 rather than serve the landing everywhere.
 {
   "name": "catchem-site",
-  "main": "src/index.mjs",
+  "main": "src/site-entry.mjs",
   "compatibility_date": "2026-08-01",
   "build": { "command": "node scripts/build.mjs" },
   // FEED_KV holds account rows, votes, alerts, follows and Custom Reads
