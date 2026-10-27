@@ -81,7 +81,10 @@ export function runBrandVisualTests() {
   t("median is the october figure", pctLabel(-1.6587) === "-1.7%" && heat.includes("-1.7%"));
   t("no em or en dash, no advice, no sold", !DASH.test(text) && !guard.test(text) && !SOLD.test(text));
   t("sealed share has no NM", sealed.sealed === true && pulse.sealed === true && !NM.test(sealedSvg) && !NM.test(pulseSvg) && !NM.test(visible(heat)));
-  t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/sealed-pulse") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="120"'));
+  t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/sealed-pulse") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="112"'));
+  t("share cards stay compact with no giant watermark", pulseSvg.includes('viewBox="0 0 1080 1080"') && !pulseSvg.includes('fill-opacity="0.07"') && sealedSvg.includes('viewBox="0 0 1080 1080"'));
+  t("sealed share carries a product image", Boolean(sealed.imageUrl) && sealedSvg.includes("<image ") && sealedSvg.includes("tcgplayer-cdn"));
+  t("product images get a drop shadow so white boxes read", page.includes("drop-shadow"));
 
   const og = shareSvg(new URLSearchParams("n=Evolving%20Skies%20Booster%20Box&p=2214.94&s=1"));
   t("public share card uses the same gold and font", og.includes(BRAND.gold) && og.includes(BRAND.font) && og.includes("Catch'em") && !og.includes("#d4af37") && !og.includes("Georgia") && !NM.test(og));
