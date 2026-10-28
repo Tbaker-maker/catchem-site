@@ -15,7 +15,7 @@ assert.equal(cacheableRequest(req("/post-office")), false);
 assert.equal(cacheableRequest(req("/c/abc", "ce_session=x")), false);
 assert.equal(cacheableRequest(new Request("https://catchemtcg.com/c/a", { method: "POST" })), false);
 assert.equal(cacheableRequest(req("/p/tcgcsv-1?prewarm=1")), false);
-assert.equal(cacheableRequest(req("/p/tcgcsv-1?prewarm=html")), false);
+assert.equal(cacheableRequest(req("/p/tcgcsv-1?prewarm=html")), true);
 
 let r = await edgeFetch(render, req("/sets"), {}, {});
 assert.equal(await r.text(), "<p>hi</p>");

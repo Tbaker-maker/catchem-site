@@ -24,8 +24,9 @@ export function cacheableRequest(request) {
   if (!cacheablePath(url.pathname)) return false;
   // ?prewarm=1 must always hit render so warmBucket can seed FEED_KV.
   // If we served an edge HIT here, seed never ran (p95 stayed cold).
-  const prewarm = url.searchParams.get("prewarm");
-  if (prewarm === "1" || prewarm === "html") return false;
+  // Seed-only must always render. prewarm=html should populate the edge Cache
+  // API so first user hits stay fast even when FEED_KV writes are rate-limited.
+  if (url.searchParams.get("prewarm") === "1") return false;
   const cookie = request.headers.get("cookie") || "";
   if (/(?:^|;\s*)ce_(session|oauth)=/.test(cookie)) return false;
   return true;
