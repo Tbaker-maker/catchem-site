@@ -292,6 +292,7 @@ export function extractPacked(text, id) {
 const RAW_TTL = 3600;
 let rawKv = null;
 let rawWaitUntil = null;
+const seededBuckets = new Set();
 export function setRawKv(kv, waitUntil) {
   rawKv = kv || null;
   rawWaitUntil = typeof waitUntil === "function" ? waitUntil : null;
@@ -398,8 +399,14 @@ export async function bucketRow(id, fetchImpl = fetch) {
     if (row && rawKv) {
       try { void rawKv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
     }
-    // Full-bucket seeding is only via POST /api/prewarm-buckets — inline seeding
-    // stormed KV/CPU on cold hits and made p95 worse.
+    // Seed the rest of this bucket at most once per isolate (waitUntil), so sibling
+    // /p/ ids hit tiny prodrow KV instead of re-parsing ~1MB.
+    const b = bucketOf(id);
+    if (text && rawKv && !seededBuckets.has(b)) {
+      seededBuckets.add(b);
+      const job = seedProdRowsFromBucket(text, rawKv).catch(() => {});
+      if (rawWaitUntil) rawWaitUntil(job); else void job;
+    }
     return row;
   });
 }
