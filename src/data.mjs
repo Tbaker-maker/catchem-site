@@ -174,7 +174,7 @@ export async function loadSetIndexes(slug, fetchImpl = fetch) {
 
 export async function loadJson(rel, fetchImpl = fetch) {
   return cached(rel, async () => {
-    const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
+    const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 3600, cacheEverything: true } });
     if (!res.ok) throw new Error(`${rel} ${res.status}`);
     return res.json();
   });
@@ -216,7 +216,7 @@ export async function proxyPublic(rel, fetchImpl = fetch) {
 
 export async function loadDiveIndex(fetchImpl = fetch) {
   return cached("dive:index", async () => {
-    const res = await fetchRepo("research/pulse/dive/index.json", fetchImpl, { cf: { cacheTtl: 300 } });
+    const res = await fetchRepo("research/pulse/dive/index.json", fetchImpl, { cf: { cacheTtl: 3600, cacheEverything: true } });
     if (!res.ok) throw new Error(`dive index ${res.status}`);
     return res.json();
   });
@@ -227,7 +227,7 @@ export async function loadDive(id, fetchImpl = fetch) {
   const safe = String(id || "").replace(/[^a-zA-Z0-9._-]/g, "");
   if (!safe || safe !== id) throw new Error("bad dive id");
   return cached(key, async () => {
-    const res = await fetchRepo(`research/pulse/dive/${encodeURIComponent(safe)}.json`, fetchImpl, { cf: { cacheTtl: 300 } });
+    const res = await fetchRepo(`research/pulse/dive/${encodeURIComponent(safe)}.json`, fetchImpl, { cf: { cacheTtl: 3600, cacheEverything: true } });
     if (!res.ok) throw new Error(`dive ${safe} ${res.status}`);
     return res.json();
   });
@@ -287,10 +287,32 @@ export function extractPacked(text, id) {
   const end = s.indexOf('"', at + key.length);
   return end < 0 ? "" : s.slice(at + key.length, end);
 }
+// Cloudflare Cache API + cf cacheEverything so cold /p/ after the first
+// colo warm does not re-pull ~1MB bucket files from GitHub every time.
+const RAW_TTL = 3600;
 async function rawText(rel, fetchImpl) {
-  const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
+  const path = `research/assets/public/${rel}`;
+  const url = repoUrl("public-data", path); // key only; fetchRepo still picks branch
+  let edge = null;
+  try { edge = typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { edge = null; }
+  const key = new Request(`https://catchem.internal/raw/${path}`, { method: "GET" });
+  if (edge) {
+    try {
+      const hit = await edge.match(key);
+      if (hit) return await hit.text();
+    } catch { /* miss */ }
+  }
+  const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: RAW_TTL, cacheEverything: true } });
   if (!res.ok) throw new Error(`${rel} ${res.status}`);
-  return res.text();
+  const text = await res.text();
+  if (edge && text) {
+    try {
+      const put = edge.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } }));
+      // Fire and forget when possible; rawText callers are on the page critical path.
+      void put.catch(() => {});
+    } catch { /* never block */ }
+  }
+  return text;
 }
 export function bucketOf(id) {
   return String((Number((String(id).match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");

@@ -72,6 +72,21 @@ async function withPremium(card, fetchImpl) {
   }
 }
 
+
+const PRODUCT_HTML_TTL = 3600;
+const productHtmlKey = (id) => `product-html:v1:${id}`;
+
+async function readProductHtml(kv, id) {
+  if (!kv || !id) return null;
+  try { return await kv.get(productHtmlKey(id)); } catch { return null; }
+}
+
+function writeProductHtml(opts, id, body) {
+  if (!opts?.anon || !opts?.kv || !id || !body) return;
+  const put = opts.kv.put(productHtmlKey(id), body, { expirationTtl: PRODUCT_HTML_TTL }).catch(() => {});
+  if (typeof opts.waitUntil === "function") opts.waitUntil(put);
+}
+
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
   status,
   headers: {
@@ -820,6 +835,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     void bucket;
+    if (opts.anon) {
+      const cachedHtml = await readProductHtml(opts.kv, cardId);
+      if (cachedHtml) return html(cachedHtml);
+    }
     const found = await bucketRow(cardId, fetchImpl).catch(() => null);
     const card = found ? { ...found } : null;
     // Wave 1: every fetch that does not need sealedId, in parallel. Cold /p/
@@ -872,11 +891,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       singleLikely ? pokemonStripFor(card, fetchImpl) : Promise.resolve(null),
       card && card.setSlug ? loadItemRead(card.setSlug, card.id, fetchImpl) : Promise.resolve(null),
       setSlugOk ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : Promise.resolve(null),
-      card ? loadJson("promos.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      // promos.json is ~660KB and was on every cold /p/+/c/ critical path.
+      // Skip here; promosInside/comesFrom stay empty until a per-product shard exists.
+      Promise.resolve(null),
       singleLikely ? loadJson("price-hold.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? loadJson("condition-prices.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? loadJson("feed/card-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      sealedLikely ? loadJson("feed/sealed-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      // Full sealed-rating.json is redundant with the shard row; skip the extra fetch.
+      sealedLikely ? Promise.resolve(null) : Promise.resolve(null),
       withPremium(card, fetchImpl),
       card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
     ]);
@@ -1037,7 +1059,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads }), card ? 200 : 404);
+    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
+    if (card) writeProductHtml(opts, cardId, pageBody);
+    return html(pageBody, card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);
@@ -1471,7 +1495,8 @@ const worker = {
       }
       if (kind && kind !== "data") {
         try {
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
+          const anon = !/(?:^|;\s*)ce_(session|oauth)=/.test(request.headers.get("cookie") || "");
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

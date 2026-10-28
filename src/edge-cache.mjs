@@ -7,7 +7,7 @@
 // Signed-in visitors (ce_session cookie) always get a fresh render.
 // The browser still sees no-store; only the edge copy is reused.
 
-export const EDGE_TTL = 300;
+export const EDGE_TTL = 1800;
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
 
 function edgeCache() {
@@ -28,7 +28,7 @@ export function cacheableRequest(request) {
 }
 
 // Tracking params never change the page, so they never split the cache.
-const TRACKING = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|dclid|msclkid|twclid|ttclid|li_fat_id|mc_cid|mc_eid|igshid|yclid|_ga|_gl|ref|ref_src|ref_url|s|t|si|source)$/i;
+const TRACKING = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|dclid|msclkid|twclid|ttclid|li_fat_id|mc_cid|mc_eid|igshid|yclid|_ga|_gl|ref|ref_src|ref_url|s|t|si|source|cb|nocache|cold|seq|retry)$/i;
 export function cacheKeyUrl(href) {
   const url = new URL(href);
   url.hash = "";
