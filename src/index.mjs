@@ -795,9 +795,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             kind: "single",
           };
           const pic = officialSrc({ id: hit.id, kind: "single" }, images);
-          const reads = await cardReadSplit(hit.id, fetchImpl);
-          const conditionNote = await conditionNoteFor(fetchImpl);
-          return html(renderCard(await withPremium(row, fetchImpl), stamp, { ...pageOpts, signalCard: await signalCardFor(hit.id, fetchImpl), catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads: await readsFor(hit.id, fetchImpl), ...reads, conditionNote, pokemon: await pokemonStripFor(row, fetchImpl) }));
+          const [reads, conditionNote, premiumRow, signalCard, productReads, pokemon] = await Promise.all([
+            cardReadSplit(hit.id, fetchImpl),
+            conditionNoteFor(fetchImpl),
+            withPremium(row, fetchImpl),
+            signalCardFor(hit.id, fetchImpl),
+            readsFor(hit.id, fetchImpl),
+            pokemonStripFor(row, fetchImpl),
+          ]);
+          return html(renderCard(premiumRow, stamp, { ...pageOpts, signalCard, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads, ...reads, conditionNote, pokemon }));
         }
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
@@ -806,17 +812,71 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     void bucket;
     const found = await bucketRow(cardId, fetchImpl).catch(() => null);
     const card = found ? { ...found } : null;
-    if (card && card.kind !== "sealed") {
-      const packed = await longHistOf(cardId, fetchImpl);
-      if (packed) card.longHist = packed;
-    }
-    const facts = await loadJson("feed/facts.json", fetchImpl).catch(() => null);
+    // Wave 1: every fetch that does not need sealedId, in parallel. Cold /p/
+    // was ~20s sequential and tripped Worker resource limits (503).
+    const sealedLikely = !!(card && card.kind === "sealed");
+    const singleLikely = !!(card && card.kind !== "sealed");
+    const setSlugOk = !!(card && card.setSlug && /^[a-z0-9-]+$/.test(String(card.setSlug || "")));
+    const [
+      packed,
+      facts,
+      diveMap,
+      images,
+      productReads,
+      counted,
+      nm,
+      rot,
+      ir,
+      cm,
+      ratingShard,
+      sealedRatingShard,
+      ripDoc,
+      splitEarly,
+      conditionNoteEarly,
+      pokemonEarly,
+      itemRaw,
+      setIndexLoaded,
+      promoFile,
+      hold,
+      ladder,
+      cardRatingMeta,
+      sealedRatingMeta,
+      premiumCard,
+      signalCard,
+      allReads,
+    ] = await Promise.all([
+      singleLikely ? longHistOf(cardId, fetchImpl) : Promise.resolve(""),
+      loadJson("feed/facts.json", fetchImpl).catch(() => null),
+      loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
+      cardImages(cardId, fetchImpl),
+      card ? itemReadsTop(cardId, fetchImpl) : Promise.resolve([]),
+      sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      card ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      card && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      card && card.setSlug ? cardIr(cardId, fetchImpl) : Promise.resolve(null),
+      card && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely ? loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
+      sealedLikely ? loadJson(`feed/sealed-rating/${sealedShard(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
+      sealedLikely ? loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely ? cardReadSplit(card.id, fetchImpl) : Promise.resolve(null),
+      singleLikely ? conditionNoteFor(fetchImpl) : Promise.resolve(null),
+      singleLikely ? pokemonStripFor(card, fetchImpl) : Promise.resolve(null),
+      card && card.setSlug ? loadItemRead(card.setSlug, card.id, fetchImpl) : Promise.resolve(null),
+      setSlugOk ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : Promise.resolve(null),
+      card ? loadJson("promos.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely ? loadJson("price-hold.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely ? loadJson("condition-prices.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely ? loadJson("feed/card-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      sealedLikely ? loadJson("feed/sealed-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      withPremium(card, fetchImpl),
+      card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
+      card ? allReadsFor(cardId, fetchImpl) : Promise.resolve([]),
+    ]);
+    if (card && packed) card.longHist = packed;
     const fact = facts && cardId ? facts[cardId] : null;
-    const diveMap = await loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} }));
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
     const sealedPage = !!(card && card.kind === "sealed");
     const diveHref = sealedPage && sealedId ? `/dive/${sealedId}` : "";
-    const images = await cardImages(cardId, fetchImpl);
     const hit = card ? officialSrc(card, images) : { src: "", crop: false };
     let listingSeries = [];
     let ebayAsk = null;
@@ -843,50 +903,40 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         };
       } catch { listingSeries = []; }
     }
-    const productReads = card ? await itemReadsTop(cardId, fetchImpl) : [];
     let listingsHtml = "";
     if (card && card.kind === "sealed" && sealedId) {
-      const counted = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
       listingsHtml = listingsBlock(listingsEntry(counted, sealedId));
     }
     let notMovedHtml = "";
-    if (card) {
-      const nm = await loadJson("feed/not-moved.json", fetchImpl).catch(() => null);
-      if (nm && nm.on !== false) {
-        if (card.kind === "sealed") {
-          const entry = sealedId ? nm.sealed?.[sealedId] : null;
-          notMovedHtml = notMovedBlock(entry, { images, sealed: true, pidFor: (id) => Number(entry?.lagging?.find((row) => row.id === id)?.pid) || 0 });
-        } else {
-          notMovedHtml = notMovedBlock(nm.cards?.[cardId], { images });
-        }
+    if (card && nm && nm.on !== false) {
+      if (card.kind === "sealed") {
+        const entry = sealedId ? nm.sealed?.[sealedId] : null;
+        notMovedHtml = notMovedBlock(entry, { images, sealed: true, pidFor: (id) => Number(entry?.lagging?.find((row) => row.id === id)?.pid) || 0 });
+      } else {
+        notMovedHtml = notMovedBlock(nm.cards?.[cardId], { images });
       }
     }
     let rotationHtml = "";
     let rotationFact = "";
     let cycleHtml = "";
     let ratingHtml = "";
-    const setIndexP = card && /^[a-z0-9-]+$/.test(String(card.setSlug || "")) ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : null;
     if (card && card.setSlug) {
-      const rot = await loadJson("rotation-status.json", fetchImpl).catch(() => null);
       rotationFact = rotationBadge(rotationRow(rot, card.setSlug), rot);
-      const ir = await cardIr(cardId, fetchImpl);
-      const cm = await loadJson("feed/card-marks.json", fetchImpl).catch(() => null);
       const art = cardArtHtml(card, rot, ir, opts.today || vancouverDay(), cm).replace(/<div class="rchips"><\/div>/g, "");
       rotationHtml = art + (cm?.cards?.[card.id] ? cardMarkBadge(cm.cards[card.id], cm) : rotationFact);
       if (card.kind !== "sealed" && (/Release cycle/.test(art) || /class="rchip(?:\s|")/.test(art))) cycleHtml = art;
     }
     let priceCheck = false;
-    if (card && card.kind !== "sealed" && cardId) {
-      const shard = await loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null);
-      const rows = (shard?.rows || []).filter((r) => r.id === cardId);
+    if (card && card.kind !== "sealed" && cardId && ratingShard) {
+      const rows = (ratingShard?.rows || []).filter((r) => r.id === cardId);
       if (rows.length) {
-        const meta = await loadJson("feed/card-rating.json", fetchImpl).catch(() => null);
-        const imgs = await cardImages(cardId, fetchImpl).catch(() => null);
+        const meta = cardRatingMeta;
+        const imgs = images;
         const pic = (r, pool) => { const hit = officialSrc({ id: r.id, kind: "single" }, { [r.id]: pool?.imgs?.[r.id] || imgs?.[r.id] }); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
         const panels = [];
         for (const r of rows) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
-          panels.push(ratingPanel(r, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true, pool, pic: (x) => pic(x, pool) }));
+          panels.push(ratingPanel(r, { ...meta, asOf: ratingShard.asOf }, { premium: opts.premium === true, pool, pic: (x) => pic(x, pool) }));
         }
         ratingHtml = panels.join("");
         if (rows.some((r) => r.check)) priceCheck = true;
@@ -894,18 +944,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       }
     }
     if (card && card.kind === "sealed" && cardId) {
-      const shard = await loadJson(`feed/sealed-rating/${sealedShard(cardId)}.json`, fetchImpl).catch(() => null);
-      const row = shard?.rows?.[cardId];
+      const row = sealedRatingShard?.rows?.[cardId];
       if (row) {
-        const meta = await loadJson("feed/sealed-rating.json", fetchImpl).catch(() => null);
-        rotationHtml = sealedRatingPanel(row, { ...meta, asOf: shard.asOf }, { premium: opts.premium === true }) + rotationHtml;
+        rotationHtml = sealedRatingPanel(row, { ...sealedRatingMeta, asOf: sealedRatingShard.asOf }, { premium: opts.premium === true }) + rotationHtml;
       }
     }
     let rip = null;
     if (card && card.kind === "sealed" && cardId) {
-      const doc = await loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null);
-      const row = (doc?.rows || []).find((item) => item && item.id === card.id);
-      const asOf = String(row?.priceAsOf || doc?.asOf || "").slice(0, 10);
+      const row = (ripDoc?.rows || []).find((item) => item && item.id === card.id);
+      const asOf = String(row?.priceAsOf || ripDoc?.asOf || "").slice(0, 10);
       if (row && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
         rip = {
           contentsEV: row.contentsEV,
@@ -923,22 +970,20 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     let priceRead = null;
     let conditionNote = null;
     let pokemon = null;
-    if (card && card.kind !== "sealed") {
-      const split = await cardReadSplit(card.id, fetchImpl);
-      sitReads = split.sitReads;
-      boardReads = split.boardReads;
-      patternRead = split.patternRead;
-      priceRead = split.priceRead;
-      conditionNote = await conditionNoteFor(fetchImpl);
-      pokemon = await pokemonStripFor(card, fetchImpl);
+    if (card && card.kind !== "sealed" && splitEarly) {
+      sitReads = splitEarly.sitReads;
+      boardReads = splitEarly.boardReads;
+      patternRead = splitEarly.patternRead;
+      priceRead = splitEarly.priceRead;
+      conditionNote = conditionNoteEarly;
+      pokemon = pokemonEarly;
       const plainPanel = (html) => String(html || "").replace(/\u2014/g, ": ").replace(/\u2013/g, ": ");
       ratingHtml = plainPanel(ratingHtml);
       cycleHtml = plainPanel(cycleHtml);
     }
     let itemReadHtml = "";
     if (card && card.setSlug) {
-      const itemRaw = await loadItemRead(card.setSlug, card.id, fetchImpl);
-      const itemRead = itemRaw && itemRaw.setMomentum ? applySetSpark(itemRaw, card.setSlug, setIndexP ? await setIndexP : null) : itemRaw;
+      const itemRead = itemRaw && itemRaw.setMomentum ? applySetSpark(itemRaw, card.setSlug, setIndexLoaded) : itemRaw;
       const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true, kind: card.kind });
       if (block) itemReadHtml = block;
       const l = itemRead?.listings;
@@ -948,22 +993,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     let comesFrom = null;
     let promosInside = null;
     if (card && cardId) {
-      const promoFile = await loadJson("promos.json", fetchImpl).catch(() => null);
       const rows = Array.isArray(promoFile?.cards) ? promoFile.cards : [];
       if (card.kind === "sealed") {
         promosInside = rows.filter((row) => row && row.productId === cardId && row.id && row.name).map((row) => ({ id: row.id, name: row.name, num: row.num || "" }));
       } else {
-        const hit = rows.find((row) => row && row.id === cardId && row.productId && row.productName);
-        if (hit) comesFrom = { id: hit.productId, name: hit.productName };
+        const hitPromo = rows.find((row) => row && row.id === cardId && row.productId && row.productName);
+        if (hitPromo) comesFrom = { id: hitPromo.productId, name: hitPromo.productName };
       }
     }
     let priceHeld = false;
     let conditionLadder = null;
     if (card && card.kind !== "sealed" && cardId) {
-      const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
       if (hold && hold.ids && hold.ids[cardId]) priceHeld = true;
       if (priceCheck) priceHeld = true;
-      const ladder = await loadJson("condition-prices.json", fetchImpl).catch(() => null);
       const day = String(ladder && ladder.asOf || "").slice(0, 10);
       const row = ladder && ladder.cards && ladder.cards[cardId];
       conditionLadder = {
@@ -982,7 +1024,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    return html(renderCard(await withPremium(card, fetchImpl), stamp, { ...pageOpts, signalCard: card ? await signalCardFor(cardId, fetchImpl) : null, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads: card ? await allReadsFor(cardId, fetchImpl) : [] }), card ? 200 : 404);
+    return html(renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads }), card ? 200 : 404);
   }
   if (kind === "movers") {
     const doc = await loadJson("movers.json", fetchImpl);

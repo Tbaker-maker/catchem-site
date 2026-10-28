@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dataBase, fetchRepo, resetDataBase, resetJsonCache } from "../src/data.mjs";
+import { dataBase, fetchRepo, mainOnlyPath, resetDataBase, resetJsonCache } from "../src/data.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
@@ -61,6 +61,27 @@ resetDataBase();
   assert.equal(next.ok, true);
   assert.equal(calls.length, 1);
   assert.match(calls[0], /\/public-data\/research\/assets\/public\/next\.json$/);
+}
+
+
+resetDataBase();
+{
+  const { calls, fetchImpl } = harness(new Set([
+    "main:research/pulse/dive/swsh7-booster-box.json",
+    "main:data/derived/rip-roi.json",
+  ]));
+  assert.equal(mainOnlyPath("research/pulse/dive/x.json"), true);
+  assert.equal(mainOnlyPath("data/derived/rip-roi.json"), true);
+  assert.equal(mainOnlyPath("research/assets/public/a.json"), false);
+  const dive = await fetchRepo("research/pulse/dive/swsh7-booster-box.json", fetchImpl);
+  assert.equal(dive.ok, true);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/main\/research\/pulse\/dive\/swsh7-booster-box\.json$/);
+  calls.length = 0;
+  const rip = await fetchRepo("data/derived/rip-roi.json", fetchImpl);
+  assert.equal(rip.ok, true);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/main\/data\/derived\/rip-roi\.json$/);
 }
 
 resetJsonCache();
