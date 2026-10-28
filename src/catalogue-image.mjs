@@ -92,6 +92,31 @@ export function productTypeLabel(row) {
   return "Single";
 }
 
+
+// A passed sealed cutout beats the TCGplayer studio photo. Fails keep the CDN
+// image. Paths are under research/assets/public and served as /data/...
+export function sealedCutoutSrc(row, cutDoc) {
+  if (!row || !cutDoc || !Array.isArray(cutDoc.products)) return null;
+  const id = String(row.id || "");
+  const pid = tcgPid(row);
+  const siteId = pid ? "tcgcsv-" + pid : "";
+  let hit = null;
+  for (const p of cutDoc.products) {
+    if (!p || p.pass !== true || !p.file) continue;
+    if (p.id === id || (siteId && p.siteId === siteId) || (pid && Number(p.tcgPlayerId) === pid)) {
+      hit = p;
+      break;
+    }
+  }
+  if (!hit) return null;
+  const file = String(hit.file).replace(/^\/+/, "");
+  if (!/^cutouts\/[A-Za-z0-9._-]+\.(webp|png)$/.test(file)) return null;
+  const src = "/data/" + file;
+  const alts = [];
+  if (pid) alts.push("/api/card-img?pid=" + pid);
+  return { src, crop: false, alts };
+}
+
 export function officialSrc(row, map, opts) {
   // Ordered by id: Post Office catalogue, then the pokemontcg.io scan for that
   // same setId-number, then the TCGplayer photo when images.tcgplayer is on.

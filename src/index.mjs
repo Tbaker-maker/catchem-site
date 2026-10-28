@@ -16,7 +16,7 @@ import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPi
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
-import { officialSrc, imageForId, editorImageFallbacks } from "./catalogue-image.mjs";
+import { officialSrc, imageForId, editorImageFallbacks, sealedCutoutSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { homeFinderSource } from "./home-finder.mjs";
@@ -276,6 +276,15 @@ async function withToday(html, fetchImpl) {
   }
 }
 
+
+async function sealedCutoutsDoc(fetchImpl) {
+  try {
+    return await loadJson("sealed-cutouts.json", fetchImpl);
+  } catch {
+    return null;
+  }
+}
+
 async function catalogueMap(fetchImpl) {
   try {
     const doc = await loadJson("catalogue-images.json", fetchImpl);
@@ -286,10 +295,11 @@ async function catalogueMap(fetchImpl) {
   }
 }
 
-function withCatalogue(list, images) {
+function withCatalogue(list, images, cutDoc) {
   return (list || []).map((row) => {
     if (!row || typeof row !== "object") return row;
-    const hit = officialSrc(row, images);
+    const cut = row.kind === "sealed" ? sealedCutoutSrc(row, cutDoc) : null;
+    const hit = cut || officialSrc(row, images);
     return { ...row, catalogueSrc: hit.src, catalogueCrop: hit.crop, alts: hit.alts || [] };
   });
 }
@@ -954,7 +964,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
     const sealedPage = !!(card && card.kind === "sealed");
     const diveHref = sealedPage && sealedId ? `/dive/${sealedId}` : "";
-    const hit = card ? officialSrc(card, images) : { src: "", crop: false };
+    let hit = card ? officialSrc(card, images) : { src: "", crop: false };
+    if (card && card.kind === "sealed") {
+      try {
+        const cutDoc = await sealedCutoutsDoc(fetchImpl);
+        const cut = sealedCutoutSrc(card, cutDoc);
+        if (cut) hit = cut;
+      } catch { /* keep CDN photo */ }
+    }
     let listingSeries = [];
     let ebayAsk = null;
     if (sealedPage && sealedId) {
