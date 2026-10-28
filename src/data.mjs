@@ -369,16 +369,28 @@ export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
     if (!row) continue;
     puts.push(kv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: ttl }).catch(() => {}));
   }
-  for (let i = 0; i < puts.length; i += 25) {
-    await Promise.all(puts.slice(i, i + 25));
+  // Small batches: 25 parallel puts on a ~1MB bucket stormed the isolate (503s).
+  for (let i = 0; i < puts.length; i += 5) {
+    await Promise.all(puts.slice(i, i + 5));
   }
   return puts.length;
 }
 
+function prodrowBucketKey(pad) { return `prodrow-bucket:v1:${pad}`; }
+
 /** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets or ?prewarm=1). */
 export async function warmBucket(bucketPad, fetchImpl = fetch) {
-  const text = await rawText(`buckets/${bucketPad}.json`, fetchImpl);
+  const pad = String(bucketPad || "").padStart(2, "0");
+  if (rawKv) {
+    try {
+      if (await rawKv.get(prodrowBucketKey(pad))) return { bytes: 0, rows: 0, skipped: true };
+    } catch { /* seed anyway */ }
+  }
+  const text = await rawText(`buckets/${pad}.json`, fetchImpl);
   const n = await seedProdRowsFromBucket(text, rawKv);
+  if (rawKv && n > 0) {
+    try { await rawKv.put(prodrowBucketKey(pad), String(n), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
+  }
   return { bytes: text.length, rows: n };
 }
 

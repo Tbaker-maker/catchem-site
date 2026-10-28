@@ -21,5 +21,7 @@ assert.match(index, /signal-chips\.json is ~400KB/);
 const data = readFileSync(new URL("../src/data.mjs", import.meta.url), "utf8");
 assert.match(data, /prodrow:v1:/);
 assert.match(data, /warmBucket/);
+assert.match(data, /prodrow-bucket:v1:/);
+assert.match(data, /i \+= 5/);
 assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
