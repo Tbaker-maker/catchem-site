@@ -287,12 +287,15 @@ export function extractPacked(text, id) {
   const end = s.indexOf('"', at + key.length);
   return end < 0 ? "" : s.slice(at + key.length, end);
 }
-// Cloudflare Cache API + cf cacheEverything so cold /p/ after the first
-// colo warm does not re-pull ~1MB bucket files from GitHub every time.
+// Cloudflare Cache API + FEED_KV so cold /p/ does not re-pull ~1MB bucket
+// files from GitHub on every colo. KV is global; Cache API is per-colo.
 const RAW_TTL = 3600;
+let rawKv = null;
+export function setRawKv(kv) { rawKv = kv || null; }
+function rawKvKey(path) { return `rawpub:v1:${path}`; }
+
 async function rawText(rel, fetchImpl) {
   const path = `research/assets/public/${rel}`;
-  const url = repoUrl("public-data", path); // key only; fetchRepo still picks branch
   let edge = null;
   try { edge = typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { edge = null; }
   const key = new Request(`https://catchem.internal/raw/${path}`, { method: "GET" });
@@ -302,15 +305,29 @@ async function rawText(rel, fetchImpl) {
       if (hit) return await hit.text();
     } catch { /* miss */ }
   }
+  if (rawKv) {
+    try {
+      const hit = await rawKv.get(rawKvKey(path));
+      if (hit) {
+        if (edge) {
+          try { void edge.put(key, new Response(hit, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {}); } catch {}
+        }
+        return hit;
+      }
+    } catch { /* miss */ }
+  }
   const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: RAW_TTL, cacheEverything: true } });
   if (!res.ok) throw new Error(`${rel} ${res.status}`);
   const text = await res.text();
-  if (edge && text) {
-    try {
-      const put = edge.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } }));
-      // Fire and forget when possible; rawText callers are on the page critical path.
-      void put.catch(() => {});
-    } catch { /* never block */ }
+  if (text) {
+    if (rawKv) {
+      try { void rawKv.put(rawKvKey(path), text, { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
+    }
+    if (edge) {
+      try {
+        void edge.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {});
+      } catch { /* never block */ }
+    }
   }
   return text;
 }
