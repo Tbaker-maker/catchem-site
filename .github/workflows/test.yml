@@ -74,3 +74,4 @@ jobs:
       - run: node scripts/market-meter.test.mjs
       - run: node scripts/heatmap-mount.test.mjs
       - run: node scripts/lock-regression.test.mjs
+      - run: node scripts/product-cold.test.mjs
