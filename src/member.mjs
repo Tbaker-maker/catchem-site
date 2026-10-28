@@ -4,6 +4,7 @@ import { pageChrome as chrome } from "./ui.mjs";
 import { readUser, avatarUrl } from "./quota.mjs";
 import { WATCH_CAP } from "./watch-cap.mjs";
 import { pushWatches } from "./feed-api.mjs";
+import { buildSmartPayload, defaultGoal, normalizeBriefPrefs, normalizeGoal } from "./smart-collection.mjs";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 
@@ -50,6 +51,8 @@ export function normalizeHolding(raw) {
     change90: numOrNull(raw?.change90),
     listings: kind === "sealed" && Number.isFinite(listings) && listings >= 0 ? Math.round(listings) : null,
     listingsAsOf: kind === "sealed" && dayOk(raw?.listingsAsOf) ? String(raw.listingsAsOf) : "",
+    set: String(raw?.set || "").replace(/\s+/g, " ").trim().slice(0, 80),
+    setSlug: /^[a-z0-9-]+$/.test(String(raw?.setSlug || "")) ? String(raw.setSlug) : "",
     href: kind === "sealed" ? `/p/${id}` : `/c/${id}`,
   };
 }
@@ -121,6 +124,21 @@ async function syncAlerts(env, user, store) {
     if (row) rows.push({ ...row, pauseAll: prefs.pauseAll, quietStart: prefs.quietStart, quietEnd: prefs.quietEnd });
   }
   await pushWatches(env, user, rows);
+}
+
+export async function handleSmartCollection(request) {
+  if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
+  let body = {};
+  try { body = await request.json(); } catch { return json({ ok: false, error: "Bad smart request." }, 400); }
+  const holdings = Array.isArray(body.holdings) ? body.holdings.map(normalizeHolding).filter(Boolean) : [];
+  const prevHoldings = Array.isArray(body.prevHoldings) ? body.prevHoldings.map(normalizeHolding).filter(Boolean) : [];
+  const setDocs = Array.isArray(body.setDocs) ? body.setDocs.filter((d) => d && typeof d === "object").slice(0, 12) : [];
+  const reads = Array.isArray(body.reads) ? body.reads.slice(0, 200) : [];
+  const views = body.views && typeof body.views === "object" ? body.views : {};
+  const goal = normalizeGoal(body.goal) || defaultGoal(holdings);
+  const briefPrefs = normalizeBriefPrefs(body.briefPrefs || { pinned: body.briefPinned, hidden: body.briefHidden });
+  const payload = buildSmartPayload({ holdings, prevHoldings, setDocs, reads, views, goal, briefPrefs });
+  return json(payload);
 }
 
 export async function handleMe(request, env) {
@@ -221,7 +239,14 @@ const CSS = `
 .switch{display:flex;align-items:center;gap:12px;min-height:44px}
 .switch input{width:44px;height:44px;flex:0 0 44px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.goal-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.goal-row button{width:100%}
+.goal-row button[aria-pressed="true"]{background:#d9b779;color:#1a1407;border:0}
+.brief-sec{display:flex;flex-direction:column;gap:8px}
+.brief-sec header{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brief-sec h3{margin:0;font:600 16px/1.3 var(--sans)}
+.score-pill{font:600 28px/1.1 var(--serif);color:var(--gold)}
+@media(max-width:700px){.grid2,.goal-row{grid-template-columns:1fr}}
 `;
 
 function shell(title, active, body, stamp) {
@@ -234,8 +259,28 @@ export function renderCollection(stamp, opts = {}) {
     : "";
   const body = `<h1>My collection</h1>
 <p>Sign-in is optional. A save on this device stays here until you sign in, then it joins the account.</p>
-<p class="muted">Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
+<p class="muted">Pick one goal. The score, Morning Brief, and panels follow that goal. Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
 ${check}
+<section class="rowcard" aria-labelledby="goal-h">
+<h2 id="goal-h">Collection goal</h2>
+<p class="muted">One choice. Change it any time.</p>
+<div class="goal-row" role="group" aria-label="Collection goal">
+<button type="button" data-goal="collecting" aria-pressed="false">Collecting</button>
+<button type="button" data-goal="selling" aria-pressed="false">Selling</button>
+<button type="button" data-goal="growth" aria-pressed="false">Growth</button>
+</div>
+<p id="goal-note" class="muted"></p>
+<p id="score-line"><span class="muted">Collection Score</span> <span id="score" class="score-pill">-</span></p>
+</section>
+<section id="brief" class="rowcard" aria-labelledby="brief-h">
+<h2 id="brief-h">Morning Brief</h2>
+<p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
+<div id="brief-body"><p class="muted">Add items to fill this card.</p></div>
+</section>
+<section id="panel" class="rowcard" aria-labelledby="panel-h">
+<h2 id="panel-h">Goal panel</h2>
+<div id="panel-body"><p class="muted">Your goal panel lands here.</p></div>
+</section>
 <form id="add-form" class="rowcard">
 <label>Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or tcgcsv id"></label>
 <div id="hits"></div>
@@ -318,12 +363,173 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ if(
 function signedIn(){ return fetch("/api/session").then(function(r){ return r.json(); }).catch(function(){ return {signedIn:false}; }); }
 function localRows(){ try { var cur=JSON.parse(localStorage.getItem("catchem-collection")||"[]"); return Array.isArray(cur)?cur:[]; } catch(err){ return []; } }
 function saveLocal(rows){ try { localStorage.setItem("catchem-collection", JSON.stringify(rows)); } catch(err) {} }
+function snapRows(){ try { var cur=JSON.parse(localStorage.getItem("catchem-collection-snap")||"null"); return cur && Array.isArray(cur.rows)?cur.rows:[]; } catch(err){ return []; } }
+function saveSnap(rows){ try { localStorage.setItem("catchem-collection-snap", JSON.stringify({ at:new Date().toISOString().slice(0,10), rows:rows })); } catch(err) {} }
+function loadGoal(){ try { return String(localStorage.getItem("catchem-collection-goal")||""); } catch(err){ return ""; } }
+function saveGoal(g){ try { localStorage.setItem("catchem-collection-goal", g); } catch(err) {} }
+function loadBriefPrefs(){ try { var cur=JSON.parse(localStorage.getItem("catchem-brief-prefs")||"{}"); return { pinned:Array.isArray(cur.pinned)?cur.pinned:[], hidden:Array.isArray(cur.hidden)?cur.hidden:[] }; } catch(err){ return { pinned:[], hidden:[] }; } }
+function saveBriefPrefs(p){ try { localStorage.setItem("catchem-brief-prefs", JSON.stringify(p||{pinned:[],hidden:[]})); } catch(err) {} }
+function loadViews(){ try { var cur=JSON.parse(localStorage.getItem("catchem-views")||"{}"); return cur && typeof cur==="object"?cur:{}; } catch(err){ return {}; } }
+function bumpView(id){ if(!id) return; var v=loadViews(); v[id]=(Number(v[id])||0)+1; try { localStorage.setItem("catchem-views", JSON.stringify(v)); } catch(err) {} }
 function sourceLine(row){ var when=dayLabel(row.asOf); return "TCGplayer market price"+(when?", "+when:"")+(row.kind==="single"&&row.condition?", "+row.condition:""); }
 function windowLine(label, block){
   if(!block || !block.n || !(block.base>0)) return label+": not on file";
   var pct=block.delta/block.base*100;
   var shown=(pct>0?"+":"")+pct.toFixed(1)+"%";
   return label+": "+shown+" on "+money(block.base)+" that has this window";
+}
+function setGoalButtons(goal){
+  document.querySelectorAll("[data-goal]").forEach(function(btn){
+    btn.setAttribute("aria-pressed", btn.getAttribute("data-goal")===goal?"true":"false");
+  });
+  var note={ collecting:"Collecting tracks master sets, gaps, and cost to finish.", selling:"Selling ranks liquidity and demand, with cashout up front.", growth:"Growth leads with concentration risk and reads on items you own." };
+  document.getElementById("goal-note").textContent=note[goal]||"";
+}
+function rowLink(row){
+  if(!row) return "";
+  var href=row.href||"#";
+  return "<a href=\\""+esc(href)+"\\" data-view=\\""+esc(row.id||"")+"\\">"+esc(row.name||row.id||"")+"</a>";
+}
+function paintBrief(brief){
+  var box=document.getElementById("brief-body");
+  if(!brief || !brief.sections || !brief.sections.length){ box.innerHTML="<p class=\\"muted\\">Add items to fill this card.</p>"; return; }
+  var prefs=loadBriefPrefs();
+  box.innerHTML="";
+  brief.sections.forEach(function(sec){
+    var card=document.createElement("article");
+    card.className="brief-sec";
+    var pinOn=prefs.pinned.indexOf(sec.id)>=0;
+    var tools="<div><button type=\\"button\\" class=\\"quiet\\" data-pin=\\""+esc(sec.id)+"\\">"+(pinOn?"Unpin":"Pin")+"</button> <button type=\\"button\\" class=\\"quiet\\" data-hide=\\""+esc(sec.id)+"\\">Hide</button></div>";
+    var body="";
+    if(sec.id==="moved"){
+      body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ return "<p>"+rowLink(r)+": "+esc(money(r.from))+" to "+esc(money(r.to))+" ("+(r.pct>0?"+":"")+r.pct+"%). "+esc(r.source)+(r.asOf?", "+dayLabel(r.asOf):"")+".</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="gaps" || sec.id==="cost"){
+      var c=sec.closest;
+      body=c?("<p>"+esc(c.name)+": "+c.have+" of "+c.total+" ("+Math.round(c.pct*100)+"%). Cost to finish "+esc(money(c.cost)||"not on file")+" across "+c.costPriced+" priced gaps. Source "+esc(c.source||"TCGplayer market")+(c.asOf?", "+dayLabel(c.asOf):"")+".</p>"):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="cheapest" || sec.id==="rarest"){
+      body=(sec.rows&&sec.rows.length)?("<p class=\\"muted\\">"+esc(sec.setName||"")+(sec.asOf?", "+dayLabel(sec.asOf):"")+".</p>"+sec.rows.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join("")):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="cashout"){
+      var cash=sec.cashout;
+      body=cash&&cash.gross>0?("<p>Gross "+esc(money(cash.gross))+". Modeled net "+esc(money(cash.net))+". "+esc(cash.note)+"</p>"):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="liquidity"){
+      body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ var lc=r.listings!=null?("Listings counted "+r.listings+(r.listingsAsOf?", "+dayLabel(r.listingsAsOf):"")):"Listings counted: not on file"; return "<p>"+rowLink(r)+". "+esc(lc)+".</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="demand"){
+      body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ return "<p>"+rowLink(r)+": 7D "+(r.change7>0?"+":"")+r.change7+"%. "+esc(money(r.price))+(r.asOf?", "+dayLabel(r.asOf):"")+". TCGplayer market.</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="risk"){
+      var risk=sec.risk;
+      body=risk&&risk.topShare!=null?("<p>Top item "+esc(risk.topName)+" is "+Math.round(risk.topShare*100)+"% of "+esc(money(risk.total))+". "+risk.n+" priced lines.</p>"):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else if(sec.id==="reads"){
+      body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ return "<p>"+rowLink(r)+". "+esc(r.headline||"")+(r.asOf?" ("+dayLabel(r.asOf)+")":"")+".</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+    } else body="<p class=\\"muted\\">"+esc(sec.empty||"")+"</p>";
+    card.innerHTML="<header><h3>"+esc(sec.title)+"</h3>"+tools+"</header>"+body;
+    box.appendChild(card);
+  });
+  box.querySelectorAll("[data-pin]").forEach(function(btn){
+    btn.onclick=function(){
+      var id=btn.getAttribute("data-pin");
+      var prefs=loadBriefPrefs();
+      if(prefs.pinned.indexOf(id)>=0) prefs.pinned=prefs.pinned.filter(function(x){ return x!==id; });
+      else { prefs.pinned=prefs.pinned.filter(function(x){ return x!==id; }); prefs.pinned.unshift(id); prefs.hidden=prefs.hidden.filter(function(x){ return x!==id; }); }
+      saveBriefPrefs(prefs); refreshSmart(state.rows, state.summary);
+    };
+  });
+  box.querySelectorAll("[data-hide]").forEach(function(btn){
+    btn.onclick=function(){
+      var id=btn.getAttribute("data-hide");
+      var prefs=loadBriefPrefs();
+      if(prefs.hidden.indexOf(id)<0) prefs.hidden.push(id);
+      prefs.pinned=prefs.pinned.filter(function(x){ return x!==id; });
+      saveBriefPrefs(prefs); refreshSmart(state.rows, state.summary);
+    };
+  });
+  box.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
+}
+function paintPanel(goal, panels){
+  var box=document.getElementById("panel-body");
+  if(!panels){ box.innerHTML="<p class=\\"muted\\">Your goal panel lands here.</p>"; return; }
+  if(goal==="selling"){
+    var cash=panels.selling&&panels.selling.cashout;
+    var liq=(panels.selling&&panels.selling.liquidity)||[];
+    box.innerHTML=(cash&&cash.gross>0?("<p>Cashout gross "+esc(money(cash.gross))+", modeled net "+esc(money(cash.net))+".</p>"):"<p class=\\"muted\\">No market prices on file.</p>")+liq.slice(0,5).map(function(r){ return "<p>"+rowLink(r)+(r.listings!=null?": listings counted "+r.listings:": listings counted not on file")+".</p>"; }).join("");
+  } else if(goal==="growth"){
+    var risk=panels.growth&&panels.growth.risk;
+    var reads=(panels.growth&&panels.growth.reads)||[];
+    box.innerHTML=(risk&&risk.topShare!=null?("<p>Concentration: "+esc(risk.topName)+" is "+Math.round(risk.topShare*100)+"% of value.</p>"):"<p class=\\"muted\\">Save priced items to see risk.</p>")+(reads.length?reads.map(function(r){ return "<p>"+rowLink(r)+". "+esc(r.headline||"")+"</p>"; }).join(""):"<p class=\\"muted\\">No reads on your items today.</p>");
+  } else {
+    var close=panels.collecting&&panels.collecting.closest;
+    var gaps=(panels.collecting&&panels.collecting.singlesGaps)||[];
+    box.innerHTML=(close?("<p>"+esc(close.name)+": "+close.have+"/"+close.total+". Cost to finish "+esc(money(close.cost)||"not on file")+".</p><p class=\\"muted\\">Cheapest gap "+esc((close.cheapest[0]&&close.cheapest[0].name)||"none")+". Rarest gap "+esc((close.rarest[0]&&close.rarest[0].name)||"none")+".</p>"):"<p class=\\"muted\\">Add cards from one set to track completion.</p>")+gaps.slice(0,3).map(function(g){ return "<p>"+esc(g.name)+": "+Math.round((g.pct||0)*100)+"%.</p>"; }).join("");
+  }
+  box.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
+}
+var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[] };
+function summarise(rows){
+  var value=0, windows={d7:{base:0,delta:0,n:0},d30:{base:0,delta:0,n:0},d90:{base:0,delta:0,n:0}};
+  rows.forEach(function(row){
+    if(!(Number(row.price)>0)||!(Number(row.qty)>0)) return;
+    var line=Number(row.price)*Number(row.qty); value+=line;
+    [["d7","change7"],["d30","change30"],["d90","change90"]].forEach(function(pair){
+      var pct=Number(row[pair[1]]);
+      if(!Number.isFinite(pct)) return;
+      windows[pair[0]].n+=1; windows[pair[0]].base+=line; windows[pair[0]].delta+=line*(pct/100);
+    });
+  });
+  var top=rows.filter(function(row){ return Number.isFinite(Number(row.change7)) && Number(row.price)>0; }).slice().sort(function(a,b){ return Math.abs(b.change7)-Math.abs(a.change7); }).slice(0,5);
+  return { value:Math.round(value*100)/100, n:rows.length, windows:windows, top:top };
+}
+function uniqueSlugs(rows){
+  var out=[], seen={};
+  rows.forEach(function(r){ var s=String(r.setSlug||""); if(s&&!seen[s]){ seen[s]=1; out.push(s); } });
+  return out.slice(0,8);
+}
+function resolveSlug(slug, name){
+  if(!slug && !name) return "";
+  var sets=state.setIndex||[];
+  if(slug && sets.some(function(s){ return s.slug===slug; })) return slug;
+  var want=String(name||"").toLowerCase();
+  for(var i=0;i<sets.length;i++){
+    var n=String(sets[i].name||"").toLowerCase();
+    if(want && (n===want || n.indexOf(want)>=0 || want.indexOf(n.replace(/^[^:]+:\\s*/,""))>=0)) return sets[i].slug;
+  }
+  return slug||"";
+}
+function loadSetDocs(rows){
+  var slugs=uniqueSlugs(rows).map(function(s){
+    var row=rows.filter(function(r){ return r.setSlug===s; })[0];
+    return resolveSlug(s, row&&row.set);
+  }).filter(Boolean);
+  var uniq=[]; var seen={}; slugs.forEach(function(s){ if(!seen[s]){ seen[s]=1; uniq.push(s); } });
+  return Promise.all(uniq.slice(0,6).map(function(slug){
+    return fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; });
+  })).then(function(docs){ return docs.filter(Boolean); });
+}
+function refreshSmart(rows, summary){
+  state.rows=rows; state.summary=summary;
+  var goal=state.goal||"collecting";
+  setGoalButtons(goal);
+  loadSetDocs(rows).then(function(setDocs){
+    var prefs=loadBriefPrefs();
+    return fetch("/api/collection/smart",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({
+        holdings:rows,
+        prevHoldings:snapRows(),
+        setDocs:setDocs,
+        reads:state.catalogueReads,
+        views:loadViews(),
+        goal:goal,
+        briefPrefs:prefs
+      })
+    }).then(function(r){ return r.json(); });
+  }).then(function(smart){
+    if(!smart||!smart.ok) return;
+    state.goal=smart.goal||goal;
+    setGoalButtons(state.goal);
+    document.getElementById("score").textContent=String(smart.score&&smart.score.score!=null?smart.score.score:"-");
+    paintBrief(smart.brief);
+    paintPanel(state.goal, smart.panels);
+  }).catch(function(){});
 }
 function paint(rows, summary){
   document.getElementById("skel").hidden=true;
@@ -350,24 +556,13 @@ function paint(rows, summary){
     card.className="rowcard";
     var cond=row.kind==="sealed"?"":(" "+(row.condition||"NM"));
     var listed=row.kind==="sealed" ? (row.listings!=null && row.listingsAsOf ? "Listings counted "+row.listings+", "+dayLabel(row.listingsAsOf)+"." : "Listings counted: not on file.") : "";
-    card.innerHTML="<h3><a href=\\""+esc(row.href||"#")+"\\">"+esc(row.name)+"</a></h3><p>"+esc(money(row.price)||"No market price on file")+" x "+esc(row.qty)+esc(cond)+"</p><p class=\\"muted\\">"+esc(sourceLine(row))+"</p>"+(listed?"<p class=\\"muted\\">"+esc(listed)+"</p>":"")+"<button type=\\"button\\" class=\\"quiet\\" data-id=\\""+esc(row.id)+"\\">Remove</button>";
+    card.innerHTML="<h3><a href=\\""+esc(row.href||"#")+"\\" data-view=\\""+esc(row.id)+"\\">"+esc(row.name)+"</a></h3><p>"+esc(money(row.price)||"No market price on file")+" x "+esc(row.qty)+esc(cond)+"</p><p class=\\"muted\\">"+esc(sourceLine(row))+"</p>"+(listed?"<p class=\\"muted\\">"+esc(listed)+"</p>":"")+"<button type=\\"button\\" class=\\"quiet\\" data-id=\\""+esc(row.id)+"\\">Remove</button>";
     card.querySelector("button").onclick=function(){ remove(row.id); };
+    card.querySelector("[data-view]").addEventListener("click", function(){ bumpView(row.id); });
     box.appendChild(card);
   });
-}
-function summarise(rows){
-  var value=0, windows={d7:{base:0,delta:0,n:0},d30:{base:0,delta:0,n:0},d90:{base:0,delta:0,n:0}};
-  rows.forEach(function(row){
-    if(!(Number(row.price)>0)||!(Number(row.qty)>0)) return;
-    var line=Number(row.price)*Number(row.qty); value+=line;
-    [["d7","change7"],["d30","change30"],["d90","change90"]].forEach(function(pair){
-      var pct=Number(row[pair[1]]);
-      if(!Number.isFinite(pct)) return;
-      windows[pair[0]].n+=1; windows[pair[0]].base+=line; windows[pair[0]].delta+=line*(pct/100);
-    });
-  });
-  var top=rows.filter(function(row){ return Number.isFinite(Number(row.change7)) && Number(row.price)>0; }).slice().sort(function(a,b){ return Math.abs(b.change7)-Math.abs(a.change7); }).slice(0,5);
-  return { value:Math.round(value*100)/100, n:rows.length, windows:windows, top:top };
+  refreshSmart(rows, summary);
+  saveSnap(rows);
 }
 function remove(id){
   signedIn().then(function(view){
@@ -381,6 +576,18 @@ function remove(id){
     saveLocal(rows); paint(rows, summarise(rows));
   });
 }
+function persistGoal(goal){
+  state.goal=goal; saveGoal(goal); setGoalButtons(goal);
+  signedIn().then(function(view){
+    if(!(view&&view.signedIn)) return;
+    var prefs=loadBriefPrefs();
+    fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"prefs",goal:goal,briefPinned:prefs.pinned,briefHidden:prefs.hidden})}).catch(function(){});
+  });
+  refreshSmart(state.rows||[], state.summary||summarise(state.rows||[]));
+}
+document.querySelectorAll("[data-goal]").forEach(function(btn){
+  btn.onclick=function(){ persistGoal(btn.getAttribute("data-goal")); };
+});
 var catalogue=[];
 fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
   var seen={};
@@ -389,6 +596,12 @@ fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; 
     if(!row||!row.sku||seen[row.sku]) return;
     seen[row.sku]=1; catalogue.push(row);
   });
+  state.catalogueReads=catalogue.filter(function(row){ return row && row.headline; }).map(function(row){
+    return { id:row.sku, name:row.name, headline:row.headline, asOf:row.asOf||(doc&&doc.asOf)||"", source:"Catch'em read", href:row.kind==="sealed"?("/p/"+row.sku):("/c/"+row.sku) };
+  });
+}).catch(function(){});
+fetch("/data/sets.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
+  state.setIndex=Array.isArray(doc&&doc.sets)?doc.sets:[];
 }).catch(function(){});
 document.getElementById("kind").onchange=function(){
   document.getElementById("cond-label").hidden=document.getElementById("kind").value==="sealed";
@@ -401,7 +614,7 @@ document.getElementById("q").oninput=function(){
   catalogue.filter(function(row){ return String(row.name||"").toLowerCase().indexOf(q)>=0 || String(row.sku||"")===q; }).slice(0,6).forEach(function(row){
     var b=document.createElement("button");
     b.type="button"; b.className="quiet"; b.textContent=row.name+" "+(money(row.price)||"");
-    b.onclick=function(){ document.getElementById("q").dataset.sku=row.sku; document.getElementById("q").value=row.name; document.getElementById("kind").value=row.kind==="sealed"?"sealed":"single"; document.getElementById("kind").onchange(); box.innerHTML=""; };
+    b.onclick=function(){ document.getElementById("q").dataset.sku=row.sku; document.getElementById("q").dataset.set=row.set||""; document.getElementById("q").dataset.setSlug=row.setSlug||""; document.getElementById("q").value=row.name; document.getElementById("kind").value=row.kind==="sealed"?"sealed":"single"; document.getElementById("kind").onchange(); box.innerHTML=""; };
     box.appendChild(b);
   });
 };
@@ -417,7 +630,9 @@ document.getElementById("add-form").onsubmit=function(ev){
     sku:sku, id:sku, name:found?found.name:q.value.trim(), kind:kind,
     condition:kind==="sealed"?null:document.getElementById("cond").value,
     qty:document.getElementById("qty").value, price:found?found.price:null, asOf:found?found.asOf:"",
-    change7:found?found.change7:null, change30:found?found.change30:null, change90:found?found.change90:null
+    change7:found?found.change7:null, change30:found?found.change30:null, change90:found?found.change90:null,
+    set:found?found.set:(q.dataset.set||""), setSlug:found?found.setSlug:(q.dataset.setSlug||""),
+    listings:found&&found.listings!=null?found.listings:null, listingsAsOf:found&&found.listingsAsOf?found.listingsAsOf:""
   };
   signedIn().then(function(view){
     if(view && view.signedIn){
@@ -436,6 +651,8 @@ signedIn().then(function(view){
     var local=localRows();
     var start=local.length?fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"merge",rows:local})}):fetch("/api/me");
     start.then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.prefs && j.prefs.goal){ state.goal=j.prefs.goal; saveGoal(j.prefs.goal); }
+      if(j && j.prefs){ saveBriefPrefs({ pinned:j.prefs.briefPinned||[], hidden:j.prefs.briefHidden||[] }); }
       if(j && j.collection){ try { localStorage.setItem("catchem-collection","[]"); } catch(err) {} paint(j.collection, j.summary||summarise(j.collection)); }
       else document.getElementById("skel").hidden=true;
     }).catch(function(){ document.getElementById("skel").hidden=true; });
