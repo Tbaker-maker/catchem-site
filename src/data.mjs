@@ -304,7 +304,33 @@ export function setRawKv(kv, waitUntil) {
   rawKv = kv || null;
   rawWaitUntil = typeof waitUntil === "function" ? waitUntil : null;
 }
-function rawKvKey(path) { return `rawpub:v1:${path}`; }
+
+// Nightly public-data publish bumps counts.asOf. Every edge/KV cache key carries
+// that day so yesterday's HTML and prodrow never outlive a publish.
+let dataVersion = "";
+let dataVersionAt = 0;
+export function setDataVersion(v) {
+  const day = String(v || "").slice(0, 10);
+  dataVersion = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+  dataVersionAt = nowFn();
+}
+export function currentDataVersion() { return dataVersion || ""; }
+export async function publicDataVersion(fetchImpl = fetch) {
+  if (dataVersion && nowFn() - dataVersionAt < 30000) return dataVersion;
+  try {
+    const doc = await loadJson("counts.json", fetchImpl);
+    const day = String(doc?.asOf || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      setDataVersion(day);
+      return day;
+    }
+  } catch { /* keep prior */ }
+  return dataVersion || "";
+}
+function rawKvKey(path) {
+  const v = dataVersion || "na";
+  return `rawpub:v2:${v}:${path}`;
+}
 
 async function rawText(rel, fetchImpl) {
   const path = `research/assets/public/${rel}`;
@@ -355,7 +381,10 @@ async function memoRow(key, load) {
   rowMem.set(key, { data, at: nowFn() });
   return data;
 }
-function prodrowKey(id) { return `prodrow:v2:${id}`; }
+function prodrowKey(id) {
+  const v = dataVersion || "na";
+  return `prodrow:v3:${v}:${id}`;
+}
 
 /** Pull every tcgcsv id out of a bucket file body (for KV row seeding). */
 export function listBucketIds(text) {
@@ -408,7 +437,10 @@ export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   return puts.length;
 }
 
-function prodrowBucketKey(pad) { return `prodrow-bucket:v2:${pad}`; }
+function prodrowBucketKey(pad) {
+  const v = dataVersion || "na";
+  return `prodrow-bucket:v3:${v}:${pad}`;
+}
 
 /** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets or ?prewarm=1). */
 export async function warmBucket(bucketPad, fetchImpl = fetch) {
@@ -428,7 +460,7 @@ export async function warmBucket(bucketPad, fetchImpl = fetch) {
 
 
 export async function bucketRow(id, fetchImpl = fetch) {
-  return memoRow(`b:${id}`, async () => {
+  return memoRow(`b:${dataVersion || "na"}:${id}`, async () => {
     if (rawKv) {
       try {
         const hit = await rawKv.get(prodrowKey(id));
@@ -447,7 +479,7 @@ export async function bucketRow(id, fetchImpl = fetch) {
   });
 }
 export async function longHistOf(id, fetchImpl = fetch) {
-  return memoRow(`l:${id}`, async () => { try { return extractPacked(await rawText(`hist-long/${bucketOf(id)}.json`, fetchImpl), id); } catch { return ""; } });
+  return memoRow(`l:${dataVersion || "na"}:${id}`, async () => { try { return extractPacked(await rawText(`hist-long/${bucketOf(id)}.json`, fetchImpl), id); } catch { return ""; } });
 }
 export function resetRowCache() { rowMem.clear(); }
 

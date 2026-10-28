@@ -5,7 +5,7 @@ import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { applySetSpark } from "./set-spark.mjs";
-import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket } from "./data.mjs";
+import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -73,9 +73,12 @@ async function withPremium(card, fetchImpl) {
 }
 
 
-const PRODUCT_HTML_TTL = 86400; // 24h: full catalog prewarm must outlive the nightly gap
-// v2: sealed cutouts prefer /data/cutouts; bump again if a stale render sticks.
-const productHtmlKey = (id) => `product-html:v2:${id}`;
+const PRODUCT_HTML_TTL = 86400; // soft TTL; counts.asOf in the key drops yesterday on publish
+// v3: key includes public-data asOf so nightly publish invalidates every cached HTML.
+const productHtmlKey = (id) => {
+  const v = currentDataVersion() || "na";
+  return `product-html:v3:${v}:${id}`;
+};
 
 async function readProductHtml(kv, id) {
   if (!kv || !id) return null;
@@ -923,19 +926,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       signalCard,
     ] = await Promise.all([
       singleLikely ? longHistOf(cardId, fetchImpl) : Promise.resolve(""),
-      // facts.json is ~85KB and rarely fills a sealed chip; skip on sealed critical path.
-      singleLikely ? loadJson("feed/facts.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      // facts.json ~85KB: skip on cold path; card.price from prodrow/bucket is the live price.
+      Promise.resolve(null),
       loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
       sealedLikely ? cardImagesSealed(cardId, fetchImpl) : cardImages(cardId, fetchImpl),
       // Sealed: skip item-reads shard on cold critical path (p95).
       singleLikely && card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       // Sealed critical path: skip not-moved / IR / marks. Keep rotation (badge + tests).
-      singleLikely ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      Promise.resolve(null),
       card && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely && card.setSlug ? cardIr(cardId, fetchImpl) : Promise.resolve(null),
-      singleLikely && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      singleLikely ? loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
+      Promise.resolve(null),
+      Promise.resolve(null),
       // Sealed rating shard deferred off cold critical path (was an extra GitHub hit).
       Promise.resolve(null),
       singleLikely ? cardReadSplit(card.id, fetchImpl) : Promise.resolve(null),
@@ -946,14 +949,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       // promos.json is ~660KB and was on every cold /p/+/c/ critical path.
       // Skip here; promosInside/comesFrom stay empty until a per-product shard exists.
       Promise.resolve(null),
-      singleLikely ? loadJson("price-hold.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      singleLikely ? loadJson("condition-prices.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      singleLikely ? loadJson("feed/card-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      Promise.resolve(null),
+      Promise.resolve(null),
+      Promise.resolve(null),
       // Full sealed-rating.json is redundant with the shard row; skip the extra fetch.
       sealedLikely ? Promise.resolve(null) : Promise.resolve(null),
       withPremium(card, fetchImpl),
-      // signal-chips.json is ~400KB; skip on sealed critical path (p95).
-      singleLikely && card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
+      // signal-chips.json ~422KB JSON.parse was a top 1102 contributor on cold /p/.
+      Promise.resolve(null),
     ]);
     const productReads = readsBundle.productReads || [];
     const allReads = readsBundle.allReads || [];
@@ -1297,7 +1300,10 @@ async function prewarmBuckets(env, ctx, fetchImpl) {
 
 const worker = {
   async fetch(request, env, ctx) {
-    return edgeFetch(worker.render, request, env, ctx);
+    const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    const dataVersion = await publicDataVersion(fetchImpl);
+    setDataVersion(dataVersion);
+    return edgeFetch(worker.render, request, env, ctx, { dataVersion });
   },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
@@ -1305,6 +1311,10 @@ const worker = {
     setRawKv(env?.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    // Keep version set for product-html / prodrow keys even on non-edge paths.
+    if (!currentDataVersion()) {
+      setDataVersion(await publicDataVersion(fetchImpl));
+    }
     const premiumHit = await handlePremiumRequest(request, env, fetchImpl);
     if (premiumHit) return premiumHit;
     if (url.pathname === "/reads/brief") return handleBrief(request, env, { fetchImpl });
