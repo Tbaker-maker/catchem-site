@@ -5,7 +5,7 @@ import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { applySetSpark } from "./set-spark.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -357,6 +357,15 @@ async function itemReadsBundle(cardId, fetchImpl) {
   const rows = (await itemReadRows(cardId, fetchImpl)).slice();
   rows.sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")));
   return { productReads: rows.slice(0, 3), allReads: mapAllReads(rows) };
+}
+
+
+async function cardImagesSealed(cardId, fetchImpl) {
+  try {
+    const doc = await smallJson(`feed/card/img/${idBucket(cardId)}.json`, fetchImpl);
+    if (doc && doc.images && typeof doc.images === "object") return doc.images;
+  } catch { /* empty */ }
+  return {};
 }
 
 // Card pages: images for this id bucket plus set logos (feed/card/img).
@@ -878,7 +887,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       // facts.json is ~85KB and rarely fills a sealed chip; skip on sealed critical path.
       singleLikely ? loadJson("feed/facts.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
-      cardImages(cardId, fetchImpl),
+      sealedLikely ? cardImagesSealed(cardId, fetchImpl) : cardImages(cardId, fetchImpl),
       card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       // Sealed critical path: skip not-moved / IR / marks. Keep rotation (badge + tests).
@@ -903,7 +912,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       // Full sealed-rating.json is redundant with the shard row; skip the extra fetch.
       sealedLikely ? Promise.resolve(null) : Promise.resolve(null),
       withPremium(card, fetchImpl),
-      card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
+      // signal-chips.json is ~400KB; skip on sealed critical path (p95).
+      singleLikely && card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
     ]);
     const productReads = readsBundle.productReads || [];
     const allReads = readsBundle.allReads || [];
@@ -1221,6 +1231,23 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   return null;
 }
 
+
+async function prewarmBuckets(env, ctx, fetchImpl) {
+  setRawKv(env?.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
+  const out = [];
+  for (let b = 0; b < 100; b += 1) {
+    const id = `tcgcsv-${1000 + b}`; // maps to bucket b via % 100 for 1000..1099 → 00..99
+    const t0 = Date.now();
+    try {
+      await bucketRow(id, fetchImpl);
+      out.push({ b, ms: Date.now() - t0, ok: true });
+    } catch (err) {
+      out.push({ b, ms: Date.now() - t0, ok: false, err: String(err && err.message || err) });
+    }
+  }
+  return out;
+}
+
 const worker = {
   async fetch(request, env, ctx) {
     return edgeFetch(worker.render, request, env, ctx);
@@ -1228,7 +1255,7 @@ const worker = {
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
     setAffiliateConfig(env);
-    setRawKv(env?.FEED_KV);
+    setRawKv(env?.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     const premiumHit = await handlePremiumRequest(request, env, fetchImpl);
@@ -1408,6 +1435,15 @@ const worker = {
         if (edge) { try { const put = edge.put(key, out.clone()); if (typeof ctx !== "undefined" && ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(put); else await put; } catch {} }
         return out;
       } catch { return miss(); }
+    }
+    if (request.method === "POST" && url.pathname === "/api/prewarm-buckets") {
+      const token = String(env?.PREWARM_TOKEN || env?.CUSTOM_READS_TOKEN || "");
+      const got = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (!token || got !== token) return new Response("Forbidden", { status: 403, headers: { "cache-control": "no-store" } });
+      const rows = await prewarmBuckets(env, ctx, fetchImpl);
+      return new Response(JSON.stringify({ ok: true, n: rows.length, rows }), {
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      });
     }
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
