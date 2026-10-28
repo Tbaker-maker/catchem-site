@@ -73,3 +73,4 @@ jobs:
       - run: node scripts/pattern-track.test.mjs
       - run: node scripts/market-meter.test.mjs
       - run: node scripts/heatmap-mount.test.mjs
+      - run: node scripts/lock-regression.test.mjs
