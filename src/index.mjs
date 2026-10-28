@@ -74,6 +74,7 @@ async function withPremium(card, fetchImpl) {
 
 
 const PRODUCT_HTML_TTL = 86400; // 24h: full catalog prewarm must outlive the nightly gap
+// v2: sealed cutouts prefer /data/cutouts; bump again if a stale render sticks.
 const productHtmlKey = (id) => `product-html:v2:${id}`;
 
 async function readProductHtml(kv, id) {
