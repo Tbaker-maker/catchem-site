@@ -44,4 +44,4 @@ assert.match(data, /i \+= 5/);
 assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
 
-assert.equal(PANEL_CACHE_GEN, "2");
+assert.equal(PANEL_CACHE_GEN, "3");

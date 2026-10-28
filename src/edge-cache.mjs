@@ -42,7 +42,7 @@ export function cacheKeyUrl(href) {
   return url.toString();
 }
 // Panel generation: bump when mid-day fact/copy changes must drop same-day edge HTML.
-export const PANEL_CACHE_GEN = "2";
+export const PANEL_CACHE_GEN = "3";
 function cacheKey(request, dataVersion = "") {
   const url = new URL(cacheKeyUrl(request.url));
   const day = String(dataVersion || "").slice(0, 10);
