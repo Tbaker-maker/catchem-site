@@ -816,7 +816,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const cards = page.cards.map((card) => { const pic = officialSrc({ id: card.id, kind: "single", tcgPlayerId: card.tcgPlayerId || "" }, images); return { ...card, image: pic.src, imageAlts: pic.alts }; });
       return html(renderPokemon({ ...page, cards }, stamp, pageOpts));
     } catch {
-      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">The catalog did not load.</p><p><a href="/search">Search</a></p></main>`, 503);
+      return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">The catalog did not load.</p><p><a href="/search">Search</a></p></main>`, 200);
     }
   }
   if (kind === "card" || kind === "product") {

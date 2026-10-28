@@ -7,7 +7,7 @@
 // Signed-in visitors (ce_session cookie) always get a fresh render.
 // The browser still sees no-store; only the edge copy is reused.
 
-export const EDGE_TTL = 1800;
+export const EDGE_TTL = 86400; // 24h: match product-html KV; 30m forced cold re-renders → 1102
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
 
 function edgeCache() {
@@ -46,6 +46,9 @@ function cacheKey(request) {
   return new Request(url.toString(), { method: "GET" });
 }
 
+// Graceful HTML for catchable render failures. Status 200 so visitors never see a
+// hard error page from us. Cloudflare 1102 (CPU kill) cannot be caught in-process;
+// longer EDGE_TTL + paced prewarm keep those off the critical path.
 export function errorPage() {
   const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Catch'em · One moment</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d12;color:#e9ecf2;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -55,7 +58,7 @@ a,button{display:inline-block;border:0;border-radius:999px;padding:12px 26px;fon
 button{background:#f2c14e;color:#14110a}a{color:#9aa3b5;margin-top:12px}</style></head>
 <body><main class="card"><h1>This page is taking a breather</h1><p>Catch'em is busy for a second. Try again and it should load.</p>
 <button onclick="location.reload()">Retry</button><br><a href="/">Go home</a></main></body></html>`;
-  return new Response(body, { status: 503, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "retry-after": "2" } });
+  return new Response(body, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-catchem-soft": "1" } });
 }
 
 async function safeRender(render, request, env, ctx) {
@@ -66,22 +69,44 @@ async function safeRender(render, request, env, ctx) {
   }
 }
 
+function asEdgeHit(hit, soft = false) {
+  const h = new Headers(hit.headers);
+  h.set("cache-control", "no-store");
+  h.set("x-edge-cache", soft ? "stale" : "hit");
+  if (soft) h.set("x-catchem-soft", "stale");
+  return new Response(hit.body, { status: 200, headers: h });
+}
+
 export async function edgeFetch(render0, request, env, ctx) {
   const render = (r, e, c) => safeRender(render0, r, e, c);
   const cache = edgeCache();
   if (!cache || !cacheableRequest(request)) return render(request, env, ctx);
   const key = cacheKey(request);
+  let hit = null;
+  try { hit = await cache.match(key); } catch { hit = null; }
+  if (hit) return asEdgeHit(hit);
+
+  let res;
   try {
-    const hit = await cache.match(key);
-    if (hit) {
-      const h = new Headers(hit.headers);
-      h.set("cache-control", "no-store");
-      h.set("x-edge-cache", "hit");
-      return new Response(hit.body, { status: hit.status, headers: h });
-    }
-  } catch { /* cache miss path */ }
-  const res = await render(request, env, ctx);
+    res = await render(request, env, ctx);
+  } catch {
+    // Last good copy if somehow still present, else graceful page (200).
+    try {
+      hit = await cache.match(key);
+      if (hit) return asEdgeHit(hit, true);
+    } catch { /* fall through */ }
+    return errorPage();
+  }
+
   const type = res.headers.get("content-type") || "";
+  // Product (and other HTML) pages must not surface upstream 5xx to visitors.
+  if (res.status >= 500 && type.includes("text/html")) {
+    try {
+      hit = await cache.match(key);
+      if (hit) return asEdgeHit(hit, true);
+    } catch { /* fall through */ }
+    return errorPage();
+  }
   if (res.status === 200 && type.includes("text/html") && !res.headers.has("set-cookie")) {
     try {
       const stored = res.clone();
