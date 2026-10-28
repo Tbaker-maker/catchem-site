@@ -24,7 +24,7 @@ assert.match(index, /prewarmHtml/);
 assert.match(index, /prewarm=html/);
 assert.match(index, /html-skip/);
 assert.match(index, /PRODUCT_HTML_TTL = 86400/);
-assert.match(index, /product-html:v3/);
+assert.match(index, /product-html:v4/);
 assert.match(index, /publicDataVersion/);
 assert.match(index, /signal-chips\.json ~422KB/);
 setDataVersion("2026-10-28");
@@ -35,7 +35,7 @@ assert.match(index, /cardImagesSealed/);
 
 const data = readFileSync(new URL("../src/data.mjs", import.meta.url), "utf8");
 assert.match(data, /prodrow:v3:/);
-assert.match(data, /rawpub:v2:/);
+assert.match(data, /rawpub:v3:/);
 assert.match(data, /publicDataVersion/);
 assert.match(data, /warmBucket/);
 assert.match(data, /prodrow-bucket:v3:/);
