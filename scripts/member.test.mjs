@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { signSession, readUser } from "../src/quota.mjs";
 import { beginDiscord, finishDiscord } from "../src/auth.mjs";
 import { handleAlert, watchRowsForBot } from "../src/feed-api.mjs";
-import { handleMe, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
+import { handleMe, handleSmartCollection, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
 import { pageKind, renderPath } from "../src/index.mjs";
 
 let fail = 0;
@@ -27,12 +27,30 @@ const collection = await (await renderPath("/collection", fetchImpl, { feed: tru
 const alerts = await (await renderPath("/alerts", fetchImpl, { feed: true })).text();
 const account = await (await renderPath("/me", fetchImpl, { feed: true })).text();
 t("collection page is a shell", collection.includes("<h1>My collection</h1>") && collection.includes('class="skel"') && collection.includes("min-height:44px") && !collection.includes("/collection-check") && !/[\u2014\u2013]/.test(collection));
+t("smart collection chrome", collection.includes("Morning Brief") && collection.includes("Collection goal") && collection.includes('data-goal="collecting"') && collection.includes('data-goal="selling"') && collection.includes('data-goal="growth"') && collection.includes("Collection Score") && collection.includes("/api/collection/smart"));
 t("check slot stays off", !renderCollection("").includes("/collection-check") && renderCollection("", { collectionCheck: true }).includes('href="/collection-check"'));
 t("alert settings are on the page", alerts.includes("<h1>Alert settings</h1>") && alerts.includes("Pause all alerts") && alerts.includes('type="time"') && alerts.includes('class="skel"') && !/[\u2014\u2013]/.test(alerts));
 t("account has export and delete", account.includes("Export my data") && account.includes("Delete my account") && account.includes("Sign-in is optional") === false && !/[\u2014\u2013]/.test(account));
 
 const sealed = normalizeHolding({ sku: "tcgcsv-9", name: "Box NM", kind: "sealed", condition: "NM", qty: 2, price: 10, asOf: "2026-10-16", listings: 22, listingsAsOf: "2026-10-16" });
 t("sealed has no condition and no NM", sealed.kind === "sealed" && sealed.condition == null && !sealed.name.includes("NM") && sealed.listings === 22);
+const withSet = normalizeHolding({ sku: "tcgcsv-3", name: "Pika", kind: "single", qty: 1, price: 4, set: "Demo", setSlug: "demo-set" });
+t("setSlug stays on holding", withSet.setSlug === "demo-set" && withSet.set === "Demo");
+const smartRes = await handleSmartCollection(new Request("https://catchemtcg.com/api/collection/smart", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    goal: "collecting",
+    holdings: [{ sku: "tcgcsv-1", name: "Alpha", kind: "single", qty: 1, price: 10, setSlug: "demo-set" }],
+    setDocs: [{ slug: "demo-set", name: "Demo Set", asOf: "2026-10-28", source: "TCGplayer market", items: [
+      { id: "tcgcsv-1", name: "Alpha", kind: "single", price: 10, printings: [{ name: "Normal", price: 10, id: "tcgcsv-1", asOf: "2026-10-28" }, { name: "Reverse Holofoil", price: 4, id: "tcgcsv-11", asOf: "2026-10-28" }] },
+      { id: "tcgcsv-3", name: "Gamma", kind: "single", price: 80, printings: [{ name: "Normal", price: 80, id: "tcgcsv-3", asOf: "2026-10-28" }] },
+    ] }],
+    prevHoldings: [{ sku: "tcgcsv-1", name: "Alpha", kind: "single", qty: 1, price: 8, asOf: "2026-10-27" }],
+  }),
+}));
+const smartBody = await smartRes.json();
+t("smart api returns brief", smartRes.status === 200 && smartBody.ok && smartBody.brief && smartBody.score && smartBody.goal === "collecting" && smartBody.panels.collecting.closest);
 const single = normalizeHolding({ sku: "tcgcsv-3", name: "Pika", kind: "single", qty: 1, price: 4, change7: 10 });
 t("single defaults to NM", single.condition === "NM");
 const summary = collectionSummary([single, sealed]);
