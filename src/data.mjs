@@ -329,7 +329,7 @@ export async function publicDataVersion(fetchImpl = fetch) {
 }
 function rawKvKey(path) {
   const v = dataVersion || "na";
-  return `rawpub:v2:${v}:${path}`;
+  return `rawpub:v3:${v}:${path}`;
 }
 
 async function rawText(rel, fetchImpl) {

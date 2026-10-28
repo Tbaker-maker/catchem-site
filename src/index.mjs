@@ -74,10 +74,11 @@ async function withPremium(card, fetchImpl) {
 
 
 const PRODUCT_HTML_TTL = 86400; // soft TTL; counts.asOf in the key drops yesterday on publish
-// v3: key includes public-data asOf so nightly publish invalidates every cached HTML.
+// v4: bump after mid-day unique-breakdown facts republish (v3 HTML kept old Our read lines).
+// Key still includes public-data asOf so nightly publish drops yesterday.
 const productHtmlKey = (id) => {
   const v = currentDataVersion() || "na";
-  return `product-html:v3:${v}:${id}`;
+  return `product-html:v4:${v}:${id}`;
 };
 
 async function readProductHtml(kv, id) {
