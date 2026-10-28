@@ -18,7 +18,7 @@ for (let i = 0; i < pick.length; i += 1) {
   const t0 = Date.now();
   let code = 0;
   try {
-    const res = await fetch(`${base}/p/${id}`, { headers: { "user-agent": "catchem-prewarm-html/1" } });
+    const res = await fetch(`${base}/p/${id}?prewarm=1`, { headers: { "user-agent": "catchem-prewarm-html/1" } });
     code = res.status;
     await res.arrayBuffer();
     if (code === 200) ok += 1;
