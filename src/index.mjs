@@ -881,9 +881,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       cardImages(cardId, fetchImpl),
       card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      // Sealed critical path: skip not-moved / rotation / IR / marks (panels stay empty).
+      // Sealed critical path: skip not-moved / IR / marks. Keep rotation (badge + tests).
       singleLikely ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      singleLikely && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      card && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely && card.setSlug ? cardIr(cardId, fetchImpl) : Promise.resolve(null),
       singleLikely && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
