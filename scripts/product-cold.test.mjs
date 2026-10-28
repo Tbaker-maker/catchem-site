@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { EDGE_TTL, cacheKeyUrl } from "../src/edge-cache.mjs";
+import { EDGE_TTL, cacheKeyUrl, PANEL_CACHE_GEN } from "../src/edge-cache.mjs";
+import { REPO_FETCH_GEN, repoUrl } from "../src/data.mjs";
 import { setRawKv, listBucketIds, extractRow, extractAllRows, setDataVersion, currentDataVersion, publicDataVersion } from "../src/data.mjs";
 
 assert.equal(EDGE_TTL, 86400);
@@ -43,3 +44,8 @@ assert.match(data, /extractAllRows/);
 assert.match(data, /i \+= 5/);
 assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
+
+assert.equal(PANEL_CACHE_GEN, "2");
+assert.match(repoUrl("public-data", "research/assets/public/counts.json"), /[?&]r=2$/);
+assert.equal(repoUrl("main", "research/digests/feed-news.json").includes("?"), false);
+assert.equal(REPO_FETCH_GEN, "2");

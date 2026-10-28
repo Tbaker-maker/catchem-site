@@ -41,10 +41,13 @@ export function cacheKeyUrl(href) {
   url.searchParams.sort();
   return url.toString();
 }
+// Panel generation: bump when mid-day fact/copy changes must drop same-day edge HTML.
+export const PANEL_CACHE_GEN = "2";
 function cacheKey(request, dataVersion = "") {
   const url = new URL(cacheKeyUrl(request.url));
   const day = String(dataVersion || "").slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(day)) url.searchParams.set("dv", day);
+  url.searchParams.set("pv", PANEL_CACHE_GEN);
   url.searchParams.sort();
   return new Request(url.toString(), { method: "GET" });
 }
