@@ -291,7 +291,11 @@ export function extractPacked(text, id) {
 // files from GitHub on every colo. KV is global; Cache API is per-colo.
 const RAW_TTL = 3600;
 let rawKv = null;
-export function setRawKv(kv) { rawKv = kv || null; }
+let rawWaitUntil = null;
+export function setRawKv(kv, waitUntil) {
+  rawKv = kv || null;
+  rawWaitUntil = typeof waitUntil === "function" ? waitUntil : null;
+}
 function rawKvKey(path) { return `rawpub:v1:${path}`; }
 
 async function rawText(rel, fetchImpl) {
@@ -343,8 +347,56 @@ async function memoRow(key, load) {
   rowMem.set(key, { data, at: nowFn() });
   return data;
 }
+function prodrowKey(id) { return `prodrow:v1:${id}`; }
+
+/** Pull every tcgcsv id out of a bucket file body (for KV row seeding). */
+export function listBucketIds(text) {
+  const out = [];
+  const re = /"id":"(tcgcsv-\d+)"/g;
+  let m;
+  const s = String(text || "");
+  while ((m = re.exec(s))) out.push(m[1]);
+  return [...new Set(out)];
+}
+
+/** Seed tiny per-id KV rows from a bucket body so later /p/ hits skip the ~1MB read. */
+export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
+  if (!kv || !text) return 0;
+  const ids = listBucketIds(text);
+  const puts = [];
+  for (const id of ids) {
+    const row = extractRow(text, id);
+    if (!row) continue;
+    puts.push(kv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: ttl }).catch(() => {}));
+  }
+  for (let i = 0; i < puts.length; i += 25) {
+    await Promise.all(puts.slice(i, i + 25));
+  }
+  return puts.length;
+}
+
 export async function bucketRow(id, fetchImpl = fetch) {
-  return memoRow(`b:${id}`, async () => extractRow(await rawText(`buckets/${bucketOf(id)}.json`, fetchImpl), id));
+  return memoRow(`b:${id}`, async () => {
+    if (rawKv) {
+      try {
+        const hit = await rawKv.get(prodrowKey(id));
+        if (hit) {
+          try { return JSON.parse(hit); } catch { /* fall through */ }
+        }
+      } catch { /* miss */ }
+    }
+    const text = await rawText(`buckets/${bucketOf(id)}.json`, fetchImpl);
+    const row = extractRow(text, id);
+    if (row && rawKv) {
+      try { void rawKv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
+    }
+    // Background: seed the rest of this bucket into tiny KV rows (p95 fix).
+    if (text && rawKv) {
+      const job = seedProdRowsFromBucket(text, rawKv).catch(() => {});
+      if (rawWaitUntil) rawWaitUntil(job); else void job;
+    }
+    return row;
+  });
 }
 export async function longHistOf(id, fetchImpl = fetch) {
   return memoRow(`l:${id}`, async () => { try { return extractPacked(await rawText(`hist-long/${bucketOf(id)}.json`, fetchImpl), id); } catch { return ""; } });
