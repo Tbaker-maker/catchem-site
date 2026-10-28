@@ -7,7 +7,7 @@
 // Signed-in visitors (ce_session cookie) always get a fresh render.
 // The browser still sees no-store; only the edge copy is reused.
 
-export const EDGE_TTL = 86400; // 24h: match product-html KV; 30m forced cold re-renders → 1102
+export const EDGE_TTL = 86400; // 24h soft TTL; publish bumps counts.asOf → new cache key (never stale prices)
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
 
 function edgeCache() {
@@ -41,8 +41,11 @@ export function cacheKeyUrl(href) {
   url.searchParams.sort();
   return url.toString();
 }
-function cacheKey(request) {
+function cacheKey(request, dataVersion = "") {
   const url = new URL(cacheKeyUrl(request.url));
+  const day = String(dataVersion || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) url.searchParams.set("dv", day);
+  url.searchParams.sort();
   return new Request(url.toString(), { method: "GET" });
 }
 
@@ -69,41 +72,49 @@ async function safeRender(render, request, env, ctx) {
   }
 }
 
-function asEdgeHit(hit, soft = false) {
+function asEdgeHit(hit, soft = false, dataVersion = "") {
   const h = new Headers(hit.headers);
   h.set("cache-control", "no-store");
   h.set("x-edge-cache", soft ? "stale" : "hit");
   if (soft) h.set("x-catchem-soft", "stale");
+  if (dataVersion) h.set("x-data-version", dataVersion);
   return new Response(hit.body, { status: 200, headers: h });
 }
 
-export async function edgeFetch(render0, request, env, ctx) {
+export async function edgeFetch(render0, request, env, ctx, opts = {}) {
+  const dataVersion = String(opts.dataVersion || "").slice(0, 10);
   const render = (r, e, c) => safeRender(render0, r, e, c);
   const cache = edgeCache();
-  if (!cache || !cacheableRequest(request)) return render(request, env, ctx);
-  const key = cacheKey(request);
+  if (!cache || !cacheableRequest(request)) {
+    const res = await render(request, env, ctx);
+    if (dataVersion && res && res.headers) {
+      const h = new Headers(res.headers);
+      h.set("x-data-version", dataVersion);
+      return new Response(res.body, { status: res.status, headers: h });
+    }
+    return res;
+  }
+  const key = cacheKey(request, dataVersion);
   let hit = null;
   try { hit = await cache.match(key); } catch { hit = null; }
-  if (hit) return asEdgeHit(hit);
+  if (hit) return asEdgeHit(hit, false, dataVersion);
 
   let res;
   try {
     res = await render(request, env, ctx);
   } catch {
-    // Last good copy if somehow still present, else graceful page (200).
     try {
       hit = await cache.match(key);
-      if (hit) return asEdgeHit(hit, true);
+      if (hit) return asEdgeHit(hit, true, dataVersion);
     } catch { /* fall through */ }
     return errorPage();
   }
 
   const type = res.headers.get("content-type") || "";
-  // Product (and other HTML) pages must not surface upstream 5xx to visitors.
   if (res.status >= 500 && type.includes("text/html")) {
     try {
       hit = await cache.match(key);
-      if (hit) return asEdgeHit(hit, true);
+      if (hit) return asEdgeHit(hit, true, dataVersion);
     } catch { /* fall through */ }
     return errorPage();
   }
@@ -112,10 +123,16 @@ export async function edgeFetch(render0, request, env, ctx) {
       const stored = res.clone();
       const h = new Headers(stored.headers);
       h.set("cache-control", `public, max-age=${EDGE_TTL}`);
+      if (dataVersion) h.set("x-data-version", dataVersion);
       h.delete("cdn-cache-control");
       const put = cache.put(key, new Response(stored.body, { status: 200, headers: h })).catch(() => {});
       if (ctx?.waitUntil) ctx.waitUntil(put); else await put;
     } catch { /* never block the page on the cache */ }
+  }
+  if (dataVersion && res.status === 200) {
+    const h = new Headers(res.headers);
+    h.set("x-data-version", dataVersion);
+    return new Response(res.body, { status: res.status, headers: h });
   }
   return res;
 }

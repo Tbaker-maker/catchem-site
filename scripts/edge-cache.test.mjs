@@ -50,4 +50,16 @@ r = await edgeFetch(five, req("/p/tcgcsv-2"), {}, {});
 assert.equal(r.status, 200);
 assert.equal(r.headers.get("x-catchem-soft"), "1");
 
+
+// Versioned edge key: different dv must miss
+store.clear(); renders = 0;
+await edgeFetch(render, req("/p/tcgcsv-9"), {}, {}, { dataVersion: "2026-10-27" });
+assert.equal(renders, 1);
+r = await edgeFetch(render, req("/p/tcgcsv-9"), {}, {}, { dataVersion: "2026-10-27" });
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+assert.equal(r.headers.get("x-data-version"), "2026-10-27");
+r = await edgeFetch(render, req("/p/tcgcsv-9"), {}, {}, { dataVersion: "2026-10-28" });
+assert.equal(renders, 2);
+assert.equal(r.headers.get("x-data-version"), "2026-10-28");
+
 console.log("edge-cache ok");
