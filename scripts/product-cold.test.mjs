@@ -14,6 +14,8 @@ assert.equal(extractRow(sample, "tcgcsv-2").name, "B");
 
 const index = readFileSync(new URL("../src/index.mjs", import.meta.url), "utf8");
 assert.match(index, /prewarm=1/);
+assert.match(index, /x-prewarm/);
+assert.match(index, /seeds prodrow KV and returns immediately/);
 assert.match(index, /warmBucket/);
 assert.match(index, /cardImagesSealed/);
 assert.match(index, /signal-chips\.json is ~400KB/);

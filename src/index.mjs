@@ -845,6 +845,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
     }
+    // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
+    // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
+    if (opts.prewarm) {
+      // Await seed so a 200 means the bucket rows are in FEED_KV (ops prewarm).
+      try { await warmBucket(bucketOf(cardId), fetchImpl); } catch { /* still 200; retry later */ }
+      return new Response("prewarm", {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },
+      });
+    }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     void bucket;
     if (opts.anon) {
@@ -1078,11 +1088,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
     if (card) writeProductHtml(opts, cardId, pageBody);
-    // Ops-only: ?prewarm=1 seeds every prodrow in this bucket after the response.
-    if (card && opts.prewarm) {
-      const job = warmBucket(bucketOf(cardId), fetchImpl).catch(() => {});
-      if (typeof opts.waitUntil === "function") opts.waitUntil(job); else void job;
-    }
     return html(pageBody, card ? 200 : 404);
   }
   if (kind === "movers") {
