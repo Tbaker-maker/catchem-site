@@ -24,4 +24,5 @@ const data = readFileSync(new URL("../src/data.mjs", import.meta.url), "utf8");
 assert.match(data, /seedProdRowsFromBucket/);
 assert.match(data, /prodrow:v1:/);
 assert.match(data, /listBucketIds/);
+assert.match(data, /seededBuckets/);
 console.log("product-cold ok");

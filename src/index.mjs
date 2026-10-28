@@ -635,10 +635,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     globalThis.CATCHEM_TCG_IMAGES = true;
   }
   let trackDoc = null;
-  try {
-    trackDoc = await loadJson("track-record.json", fetchImpl);
-  } catch {
-    trackDoc = null;
+  // Product/card cold path: skip track-record.json (~extra GitHub hit).
+  if (kind !== "product" && kind !== "card") {
+    try {
+      trackDoc = await loadJson("track-record.json", fetchImpl);
+    } catch {
+      trackDoc = null;
+    }
   }
   const trackOpen = trackRecordIsOpen(trackDoc);
   setTrackRecordOpen(trackOpen);
@@ -888,7 +891,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       singleLikely ? loadJson("feed/facts.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
       sealedLikely ? cardImagesSealed(cardId, fetchImpl) : cardImages(cardId, fetchImpl),
-      card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
+      // Sealed: skip item-reads shard on cold critical path (p95).
+      singleLikely && card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       // Sealed critical path: skip not-moved / IR / marks. Keep rotation (badge + tests).
       singleLikely ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
