@@ -16,6 +16,7 @@ t("site-entry serves /sealed-pulse", entry.includes('"/sealed-pulse"'));
 t("site-entry serves /heatmap", entry.includes('"/heatmap"'));
 t("site-entry serves /brand-visuals alias", entry.includes('"/brand-visuals"'));
 t("site-entry serves /heat alias", entry.includes('"/heat"'));
+t("site-entry redirects /sealed to feed sealed filter", entry.includes('path === "/sealed"') && entry.includes("/feed?f=sealed"));
 const page = brandPage();
 t("brand page renders Catch'em mark", page.includes("Catch'em") && page.includes("#12100e") && page.includes("#d9b779"));
 t("brand page names TCGplayer market source", /TCGplayer market/.test(page));
