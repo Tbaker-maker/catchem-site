@@ -13,6 +13,7 @@ assert.match(index, /promos\.json is ~660KB/);
 assert.match(index, /product-html:v1:/);
 assert.match(index, /setRawKv\(env\?\.FEED_KV\)/);
 assert.doesNotMatch(index, /card \? loadJson\("promos\.json"/);
+assert.match(index, /Sealed critical path/);
 
 const data = readFileSync(new URL("../src/data.mjs", import.meta.url), "utf8");
 assert.match(data, /rawpub:v1:/);
