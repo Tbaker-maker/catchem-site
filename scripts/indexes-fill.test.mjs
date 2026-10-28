@@ -36,7 +36,7 @@ const files = {
   "indexes.json": { asOf: "2026-10-13", source: "TCGplayer market, daily", singles: own },
 };
 const fetchImpl = async (url) => {
-  const rel = String(url).split("/research/assets/public/")[1];
+  const rel = String(url).split("/research/assets/public/")[1]?.split("?")[0];
   if (rel && files[rel]) return new Response(JSON.stringify(files[rel]));
   return new Response("no", { status: 404 });
 };

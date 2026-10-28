@@ -18,7 +18,7 @@ t("no chart without history", readYearChart({ id: "x", hist: [] }) === "");
 
 const read = { id: "move-tcgcsv-89318-7", href: "/c/tcgcsv-89318", headline: "Slowking (Prime) is up 24.4% this week.", price: 116.21, asOf: "2026-10-13", source: "TCGplayer market", kind: "single", receipt: { from: "2026-10-06", to: "2026-10-13", marketFrom: 93.39, marketTo: 116.21 } };
 const fetchImpl = async (u) => {
-  const url = String(u);
+  const url = String(u).split("?")[0];
   if (url.endsWith("buckets/18.json")) return new Response(JSON.stringify([card]));
   if (url.endsWith("hist-long/18.json")) return new Response(JSON.stringify({ rows: {} }));
   return new Response("{}", { status: 404 });
@@ -43,7 +43,7 @@ t("no em dashes in the chart", !/[\u2014\u2013]/.test(html.replace(/<[^>]+>/g, "
     calls++;
     if (calls > 50) throw new Error("Too many subrequests");
     const url = String(u);
-    if (url.endsWith("reads.json")) return new Response(JSON.stringify({ reads: [read, ...many] }));
+    if (url.includes("/reads.json")) return new Response(JSON.stringify({ reads: [read, ...many] }));
     return fetchImpl(u);
   };
   resetJsonCache();
@@ -52,7 +52,7 @@ t("no em dashes in the chart", !/[\u2014\u2013]/.test(html.replace(/<[^>]+>/g, "
   const cfg = JSON.parse(body.match(/id="read-year">([\s\S]*?)<\/script>/)[1]);
   t("read chart is built before the stale pass uses up subrequests", cfg && cfg.html.includes('class="hc"'));
   let n = 0;
-  const counter = async (u) => { n++; const url = String(u); if (url.endsWith("reads.json")) return new Response(JSON.stringify({ reads: many })); return new Response("[]"); };
+  const counter = async (u) => { n++; const url = String(u); if (url.includes("/reads.json")) return new Response(JSON.stringify({ reads: many })); return new Response("[]"); };
   resetJsonCache();
   await renderPath("/feed", counter, { feed: true });
   t("stale pass fetches each bucket once (100 buckets, not 160 rows)", n <= 110);

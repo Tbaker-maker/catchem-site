@@ -148,7 +148,7 @@ const fetchImpl = async (url) => {
     if (!doc) return { ok: false, status: 404, json: async () => null, text: async () => "" };
     return { ok: true, status: 200, json: async () => doc, text: async () => JSON.stringify(doc) };
   }
-  const rel = s.split("/public/")[1];
+  const rel = (s.split("/public/")[1] || "").split("?")[0];
   if (!files[rel]) return { ok: false, status: 404, json: async () => null, text: async () => "" };
   return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
 };
@@ -801,7 +801,7 @@ const staleFiles = {
   "buckets/93.json": [{ id: "tcgcsv-516693", name: "Gyarados", price: 0.39, asOf: "2026-09-27" }],
 };
 const staleFetch = async (url) => {
-  const rel = String(url).split("/public/")[1];
+  const rel = (String(url).split("/public/")[1] || "").split("?")[0];
   if (!staleFiles[rel]) return { ok: false, status: 404, json: async () => null, text: async () => "" };
   return { ok: true, status: 200, json: async () => staleFiles[rel], text: async () => JSON.stringify(staleFiles[rel]) };
 };
