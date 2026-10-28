@@ -22,7 +22,7 @@ async function sleep(ms) { await new Promise((r) => setTimeout(r, ms)); }
 
 const searchUrl =
   "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/public-data/research/assets/public/search-lite.json";
-const rows = await (await fetch(searchUrl)).json();
+const rows = await (await fetch(searchUrl, { signal: AbortSignal.timeout(60000) })).json();
 if (!Array.isArray(rows)) throw new Error("search-lite shape");
 let ids = rows
   .filter((r) => Array.isArray(r) && typeof r[0] === "string" && r[0].startsWith("tcgcsv-"))
@@ -43,6 +43,7 @@ for (let i = 0; i < ids.length; i += 1) {
   try {
     const res = await fetch(`${base}/p/${id}?prewarm=html`, {
       headers: { "user-agent": "catchem-prewarm-html/2" },
+      signal: AbortSignal.timeout(120000),
     });
     code = res.status;
     xp = res.headers.get("x-prewarm") || "";
