@@ -62,8 +62,8 @@ a{color:var(--gold)}
 
 /* HERO */
 .hero{position:relative;padding:64px 0 56px;display:grid;gap:28px}
-.mark{position:relative}
-.brand{font:600 clamp(56px,15vw,104px)/.9 var(--serif);letter-spacing:-.035em;margin:0;font-variation-settings:'opsz' 144}
+.mark{position:relative;min-width:0}
+.brand{font:600 clamp(56px,15vw,104px)/.9 var(--serif);letter-spacing:-.035em;margin:0;max-width:100%;font-variation-settings:'opsz' 144}
 .brand span{color:var(--gold)}
 .kicker{font:600 12.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:0 0 16px}
 h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin:0 0 18px;max-width:22ch;text-wrap:balance;font-variation-settings:'opsz' 96}
@@ -87,6 +87,8 @@ h1{font:500 clamp(31px,5.2vw,46px)/1.1 var(--serif);letter-spacing:-.02em;margin
 }
 @media (min-width:760px){
   .hero{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;padding:96px 0 72px;align-items:start}
+  /* Side mark must fit the 5fr column; 15vw/104px overflows into the H1. */
+  .brand{font-size:clamp(40px,7.2vw,72px)}
 }
 
 /* SECTIONS */

@@ -7,5 +7,11 @@ t("hero drops a default NM tag", h.includes("$11.17") && h.includes("$44.54") &&
 const kept = heroToday({ asOf: "2026-10-16", lines: [{ slot: "mover", text: "Eevee went from $11.17 NM to $44.54 NM.", href: "/c/tcgcsv-180459", condition: "NM" }] });
 t("hero keeps NM when the row is NM", kept.includes("$11.17 NM") && kept.includes("$44.54 NM"));
 t("hero hides when there is nothing", !heroToday({}).includes("class=\"hx-read\""));
-t("home makes no raffle claim", !/raffle/i.test(readFileSync(new URL("../index.html", import.meta.url), "utf8")));
+const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+t("home makes no raffle claim", !/raffle/i.test(index));
+t("phone hero hides the side mark", h.includes("@media(max-width:700px)") && h.includes(".hero .mark{display:none}"));
+t("mark column can shrink in the hero grid", /\.mark\{[^}]*min-width:0/.test(index));
+t("wide hero shrinks the brand so it cannot cover the H1", /@media \(min-width:760px\)\{[\s\S]*?\.brand\{font-size:clamp\(40px,7\.2vw,72px\)\}/.test(index));
+t("brand keeps max-width 100%", /\.brand\{[^}]*max-width:100%/.test(index));
 if (fail) process.exit(1);
+console.log("home-hero: all ok");
