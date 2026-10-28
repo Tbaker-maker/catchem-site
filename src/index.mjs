@@ -848,9 +848,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
     // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
     if (opts.prewarm) {
-      // Seed in waitUntil; return immediately so ops prewarm is not killed by wall time.
-      const job = warmBucket(bucketOf(cardId), fetchImpl).catch(() => {});
-      if (typeof opts.waitUntil === "function") opts.waitUntil(job); else void job;
+      // Await seed (extractAllRows is O(n)); waitUntil alone was often killed mid-put,
+      // leaving never-visited /p/ without prodrow and p95 ~40s.
+      try { await warmBucket(bucketOf(cardId), fetchImpl); } catch { /* retry later */ }
       return new Response("prewarm", {
         status: 200,
         headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },
