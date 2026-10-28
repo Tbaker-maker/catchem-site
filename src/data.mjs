@@ -16,9 +16,11 @@ export function dataBase() {
   return sessionBase;
 }
 
+// r=2 busts Cloudflare's cached GitHub raw responses after mid-day public-data republish.
+export const REPO_FETCH_GEN = "2";
 export function repoUrl(branch, path) {
   const clean = String(path || "").replace(/^\/+/, "");
-  return `${ORIGIN}/${branch}/${clean}`;
+  return `${ORIGIN}/${branch}/${clean}?r=${REPO_FETCH_GEN}`;
 }
 
 // Browser copies cannot fall back. The function body is copied into pages,
