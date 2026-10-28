@@ -347,7 +347,7 @@ async function memoRow(key, load) {
   rowMem.set(key, { data, at: nowFn() });
   return data;
 }
-function prodrowKey(id) { return `prodrow:v1:${id}`; }
+function prodrowKey(id) { return `prodrow:v2:${id}`; }
 
 /** Pull every tcgcsv id out of a bucket file body (for KV row seeding). */
 export function listBucketIds(text) {
@@ -400,7 +400,7 @@ export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   return puts.length;
 }
 
-function prodrowBucketKey(pad) { return `prodrow-bucket:v1:${pad}`; }
+function prodrowBucketKey(pad) { return `prodrow-bucket:v2:${pad}`; }
 
 /** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets or ?prewarm=1). */
 export async function warmBucket(bucketPad, fetchImpl = fetch) {
