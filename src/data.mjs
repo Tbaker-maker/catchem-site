@@ -375,6 +375,14 @@ export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   return puts.length;
 }
 
+/** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets). */
+export async function warmBucket(bucketPad, fetchImpl = fetch) {
+  const text = await rawText(`buckets/${bucketPad}.json`, fetchImpl);
+  const n = await seedProdRowsFromBucket(text, rawKv);
+  return { bytes: text.length, rows: n };
+}
+
+
 export async function bucketRow(id, fetchImpl = fetch) {
   return memoRow(`b:${id}`, async () => {
     if (rawKv) {
@@ -390,11 +398,8 @@ export async function bucketRow(id, fetchImpl = fetch) {
     if (row && rawKv) {
       try { void rawKv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
     }
-    // Background: seed the rest of this bucket into tiny KV rows (p95 fix).
-    if (text && rawKv) {
-      const job = seedProdRowsFromBucket(text, rawKv).catch(() => {});
-      if (rawWaitUntil) rawWaitUntil(job); else void job;
-    }
+    // Full-bucket seeding is only via POST /api/prewarm-buckets — inline seeding
+    // stormed KV/CPU on cold hits and made p95 worse.
     return row;
   });
 }

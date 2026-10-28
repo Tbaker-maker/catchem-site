@@ -5,7 +5,7 @@ import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { applySetSpark } from "./set-spark.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -1236,11 +1236,11 @@ async function prewarmBuckets(env, ctx, fetchImpl) {
   setRawKv(env?.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
   const out = [];
   for (let b = 0; b < 100; b += 1) {
-    const id = `tcgcsv-${1000 + b}`; // maps to bucket b via % 100 for 1000..1099 → 00..99
+    const pad = String(b).padStart(2, "0");
     const t0 = Date.now();
     try {
-      await bucketRow(id, fetchImpl);
-      out.push({ b, ms: Date.now() - t0, ok: true });
+      const info = await warmBucket(pad, fetchImpl);
+      out.push({ b, ms: Date.now() - t0, ok: true, ...info });
     } catch (err) {
       out.push({ b, ms: Date.now() - t0, ok: false, err: String(err && err.message || err) });
     }
