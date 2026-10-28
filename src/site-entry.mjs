@@ -20,7 +20,7 @@ export default {
       }
     }
     if (path === "/sealed") {
-      const dest = new URL("/feed?f=sealed", url.origin);
+      const dest = new URL("/feed", url.origin);
       return Response.redirect(dest.toString(), 301);
     }
     if (path === "/sealed-pulse" || path === "/heat" || path === "/heatmap" || path === "/brand-visuals") {
