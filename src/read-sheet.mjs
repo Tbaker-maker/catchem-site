@@ -244,12 +244,12 @@ function momentumCard(m) {
   const slug = /^[a-z0-9-]+$/.test(String(m.slug || "")) ? m.slug : "";
   const hash = m.kind === "sealed" ? "sealed-chart" : "single-chart";
   const inner = `<h3>Set momentum</h3><p>${esc(text)}</p>${svg}<p class="muted">${esc("Chain-linked TCGplayer market index")}</p>`;
-  if (slug) return `<a class="rd-card rd-mom" href="/sets/${slug}#${hash}">${inner}</a>`;
-  return `<article class="rd-card">${inner}</article>`;
+  if (slug) return `<a class="rd-card rd-mom" data-bd="momentum" href="/sets/${slug}#${hash}">${inner}</a>`;
+  return `<article class="rd-card" data-bd="momentum">${inner}</article>`;
 }
 
 export function factCards(f) {
-  const none = { range: "", pattern: "", cards: [], similar: "" };
+  const none = { range: "", pattern: "", cards: [], similar: "", ordered: "" };
   if (!f || typeof f !== "object") return none;
   const r = f.range;
   let range = "";
@@ -259,7 +259,7 @@ export function factCards(f) {
       r.daysSinceHigh > 0 && Number.isFinite(r.fromHighPct) ? `${r.daysSinceHigh} days since the last high, now ${Math.abs(r.fromHighPct)}% under it.` : (r.daysSinceHigh === 0 ? "At its high on file tonight." : ""),
       f.rank && f.rank.rank > 0 ? `No. ${f.rank.rank} of ${f.rank.of} by price in ${f.rank.set}.` : "",
     ].filter(Boolean);
-    range = `<article class="rd-card"><h3>${esc(dayLabel(r.from) ? `High and low since ${shortDay(r.from)}` : "High and low")}</h3>${lines.map((x) => `<p>${esc(x)}</p>`).join("")}<p class="muted">${esc(`TCGplayer market, ${dayLabel(r.from)} to ${dayLabel(r.now?.date || f.asOf)}`)}</p></article>`;
+    range = `<article class="rd-card" data-bd="range"><h3>${esc(dayLabel(r.from) ? `High and low since ${shortDay(r.from)}` : "High and low")}</h3>${lines.map((x) => `<p>${esc(x)}</p>`).join("")}<p class="muted">${esc(`TCGplayer market, ${dayLabel(r.from)} to ${dayLabel(r.now?.date || f.asOf)}`)}</p></article>`;
   }
   let pattern = "";
   const p = f.pattern;
@@ -269,28 +269,46 @@ export function factCards(f) {
     const bits = [copy.small];
     if (when) bits.push(`Why it matches: ${when}.`);
     if (shortDay(p.asOf)) bits.push(`Our nightly files, ${shortDay(p.asOf)}.`);
-    pattern = `<section class="rd-pattern"><h3>Pattern track record</h3><p class="rd-lead">${esc(copy.lead)}</p>${siteBars(copy)}<p class="rd-small">${esc(bits.join(" "))}</p></section>`;
+    pattern = `<section class="rd-pattern" data-bd="pattern"><h3>Pattern track record</h3><p class="rd-lead">${esc(copy.lead)}</p>${siteBars(copy)}<p class="rd-small">${esc(bits.join(" "))}</p></section>`;
   }
-  const cards = [];
+  const byId = {};
+  if (range) byId.range = range;
   const m = f.setMomentum;
-  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) cards.push(momentumCard(m));
+  if (m && Number.isFinite(m.pct) && dayLabel(m.from)) byId.momentum = momentumCard(m);
   const rb = f.rarityBand;
-  if (rb && rb.n > 0) cards.push(card("Rarity band", `${rb.n} ${rb.rarity} cards in ${rb.set}: median ${pp(rb.median)} over 30 days, ${rb.up} up, ${rb.down} down.`, `TCGplayer market, ${shortDay(rb.from)} to ${shortDay(rb.to)}`));
+  if (rb && rb.n > 0) byId.rarity = card("Rarity band", `${rb.n} ${rb.rarity} cards in ${rb.set}: median ${pp(rb.median)} over 30 days, ${rb.up} up, ${rb.down} down.`, `TCGplayer market, ${shortDay(rb.from)} to ${shortDay(rb.to)}`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"rarity\">");
+  // Artist names stay off the public breakdown lead; the band card remains only when the facts file already carries it.
   const ab = f.artistBand;
-  if (ab && ab.n > 0) cards.push(card("Artist band", `${ab.n} priced cards by ${ab.artist}: median ${pp(ab.median)} over 30 days, ${ab.up} up, ${ab.down} down.`, `TCGplayer market, ${shortDay(ab.from)} to ${shortDay(ab.to)}`));
+  if (ab && ab.n > 0) byId.artist = card("Artist band", `${ab.n} priced cards in this artist band: median ${pp(ab.median)} over 30 days, ${ab.up} up, ${ab.down} down.`, `TCGplayer market, ${shortDay(ab.from)} to ${shortDay(ab.to)}`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"artist\">");
   const v = f.variants;
-  if (Array.isArray(v) && v.length >= 2) cards.push(card("Variants", v.map((x) => `${x.name} ${money(x.price)}`).join(" · "), `TCGplayer market, ${dayLabel(v[0].asOf)}`));
+  if (Array.isArray(v) && v.length >= 2) byId.variants = card("Variants", v.map((x) => `${x.name} ${money(x.price)}`).join(" · "), `TCGplayer market, ${dayLabel(v[0].asOf)}`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"variants\">");
   const rip = f.rip;
-  if (rip && rip.contentsEV > 0 && rip.price > 0) cards.push(card("Rip value", `Expected contents ${money(rip.contentsEV)} vs ${money(rip.price)} sealed (${pp(rip.roiPct)}).${Number.isFinite(rip.beatChance) ? ` ${rip.beatChance}% of simulated openings beat the price.` : ""}`, `History-based estimate from dated pull rates, ${dayLabel(rip.asOf)}. Not advice`));
+  if (rip && rip.contentsEV > 0 && rip.price > 0) byId.rip = card("Rip value", `Expected contents ${money(rip.contentsEV)} vs ${money(rip.price)} sealed (${pp(rip.roiPct)}).${Number.isFinite(rip.beatChance) ? ` ${rip.beatChance}% of simulated openings beat the price.` : ""}`, `History-based estimate from dated pull rates, ${dayLabel(rip.asOf)}. Not advice`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"rip\">");
   const sims = (Array.isArray(f.similar) ? f.similar : []).filter((x) => safeSrc(x.image) && String(x.href || "").startsWith("/")).slice(0, 4).map((x) =>
     `<a class="rd-sim" href="${esc(x.href)}"><img alt="" loading="lazy" src="${esc(safeSrc(x.image))}" width="44" height="62"><span><b>${esc(cleanTitle(x.name))}</b><small>${esc([x.number, money(x.price)].filter(Boolean).join(" · "))}</small></span></a>`).join("");
-  const similar = sims ? `<article class="rd-card"><h3>Similar by price in this set</h3><div class="rd-sims">${sims}</div><p class="muted">${esc(`TCGplayer market, ${dayLabel(f.asOf)}`)}</p></article>` : "";
-  return { range, pattern, cards: cards.filter(Boolean), similar };
+  const similar = sims ? `<article class="rd-card" data-bd="similar"><h3>Similar by price in this set</h3><div class="rd-sims">${sims}</div><p class="muted">${esc(`TCGplayer market, ${dayLabel(f.asOf)}`)}</p></article>` : "";
+  if (similar) byId.similar = similar;
+
+  // Prefer the breakdown order from Catchem-data when present so each read's panel leads with what matters for that item.
+  const preferred = Array.isArray(f.breakdown?.order) ? f.breakdown.order : ["range", "momentum", "rarity", "artist", "variants", "rip", "similar"];
+  const seen = new Set();
+  const orderedParts = [];
+  for (const id of preferred) {
+    if (!byId[id] || seen.has(id)) continue;
+    seen.add(id);
+    orderedParts.push(byId[id]);
+  }
+  for (const id of Object.keys(byId)) {
+    if (seen.has(id)) continue;
+    orderedParts.push(byId[id]);
+  }
+  const cards = orderedParts.filter((html) => html && html !== range && html !== similar);
+  return { range, pattern, cards, similar, ordered: orderedParts.join("") };
 }
 
 const SHEET_CSS = `<style>
 .read-sheet{display:grid;gap:12px;margin:8px 0 16px}
-.rd-hero{display:flex;gap:12px;align-items:flex-start}
+.rd-line{margin:0 0 4px;font-size:16px;line-height:1.45}.rd-hero{display:flex;gap:12px;align-items:flex-start}
 .rd-hero img.rd-face{width:120px;height:auto;border-radius:16px;background:#141416;object-fit:contain}
 .rd-logo{height:28px;width:auto;border-radius:8px;background:#1a1815}
 .rd-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
@@ -335,7 +353,9 @@ export function readSheet(read, ctx = {}) {
   const hero = (face || logo || name || bits.length || prices.line)
     ? `<div class="rd-hero">${face ? `<img class="rd-face" alt="" src="${esc(face)}" width="120" height="168" decoding="async" onerror="this.remove()">` : ""}<div>${name ? `<h2>${esc(name)}</h2>` : ""}<div class="rd-meta">${logo ? `<img class="rd-logo" alt="" src="${esc(logo)}" height="28">` : ""}${bits.map((bit) => `<span>${esc(bit)}</span>`).join("")}</div>${prices.line ? `<p>${esc(prices.line)}</p>` : ""}</div></div>`
     : "";
-  const fc = factCards(facts);
+  const fc = factCards(facts || {});
+  const bdLine = String(facts?.line || facts?.breakdown?.sections?.[0]?.text || "").trim();
+  const bdHtml = bdLine && !/[\u2014\u2013]/.test(bdLine) ? `<p class="rd-line">${esc(bdLine)}</p>` : "";
   const chipRow = facts ? [!facts.listings ? listingsChip(read) : "", ...factChips(facts), ...rotTagChips(read, ctx)].filter(Boolean).join("") : chipsFor(read, ctx);
   const chips = chipRow ? `<ul class="rd-chips">${chipRow}</ul>` : "";
   const pattern = patternSentence(read);
@@ -355,8 +375,9 @@ export function readSheet(read, ctx = {}) {
   const sims = fc.similar ? "" : similarCards(read, peers);
   const have = new Set((fc.cards.join("").match(/<h3>[^<]+<\/h3>/g) || []));
   const peerCards = (cards.match(/<article class="rd-card">[\s\S]*?<\/article>/g) || []).filter((a) => !have.has((a.match(/<h3>[^<]+<\/h3>/) || [""])[0])).join("");
-  const all = fc.range + fc.cards.join("") + peerCards + (fc.similar || (sims ? `<article class="rd-card"><h3>Similar cards</h3><div class="rd-sims">${sims}</div></article>` : ""));
+  const bodyCards = fc.ordered || (fc.range + fc.cards.join("") + (fc.similar || ""));
+  const all = bodyCards + peerCards + (!fc.similar && sims ? `<article class="rd-card"><h3>Similar cards</h3><div class="rd-sims">${sims}</div></article>` : "");
   const context = all ? `<div class="rd-cards">${all}</div>` : "";
-  if (!hero && !chips && !patternHtml && !context) return "";
-  return `<section class="read-sheet" id="read-sheet" aria-label="Read details">${SHEET_CSS}${hero}${chips}${patternHtml}${context}</section>`;
+  if (!hero && !bdHtml && !chips && !patternHtml && !context) return "";
+  return `<section class="read-sheet" id="read-sheet" aria-label="Read details">${SHEET_CSS}${hero}${bdHtml}${chips}${patternHtml}${context}</section>`;
 }
