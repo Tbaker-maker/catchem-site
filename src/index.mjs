@@ -84,6 +84,8 @@ async function readProductHtml(kv, id) {
 function writeProductHtml(opts, id, body) {
   if (!opts?.anon || !opts?.kv || !id || !body) return;
   const put = opts.kv.put(productHtmlKey(id), body, { expirationTtl: PRODUCT_HTML_TTL }).catch(() => {});
+  // Ops ?prewarm=html must finish the KV put before the next paced request.
+  if (opts.prewarmHtml) return put;
   if (typeof opts.waitUntil === "function") opts.waitUntil(put);
 }
 
@@ -1100,7 +1102,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       priceRead = null;
     }
     const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
-    if (card) writeProductHtml(opts, cardId, pageBody);
+    if (card) await Promise.resolve(writeProductHtml(opts, cardId, pageBody));
     return html(pageBody, card ? 200 : 404);
   }
   if (kind === "movers") {
