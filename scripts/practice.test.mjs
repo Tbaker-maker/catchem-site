@@ -63,7 +63,7 @@ t("note says layout, not odds", PRACTICE_NOTE === "Typical pack layout. Not real
 t("promo sets are not packs", !practiceSets({ sets: [{ slug: "x-promos", name: "X Promos", single: 40 }] }, "2026-10-12").length);
 
 const files = { "counts.json": { asOf: "2026-10-12" }, "sets.json": setsDoc, "sets/new-set.json": setDoc, "sets/old-set.json": { ...setDoc, name: "Old Set" }, "catalogue-images.json": { images: {} } };
-const fetchImpl = async (u) => { const rel = String(u).split("/research/assets/public/")[1]; return rel in files ? new Response(JSON.stringify(files[rel])) : new Response("x", { status: 404 }); };
+const fetchImpl = async (u) => { const rel = String(u).split("/research/assets/public/")[1]?.split("?")[0]; return rel in files ? new Response(JSON.stringify(files[rel])) : new Response("x", { status: 404 }); };
 resetJsonCache();
 const page = await (await renderPath("/practice", fetchImpl, { today: "2026-10-12" })).text();
 t("page kind", pageKind("/practice") === "practice");

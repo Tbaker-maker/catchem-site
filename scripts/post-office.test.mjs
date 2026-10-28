@@ -65,7 +65,7 @@ t("Pikachu ex Pocket is the ex", rankCatalog("Pikachu ex", rows.filter((r) => r[
 const counts = { asOf: "2026-09-27", updatedAt: "2026-09-27T10:19:31.933Z", single: 1, sealed: 1 };
 const files = { "counts.json": counts, "reads.json": { reads: [] }, "artists.json": { artists: [] } };
 const fetchImpl = async (url) => {
-  const rel = String(url).split("/public/")[1];
+  const rel = (String(url).split("/public/")[1] || "").split("?")[0];
   if (files[rel]) return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
   if (String(url).includes("search-lite.json")) return { ok: true, status: 200, json: async () => rows };
   if (String(url).includes("pocket-catalogue.json")) return { ok: true, status: 200, json: async () => ({ cards: { "tcgp-A1-285": { name: "Pikachu ex", setName: "Genetic Apex", number: "285", artist: "PLANETA CG Works", rarity: "Crown" } } }) };

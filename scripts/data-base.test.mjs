@@ -14,7 +14,7 @@ function harness(ok) {
     const s = String(url);
     calls.push(s);
     const branch = s.includes("/public-data/") ? "public-data" : "main";
-    const path = s.split("/" + branch + "/")[1] || "";
+    const path = (s.split("/" + branch + "/")[1] || "").split("?")[0];
     if (ok.has(branch + ":" + path)) {
       return { ok: true, status: 200, json: async () => ({}), text: async () => "" };
     }
@@ -34,9 +34,9 @@ resetDataBase();
   assert.equal(a.ok, true);
   assert.equal(b.ok, true);
   assert.equal(calls.length, 3);
-  assert.match(calls[0], /\/public-data\/research\/assets\/public\/a\.json$/);
-  assert.match(calls[1], /\/main\/research\/assets\/public\/a\.json$/);
-  assert.match(calls[2], /\/main\/research\/assets\/public\/b\.json$/);
+  assert.match(calls[0], /\/public-data\/research\/assets\/public\/a\.json(?:\?r=\d+)?$/);
+  assert.match(calls[1], /\/main\/research\/assets\/public\/a\.json(?:\?r=\d+)?$/);
+  assert.match(calls[2], /\/main\/research\/assets\/public\/b\.json(?:\?r=\d+)?$/);
   assert.equal(dataBase(), "main");
 }
 
@@ -49,7 +49,7 @@ resetDataBase();
   ]));
   await fetchRepo("research/assets/public/ok.json", fetchImpl);
   assert.equal(calls.length, 1);
-  assert.match(calls[0], /\/public-data\/research\/assets\/public\/ok\.json$/);
+  assert.match(calls[0], /\/public-data\/research\/assets\/public\/ok\.json(?:\?r=\d+)?$/);
   calls.length = 0;
   const cat = await fetchRepo("data/card-catalogue.json", fetchImpl);
   assert.equal(cat.ok, true);
@@ -60,7 +60,7 @@ resetDataBase();
   const next = await fetchRepo("research/assets/public/next.json", fetchImpl);
   assert.equal(next.ok, true);
   assert.equal(calls.length, 1);
-  assert.match(calls[0], /\/public-data\/research\/assets\/public\/next\.json$/);
+  assert.match(calls[0], /\/public-data\/research\/assets\/public\/next\.json(?:\?r=\d+)?$/);
 }
 
 

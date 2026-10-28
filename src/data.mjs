@@ -16,12 +16,9 @@ export function dataBase() {
   return sessionBase;
 }
 
-// r=2 busts Cloudflare's cached GitHub raw for public assets after mid-day republish.
-export const REPO_FETCH_GEN = "2";
 export function repoUrl(branch, path) {
   const clean = String(path || "").replace(/^\/+/, "");
-  const url = `${ORIGIN}/${branch}/${clean}`;
-  return clean.startsWith("research/assets/public/") ? `${url}?r=${REPO_FETCH_GEN}` : url;
+  return `${ORIGIN}/${branch}/${clean}`;
 }
 
 // Browser copies cannot fall back. The function body is copied into pages,
@@ -357,7 +354,7 @@ async function rawText(rel, fetchImpl) {
       }
     } catch { /* miss */ }
   }
-  const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: RAW_TTL, cacheEverything: true } });
+  const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: 120, cacheEverything: true } });
   if (!res.ok) throw new Error(`${rel} ${res.status}`);
   const text = await res.text();
   if (text) {

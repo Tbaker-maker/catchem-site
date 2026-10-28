@@ -69,7 +69,7 @@ const rows = {
   11: { id: "tcgcsv-11", name: "Kadabra", kind: "single", price: 8, asOf: "2026-10-13", source: "TCGplayer market", hist: [["2026-08-01", 7], ["2026-09-01", 7.5], ["2026-10-13", 8]] },
 };
 const fetchImpl = async (url) => {
-  const rel = String(url).split("/public/")[1] || "";
+  const rel = (String(url).split("/public/")[1] || "").split("?")[0];
   if (files[rel]) return { ok: true, status: 200, json: async () => files[rel], text: async () => JSON.stringify(files[rel]) };
   const bucket = rel.match(/^buckets\/(\d+)\.json$/);
   if (bucket && rows[bucket[1]]) return { ok: true, status: 200, json: async () => [rows[bucket[1]]], text: async () => JSON.stringify([rows[bucket[1]]]) };

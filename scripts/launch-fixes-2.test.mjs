@@ -24,7 +24,7 @@ t("rest loads after first paint", page.includes("requestIdleCallback(loadRest"))
 resetSoldCheck();
 t("missing sold file reads as off", (await soldFileExists(async () => new Response("", { status: 404 }))) === false);
 resetSoldCheck();
-const lead = await renderPath("/feed/lead.json", async (u) => new Response(String(u).endsWith("reads.json") ? JSON.stringify({ reads }) : "{}"), { feed: true });
+const lead = await renderPath("/feed/lead.json", async (u) => new Response(String(u).includes("/reads.json") ? JSON.stringify({ reads }) : "{}"), { feed: true });
 const leadRows = lead ? JSON.parse(await lead.text()) : [];
 t("/feed/lead.json returns every read", lead && lead.headers.get("content-type").includes("json") && leadRows.length >= FEED_INLINE);
 
