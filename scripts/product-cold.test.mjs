@@ -47,4 +47,5 @@ console.log("product-cold ok");
 
 assert.equal(PANEL_CACHE_GEN, "2");
 assert.match(repoUrl("public-data", "research/assets/public/counts.json"), /[?&]r=2$/);
+assert.equal(repoUrl("main", "research/digests/feed-news.json").includes("?"), false);
 assert.equal(REPO_FETCH_GEN, "2");
