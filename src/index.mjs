@@ -5,7 +5,7 @@ import { handleShareCard } from "./share-card.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { applySetSpark } from "./set-spark.mjs";
-import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket } from "./data.mjs";
+import { bucketRow, bucketRows, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -875,7 +875,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       signalCard,
     ] = await Promise.all([
       singleLikely ? longHistOf(cardId, fetchImpl) : Promise.resolve(""),
-      loadJson("feed/facts.json", fetchImpl).catch(() => null),
+      // facts.json is ~85KB and rarely fills a sealed chip; skip on sealed critical path.
+      singleLikely ? loadJson("feed/facts.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
       cardImages(cardId, fetchImpl),
       card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
@@ -1225,6 +1226,7 @@ const worker = {
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
     setAffiliateConfig(env);
+    setRawKv(env?.FEED_KV);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     const premiumHit = await handlePremiumRequest(request, env, fetchImpl);
