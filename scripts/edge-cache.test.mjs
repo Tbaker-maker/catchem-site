@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { edgeFetch, cacheableRequest, errorPage } from "../src/edge-cache.mjs";
+import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL } from "../src/edge-cache.mjs";
 
 const store = new Map();
 globalThis.caches = { default: {
@@ -28,7 +28,26 @@ assert.equal(renders, 2);
 
 const boom = async () => { throw new Error("x"); };
 r = await edgeFetch(boom, new Request("https://catchemtcg.com/c/z", { headers: { accept: "text/html" } }), {}, {});
-assert.equal(r.status, 503);
+assert.equal(r.status, 200);
+assert.equal(r.headers.get("x-catchem-soft"), "1");
 assert.match(await r.text(), /Retry/);
 assert.doesNotMatch(await errorPage().text(), /\u2014/);
+
+assert.equal(EDGE_TTL, 86400);
+assert.equal(errorPage().status, 200);
+
+const five = async () => new Response("<p>down</p>", { status: 503, headers: { "content-type": "text/html" } });
+store.clear(); renders = 0;
+// Seed a good copy, then a 5xx render must return stale 200.
+await edgeFetch(render, req("/p/tcgcsv-1"), {}, {});
+assert.equal(renders, 1);
+r = await edgeFetch(five, req("/p/tcgcsv-1"), {}, {});
+assert.equal(r.status, 200);
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+// Miss + 5xx → graceful soft 200
+store.clear();
+r = await edgeFetch(five, req("/p/tcgcsv-2"), {}, {});
+assert.equal(r.status, 200);
+assert.equal(r.headers.get("x-catchem-soft"), "1");
+
 console.log("edge-cache ok");
