@@ -322,7 +322,11 @@ async function itemReadRows(cardId, fetchImpl) {
 }
 
 export async function allReadsFor(cardId, fetchImpl) {
-  return (await itemReadRows(cardId, fetchImpl))
+  return mapAllReads(await itemReadRows(cardId, fetchImpl));
+}
+
+function mapAllReads(rows) {
+  return (rows || [])
     .filter((r) => r && r.id && (r.headline || r.path))
     .map((r) => ({ id: r.id, kind: String(r.readKind || r.kind || ""), headline: String(r.headline || r.path || ""), lines: Array.isArray(r.lines) ? r.lines.slice(0, 6) : [], asOf: String(r.asOf || "").slice(0, 10), source: String(r.source || "") }))
     .sort((x, y) => y.asOf.localeCompare(x.asOf));
@@ -332,6 +336,12 @@ async function itemReadsTop(cardId, fetchImpl) {
   const rows = (await itemReadRows(cardId, fetchImpl)).slice();
   rows.sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")));
   return rows.slice(0, 3);
+}
+
+async function itemReadsBundle(cardId, fetchImpl) {
+  const rows = (await itemReadRows(cardId, fetchImpl)).slice();
+  rows.sort((a, b) => String(b.asOf || "").localeCompare(String(a.asOf || "")));
+  return { productReads: rows.slice(0, 3), allReads: mapAllReads(rows) };
 }
 
 // Card pages: images for this id bucket plus set logos (feed/card/img).
@@ -817,12 +827,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const sealedLikely = !!(card && card.kind === "sealed");
     const singleLikely = !!(card && card.kind !== "sealed");
     const setSlugOk = !!(card && card.setSlug && /^[a-z0-9-]+$/.test(String(card.setSlug || "")));
+    // One item-reads fetch feeds both the top-3 chips and the all-reads list.
+    // Skip the 500KB+ rip-roi catalogue on the critical path (optional below).
     const [
       packed,
       facts,
       diveMap,
       images,
-      productReads,
+      readsBundle,
       counted,
       nm,
       rot,
@@ -830,7 +842,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       cm,
       ratingShard,
       sealedRatingShard,
-      ripDoc,
       splitEarly,
       conditionNoteEarly,
       pokemonEarly,
@@ -843,13 +854,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       sealedRatingMeta,
       premiumCard,
       signalCard,
-      allReads,
     ] = await Promise.all([
       singleLikely ? longHistOf(cardId, fetchImpl) : Promise.resolve(""),
       loadJson("feed/facts.json", fetchImpl).catch(() => null),
       loadDiveIndex(fetchImpl).catch(() => ({ ids: [], byTcgcsv: {} })),
       cardImages(cardId, fetchImpl),
-      card ? itemReadsTop(cardId, fetchImpl) : Promise.resolve([]),
+      card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       card ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       card && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
@@ -857,7 +867,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       card && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
       sealedLikely ? loadJson(`feed/sealed-rating/${sealedShard(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
-      sealedLikely ? loadCatalogue("derived/rip-roi.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? cardReadSplit(card.id, fetchImpl) : Promise.resolve(null),
       singleLikely ? conditionNoteFor(fetchImpl) : Promise.resolve(null),
       singleLikely ? pokemonStripFor(card, fetchImpl) : Promise.resolve(null),
@@ -870,8 +879,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       sealedLikely ? loadJson("feed/sealed-rating.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       withPremium(card, fetchImpl),
       card ? signalCardFor(cardId, fetchImpl) : Promise.resolve(null),
-      card ? allReadsFor(cardId, fetchImpl) : Promise.resolve([]),
     ]);
+    const productReads = readsBundle.productReads || [];
+    const allReads = readsBundle.allReads || [];
+    // rip-roi.json is ~500KB and was blowing cold /p/ past Worker limits.
+    // Skip on the server render; rip block stays empty until a lighter shard exists.
+    const ripDoc = null;
     if (card && packed) card.longHist = packed;
     const fact = facts && cardId ? facts[cardId] : null;
     const sealedId = (diveMap.byTcgcsv && diveMap.byTcgcsv[cardId]) || (diveMap.ids || []).includes(cardId) && cardId || "";
