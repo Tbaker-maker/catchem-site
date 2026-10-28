@@ -73,7 +73,7 @@ async function withPremium(card, fetchImpl) {
 }
 
 
-const PRODUCT_HTML_TTL = 3600;
+const PRODUCT_HTML_TTL = 86400; // 24h: full catalog prewarm must outlive the nightly gap
 const productHtmlKey = (id) => `product-html:v1:${id}`;
 
 async function readProductHtml(kv, id) {
@@ -856,6 +856,16 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           status: 200,
           headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },
         });
+      }
+      // Full-catalog re-runs: skip a second render when KV already has HTML.
+      if (opts.anon) {
+        const warm = await readProductHtml(opts.kv, cardId);
+        if (warm) {
+          return new Response("prewarm-html-skip", {
+            status: 200,
+            headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "html-skip" },
+          });
+        }
       }
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");

@@ -22,6 +22,8 @@ assert.match(index, /prewarm=1/);
 assert.match(index, /x-prewarm/);
 assert.match(index, /prewarmHtml/);
 assert.match(index, /prewarm=html/);
+assert.match(index, /html-skip/);
+assert.match(index, /PRODUCT_HTML_TTL = 86400/);
 assert.match(index, /seeds prodrow KV and returns immediately/);
 assert.match(index, /warmBucket/);
 assert.match(index, /cardImagesSealed/);
