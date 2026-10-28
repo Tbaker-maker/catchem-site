@@ -848,13 +848,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
     // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
     if (opts.prewarm) {
-      // Await seed (extractAllRows is O(n)); waitUntil alone was often killed mid-put,
-      // leaving never-visited /p/ without prodrow and p95 ~40s.
       try { await warmBucket(bucketOf(cardId), fetchImpl); } catch { /* retry later */ }
-      return new Response("prewarm", {
-        status: 200,
-        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },
-      });
+      // prewarm=1: seed only. prewarm=html: seed then fall through so product-html KV fills
+      // without writing the edge Cache API (prewarm bypasses cacheableRequest).
+      if (!opts.prewarmHtml) {
+        return new Response("prewarm", {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },
+        });
+      }
     }
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     void bucket;
@@ -1551,8 +1553,10 @@ const worker = {
       if (kind && kind !== "data") {
         try {
           const anon = !/(?:^|;\s*)ce_(session|oauth)=/.test(request.headers.get("cookie") || "");
-          const prewarm = url.searchParams.get("prewarm") === "1";
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
+          const prewarmParam = url.searchParams.get("prewarm") || "";
+          const prewarm = prewarmParam === "1" || prewarmParam === "html";
+          const prewarmHtml = prewarmParam === "html";
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, prewarmHtml, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

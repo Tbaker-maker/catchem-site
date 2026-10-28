@@ -20,6 +20,8 @@ assert.equal(all[1].x, 1);
 const index = readFileSync(new URL("../src/index.mjs", import.meta.url), "utf8");
 assert.match(index, /prewarm=1/);
 assert.match(index, /x-prewarm/);
+assert.match(index, /prewarmHtml/);
+assert.match(index, /prewarm=html/);
 assert.match(index, /seeds prodrow KV and returns immediately/);
 assert.match(index, /warmBucket/);
 assert.match(index, /cardImagesSealed/);
