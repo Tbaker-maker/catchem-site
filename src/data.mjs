@@ -198,12 +198,20 @@ export async function loadFeedNews(fetchImpl = fetch) {
   }
 }
 
+export function publicContentType(rel) {
+  const name = String(rel || "");
+  if (name.endsWith(".xml")) return "application/xml; charset=utf-8";
+  if (name.endsWith(".mjs")) return "text/javascript; charset=utf-8";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  return "application/json; charset=utf-8";
+}
+
 export async function proxyPublic(rel, fetchImpl = fetch) {
   const res = await fetchRepo(`research/assets/public/${rel}`, fetchImpl, { cf: { cacheTtl: 300 } });
   if (!res.ok) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
-  const type = rel.endsWith(".xml") ? "application/xml; charset=utf-8"
-    : rel.endsWith(".mjs") ? "text/javascript; charset=utf-8"
-    : "application/json; charset=utf-8";
+  const type = publicContentType(rel);
   return new Response(res.body, {
     status: 200,
     headers: {
