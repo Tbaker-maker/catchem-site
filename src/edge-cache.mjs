@@ -28,7 +28,7 @@ export function cacheableRequest(request) {
 }
 
 // Tracking params never change the page, so they never split the cache.
-const TRACKING = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|dclid|msclkid|twclid|ttclid|li_fat_id|mc_cid|mc_eid|igshid|yclid|_ga|_gl|ref|ref_src|ref_url|s|t|si|source|cb|nocache|cold|seq|retry)$/i;
+const TRACKING = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|dclid|msclkid|twclid|ttclid|li_fat_id|mc_cid|mc_eid|igshid|yclid|_ga|_gl|ref|ref_src|ref_url|s|t|si|source|cb|nocache|cold|seq|retry|prewarm)$/i;
 export function cacheKeyUrl(href) {
   const url = new URL(href);
   url.hash = "";
