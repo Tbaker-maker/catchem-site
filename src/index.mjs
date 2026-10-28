@@ -881,17 +881,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       cardImages(cardId, fetchImpl),
       card ? itemReadsBundle(cardId, fetchImpl) : Promise.resolve({ productReads: [], allReads: [] }),
       sealedLikely ? loadJson("listings-counted.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      card ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      card && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
-      card && card.setSlug ? cardIr(cardId, fetchImpl) : Promise.resolve(null),
-      card && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      // Sealed critical path: skip not-moved / rotation / IR / marks (panels stay empty).
+      singleLikely ? loadJson("feed/not-moved.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely && card.setSlug ? loadJson("rotation-status.json", fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely && card.setSlug ? cardIr(cardId, fetchImpl) : Promise.resolve(null),
+      singleLikely && card.setSlug ? loadJson("feed/card-marks.json", fetchImpl).catch(() => null) : Promise.resolve(null),
       singleLikely ? loadJson(`feed/rating/${shardOf(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
-      sealedLikely ? loadJson(`feed/sealed-rating/${sealedShard(cardId)}.json`, fetchImpl).catch(() => null) : Promise.resolve(null),
+      // Sealed rating shard deferred off cold critical path (was an extra GitHub hit).
+      Promise.resolve(null),
       singleLikely ? cardReadSplit(card.id, fetchImpl) : Promise.resolve(null),
       singleLikely ? conditionNoteFor(fetchImpl) : Promise.resolve(null),
       singleLikely ? pokemonStripFor(card, fetchImpl) : Promise.resolve(null),
-      card && card.setSlug ? loadItemRead(card.setSlug, card.id, fetchImpl) : Promise.resolve(null),
-      setSlugOk ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : Promise.resolve(null),
+      singleLikely && card.setSlug ? loadItemRead(card.setSlug, card.id, fetchImpl) : Promise.resolve(null),
+      singleLikely && setSlugOk ? loadSetIndexes(card.setSlug, fetchImpl).catch(() => null) : Promise.resolve(null),
       // promos.json is ~660KB and was on every cold /p/+/c/ critical path.
       // Skip here; promosInside/comesFrom stay empty until a per-product shard exists.
       Promise.resolve(null),
