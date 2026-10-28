@@ -848,8 +848,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
     // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
     if (opts.prewarm) {
-      // Await seed so a 200 means the bucket rows are in FEED_KV (ops prewarm).
-      try { await warmBucket(bucketOf(cardId), fetchImpl); } catch { /* still 200; retry later */ }
+      // Seed in waitUntil; return immediately so ops prewarm is not killed by wall time.
+      const job = warmBucket(bucketOf(cardId), fetchImpl).catch(() => {});
+      if (typeof opts.waitUntil === "function") opts.waitUntil(job); else void job;
       return new Response("prewarm", {
         status: 200,
         headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-prewarm": "1" },

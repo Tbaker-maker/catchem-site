@@ -359,17 +359,41 @@ export function listBucketIds(text) {
   return [...new Set(out)];
 }
 
+/** One pass over a bucket body. Calling extractRow once per id was O(n²) on ~1MB and hung warmBucket. */
+export function extractAllRows(text) {
+  const s = String(text || "");
+  const out = [];
+  let at = 0;
+  while (at < s.length) {
+    const start = s.indexOf('{"id":"tcgcsv-', at);
+    if (start < 0) break;
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = start; i < s.length; i++) {
+      const c = s[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === "{" || c === "[") depth++;
+      else if (c === "}" || c === "]") { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) break;
+    at = end + 1;
+    try {
+      const row = JSON.parse(s.slice(start, end + 1));
+      if (row && typeof row === "object" && row.id && Object.keys(row).some((k) => k !== "id" && k !== "name")) out.push(row);
+    } catch { /* skip malformed */ }
+  }
+  return out;
+}
+
 /** Seed tiny per-id KV rows from a bucket body so later /p/ hits skip the ~1MB read. */
 export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   if (!kv || !text) return 0;
-  const ids = listBucketIds(text);
+  const rows = extractAllRows(text);
   const puts = [];
-  for (const id of ids) {
-    const row = extractRow(text, id);
-    if (!row) continue;
-    puts.push(kv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: ttl }).catch(() => {}));
+  for (const row of rows) {
+    if (!row || !row.id) continue;
+    puts.push(kv.put(prodrowKey(row.id), JSON.stringify(row), { expirationTtl: ttl }).catch(() => {}));
   }
-  // Small batches: 25 parallel puts on a ~1MB bucket stormed the isolate (503s).
   for (let i = 0; i < puts.length; i += 5) {
     await Promise.all(puts.slice(i, i + 5));
   }
