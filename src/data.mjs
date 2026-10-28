@@ -28,9 +28,18 @@ export function browserAssetUrl(path) {
   return "https://raw.githubusercontent.com/Tbaker-maker/Catchem-data/main/" + clean;
 }
 
+// Dive JSON and derived catalogues live on main only. Probing public-data
+// first doubled every cold /p/ and /c/ render and pushed Workers past CPU
+// limits (1102 / intermittent 503). Keep public-data for research/assets/public.
+export function mainOnlyPath(path) {
+  const clean = String(path || "").replace(/^\/+/, "");
+  return clean.startsWith("research/pulse/") || clean.startsWith("data/derived/");
+}
+
 export async function fetchRepo(path, fetchImpl = fetch, init) {
   const clean = String(path || "").replace(/^\/+/, "");
   const load = (branch) => fetchImpl(repoUrl(branch, clean), init);
+  if (mainOnlyPath(clean)) return load("main");
   if (sessionBase === "main") return load("main");
   if (sessionBase === "public-data") {
     try {
