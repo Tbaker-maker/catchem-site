@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { EDGE_TTL, cacheKeyUrl } from "../src/edge-cache.mjs";
 import { setRawKv, listBucketIds, extractRow, extractAllRows } from "../src/data.mjs";
 
-assert.equal(EDGE_TTL, 1800);
+assert.equal(EDGE_TTL, 86400);
 assert.equal(cacheKeyUrl("https://catchemtcg.com/p/tcgcsv-1?prewarm=1"), "https://catchemtcg.com/p/tcgcsv-1");
 assert.equal(typeof setRawKv, "function");
 setRawKv(null);
