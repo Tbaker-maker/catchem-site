@@ -375,7 +375,7 @@ export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   return puts.length;
 }
 
-/** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets). */
+/** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets or ?prewarm=1). */
 export async function warmBucket(bucketPad, fetchImpl = fetch) {
   const text = await rawText(`buckets/${bucketPad}.json`, fetchImpl);
   const n = await seedProdRowsFromBucket(text, rawKv);
