@@ -20,16 +20,24 @@ export function itemReadBlock(f, { skipRip = false, skipRotation = false, skipWi
     .map(([l, c]) => `<li class="rd-chip">${esc(`${l} ${pp(c.pct)}, ${short(c.from)} to ${short(c.to)}`)}</li>`);
   if (!skipRotation && doc.rotation && (doc.rotation.mark || doc.rotation.status)) chips.push(`<li class="rd-chip">${esc([doc.rotation.mark ? `Mark ${doc.rotation.mark}` : "", doc.rotation.status].filter(Boolean).join(" · "))}</li>`);
   const fc = factCards(doc);
-  const line = String(doc.line || "").trim();
+  const line = String(doc.line || doc.breakdown?.sections?.[0]?.text || "").trim();
   const lineHtml = line && !BANNED.test(line) && !/[\u2014\u2013]/.test(line) ? `<p class="ir-line">${esc(line)}</p>` : "";
+  // Extra section paras only when they add a signal not already in the lead line.
+  const extras = Array.isArray(doc.breakdown?.sections) ? doc.breakdown.sections : [];
+  const detail = extras
+    .filter((s) => s && s.text && s.text !== line && !line.includes(s.text) && !BANNED.test(s.text) && !/[\u2014\u2013]/.test(s.text))
+    .slice(0, 2)
+    .map((s) => `<p class="ir-detail"><strong>${esc(s.title || "Detail")}</strong> ${esc(s.text)}${s.note ? ` <span class="muted">${esc(s.note)}</span>` : ""}</p>`)
+    .join("");
   const all = [...(skipWindows ? [] : windows), ...chips];
-  const body = `${lineHtml}${all.length ? `<ul class="rd-chips">${all.join("")}</ul>` : ""}${fc.pattern}${fc.range || fc.cards.length ? `<div class="rd-cards">${fc.range}${fc.cards.join("")}</div>` : ""}`;
+  const cardsHtml = fc.ordered || `${fc.range || ""}${fc.cards.join("")}${fc.similar || ""}`;
+  const body = `${lineHtml}${detail}${all.length ? `<ul class="rd-chips">${all.join("")}</ul>` : ""}${fc.pattern}${cardsHtml ? `<div class="rd-cards">${cardsHtml}</div>` : ""}`;
   if (!body) return "";
   return `<section class="item-read" aria-label="Our read"><style>${CSS}</style><h2>Our read</h2>${body}<p class="muted ir-src">${esc(`From our dated files. TCGplayer market, eBay asks and listings counted. As of ${short(doc.asOf)}.`)}</p></section>`;
 }
 
 const CSS = `.item-read{display:grid;gap:12px;margin:16px 0;padding:16px;border-radius:20px;background:#15130f;border:1px solid #2f2b26}
-.item-read h2{margin:0;font-size:18px}.ir-line{margin:0;font-size:16px;line-height:1.45}.ir-src{margin:0;font-size:13px}
+.item-read h2{margin:0;font-size:18px}.ir-line{margin:0;font-size:16px;line-height:1.45}.ir-detail{margin:0;font-size:14px;line-height:1.45}.ir-detail strong{font-weight:650}.ir-src{margin:0;font-size:13px}
 .item-read .rd-chips{display:flex;gap:8px;flex-wrap:wrap;list-style:none;margin:0;padding:0}
 .item-read .rd-chip{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);font:600 14px/1.2 var(--sans)}
 .item-read .rd-pattern,.item-read .rd-card{padding:14px 16px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26}
