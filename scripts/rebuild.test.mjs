@@ -126,7 +126,7 @@ const diveFiles = {
     latest: { id: "sv3pt5-etb", name: "151 Elite Trainer Box", set: "151", subtype: "etb", priceMedian: 87.5, listingCount: 35, source: "ebay-browse-api", marketplace: "EBAY_US", dataStatus: "live" },
     buyout: { id: "sv3pt5-etb", browseTotalNow: 324, browseTotalBefore: 323, level: "unscored", ebayCalled: true },
     volume: null,
-    volumeNote: "Sold counts need Insights scope.",
+    volumeNote: "Listings counted need Insights scope.",
     outlier: null,
     outlierHook: "Optional file data/derived/sealed-price-outliers.json",
   },
@@ -178,7 +178,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     series: [{ date: "2026-10-06", price: 499.99, listingCount: 6, source: "ebay-browse-ask" }],
     latest: { id: "sv5-pc-etb", set: "Temporal Forces", subtype: "pc-etb", priceMedian: 499.99, listingCount: 6 },
     volume: null,
-    volumeNote: "Sold counts need Insights scope.",
+    volumeNote: "Listings counted need Insights scope.",
     outlier: {
       flag: "high",
       note: "Price flagged: 95.5% above recent median — review",
@@ -193,7 +193,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
     id: "cel25-etb", name: "Celebrations Elite Trainer Box", asOf: "2026-10-06",
     series: [{ date: "2026-10-06", price: 161.99, listingCount: 29 }],
     latest: { id: "cel25-etb", set: "Celebrations", subtype: "etb", priceMedian: 161.99, listingCount: 29 },
-    volume: null, volumeNote: "Sold counts need Insights scope.",
+    volume: null, volumeNote: "Listings counted need Insights scope.",
     listingChange: { label: "net change in active eBay listings (estimate)", net: 191, from: "2026-10-04", to: "2026-10-06", days: 3, startTotal: 3881, endTotal: 4072, readEligible: false },
   }, "stamp", { feed: true });
   t("dive does not publish the listing-change estimate", !withChange.includes("net change in active eBay listings") && !withChange.includes("over 3 days of eBay Browse totals"));
@@ -202,7 +202,7 @@ t("dive urls are their own kind", pageKind("/dive/sv3pt5-etb") === "dive" && pag
 {
   const divePage = await renderPath("/dive/sv3pt5-etb", fetchImpl, { feed: true });
   const diveHtml = await divePage.text();
-  t("dive page renders series chart and table", divePage.status === 200 && diveHtml.includes("151 Elite Trainer Box") && diveHtml.includes("TCGplayer market") && diveHtml.includes("2026-08-20") && diveHtml.includes("data-chart") && diveHtml.includes("<table") && diveHtml.includes("Volume / solds: not available") && !diveHtml.includes("$undefined"));
+  t("dive page renders series chart and table", divePage.status === 200 && diveHtml.includes("151 Elite Trainer Box") && diveHtml.includes("TCGplayer market") && diveHtml.includes("2026-08-20") && diveHtml.includes("data-chart") && diveHtml.includes("<table") && diveHtml.includes("Listings counted volume: not available") && !diveHtml.includes("$undefined"));
   t("dive without outlier stays quiet", diveHtml.includes("Outlier flags: none yet") && !diveHtml.includes("Price flagged:"));
   const miss = await renderPath("/dive/no-such-sku", fetchImpl, { feed: true });
   t("missing dive is 404", miss.status === 404);
