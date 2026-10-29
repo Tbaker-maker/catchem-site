@@ -427,6 +427,8 @@ export function focusSetPanel(holdings, setDocs, focusSlug) {
     name: doc.name || slug,
     asOf: doc.asOf || "",
     source: doc.source || "TCGplayer market",
+    logo: typeof doc.logo === "string" ? doc.logo : "",
+    era: typeof doc.era === "string" ? doc.era : "",
     singles,
     sealed,
     href: "/collection?set=" + encodeURIComponent(slug),
