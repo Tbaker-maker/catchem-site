@@ -272,6 +272,14 @@ const CSS = `
 .brief-sec header{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .brief-sec h3{margin:0;font:600 16px/1.3 var(--sans)}
 .score-pill{font:600 28px/1.1 var(--serif);color:var(--gold)}
+.progress{height:10px;border-radius:999px;background:#2a2621;overflow:hidden;margin:6px 0}
+.progress>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#c4a35a,#e4d2a0);width:0;transition:width .45s ease}
+.celebrate{padding:12px 14px;border-radius:16px;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.10);color:var(--gold);font:600 16px/1.35 var(--sans)}
+.streak{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font:600 13px/1.2 var(--sans);color:var(--gold)}
+.mem details.rowcard{gap:10px}
+.mem details.rowcard>summary{cursor:pointer;font:600 18px/1.3 var(--sans);list-style:none}
+.mem details.rowcard>summary::-webkit-details-marker{display:none}
+.mem .empty-cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 @media(max-width:700px){.grid2,.goal-row{grid-template-columns:1fr}}
 `;
 
@@ -284,8 +292,8 @@ export function renderCollection(stamp, opts = {}) {
     ? `<p><a class="tap" href="/collection-check">Collection check</a></p>`
     : "";
   const body = `<h1>My collection</h1>
-<p>Sign-in is optional. A save on this device stays here until you sign in, then it joins the account.</p>
-<p class="muted">Pick one goal. The score, Morning Brief, and panels follow that goal. Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
+<p>Sign-in is optional. Saves on this device stay here until you sign in, then they join the account.</p>
+<p class="muted">Pick one goal. Your score and Morning Brief follow it. Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
 ${check}
 <section class="rowcard" aria-labelledby="goal-h">
 <h2 id="goal-h">Collection goal</h2>
@@ -296,43 +304,12 @@ ${check}
 <button type="button" data-goal="growth" aria-pressed="false">Growth</button>
 </div>
 <p id="goal-note" class="muted"></p>
-<p id="score-line"><span class="muted">Collection Score</span> <span id="score" class="score-pill">-</span></p>
-</section>
-<section id="brief" class="rowcard" aria-labelledby="brief-h">
-<h2 id="brief-h">Morning Brief</h2>
-<p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
-<div id="brief-body"><p class="muted">Add items to fill this card.</p></div>
-<div id="brief-email" class="brief-email">
-<h3>Email digest</h3>
-<p class="muted">Opt in to a daily Morning Brief email. Sending stays off until the site flag is turned on.</p>
-<label class="switch"><input id="brief-email-on" type="checkbox"> Email me the Morning Brief</label>
-<label>Email<input id="brief-email-addr" type="email" autocomplete="email" maxlength="120" placeholder="you@email.com"></label>
-<button type="button" id="brief-email-save">Save email preference</button>
-<p id="brief-email-note" class="muted"></p>
-</div>
-</section>
-<section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
-<h2 id="focus-h">This set</h2>
-<p id="focus-note" class="muted"></p>
-<div id="focus-body"><p class="muted">Open a set and tap My missing cards to land here.</p></div>
-<p><a class="tap quiet" id="focus-back" href="/sets">Back to sets</a> <button type="button" class="quiet" id="focus-clear">Clear set focus</button></p>
-</section>
-<section id="panel" class="rowcard" aria-labelledby="panel-h">
-<h2 id="panel-h">Goal panel</h2>
-<div id="panel-body"><p class="muted">Your goal panel lands here.</p></div>
-</section>
-<section id="import" class="rowcard" aria-labelledby="import-h">
-<h2 id="import-h">Import CSV</h2>
-<p class="muted">Upload a CSV with tcgcsv ids, or names and sets. We fill setSlug from the catalogue. Preview first. Nothing saves until you confirm.</p>
-<label>CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
-<textarea id="csv-text" rows="4" placeholder="id,name,set,qty,condition,kind" aria-label="CSV text"></textarea>
-<button type="button" id="csv-preview">Preview import</button>
-<p id="csv-note" class="muted"></p>
-<div id="csv-preview-box"></div>
-<button type="button" id="csv-confirm" hidden>Save previewed rows</button>
+<p id="score-line"><span class="muted">Collection Score</span> <span id="score" class="score-pill">-</span> <span id="brief-streak" class="streak" hidden></span></p>
 </section>
 <form id="add-form" class="rowcard">
-<label>Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or tcgcsv id"></label>
+<h2>Add something</h2>
+<p class="muted">Search by name. Tap a hit, then Add.</p>
+<label>Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or product id"></label>
 <div id="hits"></div>
 <div class="grid2">
 <label>Kind<select id="kind" name="kind"><option value="single">Single</option><option value="sealed">Sealed</option></select></label>
@@ -341,7 +318,43 @@ ${check}
 </div>
 <button type="submit">Add</button>
 <p id="add-note" class="muted"></p>
+<p class="empty-cta"><a class="tap quiet" href="/sets">Browse sets</a> <a class="tap quiet" href="/search">Search the catalogue</a></p>
 </form>
+<section id="brief" class="rowcard" aria-labelledby="brief-h">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><h2 id="brief-h" style="margin:0">Morning Brief</h2></div>
+<p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
+<div id="brief-body"><p class="muted">Add your first card above to open your Morning Brief.</p><p class="empty-cta"><a class="tap" href="#add-form">Add a card</a> <a class="tap quiet" href="/sets">Or browse a set</a></p></div>
+</section>
+<section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
+<h2 id="focus-h">This set</h2>
+<p id="focus-note" class="muted"></p>
+<div id="focus-celebrate" class="celebrate" hidden>Set complete. Nice work.</div>
+<div class="progress" id="focus-progress" hidden aria-hidden="true"><span id="focus-progress-bar"></span></div>
+<div id="focus-body"><p class="muted">Open a set and tap My missing cards to land here.</p></div>
+<p><a class="tap quiet" id="focus-back" href="/sets">Back to sets</a> <button type="button" class="quiet" id="focus-clear">Clear set focus</button></p>
+</section>
+<section id="panel" class="rowcard" aria-labelledby="panel-h">
+<h2 id="panel-h">For you</h2>
+<div id="panel-body"><p class="muted">Your collecting, selling, or growth view lands here once you add items.</p><p class="empty-cta"><a class="tap quiet" href="#add-form">Add a card</a></p></div>
+</section>
+<details id="brief-email" class="rowcard brief-email">
+<summary>Email digest</summary>
+<p class="muted">Get the Morning Brief by email. Digests are not sending yet. Save your address and we will use it when they go live.</p>
+<label class="switch"><input id="brief-email-on" type="checkbox"> Email me the Morning Brief</label>
+<label>Email<input id="brief-email-addr" type="email" autocomplete="email" maxlength="120" placeholder="you@email.com"></label>
+<button type="button" id="brief-email-save">Save email preference</button>
+<p id="brief-email-note" class="muted"></p>
+</details>
+<details id="import" class="rowcard" aria-labelledby="import-h">
+<summary id="import-h">Import a CSV</summary>
+<p class="muted">Upload a file with product ids, or names and sets. Preview first. Nothing saves until you confirm.</p>
+<label>CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
+<textarea id="csv-text" rows="4" placeholder="id,name,set,qty,condition,kind" aria-label="CSV text"></textarea>
+<button type="button" id="csv-preview">Preview import</button>
+<p id="csv-note" class="muted"></p>
+<div id="csv-preview-box"></div>
+<button type="button" id="csv-confirm" hidden>Save previewed rows</button>
+</details>
 <div id="skel" class="skel" aria-hidden="true"></div>
 <p id="total"></p>
 <p id="windows"></p>
@@ -419,6 +432,34 @@ function loadGoal(){ try { return String(localStorage.getItem("catchem-collectio
 function saveGoal(g){ try { localStorage.setItem("catchem-collection-goal", g); } catch(err) {} }
 function loadBriefPrefs(){ try { var cur=JSON.parse(localStorage.getItem("catchem-brief-prefs")||"{}"); return { pinned:Array.isArray(cur.pinned)?cur.pinned:[], hidden:Array.isArray(cur.hidden)?cur.hidden:[] }; } catch(err){ return { pinned:[], hidden:[] }; } }
 function saveBriefPrefs(p){ try { localStorage.setItem("catchem-brief-prefs", JSON.stringify(p||{pinned:[],hidden:[]})); } catch(err) {} }
+function todayStamp(){ try { return new Date().toISOString().slice(0,10); } catch(err){ return ""; } }
+function loadBriefStreak(){
+  try {
+    var cur=JSON.parse(localStorage.getItem("catchem-brief-streak")||"null");
+    if(!cur || typeof cur!=="object") return { count:0, last:"" };
+    return { count:Number(cur.count)||0, last:String(cur.last||"") };
+  } catch(err){ return { count:0, last:"" }; }
+}
+function touchBriefStreak(){
+  var today=todayStamp();
+  if(!today) return { count:0, last:"" };
+  var cur=loadBriefStreak();
+  if(cur.last===today) return cur;
+  var y=new Date(today+"T12:00:00Z");
+  y.setUTCDate(y.getUTCDate()-1);
+  var yest=y.toISOString().slice(0,10);
+  var next={ count:(cur.last===yest?(cur.count||0)+1:1), last:today };
+  try { localStorage.setItem("catchem-brief-streak", JSON.stringify(next)); } catch(err) {}
+  return next;
+}
+function paintBriefStreak(){
+  var el=document.getElementById("brief-streak");
+  if(!el) return;
+  var cur=touchBriefStreak();
+  if(!(cur.count>0)){ el.hidden=true; el.textContent=""; return; }
+  el.hidden=false;
+  el.textContent=cur.count===1?"Brief opened today":("Brief streak · "+cur.count+" days");
+}
 function loadViews(){ try { var cur=JSON.parse(localStorage.getItem("catchem-views")||"{}"); return cur && typeof cur==="object"?cur:{}; } catch(err){ return {}; } }
 function bumpView(id){ if(!id) return; var v=loadViews(); v[id]=(Number(v[id])||0)+1; try { localStorage.setItem("catchem-views", JSON.stringify(v)); } catch(err) {} }
 function sourceLine(row){ var when=dayLabel(row.asOf); return "TCGplayer market price"+(when?", "+when:"")+(row.kind==="single"&&row.condition?", "+row.condition:""); }
@@ -441,8 +482,9 @@ function rowLink(row){
   return "<a href=\\""+esc(href)+"\\" data-view=\\""+esc(row.id||"")+"\\">"+esc(row.name||row.id||"")+"</a>";
 }
 function paintBrief(brief){
+  paintBriefStreak();
   var box=document.getElementById("brief-body");
-  if(!brief || !brief.sections || !brief.sections.length){ box.innerHTML="<p class=\\"muted\\">Add items to fill this card.</p>"; return; }
+  if(!brief || !brief.sections || !brief.sections.length){ box.innerHTML="<p class=\\"muted\\">Add your first card above to open your Morning Brief.</p><p class=\\"empty-cta\\"><a class=\\"tap\\" href=\\"#add-form\\">Add a card</a> <a class=\\"tap quiet\\" href=\\"/sets\\">Or browse a set</a></p>"; return; }
   var prefs=loadBriefPrefs();
   box.innerHTML="";
   brief.sections.forEach(function(sec){
@@ -500,7 +542,7 @@ function paintBrief(brief){
 }
 function paintPanel(goal, panels){
   var box=document.getElementById("panel-body");
-  if(!panels){ box.innerHTML="<p class=\\"muted\\">Your goal panel lands here.</p>"; return; }
+  var panelH=document.getElementById("panel-h"); if(panelH){ panelH.textContent=goal==="selling"?"Selling view":(goal==="growth"?"Growth view":"Collecting view"); } if(!panels){ box.innerHTML="<p class=\\"muted\\">Add items to fill this view.</p><p class=\\"empty-cta\\"><a class=\\"tap quiet\\" href=\\"#add-form\\">Add a card</a></p>"; return; }
   if(goal==="selling"){
     var cash=panels.selling&&panels.selling.cashout;
     var liq=(panels.selling&&panels.selling.liquidity)||[];
@@ -534,27 +576,41 @@ function paintFocus(focus){
   var note=document.getElementById("focus-note");
   var back=document.getElementById("focus-back");
   if(!sec||!body) return;
-  if(!state.focusSet){ sec.hidden=true; body.innerHTML=""; if(note) note.textContent=""; return; }
+  if(!state.focusSet){ sec.hidden=true; body.innerHTML=""; if(note) note.textContent=""; var cele0=document.getElementById("focus-celebrate"); if(cele0) cele0.hidden=true; var pw=document.getElementById("focus-progress"); if(pw){ pw.hidden=true; } return; }
   sec.hidden=false;
   if(back) back.href="/sets/"+encodeURIComponent(state.focusSet);
   if(!focus){
     if(note) note.textContent="Loading "+state.focusSet+" gaps.";
-    body.innerHTML="<p class=\"muted\">Loading set gaps.</p>";
+    body.innerHTML="<p class=\\"muted\\">Loading set gaps.</p>";
     return;
   }
   if(note) note.textContent=(focus.name||state.focusSet)+" · source "+(focus.source||"TCGplayer market")+(focus.asOf?", "+dayLabel(focus.asOf):"")+".";
   var g=focus.singles||{};
-  var pct=g.pct==null?"-":(Math.round(g.pct*1000)/10)+"%";
+  var pctNum=g.pct==null?null:Math.round(g.pct*1000)/10;
+  var pct=pctNum==null?"-":pctNum+"%";
+  var barWrap=document.getElementById("focus-progress");
+  var bar=document.getElementById("focus-progress-bar");
+  var cele=document.getElementById("focus-celebrate");
+  if(barWrap&&bar){
+    if(g.total>0 && pctNum!=null){
+      barWrap.hidden=false; barWrap.setAttribute("aria-hidden","false");
+      bar.style.width=Math.max(0, Math.min(100, pctNum))+"%";
+    } else { barWrap.hidden=true; bar.style.width="0%"; }
+  }
+  if(cele){
+    var done=g.total>0 && g.missing===0;
+    cele.hidden=!done;
+  }
   var lines=[];
   lines.push("<p><b>Completion</b> "+(g.have||0)+" of "+(g.total||0)+" ("+pct+"). Missing "+(g.missing||0)+".</p>");
   lines.push("<p><b>Cost to finish</b> "+esc(money(g.cost)||"not on file")+" across "+(g.costPriced||0)+" priced gaps.</p>");
   var cheap=(g.cheapest||[]).slice(0,5);
   var rare=(g.rarest||[]).slice(0,5);
-  lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
-  lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
+  lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
+  lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
   if(focus.sealed && focus.sealed.total){
     var s=focus.sealed;
-    lines.push("<p class=\"muted\">Sealed in this set: "+s.have+" of "+s.total+". Cost to finish "+esc(money(s.cost)||"not on file")+".</p>");
+    lines.push("<p class=\\"muted\\">Sealed in this set: "+s.have+" of "+s.total+". Cost to finish "+esc(money(s.cost)||"not on file")+".</p>");
   }
   body.innerHTML=lines.join("");
   body.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
@@ -784,7 +840,7 @@ function paintBriefEmailForm(prefs, armed){
   if(!on||!addr) return;
   on.checked=!!(prefs&&prefs.optIn);
   if(prefs&&prefs.email) addr.value=prefs.email;
-  note.textContent=armed?"Email sending can run when you are opted in.":"Email sending is off site-wide. Your opt-in is saved for when it turns on.";
+  note.textContent=armed?"Digests can send when you are opted in.":"Digests are not sending yet. Your preference is saved for when they go live.";
 }
 document.getElementById("brief-email-save").onclick=function(){
   var prefs={ optIn:document.getElementById("brief-email-on").checked, email:document.getElementById("brief-email-addr").value, goal:state.goal||"" };

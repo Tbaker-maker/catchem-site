@@ -19,7 +19,7 @@ const LOGS = [
   ["singles", "Singles", "Single cards and the price on file."],
   ["listings", "Listings counted", "How many listings were counted."],
   ["history", "Price history", "First and last price on file."],
-  ["pulse", "Pulse", "Mood and heat by day."],
+  ["pulse", "Pulse", "Daily market mood and heat."],
   ["news", "News", "News lines and release dates."],
   ["reads", "Reads", "Past reads and how they turned out."],
 ];
@@ -536,7 +536,7 @@ export function renderExplorer(id, docs, query = {}) {
     const choices = LOGS.map(([lid, title, blurb]) => {
       return "<a class=\"choice\" href=\"/data-explorer/" + lid + "\"><span><b>" + esc(title) + "</b><span>" + esc(blurb) + "</span></span><span>" + esc(countLabel(lid, docs)) + "</span></a>";
     }).join("");
-    return pageShell("Data Explorer", "<h1>Data Explorer</h1><p class=\"sub\">One published file at a time. Pick a log.</p>" + choices + "<p class=\"note\">Rows come from published Catch'em files. This page does not scrape.</p>");
+    return pageShell("Data Explorer", "<h1>Data Explorer</h1><p class=\"sub\">Browse one published Catch'em file at a time. Pick a list to open.</p>" + choices + "<p class=\"note\">Rows come from published Catch'em files. This page does not scrape.</p>");
   }
   const spec = logSpec(id, docs);
   if (!spec) {
