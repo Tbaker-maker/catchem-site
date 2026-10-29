@@ -111,6 +111,7 @@ export function productImage(row) {
 export function pctLabel(n) {
   if (n == null || !Number.isFinite(Number(n))) return "No reading";
   const v = Number(n);
+  if (Math.abs(v) < 0.05) return "0.0%";
   const sign = v > 0 ? "+" : "";
   return sign + v.toFixed(1) + "%";
 }
@@ -173,25 +174,41 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
       const up = c.direction === "up";
       const down = c.direction === "down";
       const cls = up ? "bv-cell bv-up" : down ? "bv-cell bv-down" : "bv-cell";
-      const wash = (up || down) ? Math.min(0.45, Math.abs(Number(c.pct)) / 40).toFixed(2) : "0";
+      // Opaque enough wash so ink on tint meets contrast; floor 0.42, cap 0.88.
+      const wash = (up || down) ? Math.min(0.88, 0.42 + Math.abs(Number(c.pct)) / 40 * 0.46).toFixed(2) : "0";
       const mirrored = c.priceSource === "archived-market" || c.mirrored === true;
       const readDay = c.readAt || c.priceDate || "";
       const srcBits = [];
       if (mirrored) srcBits.push("mirrored third-party");
       if (c.priceSource) srcBits.push(String(c.priceSource));
       if (readDay) srcBits.push("read " + prettyDay(readDay));
+      const priceBit = money(c.price);
+      const tipCore = (priceBit ? priceBit + " " : "") + label;
       const src = srcBits.length ? " (" + srcBits.join(", ") + ")" : "";
-      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + label + src)}" title="${esc(label + src)}">${esc(label)}</button>`;
+      const tip = tipCore + src;
+      return `<button type="button" class="${cls}" style="--wash:${wash}" aria-label="${esc(row.set + " " + monthLabel(month) + " " + tip)}" title="${esc(tip)}">${esc(label)}</button>`;
     }).join("");
     return name + cells;
   }).join("");
   const last = opts.median || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
   const source = opts.source || SOURCE;
   const asOf = opts.asOf || AS_OF;
+  const legend = `<div class="bv-legend" role="group" aria-label="Color scale for month change">
+      <span class="bv-legend-k">Month change</span>
+      <span class="bv-swatch bv-swatch-down" aria-hidden="true"></span>
+      <span class="bv-legend-lab">Down</span>
+      <span class="bv-swatch bv-swatch-mid" aria-hidden="true"></span>
+      <span class="bv-legend-lab">Flat</span>
+      <span class="bv-swatch bv-swatch-up" aria-hidden="true"></span>
+      <span class="bv-legend-lab">Up</span>
+      <span class="bv-swatch bv-swatch-empty" aria-hidden="true"></span>
+      <span class="bv-legend-lab">No reading</span>
+    </div>`;
   return `<section class="bv-card" id="heat">
     <div class="bv-scroll">
       <div class="bv-heat" style="--m:${months.length}">${head}${body}</div>
     </div>
+    ${legend}
     <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(source)}, ${esc(prettyDay(asOf))}. A blank month says No reading. These rows are on file.</p>
   </section>`;
 }
@@ -207,28 +224,41 @@ export const BRAND_CSS = `
 .bv-heat{display:grid;grid-template-columns:168px repeat(var(--m), minmax(96px, 1fr));gap:6px;min-width:600px}
 .bv-hh{min-height:44px;display:flex;align-items:flex-end;color:${BRAND.dim};font:600 13px/1.2 ${BRAND.font}}
 .bv-hh:first-child{position:sticky;left:0;background:#1a1815;z-index:2}
-.bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2}
+.bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2;overflow:hidden;padding-right:6px;box-shadow:6px 0 8px -6px rgba(0,0,0,.55)}
 .bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.16)}
 .bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
 .bv-ph{width:36px;border-radius:8px;background:#2a2622}
-.bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px}
-.bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em}
+.bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px;overflow:hidden}
+.bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bv-copy span{color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
 .bv-cell{min-width:44px;min-height:44px;border:0;border-radius:14px;background:rgba(239,233,222,.06);color:${BRAND.dim};font-family:${BRAND.font};font-size:15px;font-weight:600;line-height:1.15;padding:8px 4px}
-.bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.ink}}
-.bv-down{background:rgba(224,122,122,var(--wash));color:${BRAND.ink}}
+.bv-up{background:rgba(46,110,72,var(--wash));color:${BRAND.ink}}
+.bv-down{background:rgba(140,55,55,var(--wash));color:${BRAND.ink}}
 .bv-cell:focus-visible{outline:2px solid ${BRAND.gold};outline-offset:2px}
+.bv-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:12px 2px 0;color:${BRAND.dim};font:13px/1.3 ${BRAND.font}}
+.bv-legend-k{color:${BRAND.gold};font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11px;margin-right:4px}
+.bv-legend-lab{margin-right:4px}
+.bv-swatch{width:18px;height:18px;border-radius:6px;display:inline-block;flex:0 0 auto}
+.bv-swatch-down{background:rgba(140,55,55,.75)}
+.bv-swatch-mid{background:rgba(239,233,222,.12)}
+.bv-swatch-up{background:rgba(46,110,72,.75)}
+.bv-swatch-empty{background:rgba(239,233,222,.08);box-shadow:inset 0 0 0 1px ${BRAND.line}}
 @media (prefers-reduced-motion:reduce){.bv-page *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .bv-note{margin:12px 0 0;color:${BRAND.dim};font:14px/1.4 ${BRAND.font}}
 .bv-foot{margin:28px 0 0;padding-top:14px;border-top:1px solid ${BRAND.line};color:${BRAND.dim};font:13px/1.4 ${BRAND.font}}
 .bv-shares{display:grid;gap:14px;margin-top:22px}
 @media (max-width:520px){
-.bv-scroll{overflow:visible}
-.bv-heat{grid-template-columns:repeat(var(--m),minmax(0,1fr));min-width:0}
-.bv-hh:first-child{display:none}
-.bv-hh{min-height:28px;justify-content:center}
-.bv-name{grid-column:1/-1;position:static;min-height:0;margin-top:8px}
-.bv-cell{font-size:14px;padding:8px 2px}
+.bv-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bv-heat{grid-template-columns:120px repeat(var(--m),minmax(72px,1fr));min-width:calc(120px + var(--m) * 78px)}
+.bv-hh{min-height:32px;font-size:11px;line-height:1.15}
+.bv-hh:first-child,.bv-name{position:sticky;left:0;z-index:2;background:#1a1815}
+.bv-name{min-height:72px;margin-top:0;box-shadow:6px 0 8px -6px rgba(0,0,0,.55);overflow:hidden}
+.bv-stage{width:44px;padding:2px}
+.bv-stage img,.bv-ph{max-width:40px}
+.bv-copy strong{font-size:12px}
+.bv-copy span{font-size:11px}
+.bv-cell{font-size:13px;padding:8px 2px}
+.bv-legend{gap:6px 10px}
 }
 .bv-shares svg{width:100%;height:auto;border-radius:${BRAND.radius}px;min-height:320px}
 `.trim();
@@ -324,7 +354,7 @@ ${heat}
 </section>
 </main>
 <footer class="bv-foot">${esc(SITE_FOOTER)}</footer>
-<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;if(!reduce)s.scrollLeft=s.scrollWidth;}</script>
+<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;var phone=window.matchMedia("(max-width:520px)").matches;if(!reduce&&!phone)s.scrollLeft=s.scrollWidth;}</script>
 </body></html>`;
 }
 
