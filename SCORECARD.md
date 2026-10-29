@@ -75,3 +75,5 @@ The sample on the unmerged Shorts branch was measured with ffmpeg, not a phone:
 - Hook frame includes the card. The price line sits above the caption pill (price at y 1688, pill at y 1780)
 
 Studio export asks for `video/mp4;codecs=avc1.42E01E,mp4a.40.2` and will not name a VP9 recording `.mp4`. Card art in the studio is `/api/card-img`, not `/cards/cache/`.
+
+<!-- ux-crew deploy kick 2026-10-28 -->
