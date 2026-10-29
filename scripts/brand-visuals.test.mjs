@@ -92,7 +92,7 @@ export function runBrandVisualTests() {
   t("public share card uses the same gold and font", og.includes(BRAND.gold) && og.includes(BRAND.font) && og.includes("Catch'em") && !og.includes("#d4af37") && !og.includes("Georgia") && !NM.test(og));
   t("before is the old equal square", legacy.includes("height:36px") && legacy.includes("#3ddc84") && legacy.includes("#ff7b72") && !legacy.includes(BRAND.gold) && !legacy.includes("data-h=\"72\""));
 
-  t("phone layout has no sticky column to overlap", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{grid-column:1\/-1;position:static/.test(page) && page.includes("minmax(72px,1fr)"));
+  t("phone keeps a sticky product column while months scroll", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{min-height:72px/.test(page) && page.includes("minmax(72px,1fr)") && page.includes("position:sticky;left:0"));
   const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
   t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
   t("page date stays Oct 27, 2026", visible(page).includes("Oct 27, 2026"));

@@ -249,10 +249,14 @@ export const BRAND_CSS = `
 .bv-shares{display:grid;gap:14px;margin-top:22px}
 @media (max-width:520px){
 .bv-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.bv-heat{grid-template-columns:repeat(var(--m),minmax(72px,1fr));min-width:calc(var(--m) * 78px)}
-.bv-hh:first-child{display:none}
-.bv-hh{min-height:28px;justify-content:center;font-size:11px;line-height:1.15;text-align:center}
-.bv-name{grid-column:1/-1;position:static;min-height:0;margin-top:8px;box-shadow:none;overflow:visible}
+.bv-heat{grid-template-columns:120px repeat(var(--m),minmax(72px,1fr));min-width:calc(120px + var(--m) * 78px)}
+.bv-hh{min-height:32px;font-size:11px;line-height:1.15}
+.bv-hh:first-child,.bv-name{position:sticky;left:0;z-index:2;background:#1a1815}
+.bv-name{min-height:72px;margin-top:0;box-shadow:6px 0 8px -6px rgba(0,0,0,.55);overflow:hidden}
+.bv-stage{width:44px;padding:2px}
+.bv-stage img,.bv-ph{max-width:40px}
+.bv-copy strong{font-size:12px}
+.bv-copy span{font-size:11px}
 .bv-cell{font-size:13px;padding:8px 2px}
 .bv-legend{gap:6px 10px}
 }
@@ -350,7 +354,7 @@ ${heat}
 </section>
 </main>
 <footer class="bv-foot">${esc(SITE_FOOTER)}</footer>
-<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;if(!reduce)s.scrollLeft=s.scrollWidth;}</script>
+<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;var phone=window.matchMedia("(max-width:520px)").matches;if(!reduce&&!phone)s.scrollLeft=s.scrollWidth;}</script>
 </body></html>`;
 }
 
