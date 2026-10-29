@@ -4499,7 +4499,12 @@ export function renderDive(doc, stamp, opts = {}) {
     return `<tr><td>${esc(r.date)}</td><td>${money(r.price) || naChip()}</td><td>${lc}</td><td class="muted">${esc(r.source || "ebay-browse-ask")}</td></tr>`;
   }).join("");
   const catalog = doc.tcgcsvId ? `<p><a href="/p/${esc(doc.tcgcsvId)}">TCGplayer catalog page</a> (market price, labeled separately from eBay asks)</p>` : "";
-  const volumeLine = `<p class="muted">Volume / solds: not available. ${esc(doc.volumeNote || "Sold counts need Insights scope. listingCount is not solds.")}</p>`;
+  const volumeNoteText = String(doc.volumeNote || "Listings counted need Insights scope. listingCount is active Browse asks, not solds.")
+    .replace(/Sold counts need eBay Marketplace Insights scope\.?/gi, "Listings counted need eBay Marketplace Insights scope.")
+    .replace(/Sold counts need Insights scope\.?/gi, "Listings counted need Insights scope.")
+    .replace(/\bsolds\b/gi, "listings counted")
+    .replace(/\bsold\b/gi, "listings counted");
+  const volumeLine = `<p class="muted">Listings counted volume: not available. ${esc(volumeNoteText)}</p>`;
   const outlierNote = outlier && (outlier.note || (outlier.pctGap != null
     ? `Price flagged for review: ${Math.abs(Number(outlier.pctGap))}% ${Number(outlier.pctGap) < 0 || outlier.direction === "low" ? "below" : "above"} the recent median`
     : null));
@@ -7031,7 +7036,7 @@ async function showFlat(index, dir){
     else if(!msg && loopFilter==="wave") msg="No wave or reprint news.";
     else if(!msg && loopFilter==="flagged") msg="No flagged prices.";
     else if(!msg && loopFilter==="dive") msg="No deep dives.";
-    else if(!msg && loopFilter==="volume") msg="No TCGplayer sold counts on file.";
+    else if(!msg && loopFilter==="volume") msg="No listings counted on file.";
     else if(!msg && loopFilter==="signals") msg="No signal reads tonight.";
     else if(!msg && loopFilter==="pokemon") msg="No Pokémon facts.";
     else if(!msg) msg="Nothing in this filter.";
