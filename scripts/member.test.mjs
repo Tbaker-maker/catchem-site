@@ -147,3 +147,34 @@ t("set page links to collection focus", setShell.includes("/collection?set=demo-
 
 if (fail) process.exit(1);
 console.log("member ok");
+
+// Client scripts inside template literals must double-escape quotes, or the
+// browser hits SyntaxError and the whole collection page goes dead.
+const collectionSrc = readFileSync(new URL("../src/member.mjs", import.meta.url), "utf8");
+const clientStart = collectionSrc.indexOf("const CLIENT = `");
+const clientEnd = collectionSrc.indexOf("`;\n\nconst ALERT_JS", clientStart);
+const clientLit = collectionSrc.slice(clientStart + "const CLIENT = `".length, clientEnd);
+function evalTemplate(s) {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\\" && i + 1 < s.length) {
+      const n = s[i + 1];
+      if (n === "\\" || n === "`" || n === '"' || n === "'") { out += n; i++; continue; }
+      if (n === "n") { out += "\n"; i++; continue; }
+    }
+    out += s[i];
+  }
+  return out;
+}
+let clientOk = false;
+try { new Function(evalTemplate(clientLit)); clientOk = true; } catch { clientOk = false; }
+t("collection CLIENT script parses", clientOk);
+
+const vtSrc = readFileSync(new URL("../src/variant-tracker.mjs", import.meta.url), "utf8");
+const vtBodyStart = vtSrc.indexOf("const body = `");
+const vtBodyEnd = vtSrc.indexOf("`;\n  return chrome", vtBodyStart);
+const vtEmitted = evalTemplate(vtSrc.slice(vtBodyStart + "const body = `".length, vtBodyEnd));
+const vtScript = (vtEmitted.match(/<script>([\s\S]*)<\/script>/) || [])[1] || "";
+let vtOk = false;
+try { new Function(vtScript); vtOk = true; } catch { vtOk = false; }
+t("variant tracker script parses", vtOk);
