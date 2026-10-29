@@ -410,7 +410,11 @@ function paintBrief(brief){
       body=(sec.rows&&sec.rows.length)?("<p class=\\"muted\\">"+esc(sec.setName||"")+(sec.asOf?", "+dayLabel(sec.asOf):"")+".</p>"+sec.rows.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join("")):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
     } else if(sec.id==="cashout"){
       var cash=sec.cashout;
-      body=cash&&cash.gross>0?("<p>Gross "+esc(money(cash.gross))+". Modeled net "+esc(money(cash.net))+". "+esc(cash.note)+"</p>"):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
+      if(cash&&cash.gross>0){
+        var tierLines=(cash.tiers||[]).map(function(t){ return "<p class=\\"muted\\">"+esc(t.label)+": keep "+Math.round(t.keep*100)+"% on "+t.n+" line"+(t.n===1?"":"s")+" ("+esc(money(t.gross))+" to "+esc(money(t.net))+").</p>"; }).join("");
+        var method=cash.method||{};
+        body="<p>Gross "+esc(money(cash.gross))+". Modeled net "+esc(money(cash.net))+".</p><p class=\\"muted\\">Source "+esc(method.source||"TCGplayer market price")+". Keep rates use "+esc(method.listingsSource||"listings counted")+".</p>"+tierLines+"<p class=\\"muted\\">"+esc(cash.note||"")+"</p>";
+      } else body="<p class=\\"muted\\">"+esc(sec.empty)+"</p>";
     } else if(sec.id==="liquidity"){
       body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ var lc=r.listings!=null?("Listings counted "+r.listings+(r.listingsAsOf?", "+dayLabel(r.listingsAsOf):"")):"Listings counted: not on file"; return "<p>"+rowLink(r)+". "+esc(lc)+".</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
     } else if(sec.id==="demand"){
@@ -450,7 +454,10 @@ function paintPanel(goal, panels){
   if(goal==="selling"){
     var cash=panels.selling&&panels.selling.cashout;
     var liq=(panels.selling&&panels.selling.liquidity)||[];
-    box.innerHTML=(cash&&cash.gross>0?("<p>Cashout gross "+esc(money(cash.gross))+", modeled net "+esc(money(cash.net))+".</p>"):"<p class=\\"muted\\">No market prices on file.</p>")+liq.slice(0,5).map(function(r){ return "<p>"+rowLink(r)+(r.listings!=null?": listings counted "+r.listings:": listings counted not on file")+".</p>"; }).join("");
+    var method=cash&&cash.method?cash.method:{};
+    var tierBits=(cash&&cash.tiers||[]).slice(0,4).map(function(t){ return "<p class=\\"muted\\">"+esc(t.label)+": keep "+Math.round(t.keep*100)+"%. </p>"; }).join("");
+    box.innerHTML=(cash&&cash.gross>0?("<p>Cashout gross "+esc(money(cash.gross))+", modeled net "+esc(money(cash.net))+".</p><p class=\\"muted\\">Source "+esc(method.source||"TCGplayer market price")+". Method: keep rate from listings counted on sealed rows.</p>"+tierBits):"<p class=\\"muted\\">No market prices on file.</p>")+liq.slice(0,5).map(function(r){ return "<p>"+rowLink(r)+(r.listings!=null?": listings counted "+r.listings:": listings counted not on file")+".</p>"; }).join("");
+
   } else if(goal==="growth"){
     var risk=panels.growth&&panels.growth.risk;
     var reads=(panels.growth&&panels.growth.reads)||[];

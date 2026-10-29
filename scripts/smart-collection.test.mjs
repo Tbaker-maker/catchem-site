@@ -3,6 +3,8 @@ import { flagLine } from "../src/advice-rules.mjs";
 import {
   buildSmartPayload,
   cashoutEstimate,
+  cashoutKeepRate,
+  CASHOUT_METHOD,
   closestSet,
   collectionScore,
   defaultGoal,
@@ -56,6 +58,11 @@ const collectScore = collectionScore(holdings, "collecting", { gapList: [gaps] }
 t("goal reweights score", sellScore.goal === "selling" && collectScore.goal === "collecting" && sellScore.weights.liquidity > collectScore.weights.liquidity);
 
 const cash = cashoutEstimate(holdings);
+
+t("cashout keep uses listings counted tiers", cashoutKeepRate({ kind: "sealed", listings: 2 }).keep === 0.75 && cashoutKeepRate({ kind: "sealed", listings: 12 }).keep === 0.85 && cashoutKeepRate({ kind: "sealed", listings: 40 }).keep === 0.93 && cashoutKeepRate({ kind: "sealed" }).keep === 0.8);
+t("cashout method shows source and tiers", cash.method && cash.method.source === "TCGplayer market price" && /listings counted/i.test(cash.method.listingsSource) && Array.isArray(cash.tiers) && cash.tiers.length >= 1 && cash.rows[0].tierLabel);
+t("cashout note names listings counted", /listings counted/i.test(cash.note) && /model, not a quote/i.test(cash.note) && !/\bsold\b/i.test(cash.note));
+t("CASHOUT_METHOD has no em dash", !/[\u2013\u2014]/.test(JSON.stringify(CASHOUT_METHOD)));
 t("cashout has gross and net", cash.gross === 120 && cash.net > 0 && cash.net < cash.gross && !/sold/i.test(cash.note));
 
 const prev = holdings.map((r) => ({ ...r, price: r.id === "tcgcsv-1" ? 8 : r.price, asOf: "2026-10-27" }));

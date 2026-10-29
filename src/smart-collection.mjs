@@ -106,34 +106,79 @@ export function liquidityRank(holdings) {
     .sort((a, b) => b.score - a.score);
 }
 
+export const CASHOUT_METHOD = {
+  source: "TCGplayer market price",
+  listingsSource: "listings counted on sealed rows when on file",
+  note: "Cashout uses TCGplayer market on each line, then a keep rate from listings counted. It is a model, not a quote.",
+  tiers: [
+    { id: "sealed-missing", kind: "sealed", min: null, max: null, keep: 0.8, label: "Sealed with listings counted not on file" },
+    { id: "sealed-thin", kind: "sealed", min: 0, max: 4, keep: 0.75, label: "Sealed with under 5 listings counted" },
+    { id: "sealed-mid", kind: "sealed", min: 5, max: 19, keep: 0.85, label: "Sealed with 5 to 19 listings counted" },
+    { id: "sealed-deep", kind: "sealed", min: 20, max: null, keep: 0.93, label: "Sealed with 20 or more listings counted" },
+    { id: "single-default", kind: "single", min: null, max: null, keep: 0.9, label: "Singles (listings counted not applied)" },
+  ],
+};
+
+export function cashoutKeepRate(row) {
+  const kind = row?.kind === "sealed" ? "sealed" : "single";
+  if (kind === "single") {
+    return { keep: 0.9, tierId: "single-default", label: "Singles (listings counted not applied)", listings: null };
+  }
+  const listings = Number.isFinite(Number(row?.listings)) ? Number(row.listings) : null;
+  if (listings == null) {
+    return { keep: 0.8, tierId: "sealed-missing", label: "Sealed with listings counted not on file", listings: null };
+  }
+  if (listings < 5) {
+    return { keep: 0.75, tierId: "sealed-thin", label: "Sealed with under 5 listings counted", listings };
+  }
+  if (listings < 20) {
+    return { keep: 0.85, tierId: "sealed-mid", label: "Sealed with 5 to 19 listings counted", listings };
+  }
+  return { keep: 0.93, tierId: "sealed-deep", label: "Sealed with 20 or more listings counted", listings };
+}
+
 export function cashoutEstimate(holdings) {
   const ranked = liquidityRank(holdings);
   let gross = 0;
   let haircut = 0;
   const rows = [];
+  const byTier = Object.create(null);
   for (const row of ranked) {
     if (!(row.value > 0)) continue;
     gross += row.value;
-    let keep = 0.92;
-    if (row.kind === "sealed") {
-      if (row.listings == null) keep = 0.8;
-      else if (row.listings < 5) keep = 0.75;
-      else if (row.listings < 20) keep = 0.85;
-      else keep = 0.93;
-    } else {
-      keep = 0.9;
-    }
-    const net = row.value * keep;
+    const rate = cashoutKeepRate(row);
+    const net = row.value * rate.keep;
     haircut += row.value - net;
-    rows.push({ ...row, keep, net: Math.round(net * 100) / 100 });
+    const line = {
+      ...row,
+      keep: rate.keep,
+      tierId: rate.tierId,
+      tierLabel: rate.label,
+      net: Math.round(net * 100) / 100,
+      source: CASHOUT_METHOD.source,
+      listingsSource: row.kind === "sealed" ? CASHOUT_METHOD.listingsSource : "",
+    };
+    rows.push(line);
+    const bucket = byTier[rate.tierId] || { id: rate.tierId, label: rate.label, keep: rate.keep, n: 0, gross: 0, net: 0 };
+    bucket.n += 1;
+    bucket.gross += row.value;
+    bucket.net += net;
+    byTier[rate.tierId] = bucket;
   }
+  const tiers = Object.values(byTier).map((t) => ({
+    ...t,
+    gross: Math.round(t.gross * 100) / 100,
+    net: Math.round(t.net * 100) / 100,
+  }));
   return {
     gross: Math.round(gross * 100) / 100,
     net: Math.round((gross - haircut) * 100) / 100,
     haircut: Math.round(haircut * 100) / 100,
     n: rows.length,
     rows: rows.slice(0, 12),
-    note: "Cashout uses TCGplayer market on each line, then a liquidity keep rate. It is a model, not a quote.",
+    tiers,
+    method: CASHOUT_METHOD,
+    note: CASHOUT_METHOD.note,
   };
 }
 
