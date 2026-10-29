@@ -298,6 +298,14 @@ const CSS = `
   .mem .progress-fill{transition:none!important}
   .mem .celebrate,.mem .celebrate *{animation:none!important;transition:none!important}
 }
+.mem .guided-progress{display:flex;flex-direction:column;gap:8px}
+.mem .guided-progress .count{font:600 15px/1.3 var(--sans)}
+.mem #guided-hits{display:flex;flex-direction:column;gap:6px}
+.mem #guided-hits button{width:100%;justify-content:flex-start;text-align:left;min-height:44px}
+.mem #guided-hits button .meta{display:block;font:500 13px/1.3 var(--sans);opacity:.75;margin-top:2px}
+.mem .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;max-width:min(92vw,420px);padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:#1a1815;box-shadow:0 8px 28px rgba(0,0,0,.35);display:none;gap:10px;align-items:center;flex-wrap:wrap}
+.mem .toast.is-on{display:flex}
+.mem .toast[hidden]{display:none!important}
 `;
 
 function shell(title, active, body, stamp) {
@@ -313,19 +321,22 @@ export function renderCollection(stamp, opts = {}) {
 <p class="muted">Pick one goal. Your score and Morning Brief follow it. Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
 ${check}
 <section id="onboard" class="onboard" aria-labelledby="onboard-h" data-onboard="1" hidden>
-<h2 id="onboard-h">Start in three steps</h2>
-<p class="muted">Built for a first visit. Skip any time.</p>
-<ol>
-<li><strong>Pick a goal</strong> below. Collecting tracks set gaps. Selling leads with cashout. Growth leads with risk.</li>
-<li><strong>Try a sample</strong> or add one card you own. Your Morning Brief fills in from real prices on file.</li>
-<li><strong>Open a set</strong> and tap My missing cards when you want completion and cost to finish.</li>
-</ol>
+<h2 id="onboard-h">Add 3 cards you own</h2>
+<p class="muted">Under a minute. Skip any time. Prices use TCGplayer market on file.</p>
+<div class="guided-progress" aria-labelledby="guided-count">
+<p id="guided-count" class="count" role="status" aria-live="polite">0 of 3</p>
+<div class="progress-rail" aria-hidden="true"><div id="guided-fill" class="progress-fill" style="width:0%"></div></div>
+</div>
+<label for="guided-q">Find a card you own<input id="guided-q" name="guided-q" autocomplete="off" placeholder="Search by name" aria-autocomplete="list" aria-controls="guided-hits" aria-describedby="guided-hint"></label>
+<p id="guided-hint" class="muted">Suggestions use popular cards and ones you opened recently.</p>
+<div id="guided-hits" role="listbox" aria-label="Card suggestions"></div>
 <p>
 <button type="button" class="tap" id="sample-load">Try a sample collection</button>
 <button type="button" class="quiet" id="onboard-skip">Skip guide</button>
 </p>
 <p id="onboard-note" class="muted" role="status" aria-live="polite"></p>
 </section>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <section class="rowcard" aria-labelledby="goal-h">
 <h2 id="goal-h">Collection goal</h2>
 <p class="muted">One choice. Change it any time.</p>
@@ -917,6 +928,7 @@ fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; 
   state.catalogueReads=catalogue.filter(function(row){ return row && row.headline; }).map(function(row){
     return { id:row.sku, name:row.name, headline:row.headline, asOf:row.asOf||(doc&&doc.asOf)||"", source:"Catch'em read", href:row.kind==="sealed"?("/p/"+row.sku):("/c/"+row.sku) };
   });
+  paintGuidedHits("");
 }).catch(function(){});
 fetch("/data/sets.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
   state.setIndex=Array.isArray(doc&&doc.sets)?doc.sets:[];
@@ -970,10 +982,51 @@ function setOnboardDone(){ try { localStorage.setItem("catchem-onboard","done");
 function syncOnboard(rows){
   var box=document.getElementById("onboard");
   if(!box) return;
-  var show=!onboardDismissed() && !(rows&&rows.length);
+  var n=(rows&&rows.length)||0;
+  var show=!onboardDismissed() && n<3;
   box.hidden=!show;
+  paintGuidedProgress(n);
+  if(show) paintGuidedHits((document.getElementById("guided-q")||{}).value||"");
+}
+function paintGuidedProgress(n){
+  var count=document.getElementById("guided-count");
+  var fill=document.getElementById("guided-fill");
+  var have=Math.max(0, Math.min(3, Number(n)||0));
+  if(count) count.textContent=have+" of 3";
+  if(fill) fill.style.width=(have/3*100)+"%";
+}
+function holdingFromCat(row){
+  if(!row||!row.sku) return null;
+  var kind=row.kind==="sealed"?"sealed":"single";
+  return {
+    id:row.sku, sku:row.sku, name:row.name, kind:kind,
+    condition:kind==="sealed"?null:"NM", qty:1,
+    price:Number(row.price)>0?Number(row.price):null, asOf:row.asOf||"",
+    change7:row.change7!=null?row.change7:null, change30:row.change30!=null?row.change30:null, change90:row.change90!=null?row.change90:null,
+    set:row.set||"", setSlug:row.setSlug||"",
+    listings:row.listings!=null?row.listings:null, listingsAsOf:row.listingsAsOf||"",
+    href:(kind==="sealed"?"/p/":"/c/")+row.sku, source:"TCGplayer market price"
+  };
+}
+function saveHolding(row, opts){
+  opts=opts||{};
+  if(!row||!row.sku) return Promise.resolve(null);
+  return signedIn().then(function(view){
+    if(view && view.signedIn){
+      return fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.assign({action:"holding"}, row))})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+        .then(function(res){
+          if(res.ok && res.j && res.j.collection) paint(res.j.collection, res.j.summary||summarise(res.j.collection));
+          return res;
+        });
+    }
+    var rows=localRows().filter(function(item){ return item.id!==row.sku; });
+    rows.unshift(row); saveLocal(rows); paint(rows, summarise(rows));
+    return { ok:true, j:{ collection:rows } };
+  });
 }
 var SAMPLE_SKUS=["tcgcsv-42402","tcgcsv-250320","tcgcsv-250332","tcgcsv-223073"];
+var POPULAR_SKUS=["tcgcsv-42402","tcgcsv-250320","tcgcsv-250332","tcgcsv-223073","tcgcsv-45214","tcgcsv-85564","tcgcsv-232082","tcgcsv-47947"];
 function sampleHoldings(){
   var bySku={};
   catalogue.forEach(function(row){ if(row&&row.sku) bySku[row.sku]=row; });
@@ -986,16 +1039,84 @@ function sampleHoldings(){
   return SAMPLE_SKUS.map(function(sku,i){
     var hit=bySku[sku]||fallback[i];
     if(!hit) return null;
-    return {
-      id:hit.sku||sku, sku:hit.sku||sku, name:hit.name, kind:hit.kind==="sealed"?"sealed":"single",
-      condition:hit.kind==="sealed"?null:"NM", qty:1,
-      price:Number(hit.price)>0?Number(hit.price):null, asOf:hit.asOf||"",
-      change7:hit.change7!=null?hit.change7:null, change30:hit.change30!=null?hit.change30:null, change90:hit.change90!=null?hit.change90:null,
-      set:hit.set||"", setSlug:hit.setSlug||"",
-      listings:hit.listings!=null?hit.listings:null, listingsAsOf:hit.listingsAsOf||"",
-      href:(hit.kind==="sealed"?"/p/":"/c/")+(hit.sku||sku), source:"TCGplayer market price"
-    };
+    return holdingFromCat(hit)||holdingFromCat(Object.assign({sku:sku}, hit));
   }).filter(Boolean);
+}
+function guidedSuggest(q){
+  var query=String(q||"").trim().toLowerCase();
+  var owned={};
+  (state.rows||localRows()).forEach(function(r){ if(r&&r.id) owned[r.id]=1; });
+  var views=loadViews();
+  var scored=[];
+  catalogue.forEach(function(row){
+    if(!row||!row.sku||owned[row.sku]) return;
+    if(row.kind==="sealed") return;
+    var name=String(row.name||"").toLowerCase();
+    var sku=String(row.sku||"");
+    if(query){
+      if(name.indexOf(query)<0 && sku!==query) return;
+    }
+    var score=0;
+    if(POPULAR_SKUS.indexOf(sku)>=0) score+=50;
+    if(Number(views[sku])>0) score+=20+Math.min(20, Number(views[sku]));
+    if(Number.isFinite(Number(row.change7))) score+=Math.min(15, Math.abs(Number(row.change7))/2);
+    if(Number(row.price)>0 && Number(row.price)<40) score+=5;
+    if(!query && score<=0) return;
+    scored.push({ row:row, score:score, name:name });
+  });
+  if(!query){
+    scored.sort(function(a,b){ return b.score-a.score || a.name.localeCompare(b.name); });
+    return scored.slice(0,6).map(function(x){ return x.row; });
+  }
+  scored.sort(function(a,b){ return b.score-a.score || a.name.localeCompare(b.name); });
+  return scored.slice(0,6).map(function(x){ return x.row; });
+}
+function paintGuidedHits(q){
+  var box=document.getElementById("guided-hits");
+  if(!box) return;
+  box.innerHTML="";
+  var onboard=document.getElementById("onboard");
+  if(onboard && onboard.hidden) return;
+  var rows=guidedSuggest(q);
+  if(!rows.length){
+    box.innerHTML=q && String(q).trim().length>=2 ? "<p class=\\"muted\\">No match on file. Try another name.</p>" : "<p class=\\"muted\\">Catalogue is loading suggestions.</p>";
+    return;
+  }
+  rows.forEach(function(row){
+    var b=document.createElement("button");
+    b.type="button"; b.className="quiet"; b.setAttribute("role","option");
+    var price=money(row.price)||"price not on file";
+    var when=dayLabel(row.asOf);
+    var label=(row.name||"")+" · "+price+(when?" · "+when:"");
+    b.setAttribute("aria-label","Add "+(row.name||"card")+", "+price+(when?", "+when:"")+", TCGplayer market");
+    b.innerHTML="<span>"+esc(row.name||"")+"</span><span class=\\"meta\\">"+esc(price)+(when?" · "+esc(when):"")+" · TCGplayer</span>";
+    b.onclick=function(){ addGuidedCard(row); };
+    box.appendChild(b);
+  });
+}
+function finishGuided(rows){
+  setOnboardDone();
+  syncOnboard(rows||[]);
+  var note=document.getElementById("onboard-note");
+  if(note) note.textContent="Three on file. Your score and Morning Brief are ready.";
+  maybeCelebrate(rows||[]);
+  var score=document.getElementById("score-line");
+  if(score){ try { score.scrollIntoView({ behavior:(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)?"auto":"smooth", block:"nearest" }); } catch(err){} }
+}
+function addGuidedCard(catRow){
+  var row=holdingFromCat(catRow);
+  if(!row) return;
+  if(!state.goal){ state.goal="collecting"; saveGoal("collecting"); }
+  var note=document.getElementById("onboard-note");
+  saveHolding(row).then(function(res){
+    if(!(res&&res.ok)){ if(note) note.textContent="Could not save that card."; return; }
+    var rows=(res.j&&res.j.collection)||localRows();
+    var n=rows.length;
+    paintGuidedProgress(n);
+    if(note) note.textContent=n>=3 ? "Three on file." : ("Saved "+(row.name||"card")+". "+n+" of 3.");
+    if(n>=3) finishGuided(rows);
+    else paintGuidedHits((document.getElementById("guided-q")||{}).value||"");
+  }).catch(function(){ if(note) note.textContent="Could not save that card."; });
 }
 function loadSample(){
   var rows=sampleHoldings();
@@ -1029,6 +1150,11 @@ function maybeCelebrate(rows){
   if(!el||!(rows&&rows.length)) return;
   el.textContent="Nice. "+rows.length+" item"+(rows.length===1?"":"s")+" on file. Your Morning Brief is ready.";
   el.className="celebrate is-on";
+}
+var guidedQ=document.getElementById("guided-q");
+if(guidedQ){
+  guidedQ.oninput=function(){ paintGuidedHits(guidedQ.value); };
+  guidedQ.onfocus=function(){ paintGuidedHits(guidedQ.value); };
 }
 var sampleBtn=document.getElementById("sample-load");
 if(sampleBtn) sampleBtn.onclick=function(){ loadSample(); };
