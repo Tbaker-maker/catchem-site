@@ -103,13 +103,13 @@ function paint(tracker){
   sum.innerHTML="<h2>"+esc(tracker.name)+"</h2><p>"+esc(g.have)+" of "+esc(g.total)+" printings ("+(g.pct==null?"-":(Math.round(g.pct*1000)/10)+"%")+"). Cost to finish "+esc(money(g.cost)||"not on file")+" across "+esc(g.costPriced||0)+" priced gaps.</p>";
   fin.hidden=false;
   document.getElementById("finish-box").innerHTML=(tracker.finishes||[]).map(function(f){
-    return "<span class=\"chip\">"+esc(f.finish)+": "+f.have+"/"+f.total+"</span>";
-  }).join("")||"<p class=\"muted\">No finishes on file.</p>";
+    return "<span class=\\"chip\\">"+esc(f.finish)+": "+f.have+"/"+f.total+"</span>";
+  }).join("")||"<p class=\\"muted\\">No finishes on file.</p>";
   rows.hidden=false;
-  var html="<p><label><input type=\"checkbox\" id=\"missing-only\"> Missing only</label></p>";
+  var html="<p><label><input type=\\"checkbox\\" id=\\"missing-only\\"> Missing only</label></p>";
   html+="<table><thead><tr><th>Owned</th><th>Card</th><th>Finish</th><th>Price</th></tr></thead><tbody>";
   (tracker.rows||[]).forEach(function(r){
-    html+="<tr data-owned=\""+(r.owned?"1":"0")+"\"><td>"+(r.owned?"Yes":"No")+"</td><td><a href=\""+esc(r.href)+"\">"+esc(r.name)+"</a>"+(r.rarity?" <span class=\"muted\">"+esc(r.rarity)+"</span>":"")+"</td><td>"+esc(r.finish||"")+"</td><td>"+esc(money(r.price)||"not on file")+"</td></tr>";
+    html+="<tr data-owned=\\""+(r.owned?"1":"0")+"\\"><td>"+(r.owned?"Yes":"No")+"</td><td><a href=\\""+esc(r.href)+"\\">"+esc(r.name)+"</a>"+(r.rarity?" <span class=\\"muted\\">"+esc(r.rarity)+"</span>":"")+"</td><td>"+esc(r.finish||"")+"</td><td>"+esc(money(r.price)||"not on file")+"</td></tr>";
   });
   html+="</tbody></table>";
   document.getElementById("rows-box").innerHTML=html;

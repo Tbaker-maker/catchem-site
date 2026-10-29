@@ -539,7 +539,7 @@ function paintFocus(focus){
   if(back) back.href="/sets/"+encodeURIComponent(state.focusSet);
   if(!focus){
     if(note) note.textContent="Loading "+state.focusSet+" gaps.";
-    body.innerHTML="<p class=\"muted\">Loading set gaps.</p>";
+    body.innerHTML="<p class=\\"muted\\">Loading set gaps.</p>";
     return;
   }
   if(note) note.textContent=(focus.name||state.focusSet)+" · source "+(focus.source||"TCGplayer market")+(focus.asOf?", "+dayLabel(focus.asOf):"")+".";
@@ -550,11 +550,11 @@ function paintFocus(focus){
   lines.push("<p><b>Cost to finish</b> "+esc(money(g.cost)||"not on file")+" across "+(g.costPriced||0)+" priced gaps.</p>");
   var cheap=(g.cheapest||[]).slice(0,5);
   var rare=(g.rarest||[]).slice(0,5);
-  lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
-  lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
+  lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
+  lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
   if(focus.sealed && focus.sealed.total){
     var s=focus.sealed;
-    lines.push("<p class=\"muted\">Sealed in this set: "+s.have+" of "+s.total+". Cost to finish "+esc(money(s.cost)||"not on file")+".</p>");
+    lines.push("<p class=\\"muted\\">Sealed in this set: "+s.have+" of "+s.total+". Cost to finish "+esc(money(s.cost)||"not on file")+".</p>");
   }
   body.innerHTML=lines.join("");
   body.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
