@@ -404,6 +404,7 @@ ${check}
 <details id="import" class="rowcard" aria-labelledby="import-h">
 <summary id="import-h">Import a CSV</summary>
 <p class="muted">Upload a file with product ids, or names and sets. Preview first. Nothing saves until you confirm.</p>
+<p><button type="button" class="quiet" id="csv-template">Download CSV template</button></p>
 <label>CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
 <textarea id="csv-text" rows="4" placeholder="id,name,set,qty,condition,kind" aria-label="CSV text"></textarea>
 <button type="button" id="csv-preview">Preview import</button>
@@ -924,6 +925,19 @@ function paintImportPreview(preview){
   }).join("")+(preview.rows.length>40?"<p class=\\"muted\\">Showing first 40 preview lines.</p>":"");
   confirm.hidden=!(preview.accepted>0);
 }
+
+document.getElementById("csv-template").onclick=function(){
+  var text="id,name,set,qty,condition,kind,note\\ntcgcsv-1,Alpha,Demo Set,1,NM,single,example\\ntcgcsv-9,Box,Demo Set,1,,sealed,example\\n";
+  var blob=new Blob([text],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="catchem-collection-template.csv";
+  a.click();
+  setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(err){} }, 1500);
+  var note=document.getElementById("csv-note");
+  if(note) note.textContent="Template saved on this device. Example rows are marked in the note column.";
+};
+
 document.getElementById("csv-file").onchange=function(ev){
   var file=ev.target.files&&ev.target.files[0];
   if(!file) return;

@@ -3,6 +3,33 @@
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 
+export const CSV_TEMPLATE_HEADERS = ["id", "name", "set", "qty", "condition", "kind", "note"];
+
+// Two clearly marked example rows. Importer accepts them when they match the catalogue.
+export const CSV_TEMPLATE_ROWS = [
+  ["tcgcsv-1", "Alpha", "Demo Set", "1", "NM", "single", "example"],
+  ["tcgcsv-9", "Box", "Demo Set", "1", "", "sealed", "example"],
+];
+
+export function csvTemplateText() {
+  const lines = [CSV_TEMPLATE_HEADERS.join(",")];
+  for (const row of CSV_TEMPLATE_ROWS) {
+    lines.push(row.map((cell) => {
+      const s = String(cell ?? "");
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","));
+  }
+  return lines.join("\n") + "\n";
+}
+
+export function isExampleRow(mapped, headers, cells) {
+  const noteIdx = headers.indexOf("note");
+  if (noteIdx >= 0 && /^example$/i.test(String(cells[noteIdx] ?? "").trim())) return true;
+  const name = String(mapped?.name || "").trim();
+  if (/^\[example\]/i.test(name) || /^example\b/i.test(name)) return true;
+  return false;
+}
+
 export function validSku(value) {
   const id = String(value || "").trim();
   return /^tcgcsv-\d+$/.test(id) ? id : "";
@@ -142,6 +169,11 @@ export function previewImport({ text, catalogue }) {
   let rejected = 0;
   for (const cells of parsed.rows.slice(0, 500)) {
     const mapped = mapCsvRow(headers, cells);
+    const example = isExampleRow(mapped, headers, cells);
+    if (example) {
+      mapped.name = String(mapped.name || "").replace(/^\[example\]\s*/i, "").replace(/^example\s*[:\-]?\s*/i, "").trim();
+      mapped.example = true;
+    }
     const hit = matchCatalogue(mapped, catalogue);
     if (!hit) {
       rejected += 1;
@@ -177,7 +209,8 @@ export function previewImport({ text, catalogue }) {
       holding.name = String(holding.name).replace(/\bNM\b/g, "").replace(/\s+/g, " ").trim();
     }
     accepted += 1;
-    out.push({ ok: true, reason: "", input: mapped, holding });
+    if (example) holding.example = true;
+    out.push({ ok: true, reason: example ? "Example row." : "", input: mapped, holding });
   }
   return {
     ok: true,
