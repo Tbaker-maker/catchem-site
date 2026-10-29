@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EDGE_TTL, cacheKeyUrl, PANEL_CACHE_GEN } from "../src/edge-cache.mjs";
 import { setRawKv, listBucketIds, extractRow, extractAllRows, setDataVersion, currentDataVersion, publicDataVersion } from "../src/data.mjs";
+import { runPrewarmBatchTests } from "./prewarm-product-pages.test.mjs";
 
 assert.equal(EDGE_TTL, 86400);
 assert.equal(cacheKeyUrl("https://catchemtcg.com/p/tcgcsv-1?prewarm=1"), "https://catchemtcg.com/p/tcgcsv-1");
@@ -45,3 +46,4 @@ assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
 
 assert.equal(PANEL_CACHE_GEN, "4");
+await runPrewarmBatchTests();
