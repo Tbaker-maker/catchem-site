@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { signSession, readUser } from "../src/quota.mjs";
 import { beginDiscord, finishDiscord } from "../src/auth.mjs";
 import { handleAlert, watchRowsForBot } from "../src/feed-api.mjs";
-import { handleMe, handleSmartCollection, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
+import { handleMe, handleSmartCollection, handleCollectionImport, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
 import { renderSetShell } from "../src/ui.mjs";
 import { pageKind, renderPath } from "../src/index.mjs";
 
@@ -28,7 +28,7 @@ const collection = await (await renderPath("/collection", fetchImpl, { feed: tru
 const alerts = await (await renderPath("/alerts", fetchImpl, { feed: true })).text();
 const account = await (await renderPath("/me", fetchImpl, { feed: true })).text();
 t("collection page is a shell", collection.includes("<h1>My collection</h1>") && collection.includes('class="skel"') && collection.includes("min-height:44px") && !collection.includes("/collection-check") && !/[\u2014\u2013]/.test(collection));
-t("smart collection chrome", collection.includes("Morning Brief") && collection.includes("Collection goal") && collection.includes('data-goal="collecting"') && collection.includes('data-goal="selling"') && collection.includes('data-goal="growth"') && collection.includes("Collection Score") && collection.includes("/api/collection/smart") && collection.includes("This set") && collection.includes("focusSet"));
+t("smart collection chrome", collection.includes("Morning Brief") && collection.includes("Collection goal") && collection.includes('data-goal="collecting"') && collection.includes('data-goal="selling"') && collection.includes('data-goal="growth"') && collection.includes("Collection Score") && collection.includes("/api/collection/smart") && collection.includes("This set") && collection.includes("focusSet") && collection.includes("Import CSV") && collection.includes("/api/collection/import"));
 t("check slot stays off", !renderCollection("").includes("/collection-check") && renderCollection("", { collectionCheck: true }).includes('href="/collection-check"'));
 t("alert settings are on the page", alerts.includes("<h1>Alert settings</h1>") && alerts.includes("Pause all alerts") && alerts.includes('type="time"') && alerts.includes('class="skel"') && !/[\u2014\u2013]/.test(alerts));
 t("account has export and delete", account.includes("Export my data") && account.includes("Delete my account") && account.includes("Sign-in is optional") === false && !/[\u2014\u2013]/.test(account));
@@ -51,6 +51,18 @@ const smartRes = await handleSmartCollection(new Request("https://catchemtcg.com
   }),
 }));
 const smartBody = await smartRes.json();
+
+const importRes = await handleCollectionImport(new Request("https://catchemtcg.com/api/collection/import", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    action: "preview",
+    text: "id,name,set\ntcgcsv-1,Alpha,Demo",
+    catalogue: [{ sku: "tcgcsv-1", name: "Alpha", set: "Demo", setSlug: "demo-set", kind: "single", price: 10 }],
+  }),
+}));
+const importBody = await importRes.json();
+t("import preview api", importRes.status === 200 && importBody.ok && importBody.accepted === 1 && importBody.rows[0].holding.setSlug === "demo-set");
 t("smart api returns brief", smartRes.status === 200 && smartBody.ok && smartBody.brief && smartBody.score && smartBody.goal === "collecting" && smartBody.panels.collecting.closest);
 const single = normalizeHolding({ sku: "tcgcsv-3", name: "Pika", kind: "single", qty: 1, price: 4, change7: 10 });
 t("single defaults to NM", single.condition === "NM");

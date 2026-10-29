@@ -5,6 +5,7 @@ import { readUser, avatarUrl } from "./quota.mjs";
 import { WATCH_CAP } from "./watch-cap.mjs";
 import { pushWatches } from "./feed-api.mjs";
 import { buildSmartPayload, defaultGoal, normalizeBriefPrefs, normalizeGoal } from "./smart-collection.mjs";
+import { previewImport, holdingsFromPreview } from "./collection-import.mjs";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 
@@ -139,6 +140,25 @@ export async function handleSmartCollection(request) {
   const briefPrefs = normalizeBriefPrefs(body.briefPrefs || { pinned: body.briefPinned, hidden: body.briefHidden });
   const payload = buildSmartPayload({ holdings, prevHoldings, setDocs, reads, views, goal, briefPrefs });
   return json(payload);
+}
+
+
+export async function handleCollectionImport(request) {
+  if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
+  let body = {};
+  try { body = await request.json(); } catch { return json({ ok: false, error: "Bad import request." }, 400); }
+  const action = String(body.action || "preview");
+  const catalogue = Array.isArray(body.catalogue) ? body.catalogue.slice(0, 20000) : [];
+  if (action === "preview") {
+    const text = String(body.text || "").slice(0, 1_000_000);
+    const preview = previewImport({ text, catalogue });
+    return json(preview, preview.ok ? 200 : 400);
+  }
+  if (action === "holdings") {
+    const holdings = holdingsFromPreview(body.preview).map(normalizeHolding).filter(Boolean);
+    return json({ ok: true, holdings, n: holdings.length });
+  }
+  return json({ ok: false, error: "Unknown import action." }, 400);
 }
 
 export async function handleMe(request, env) {
@@ -286,6 +306,16 @@ ${check}
 <section id="panel" class="rowcard" aria-labelledby="panel-h">
 <h2 id="panel-h">Goal panel</h2>
 <div id="panel-body"><p class="muted">Your goal panel lands here.</p></div>
+</section>
+<section id="import" class="rowcard" aria-labelledby="import-h">
+<h2 id="import-h">Import CSV</h2>
+<p class="muted">Upload a CSV with tcgcsv ids, or names and sets. We fill setSlug from the catalogue. Preview first. Nothing saves until you confirm.</p>
+<label>CSV file<input id="csv-file" type="file" accept=".csv,text/csv"></label>
+<textarea id="csv-text" rows="4" placeholder="id,name,set,qty,condition,kind" aria-label="CSV text"></textarea>
+<button type="button" id="csv-preview">Preview import</button>
+<p id="csv-note" class="muted"></p>
+<div id="csv-preview-box"></div>
+<button type="button" id="csv-confirm" hidden>Save previewed rows</button>
 </section>
 <form id="add-form" class="rowcard">
 <label>Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or tcgcsv id"></label>
@@ -660,6 +690,76 @@ if(state.focusSet){
   if(!loadGoal()) { state.goal="collecting"; saveGoal("collecting"); }
   paintFocus(null);
 }
+
+var importPreview=null;
+function paintImportPreview(preview){
+  var box=document.getElementById("csv-preview-box");
+  var note=document.getElementById("csv-note");
+  var confirm=document.getElementById("csv-confirm");
+  importPreview=preview;
+  if(!preview||!preview.ok){
+    note.textContent=(preview&&preview.error)||"Preview failed.";
+    box.innerHTML="";
+    confirm.hidden=true;
+    return;
+  }
+  note.textContent="Matched "+preview.accepted+" · skipped "+preview.rejected+(preview.truncated?" · first 500 rows only":"")+". "+(preview.note||"");
+  box.innerHTML=(preview.rows||[]).slice(0,40).map(function(row){
+    if(row.ok){
+      var h=row.holding;
+      return "<p>"+esc(h.name)+(h.setSlug?" · "+esc(h.setSlug):"")+" · "+esc(h.kind)+" x "+esc(h.qty)+(h.condition?" · "+esc(h.condition):"")+"</p>";
+    }
+    return "<p class=\\"muted\\">Skip: "+esc((row.input&& (row.input.name||row.input.id))||"?")+" ("+esc(row.reason)+")</p>";
+  }).join("")+(preview.rows.length>40?"<p class=\\"muted\\">Showing first 40 preview lines.</p>":"");
+  confirm.hidden=!(preview.accepted>0);
+}
+document.getElementById("csv-file").onchange=function(ev){
+  var file=ev.target.files&&ev.target.files[0];
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(){ document.getElementById("csv-text").value=String(reader.result||""); };
+  reader.readAsText(file);
+};
+document.getElementById("csv-preview").onclick=function(){
+  var text=document.getElementById("csv-text").value||"";
+  document.getElementById("csv-note").textContent="Building preview.";
+  fetch("/api/collection/import",{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({ action:"preview", text:text, catalogue:catalogue })
+  }).then(function(r){ return r.json(); }).then(paintImportPreview).catch(function(){ paintImportPreview({ ok:false, error:"Preview failed." }); });
+};
+document.getElementById("csv-confirm").onclick=function(){
+  if(!importPreview||!(importPreview.accepted>0)) return;
+  fetch("/api/collection/import",{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({ action:"holdings", preview:importPreview })
+  }).then(function(r){ return r.json(); }).then(function(j){
+    var rows=(j&&j.holdings)||[];
+    if(!rows.length){ document.getElementById("csv-note").textContent="Nothing to save."; return; }
+    signedIn().then(function(view){
+      if(view&&view.signedIn){
+        fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"merge",rows:rows})})
+          .then(function(r){ return r.json(); })
+          .then(function(me){
+            document.getElementById("csv-note").textContent="Saved "+rows.length+" rows to the account.";
+            if(me&&me.collection) paint(me.collection, me.summary||summarise(me.collection));
+            document.getElementById("csv-confirm").hidden=true;
+          });
+        return;
+      }
+      var local=localRows();
+      var byId={}; local.forEach(function(r){ byId[r.id]=r; });
+      rows.forEach(function(r){ byId[r.id]=r; });
+      var next=Object.keys(byId).map(function(k){ return byId[k]; });
+      saveLocal(next); paint(next, summarise(next));
+      document.getElementById("csv-note").textContent="Saved "+rows.length+" rows on this device.";
+      document.getElementById("csv-confirm").hidden=true;
+    });
+  }).catch(function(){ document.getElementById("csv-note").textContent="Save failed."; });
+};
+
 var catalogue=[];
 fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
   var seen={};

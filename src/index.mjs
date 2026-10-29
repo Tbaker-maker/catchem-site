@@ -11,7 +11,7 @@ import { liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
-import { handleMe, handleSmartCollection, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
+import { handleMe, handleSmartCollection, handleCollectionImport, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
@@ -1523,6 +1523,7 @@ const worker = {
       if (url.pathname === "/api/alerts") return handleAlert(request, env);
       if (url.pathname === "/api/me" || url.pathname === "/api/me/export") return handleMe(request, env);
       if (url.pathname === "/api/collection/smart") return handleSmartCollection(request);
+      if (url.pathname === "/api/collection/import") return handleCollectionImport(request);
       if (url.pathname === "/api/follow") return handleFollow(request, env);
       if (url.pathname === "/api/reads") return handleReads(request, env);
       if (url.pathname === "/api/reads/click") return handleReadsClick(request, env);
