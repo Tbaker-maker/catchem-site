@@ -1,5 +1,5 @@
 // Compact Morning Brief strip on the static home page.
-// Uses published collection data already on the device. No data pulls.
+// Uses the collection already saved on the device. Does not fetch market files.
 // Copy rules: no em/en dashes, listings counted, no NM on sealed, no advice.
 
 export const HOME_BRIEF_HIDE_KEY = "catchem-brief-home-hide";
