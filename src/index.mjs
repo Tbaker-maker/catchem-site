@@ -176,6 +176,7 @@ export function pageKind(pathname) {
   if (path === "/premium") return "premium";
   if (path === "/meter") return "meter";
   if (path === "/collection") return "collection";
+  if (path === "/heatmap" || path === "/heat" || path === "/sealed-pulse") return "heatmap";
   if (path === "/variants") return "variants";
   if (path === "/alerts") return "alerts";
   if (path === "/me") return "account";
@@ -1564,6 +1565,9 @@ const worker = {
       if (feed && norm(url.pathname) === "/movers") return Response.redirect(new URL("/board", url), 301);
       if (feed && norm(url.pathname) === "/pulse") return Response.redirect(new URL("/feed", url), 301);
       const kind = pageKind(url.pathname);
+      if (kind === "heatmap") {
+        return new Response("<!doctype html><title>Heatmap</title><h1>Heatmap</h1><p>The sealed market pulse is served at this path.</p>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+      }
       let reads = null;
       if (kind === "reads") {
         let viewer = null;
