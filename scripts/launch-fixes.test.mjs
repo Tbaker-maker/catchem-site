@@ -26,7 +26,7 @@ const icon = await worker.fetch(new Request("https://catchemtcg.com/favicon.ico"
 t("favicon.ico is served", icon.status === 200 && (await icon.text()) === FAVICON_SVG);
 t("every chrome page links the favicon", nf.includes('rel="icon" href="/favicon.svg"'));
 t("practice is out of the site nav and dock", !/href="\/practice"/.test(nf) && !/href="\/practice"/.test(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8")));
-t("mobile dock is Feed or Home, Sets, Search, Indexes, Premium", nf.includes('href="/indexes"') && nf.includes(">Indexes<") && nf.includes(">Sets<") && nf.includes(">Search<") && nf.includes(">Premium<") && nf.includes("min-height:48px") && nf.includes("min-width:44px") && nf.includes("padding-bottom:88px"));
+t("mobile dock is Feed or Home, Sets, Collection, Search, Premium", (() => { const dock = (nf.match(/<nav class=\"dock\"[\s\S]*?<\/nav>/) || [""])[0]; return dock.includes('href="/collection"') && />Collection</.test(dock) && />Sets</.test(dock) && />Search</.test(dock) && />Premium</.test(dock) && !/>Indexes</.test(dock) && nf.includes("min-height:48px") && nf.includes("min-width:44px") && nf.includes("padding-bottom:88px"); })());
 t("footer commission line", PAID_FOOTER === "Paid link. We may earn a commission from links on this page." && !/\bbuy\b/.test(PAID_FOOTER));
 t("rotation copy avoids printed", !/printed/i.test(visible(renderRotation(""))));
 t("set value hides with no prices", setValueBlock(null) === "" && setValueBlock({ top: [], master: {} }) === "");

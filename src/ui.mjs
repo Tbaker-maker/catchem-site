@@ -1660,12 +1660,13 @@ const DOCK_ICON = {
   feed: '<rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/>',
   sets: '<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
+  collection: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6"/><path d="M9 13h6"/><path d="M9 17h4"/>',
   indexes: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 2 5-6"/>',
   practice: '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6"/>',
   premium: '<path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
 };
 function dockNav(active, feed) {
-  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/search", "Search", "search"], ["/indexes", "Indexes", "indexes"], ["/premium", "Premium", "premium", "Discord Premium"]];
+  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/collection", "Collection", "collection", "My collection"], ["/search", "Search", "search"], ["/premium", "Premium", "premium", "Discord Premium"]];
   return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
 }
 

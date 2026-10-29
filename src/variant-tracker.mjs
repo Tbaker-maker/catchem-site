@@ -66,20 +66,23 @@ const VT_CSS = `.vt .rowcard{padding:14px;border-radius:18px;background:#1a1815;
 
 export function renderVariants(stamp, opts = {}) {
   const focus = focusSlug(opts.set);
-  const body = `<style>${VT_CSS}</style><main id="main" tabindex="-1" class="wrap vt"><h1>Variant tracker</h1>
+  const body = `<style>${VT_CSS}
+.vt .chip{min-height:44px;display:inline-flex;align-items:center}
+@media (prefers-reduced-motion:reduce){.vt .progress>span,.vt .celebrate{transition:none!important;animation:none!important}}
+</style><main id="main" tabindex="-1" class="wrap vt"><h1>Variant tracker</h1>
 <p class="muted">See every printing and finish in a set. Owned rows come from My collection. Prices are TCGplayer market when on file.</p>
 <div class="pick">
 <label for="set-search">Find a set</label>
 <div class="pick-row">
-<input id="set-search" value="" placeholder="Search set name" autocomplete="off" aria-autocomplete="list">
+<input id="set-search" value="" placeholder="Search set name" autocomplete="off" aria-autocomplete="list" aria-controls="set-hits">
 <button type="button" id="load-set">Open set</button>
 </div>
 <input id="set-slug" type="hidden" value="${focus}">
 <div class="hits" id="set-hits" role="listbox" aria-label="Set matches"></div>
 </div>
-<p id="vt-note" class="muted">${focus ? "Loading that set." : "Search a set name to get started. Try Surging Sparks."}</p>
+<p id="vt-note" class="muted" role="status">${focus ? "Loading that set." : "Search a set name to get started. Try Surging Sparks."}</p>
 <section id="vt-summary" class="rowcard" hidden></section>
-<section id="vt-finishes" class="rowcard" hidden><h2>Finishes</h2><div class="finish" id="finish-box"></div></section>
+<section id="vt-finishes" class="rowcard" hidden><h2>Finishes</h2><div class="finish" id="finish-box" role="list"></div></section>
 <section id="vt-rows" class="rowcard" hidden><h2>Printings</h2><div id="rows-box"></div></section>
 <p><a class="tap quiet" href="/collection">My collection</a> <a class="tap quiet" id="set-link" href="/sets">Browse sets</a></p>
 <script>
@@ -147,7 +150,7 @@ function paint(tracker){
   }).join("")||"<p class=\\"muted\\">No finishes on file.</p>";
   rows.hidden=false;
   var html="<p><label><input type=\\"checkbox\\" id=\\"missing-only\\"> Missing only</label></p>";
-  html+="<table><thead><tr><th>Owned</th><th>Card</th><th>Finish</th><th>Price</th></tr></thead><tbody>";
+  html+="<table><thead><tr><th scope=\\"col\\">Owned</th><th scope=\\"col\\">Card</th><th scope=\\"col\\">Finish</th><th scope=\\"col\\">Price</th></tr></thead><tbody>";
   (tracker.rows||[]).forEach(function(r){
     html+="<tr data-owned=\\""+(r.owned?"1":"0")+"\\"><td>"+(r.owned?"Yes":"No")+"</td><td><a href=\\""+esc(r.href)+"\\">"+esc(r.name)+"</a>"+(r.rarity?" <span class=\\"muted\\">"+esc(r.rarity)+"</span>":"")+"</td><td>"+esc(r.finish||"")+"</td><td>"+esc(money(r.price)||"not on file")+"</td></tr>";
   });

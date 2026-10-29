@@ -516,7 +516,7 @@ const CSS = [
 ].join("");
 
 function pageShell(title, body) {
-  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>" + esc(title) + "</title><style>" + CSS + "</style></head><body><header class=\"wrap\"><a class=\"logo\" href=\"/\">Catch'em</a></header><main class=\"wrap\" id=\"main\">" + body + "</main></body></html>";
+  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>" + esc(title) + "</title><style>" + CSS + ".skip{position:absolute;left:8px;top:-60px;z-index:1000;background:#111;color:#fff;padding:8px 12px;border-radius:6px}.skip:focus{top:8px}:focus-visible{outline:2px solid var(--gold);outline-offset:2px}</style></head><body><a class=\"skip\" href=\"#main\">Skip to content</a><header class=\"wrap\"><a class=\"logo\" href=\"/\">Catch'em</a></header><main class=\"wrap\" id=\"main\" tabindex=\"-1\">" + body + "</main></body></html>";
 }
 
 function options(list, current) {
