@@ -55,6 +55,9 @@ t("sealed master gaps", sealedGaps.total === 2 && sealedGaps.have === 1 && seale
 const close = closestSet(holdings, [setDoc]);
 t("closest set is demo", close && close.slug === "demo-set" && close.pct === 0.5);
 
+const emptyScore = collectionScore([], "collecting");
+t("empty collection has no score", emptyScore.score == null);
+
 const sellScore = collectionScore(holdings, "selling", { gapList: [gaps] });
 const collectScore = collectionScore(holdings, "collecting", { gapList: [gaps] });
 t("goal reweights score", sellScore.goal === "selling" && collectScore.goal === "collecting" && sellScore.weights.liquidity > collectScore.weights.liquidity);

@@ -310,7 +310,7 @@ export function brandPageFromDoc(doc) {
   const medians = medianFromDoc(doc);
   const last = medians[medians.length - 1] || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
   const months = monthsOf(use);
-  // Prefer the latest months in view on phones: scroll script stays; note names the window.
+  // Prefer the latest months in view, including phones. Reduced motion stays put.
   const heat = heatmapHtml(use, { asOf, source, median: last, about });
   const pulse = {
     id: "pulse-median",
@@ -354,7 +354,7 @@ ${heat}
 </section>
 </main>
 <footer class="bv-foot">${esc(SITE_FOOTER)}</footer>
-<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;var phone=window.matchMedia("(max-width:520px)").matches;if(!reduce&&!phone)s.scrollLeft=s.scrollWidth;}</script>
+<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;if(!reduce)s.scrollLeft=s.scrollWidth;}</script>
 </body></html>`;
 }
 

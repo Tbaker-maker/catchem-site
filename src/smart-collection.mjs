@@ -276,9 +276,12 @@ function clamp01(n) {
 }
 
 export function collectionScore(holdings, goal, ctx = {}) {
+  const rows = Array.isArray(holdings) ? holdings.filter(Boolean) : [];
   const g = normalizeGoal(goal) || defaultGoal(holdings);
   const w = SCORE_WEIGHTS[g];
-  const rows = Array.isArray(holdings) ? holdings.filter(Boolean) : [];
+  if (!rows.length) {
+    return { goal: g, label: goalLabel(g), score: null, parts: {}, weights: w, concentration: concentration(rows) };
+  }
   const conc = concentration(rows);
   const ranked = liquidityRank(rows);
   const withList = ranked.filter((r) => r.listings != null);
