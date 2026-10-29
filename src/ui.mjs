@@ -1671,13 +1671,13 @@ const DOCK_ICON = {
 };
 function dockNav(active, feed) {
   const rows = [
-    ["/feed", "Feed", "feed"],
+    feed ? ["/feed", "Feed", "feed"] : null,
     ["/collection", "Collection", "collection", "My collection"],
     ["/heatmap", "Heatmap", "heatmap"],
     ["/rip", "Rip", "rip", "Rip value"],
     ["/reads", "Reads", "reads"],
     ["/releases", "Releases", "releases"],
-  ];
+  ].filter(Boolean);
   return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
 }
 
