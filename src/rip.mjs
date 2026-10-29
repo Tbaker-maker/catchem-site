@@ -83,7 +83,10 @@ export function ripBody(doc, ctx = {}) {
   const logos = ctx.logos && typeof ctx.logos === "object" ? ctx.logos : {};
   const rows = doc && Array.isArray(doc.rows) ? orderedRows(doc) : [];
   if (!rows.length) {
-    return `<main id="main" tabindex="-1" class="wrap"><h1>Rip value</h1></main>`;
+    const why = doc
+      ? "No products scored on this build."
+      : "The published rip file did not load. Open this page again in a minute.";
+    return `<main id="main" tabindex="-1" class="wrap"><h1>Rip value</h1><p class="muted">${esc(why)}</p><p><a href="/sets">Browse sets</a></p></main>`;
   }
   const asOf = shortDate(doc.asOf);
   const rates = shortDate(doc.pullRatesUpdated);
