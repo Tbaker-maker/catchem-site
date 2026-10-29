@@ -3,7 +3,7 @@ import { banGuard } from "../src/advice-rules.mjs";
 // Whole pages carry code comments, so dashes are checked by their own assertion here.
 const PAGE = { skipKinds: ["house"] };
 import worker from "../src/index.mjs";
-import { handleShareCard, readShareUrl, safeImagePath, shareCardUrl, shareSvg } from "../src/share-card.mjs";
+import { handleShareCard, readShareUrl, safeImagePath, setCompleteShareUrl, shareCardUrl, shareSvg } from "../src/share-card.mjs";
 import { renderFeed, shownRead } from "../src/ui.mjs";
 import { priceBits } from "../src/read-sheet.mjs";
 
@@ -46,6 +46,24 @@ const env = { ASSETS: { fetch: async () => new Response("", { status: 404 }) }, 
 const live = await worker.fetch(new Request("https://catchemtcg.com/og/card.svg?k=card&n=Pikachu&p=1.5"), env);
 const liveBody = await live.text();
 t("route serves the share card", live.status === 200 && liveBody.includes('width="1200"') && liveBody.includes("Pikachu") && liveBody.includes("$1.50"));
+
+const setUrl = setCompleteShareUrl({
+  name: "SV08: Surging Sparks",
+  setName: "SV08: Surging Sparks",
+  logo: "/img/sv8/logo.png",
+  have: 162,
+  total: 162,
+  date: "2026-10-28",
+  era: "scarlet & violet",
+});
+t("set complete share url", setUrl.includes("k=set") && setUrl.includes("n=SV08") && setUrl.includes("num=162%2F162") && setUrl.includes("img=%2Fimg%2Fsv8%2Flogo.png") && setUrl.includes("d=2026-10-28"));
+const setSvg = shareSvg(new URL(setUrl).searchParams);
+t("set complete svg is branded and rounded", setSvg.includes('width="1200"') && setSvg.includes('rx="36"') && setSvg.includes("Catch'em") && setSvg.includes("Set complete") && setSvg.includes("162/162 complete") && setSvg.includes("2026-10-28") && setSvg.includes("/img/sv8/logo.png"));
+t("set complete svg has no advice and no creator names", !/\b(should|consider|recommend|must buy)\b/i.test(setSvg) && !/Pok[eé]mon TCG Pocket|Collectr|creator/i.test(setSvg) && !/[\u2013\u2014]/.test(setSvg) && !BANNED.test(setSvg));
+const setLive = await worker.fetch(new Request(setUrl), env);
+const setBody = await setLive.text();
+t("route serves set complete card", setLive.status === 200 && setBody.includes("Set complete") && setBody.includes("SV08: Surging Sparks"));
+
 
 const bundle = {
   reads: [{

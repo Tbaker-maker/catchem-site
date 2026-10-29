@@ -275,6 +275,10 @@ const CSS = `
 .progress{height:10px;border-radius:999px;background:#2a2621;overflow:hidden;margin:6px 0}
 .progress>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#c4a35a,#e4d2a0);width:0;transition:width .45s ease}
 .celebrate{padding:12px 14px;border-radius:16px;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.10);color:var(--gold);font:600 16px/1.35 var(--sans)}
+.celebrate .share-tools{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.celebrate .share-actions{display:flex;flex-wrap:wrap;gap:8px}
+.celebrate .share-actions button{min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;border:1px solid rgba(212,175,55,.45);background:rgba(18,16,14,.35);color:var(--ink);font:600 14px/1 var(--sans);cursor:pointer}
+.celebrate .share-preview{width:min(100%,280px);height:auto;border-radius:14px;background:#1a1815;border:1px solid var(--line)}
 .streak{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font:600 13px/1.2 var(--sans);color:var(--gold)}
 .mem details.rowcard{gap:10px}
 .mem details.rowcard>summary{cursor:pointer;font:600 18px/1.3 var(--sans);list-style:none}
@@ -370,7 +374,17 @@ ${check}
 <section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
 <h2 id="focus-h">This set</h2>
 <p id="focus-note" class="muted"></p>
-<div id="focus-celebrate" class="celebrate" hidden>Set complete. Nice work.</div>
+<div id="focus-celebrate" class="celebrate" hidden>
+<p id="focus-celebrate-copy" style="margin:0">Set complete.</p>
+<div id="focus-share-tools" class="share-tools" hidden>
+<img id="focus-share-preview" class="share-preview" alt="Set complete share card" width="280" height="147">
+<div class="share-actions">
+<button type="button" id="focus-share-download">Download</button>
+<button type="button" id="focus-share-share">Share</button>
+</div>
+<p id="focus-share-note" class="muted" style="margin:0"></p>
+</div>
+</div>
 <div class="progress" id="focus-progress" hidden aria-hidden="true"><span id="focus-progress-bar"></span></div>
 <div id="focus-body"><p class="muted">Open a set and tap My missing cards to land here.</p></div>
 <p><a class="tap quiet" id="focus-back" href="/sets">Back to sets</a> <button type="button" class="quiet" id="focus-clear">Clear set focus</button></p>
@@ -612,7 +626,7 @@ function paintPanel(goal, panels){
   }
   box.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
 }
-var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[], focusSet:"" };
+var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[], focusSet:"", setShareUrl:"" };
 function readFocusSet(){
   try {
     var q=new URLSearchParams(location.search||"");
@@ -621,13 +635,50 @@ function readFocusSet(){
   } catch(err){ return ""; }
 }
 state.focusSet=readFocusSet();
+
+function setShareUrl(focus, gaps){
+  var q=new URLSearchParams();
+  q.set("k","set");
+  var name=String((focus&&focus.name)||state.focusSet||"Set").replace(/\s+/g," ").trim().slice(0,80);
+  if(name) q.set("n",name);
+  if(name) q.set("set",name.slice(0,48));
+  var have=Number(gaps&&gaps.have), total=Number(gaps&&gaps.total);
+  if(Number.isFinite(have)&&Number.isFinite(total)&&total>0) q.set("num", Math.round(have)+"/"+Math.round(total));
+  var logo=String((focus&&focus.logo)||"").trim();
+  if(/^\/img\/[a-z0-9]+\/logo\.png$/i.test(logo)) q.set("img", logo);
+  var day=String((focus&&focus.asOf)||"").slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(day)) q.set("d", day);
+  var era=String((focus&&focus.era)||"").replace(/\s+/g," ").trim().slice(0,32);
+  if(era) q.set("era", era);
+  return "https://catchemtcg.com/og/card.svg?"+q.toString();
+}
+function clearSetShare(){
+  var tools=document.getElementById("focus-share-tools");
+  if(tools) tools.hidden=true;
+  var note=document.getElementById("focus-share-note");
+  if(note) note.textContent="";
+  state.setShareUrl="";
+}
+function paintSetShare(focus, gaps){
+  var tools=document.getElementById("focus-share-tools");
+  var preview=document.getElementById("focus-share-preview");
+  var note=document.getElementById("focus-share-note");
+  if(!tools||!preview) return;
+  var url=setShareUrl(focus, gaps);
+  state.setShareUrl=url;
+  preview.src=url;
+  preview.alt=(focus&&focus.name?focus.name+" ":"")+"set complete share card";
+  tools.hidden=false;
+  if(note) note.textContent="";
+}
+
 function paintFocus(focus){
   var sec=document.getElementById("focus-set");
   var body=document.getElementById("focus-body");
   var note=document.getElementById("focus-note");
   var back=document.getElementById("focus-back");
   if(!sec||!body) return;
-  if(!state.focusSet){ sec.hidden=true; body.innerHTML=""; if(note) note.textContent=""; var cele0=document.getElementById("focus-celebrate"); if(cele0) cele0.hidden=true; var pw=document.getElementById("focus-progress"); if(pw){ pw.hidden=true; } return; }
+  if(!state.focusSet){ sec.hidden=true; body.innerHTML=""; if(note) note.textContent=""; var cele0=document.getElementById("focus-celebrate"); if(cele0) cele0.hidden=true; clearSetShare(); var pw=document.getElementById("focus-progress"); if(pw){ pw.hidden=true; } return; }
   sec.hidden=false;
   if(back) back.href="/sets/"+encodeURIComponent(state.focusSet);
   if(!focus){
@@ -651,6 +702,8 @@ function paintFocus(focus){
   if(cele){
     var done=g.total>0 && g.missing===0;
     cele.hidden=!done;
+    if(done) paintSetShare(focus, g);
+    else clearSetShare();
   }
   var lines=[];
   lines.push("<p><b>Completion</b> "+(g.have||0)+" of "+(g.total||0)+" ("+pct+"). Missing "+(g.missing||0)+".</p>");
@@ -807,6 +860,40 @@ function persistGoal(goal){
 document.querySelectorAll("[data-goal]").forEach(function(btn){
   btn.onclick=function(){ persistGoal(btn.getAttribute("data-goal")); };
 });
+
+(function wireSetShare(){
+  var dl=document.getElementById("focus-share-download");
+  var sh=document.getElementById("focus-share-share");
+  if(dl) dl.onclick=function(){
+    var url=state.setShareUrl; if(!url) return;
+    var note=document.getElementById("focus-share-note");
+    fetch(url).then(function(r){ return r.blob(); }).then(function(blob){
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download="catchem-set-complete.svg";
+      a.click();
+      setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(err){} }, 1500);
+      if(note) note.textContent="Card saved on this device.";
+    }).catch(function(){ if(note) note.textContent="Download failed."; });
+  };
+  if(sh) sh.onclick=function(){
+    var url=state.setShareUrl; if(!url) return;
+    var note=document.getElementById("focus-share-note");
+    var title="Set complete on Catch'em";
+    if(navigator.share){
+      navigator.share({ title:title, url:url }).then(function(){
+        if(note) note.textContent="Shared.";
+      }).catch(function(){ if(note) note.textContent=""; });
+      return;
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){ if(note) note.textContent="Link copied."; }).catch(function(){ if(note) note.textContent=url; });
+      return;
+    }
+    if(note) note.textContent=url;
+  };
+})();
+
 var clearBtn=document.getElementById("focus-clear");
 if(clearBtn) clearBtn.onclick=function(){ clearFocus(); };
 if(state.focusSet){
