@@ -3,6 +3,7 @@ import { signSession, readUser } from "../src/quota.mjs";
 import { beginDiscord, finishDiscord } from "../src/auth.mjs";
 import { handleAlert, watchRowsForBot } from "../src/feed-api.mjs";
 import { handleMe, handleSmartCollection, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
+import { renderSetShell } from "../src/ui.mjs";
 import { pageKind, renderPath } from "../src/index.mjs";
 
 let fail = 0;
@@ -27,7 +28,7 @@ const collection = await (await renderPath("/collection", fetchImpl, { feed: tru
 const alerts = await (await renderPath("/alerts", fetchImpl, { feed: true })).text();
 const account = await (await renderPath("/me", fetchImpl, { feed: true })).text();
 t("collection page is a shell", collection.includes("<h1>My collection</h1>") && collection.includes('class="skel"') && collection.includes("min-height:44px") && !collection.includes("/collection-check") && !/[\u2014\u2013]/.test(collection));
-t("smart collection chrome", collection.includes("Morning Brief") && collection.includes("Collection goal") && collection.includes('data-goal="collecting"') && collection.includes('data-goal="selling"') && collection.includes('data-goal="growth"') && collection.includes("Collection Score") && collection.includes("/api/collection/smart"));
+t("smart collection chrome", collection.includes("Morning Brief") && collection.includes("Collection goal") && collection.includes('data-goal="collecting"') && collection.includes('data-goal="selling"') && collection.includes('data-goal="growth"') && collection.includes("Collection Score") && collection.includes("/api/collection/smart") && collection.includes("This set") && collection.includes("focusSet"));
 t("check slot stays off", !renderCollection("").includes("/collection-check") && renderCollection("", { collectionCheck: true }).includes('href="/collection-check"'));
 t("alert settings are on the page", alerts.includes("<h1>Alert settings</h1>") && alerts.includes("Pause all alerts") && alerts.includes('type="time"') && alerts.includes('class="skel"') && !/[\u2014\u2013]/.test(alerts));
 t("account has export and delete", account.includes("Export my data") && account.includes("Delete my account") && account.includes("Sign-in is optional") === false && !/[\u2014\u2013]/.test(account));
@@ -126,6 +127,11 @@ t("an open Post Office still refuses an unapproved member", officeHeld.status ==
 const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 t("device list uses the same 25", ui.includes("cur.slice(0,25)") && ui.includes("function mergeLocalWatch()"));
 t("render helpers exist", typeof renderAlerts === "function" && typeof renderAccount === "function");
+
+
+const setShell = renderSetShell("demo-set", "");
+const jump = setShell.slice(setShell.indexOf("my-set-jump"), setShell.indexOf("my-set-jump") + 280);
+t("set page links to collection focus", setShell.includes("/collection?set=demo-set") && setShell.includes("My missing cards") && jump.includes("cost to finish") && !/[\u2014\u2013]/.test(jump));
 
 if (fail) process.exit(1);
 console.log("member ok");

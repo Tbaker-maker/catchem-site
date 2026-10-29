@@ -364,6 +364,31 @@ export function briefSectionOrder(goal, prefs) {
   return [...pin, ...rest];
 }
 
+
+export function normalizeFocusSlug(raw) {
+  const slug = String(raw || "").trim().toLowerCase();
+  return /^[a-z0-9-]+$/.test(slug) ? slug : "";
+}
+
+export function focusSetPanel(holdings, setDocs, focusSlug) {
+  const slug = normalizeFocusSlug(focusSlug);
+  if (!slug) return null;
+  const doc = (Array.isArray(setDocs) ? setDocs : []).find((d) => normalizeFocusSlug(d?.slug) === slug);
+  if (!doc) return null;
+  const singles = setGaps(holdings, doc, { mode: "singles" });
+  const sealed = setGaps(holdings, doc, { mode: "sealed" });
+  return {
+    slug,
+    name: doc.name || slug,
+    asOf: doc.asOf || "",
+    source: doc.source || "TCGplayer market",
+    singles,
+    sealed,
+    href: "/collection?set=" + encodeURIComponent(slug),
+    setHref: "/sets/" + encodeURIComponent(slug),
+  };
+}
+
 export function morningBrief(input = {}) {
   const holdings = Array.isArray(input.holdings) ? input.holdings.filter(Boolean) : [];
   const goal = normalizeGoal(input.goal) || defaultGoal(holdings);
@@ -375,7 +400,9 @@ export function morningBrief(input = {}) {
 
   const moved = movedSince(prev, holdings).slice(0, 6);
   const gapList = setDocs.map((doc) => setGaps(holdings, doc, { mode: "singles" })).filter((g) => g.total > 0 && g.have > 0);
-  const closest = closestSet(holdings, setDocs);
+  const focusSlug = normalizeFocusSlug(input.focusSet);
+  const focused = focusSetPanel(holdings, setDocs, focusSlug);
+  const closest = focused ? focused.singles : closestSet(holdings, setDocs);
   const cashout = cashoutEstimate(holdings);
   const liq = liquidityRank(holdings).slice(0, 6);
   const demand = holdings
@@ -483,9 +510,11 @@ export function buildSmartPayload(body = {}) {
   const briefPrefs = normalizeBriefPrefs(body.briefPrefs);
   const prevHoldings = Array.isArray(body.prevHoldings) ? body.prevHoldings : [];
   const reads = Array.isArray(body.reads) ? body.reads : [];
+  const focusSet = normalizeFocusSlug(body.focusSet);
   const gapList = setDocs.map((doc) => setGaps(holdings, doc, { mode: "singles" })).filter((g) => g.total);
   const sealedGaps = setDocs.map((doc) => setGaps(holdings, doc, { mode: "sealed" })).filter((g) => g.total && g.have > 0);
-  const brief = morningBrief({ holdings, goal, setDocs, views, briefPrefs, prevHoldings, reads });
+  const focused = focusSetPanel(holdings, setDocs, focusSet);
+  const brief = morningBrief({ holdings, goal, setDocs, views, briefPrefs, prevHoldings, reads, focusSet });
   const score = collectionScore(holdings, goal, { gapList });
   return {
     ok: true,
@@ -493,9 +522,11 @@ export function buildSmartPayload(body = {}) {
     label: goalLabel(goal),
     score,
     brief,
+    focusSet: focused,
     panels: {
       collecting: {
-        closest: closestSet(holdings, setDocs),
+        closest: focused ? focused.singles : closestSet(holdings, setDocs),
+        focus: focused,
         sealedGaps: sealedGaps.slice(0, 5),
         singlesGaps: gapList.filter((g) => g.have > 0 && g.pct < 1).sort((a, b) => b.pct - a.pct).slice(0, 5),
       },

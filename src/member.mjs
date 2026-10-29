@@ -277,6 +277,12 @@ ${check}
 <p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
 <div id="brief-body"><p class="muted">Add items to fill this card.</p></div>
 </section>
+<section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
+<h2 id="focus-h">This set</h2>
+<p id="focus-note" class="muted"></p>
+<div id="focus-body"><p class="muted">Open a set and tap My missing cards to land here.</p></div>
+<p><a class="tap quiet" id="focus-back" href="/sets">Back to sets</a> <button type="button" class="quiet" id="focus-clear">Clear set focus</button></p>
+</section>
 <section id="panel" class="rowcard" aria-labelledby="panel-h">
 <h2 id="panel-h">Goal panel</h2>
 <div id="panel-body"><p class="muted">Your goal panel lands here.</p></div>
@@ -462,7 +468,56 @@ function paintPanel(goal, panels){
   }
   box.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
 }
-var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[] };
+var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[], focusSet:"" };
+function readFocusSet(){
+  try {
+    var q=new URLSearchParams(location.search||"");
+    var s=String(q.get("set")||"").trim().toLowerCase();
+    return /^[a-z0-9-]+$/.test(s)?s:"";
+  } catch(err){ return ""; }
+}
+state.focusSet=readFocusSet();
+function paintFocus(focus){
+  var sec=document.getElementById("focus-set");
+  var body=document.getElementById("focus-body");
+  var note=document.getElementById("focus-note");
+  var back=document.getElementById("focus-back");
+  if(!sec||!body) return;
+  if(!state.focusSet){ sec.hidden=true; body.innerHTML=""; if(note) note.textContent=""; return; }
+  sec.hidden=false;
+  if(back) back.href="/sets/"+encodeURIComponent(state.focusSet);
+  if(!focus){
+    if(note) note.textContent="Loading "+state.focusSet+" gaps.";
+    body.innerHTML="<p class=\"muted\">Loading set gaps.</p>";
+    return;
+  }
+  if(note) note.textContent=(focus.name||state.focusSet)+" · source "+(focus.source||"TCGplayer market")+(focus.asOf?", "+dayLabel(focus.asOf):"")+".";
+  var g=focus.singles||{};
+  var pct=g.pct==null?"-":(Math.round(g.pct*1000)/10)+"%";
+  var lines=[];
+  lines.push("<p><b>Completion</b> "+(g.have||0)+" of "+(g.total||0)+" ("+pct+"). Missing "+(g.missing||0)+".</p>");
+  lines.push("<p><b>Cost to finish</b> "+esc(money(g.cost)||"not on file")+" across "+(g.costPriced||0)+" priced gaps.</p>");
+  var cheap=(g.cheapest||[]).slice(0,5);
+  var rare=(g.rarest||[]).slice(0,5);
+  lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
+  lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\"muted\">No priced gaps on file.</p>"));
+  if(focus.sealed && focus.sealed.total){
+    var s=focus.sealed;
+    lines.push("<p class=\"muted\">Sealed in this set: "+s.have+" of "+s.total+". Cost to finish "+esc(money(s.cost)||"not on file")+".</p>");
+  }
+  body.innerHTML=lines.join("");
+  body.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
+}
+function clearFocus(){
+  state.focusSet="";
+  try {
+    var url=new URL(location.href);
+    url.searchParams.delete("set");
+    history.replaceState({}, "", url.pathname+(url.search||""));
+  } catch(err){}
+  paintFocus(null);
+  refreshSmart(state.rows||[], state.summary||summarise(state.rows||[]));
+}
 function summarise(rows){
   var value=0, windows={d7:{base:0,delta:0,n:0},d30:{base:0,delta:0,n:0},d90:{base:0,delta:0,n:0}};
   rows.forEach(function(row){
@@ -498,8 +553,9 @@ function loadSetDocs(rows){
     var row=rows.filter(function(r){ return r.setSlug===s; })[0];
     return resolveSlug(s, row&&row.set);
   }).filter(Boolean);
+  if(state.focusSet) slugs.unshift(state.focusSet);
   var uniq=[]; var seen={}; slugs.forEach(function(s){ if(!seen[s]){ seen[s]=1; uniq.push(s); } });
-  return Promise.all(uniq.slice(0,6).map(function(slug){
+  return Promise.all(uniq.slice(0,8).map(function(slug){
     return fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; });
   })).then(function(docs){ return docs.filter(Boolean); });
 }
@@ -519,7 +575,8 @@ function refreshSmart(rows, summary){
         reads:state.catalogueReads,
         views:loadViews(),
         goal:goal,
-        briefPrefs:prefs
+        briefPrefs:prefs,
+        focusSet:state.focusSet||""
       })
     }).then(function(r){ return r.json(); });
   }).then(function(smart){
@@ -529,6 +586,7 @@ function refreshSmart(rows, summary){
     document.getElementById("score").textContent=String(smart.score&&smart.score.score!=null?smart.score.score:"-");
     paintBrief(smart.brief);
     paintPanel(state.goal, smart.panels);
+    paintFocus(smart.focusSet||(smart.panels&&smart.panels.collecting&&smart.panels.collecting.focus)||null);
   }).catch(function(){});
 }
 function paint(rows, summary){
@@ -588,6 +646,13 @@ function persistGoal(goal){
 document.querySelectorAll("[data-goal]").forEach(function(btn){
   btn.onclick=function(){ persistGoal(btn.getAttribute("data-goal")); };
 });
+var clearBtn=document.getElementById("focus-clear");
+if(clearBtn) clearBtn.onclick=function(){ clearFocus(); };
+if(state.focusSet){
+  state.goal=state.goal||"collecting";
+  if(!loadGoal()) { state.goal="collecting"; saveGoal("collecting"); }
+  paintFocus(null);
+}
 var catalogue=[];
 fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
   var seen={};
