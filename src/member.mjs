@@ -623,9 +623,18 @@ function paintPanel(goal, panels){
   } else {
     var close=panels.collecting&&panels.collecting.closest;
     var gaps=(panels.collecting&&panels.collecting.singlesGaps)||[];
-    box.innerHTML=(close?("<p>"+esc(close.name)+": "+close.have+"/"+close.total+". Cost to finish "+esc(money(close.cost)||"not on file")+".</p><p class=\\"muted\\">Cheapest gap "+esc((close.cheapest[0]&&close.cheapest[0].name)||"none")+". Rarest gap "+esc((close.rarest[0]&&close.rarest[0].name)||"none")+".</p>"):"<p class=\\"muted\\">Add cards from one set to track completion.</p>")+gaps.slice(0,3).map(function(g){ return "<p>"+esc(g.name)+": "+Math.round((g.pct||0)*100)+"%.</p>"; }).join("");
+        var cheapBtn=close&&close.cheapest&&close.cheapest[0]?cheapestAddButton(close.cheapest[0], { asOf:close.asOf||"", source:close.source||"TCGplayer market", slug:close.slug||"", setName:close.name||"" }):"";
+box.innerHTML=(close?("<p>"+esc(close.name)+": "+close.have+"/"+close.total+". Cost to finish "+esc(money(close.cost)||"not on file")+".</p><p class=\\"muted\\">Cheapest gap "+esc((close.cheapest[0]&&close.cheapest[0].name)||"none")+". Rarest gap "+esc((close.rarest[0]&&close.rarest[0].name)||"none")+".</p>"+cheapBtn):"<p class=\\"muted\\">Add cards from one set to track completion.</p>")+gaps.slice(0,3).map(function(g){ return "<p>"+esc(g.name)+": "+Math.round((g.pct||0)*100)+"%.</p>"; }).join("");
   }
   box.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
+  box.querySelectorAll("[data-add-cheap]").forEach(function(btn){
+    btn.onclick=function(){
+      var id=btn.getAttribute("data-add-cheap");
+      var close=panels&&panels.collecting&&panels.collecting.closest;
+      var hit=close&&close.cheapest?close.cheapest.filter(function(r){ return r&&r.id===id; })[0]:null;
+      if(hit) addCheapestMissing(hit, { asOf:(close&&close.asOf)||"", source:(close&&close.source)||"TCGplayer market", slug:(close&&close.slug)||"", setName:(close&&close.name)||"" });
+    };
+  });
 }
 var state={ rows:[], summary:null, goal:loadGoal()||"collecting", setIndex:[], catalogueReads:[], focusSet:"", setShareUrl:"" };
 function readFocusSet(){
@@ -712,6 +721,8 @@ function paintFocus(focus){
   var cheap=(g.cheapest||[]).slice(0,5);
   var rare=(g.rarest||[]).slice(0,5);
   lines.push("<h3>Cheapest missing</h3>"+(cheap.length?cheap.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
+  
+  if(cheap.length) lines.push(cheapestAddButton(cheap[0], { asOf:focus.asOf||g.asOf||"", source:focus.source||g.source||"TCGplayer market", slug:focus.slug||state.focusSet||"", setName:focus.name||"" }));
   lines.push("<h3>Rarest missing</h3>"+(rare.length?rare.map(function(r){ return "<p>"+rowLink(r)+(r.printing?" · "+esc(r.printing):"")+": "+esc(money(r.price))+"</p>"; }).join(""):"<p class=\\"muted\\">No priced gaps on file.</p>"));
   if(focus.sealed && focus.sealed.total){
     var s=focus.sealed;
@@ -719,6 +730,13 @@ function paintFocus(focus){
   }
   body.innerHTML=lines.join("");
   body.querySelectorAll("[data-view]").forEach(function(a){ a.addEventListener("click", function(){ bumpView(a.getAttribute("data-view")); }); });
+  body.querySelectorAll("[data-add-cheap]").forEach(function(btn){
+    btn.onclick=function(){
+      var id=btn.getAttribute("data-add-cheap");
+      var hit=(cheap||[]).filter(function(r){ return r && r.id===id; })[0]||null;
+      if(hit) addCheapestMissing(hit, { asOf:focus.asOf||g.asOf||"", source:focus.source||g.source||"TCGplayer market", slug:focus.slug||state.focusSet||"", setName:focus.name||"" });
+    };
+  });
 }
 function clearFocus(){
   state.focusSet="";
@@ -1125,6 +1143,79 @@ function saveHolding(row, opts){
     rows.unshift(row); saveLocal(rows); paint(rows, summarise(rows));
     return { ok:true, j:{ collection:rows } };
   });
+}
+var undoTimer=null;
+var undoSnapshot=null;
+function hideToast(){
+  var el=document.getElementById("toast");
+  if(!el) return;
+  el.hidden=true; el.className="toast"; el.innerHTML="";
+}
+function showToast(message, undoFn){
+  var el=document.getElementById("toast");
+  if(!el) return;
+  if(undoTimer){ clearTimeout(undoTimer); undoTimer=null; }
+  el.hidden=false; el.className="toast is-on";
+  el.innerHTML="";
+  var text=document.createElement("span");
+  text.textContent=message;
+  el.appendChild(text);
+  if(typeof undoFn==="function"){
+    var btn=document.createElement("button");
+    btn.type="button"; btn.className="quiet"; btn.textContent="Undo";
+    btn.setAttribute("aria-label","Undo last add");
+    btn.onclick=function(){ hideToast(); undoFn(); };
+    el.appendChild(btn);
+  }
+  undoTimer=setTimeout(function(){ hideToast(); undoSnapshot=null; }, 8000);
+}
+function undoLastAdd(addedId, snap){
+  if(!addedId) return;
+  signedIn().then(function(view){
+    if(view && view.signedIn){
+      fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"remove",id:addedId})})
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(j&&j.collection) paint(j.collection, j.summary||summarise(j.collection)); });
+      return;
+    }
+    var rows=(snap||[]).slice();
+    saveLocal(rows); paint(rows, summarise(rows));
+  });
+}
+function addCheapestMissing(gapRow, meta){
+  meta=meta||{};
+  if(!gapRow||!gapRow.id) return;
+  var owned=(state.rows||localRows()).some(function(r){ return r && r.id===gapRow.id; });
+  if(owned){ showToast("Already in your collection."); return; }
+  var cat=catalogue.filter(function(r){ return r && r.sku===gapRow.id; })[0]||null;
+  var row=holdingFromCat(cat)||{
+    id:gapRow.id, sku:gapRow.id, name:gapRow.name, kind:gapRow.kind==="sealed"?"sealed":"single",
+    condition:gapRow.kind==="sealed"?null:"NM", qty:1,
+    price:Number(gapRow.price)>0?Number(gapRow.price):null, asOf:gapRow.asOf||meta.asOf||"",
+    set:gapRow.set||meta.setName||"", setSlug:gapRow.setSlug||meta.slug||"",
+    href:gapRow.href||((gapRow.kind==="sealed"?"/p/":"/c/")+gapRow.id),
+    source:"TCGplayer market price"
+  };
+  if(row.kind==="sealed") row.condition=null;
+  var snap=(state.rows||localRows()).map(function(r){ return Object.assign({}, r); });
+  undoSnapshot=snap;
+  saveHolding(row).then(function(res){
+    if(!(res&&res.ok)){ showToast("Could not add that card."); undoSnapshot=null; return; }
+    var price=money(row.price)||"price not on file";
+    var when=dayLabel(row.asOf||meta.asOf||"");
+    var srcLabel=meta.source||row.source||"TCGplayer market";
+    var msg="Added "+(row.name||"card")+" · "+price+" · "+srcLabel+(when?" · "+when:"");
+    showToast(msg, function(){ undoLastAdd(row.id, snap); });
+  }).catch(function(){ showToast("Could not add that card."); undoSnapshot=null; });
+}
+function cheapestAddButton(gapRow, meta){
+  if(!gapRow||!gapRow.id||!(Number(gapRow.price)>0)) return "";
+  var price=money(gapRow.price)||"";
+  var when=dayLabel(gapRow.asOf||meta.asOf||"");
+  var srcLabel=meta.source||"TCGplayer market";
+  var label="Add cheapest · "+price+(when?" · "+when:"")+" · "+srcLabel;
+  var aria="Add cheapest missing card "+(gapRow.name||"")+", "+price+", "+srcLabel+(when?", "+when:"");
+  return "<p><button type=\\"button\\" class=\\"tap\\" data-add-cheap=\\""+esc(gapRow.id)+"\\" aria-label=\\""+esc(aria)+"\\">"+esc(label)+"</button></p><p class=\\"muted\\">"+esc(gapRow.name||"")+(gapRow.printing?" · "+esc(gapRow.printing):"")+". Source "+esc(srcLabel)+(when?", "+when:"")+".</p>";
 }
 var SAMPLE_SKUS=["tcgcsv-42402","tcgcsv-250320","tcgcsv-250332","tcgcsv-223073"];
 var POPULAR_SKUS=["tcgcsv-42402","tcgcsv-250320","tcgcsv-250332","tcgcsv-223073","tcgcsv-45214","tcgcsv-85564","tcgcsv-232082","tcgcsv-47947"];
