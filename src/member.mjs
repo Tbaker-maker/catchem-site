@@ -6,6 +6,7 @@ import { WATCH_CAP } from "./watch-cap.mjs";
 import { pushWatches } from "./feed-api.mjs";
 import { buildSmartPayload, defaultGoal, normalizeBriefPrefs, normalizeGoal } from "./smart-collection.mjs";
 import { previewImport, holdingsFromPreview } from "./collection-import.mjs";
+import { morningBriefEmailArmed, readBriefEmailPrefs, saveBriefEmailPrefs, normalizeBriefEmailPrefs } from "./morning-brief-email.mjs";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 
@@ -201,6 +202,11 @@ export async function handleMe(request, env) {
   let body = {};
   try { body = await request.json(); } catch { return json({ ok: false, error: "Bad account request." }, 400); }
   if (body.action === "delete") return wipe(store, user);
+  if (body.action === "brief-email") {
+    const saved = await saveBriefEmailPrefs(store, user.sub, { optIn: body.optIn === true, email: body.email, goal: body.goal });
+    if (!saved.ok) return json({ ok: false, error: "Could not save email preference." }, 503);
+    return json({ ok: true, prefs: saved.prefs, armed: morningBriefEmailArmed(env) });
+  }
   if (body.action === "prefs") {
     const prefs = prefsOf(body);
     await store.put(`prefs:${user.sub}`, JSON.stringify(prefs));
@@ -296,6 +302,14 @@ ${check}
 <h2 id="brief-h">Morning Brief</h2>
 <p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
 <div id="brief-body"><p class="muted">Add items to fill this card.</p></div>
+<div id="brief-email" class="brief-email">
+<h3>Email digest</h3>
+<p class="muted">Opt in to a daily Morning Brief email. Sending stays off until the site flag is turned on.</p>
+<label class="switch"><input id="brief-email-on" type="checkbox"> Email me the Morning Brief</label>
+<label>Email<input id="brief-email-addr" type="email" autocomplete="email" maxlength="120" placeholder="you@email.com"></label>
+<button type="button" id="brief-email-save">Save email preference</button>
+<p id="brief-email-note" class="muted"></p>
+</div>
 </section>
 <section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
 <h2 id="focus-h">This set</h2>
@@ -759,6 +773,39 @@ document.getElementById("csv-confirm").onclick=function(){
     });
   }).catch(function(){ document.getElementById("csv-note").textContent="Save failed."; });
 };
+function loadBriefEmailLocal(){
+  try { return JSON.parse(localStorage.getItem("catchem-brief-email")||"{}"); } catch(err){ return {}; }
+}
+function saveBriefEmailLocal(p){ try { localStorage.setItem("catchem-brief-email", JSON.stringify(p||{})); } catch(err) {} }
+function paintBriefEmailForm(prefs, armed){
+  var on=document.getElementById("brief-email-on");
+  var addr=document.getElementById("brief-email-addr");
+  var note=document.getElementById("brief-email-note");
+  if(!on||!addr) return;
+  on.checked=!!(prefs&&prefs.optIn);
+  if(prefs&&prefs.email) addr.value=prefs.email;
+  note.textContent=armed?"Email sending can run when you are opted in.":"Email sending is off site-wide. Your opt-in is saved for when it turns on.";
+}
+document.getElementById("brief-email-save").onclick=function(){
+  var prefs={ optIn:document.getElementById("brief-email-on").checked, email:document.getElementById("brief-email-addr").value, goal:state.goal||"" };
+  saveBriefEmailLocal(prefs);
+  signedIn().then(function(view){
+    if(!(view&&view.signedIn)){
+      document.getElementById("brief-email-note").textContent="Saved on this device. Sign in to keep it on the account.";
+      return;
+    }
+    fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"brief-email",optIn:prefs.optIn,email:prefs.email,goal:prefs.goal})})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){ document.getElementById("brief-email-note").textContent=res.ok?"Email preference saved on the account.":(res.j.error||"Not saved."); })
+      .catch(function(){ document.getElementById("brief-email-note").textContent="Not saved."; });
+  });
+};
+paintBriefEmailForm(loadBriefEmailLocal(), false);
+fetch("/api/collection/brief-email").then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  if(!j) return;
+  if(j.prefs) paintBriefEmailForm(j.prefs, !!j.armed);
+  else paintBriefEmailForm(loadBriefEmailLocal(), !!j.armed);
+}).catch(function(){});
 
 var catalogue=[];
 fetch("/data/feed/catalogue.json").then(function(r){ return r.ok?r.json():null; }).then(function(doc){
