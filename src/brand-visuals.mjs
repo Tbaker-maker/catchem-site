@@ -215,8 +215,10 @@ export const BRAND_CSS = `
 .bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em}
 .bv-copy span{color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
 .bv-cell{min-width:44px;min-height:44px;border:0;border-radius:14px;background:rgba(239,233,222,.06);color:${BRAND.dim};font-family:${BRAND.font};font-size:15px;font-weight:600;line-height:1.15;padding:8px 4px}
-.bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.up}}
-.bv-down{background:rgba(224,122,122,var(--wash));color:#e07a7a}
+.bv-up{background:rgba(127,199,154,var(--wash));color:${BRAND.ink}}
+.bv-down{background:rgba(224,122,122,var(--wash));color:${BRAND.ink}}
+.bv-cell:focus-visible{outline:2px solid ${BRAND.gold};outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.bv-page *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .bv-note{margin:12px 0 0;color:${BRAND.dim};font:14px/1.4 ${BRAND.font}}
 .bv-foot{margin:28px 0 0;padding-top:14px;border-top:1px solid ${BRAND.line};color:${BRAND.dim};font:13px/1.4 ${BRAND.font}}
 .bv-shares{display:grid;gap:14px;margin-top:22px}
@@ -303,20 +305,26 @@ export function brandPageFromDoc(doc) {
     date: prettyDay(asOf),
     href: "https://catchemtcg.com/sealed-pulse",
   };
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sealed Market Pulse</title><style>${BRAND_CSS}</style></head><body class="bv-page">
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sealed Market Pulse</title><style>${BRAND_CSS}
+.bv-skip{position:absolute;left:8px;top:-60px;z-index:1000;background:#111;color:#fff;padding:8px 12px;border-radius:6px}
+.bv-skip:focus{top:8px}
+</style></head><body class="bv-page">
+<a class="bv-skip" href="#main">Skip to content</a>
 <a class="bv-mark" href="https://catchemtcg.com/">${esc(BRAND.wordmark)}</a>
+<main id="main" tabindex="-1">
 <p class="bv-kicker">Sealed Market Pulse</p>
 <h1>Month end market.</h1>
 <p class="bv-src">${esc(source)}. ${esc(prettyDay(asOf))}.</p>
 ${heat}
 <p class="bv-note">${esc(MIRROR_NOTE)}</p>
-<section class="bv-shares" id="shares">
-  <h2>Share cards</h2>
+<section class="bv-shares" id="shares" aria-labelledby="shares-h">
+  <h2 id="shares-h">Share cards</h2>
   ${brandShareSvg(pulse)}
   ${brandShareSvg(sealed)}
 </section>
+</main>
 <footer class="bv-foot">${esc(SITE_FOOTER)}</footer>
-<script>var s=document.querySelector(".bv-scroll");if(s)s.scrollLeft=s.scrollWidth;</script>
+<script>var s=document.querySelector(".bv-scroll");if(s){var reduce=window.matchMedia("(prefers-reduced-motion:reduce)").matches;if(!reduce)s.scrollLeft=s.scrollWidth;}</script>
 </body></html>`;
 }
 

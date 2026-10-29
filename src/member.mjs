@@ -281,6 +281,23 @@ const CSS = `
 .mem details.rowcard>summary::-webkit-details-marker{display:none}
 .mem .empty-cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 @media(max-width:700px){.grid2,.goal-row{grid-template-columns:1fr}}
+.mem .muted{color:#c4beb3;opacity:1}
+.mem button.quiet,.mem a.quiet{min-height:44px;min-width:44px;padding:0 12px}
+.mem #hits{display:flex;flex-direction:column;gap:6px}
+.mem #hits button{width:100%;justify-content:flex-start;text-align:left}
+.mem .onboard{border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;background:#1a1815}
+.mem .onboard ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.mem .onboard li{line-height:1.35}
+.mem .onboard[hidden],.mem .empty-cta[hidden]{display:none}
+.mem .empty-cta{border:1px dashed var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.mem .progress-rail{height:8px;border-radius:999px;background:#2a2622;overflow:hidden}
+.mem .progress-fill{height:100%;width:0;border-radius:999px;background:#d9b779;transition:width .35s ease}
+.mem .celebrate{display:none}
+.mem .celebrate.is-on{display:block}
+@media (prefers-reduced-motion:reduce){
+  .mem .progress-fill{transition:none!important}
+  .mem .celebrate,.mem .celebrate *{animation:none!important;transition:none!important}
+}
 `;
 
 function shell(title, active, body, stamp) {
@@ -295,6 +312,20 @@ export function renderCollection(stamp, opts = {}) {
 <p>Sign-in is optional. Saves on this device stay here until you sign in, then they join the account.</p>
 <p class="muted">Pick one goal. Your score and Morning Brief follow it. Singles keep a condition. Sealed items do not. Totals use TCGplayer market price and the date on each line.</p>
 ${check}
+<section id="onboard" class="onboard" aria-labelledby="onboard-h" data-onboard="1" hidden>
+<h2 id="onboard-h">Start in three steps</h2>
+<p class="muted">Built for a first visit. Skip any time.</p>
+<ol>
+<li><strong>Pick a goal</strong> below. Collecting tracks set gaps. Selling leads with cashout. Growth leads with risk.</li>
+<li><strong>Try a sample</strong> or add one card you own. Your Morning Brief fills in from real prices on file.</li>
+<li><strong>Open a set</strong> and tap My missing cards when you want completion and cost to finish.</li>
+</ol>
+<p>
+<button type="button" class="tap" id="sample-load">Try a sample collection</button>
+<button type="button" class="quiet" id="onboard-skip">Skip guide</button>
+</p>
+<p id="onboard-note" class="muted" role="status" aria-live="polite"></p>
+</section>
 <section class="rowcard" aria-labelledby="goal-h">
 <h2 id="goal-h">Collection goal</h2>
 <p class="muted">One choice. Change it any time.</p>
@@ -304,26 +335,26 @@ ${check}
 <button type="button" data-goal="growth" aria-pressed="false">Growth</button>
 </div>
 <p id="goal-note" class="muted"></p>
-<p id="score-line"><span class="muted">Collection Score</span> <span id="score" class="score-pill">-</span> <span id="brief-streak" class="streak" hidden></span></p>
+<p id="score-line"><span class="muted">Collection Score</span> <span id="score" class="score-pill" aria-live="polite">-</span> <span id="brief-streak" class="streak" hidden></span></p>
 </section>
-<form id="add-form" class="rowcard">
-<h2>Add something</h2>
+<form id="add-form" class="rowcard" aria-labelledby="add-h">
+<h2 id="add-h">Add something</h2>
 <p class="muted">Search by name. Tap a hit, then Add.</p>
-<label>Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or product id"></label>
-<div id="hits"></div>
+<label for="q">Find a card or sealed item<input id="q" name="q" autocomplete="off" placeholder="Name or product id" aria-autocomplete="list" aria-controls="hits"></label>
+<div id="hits" role="listbox" aria-label="Search hits"></div>
 <div class="grid2">
-<label>Kind<select id="kind" name="kind"><option value="single">Single</option><option value="sealed">Sealed</option></select></label>
-<label id="cond-label">Condition<select id="cond" name="condition"><option>NM</option><option>LP</option><option>MP</option><option>HP</option><option>DMG</option></select></label>
-<label>Quantity<input id="qty" name="qty" inputmode="numeric" value="1"></label>
+<label for="kind">Kind<select id="kind" name="kind"><option value="single">Single</option><option value="sealed">Sealed</option></select></label>
+<label id="cond-label" for="cond">Condition<select id="cond" name="condition"><option>NM</option><option>LP</option><option>MP</option><option>HP</option><option>DMG</option></select></label>
+<label for="qty">Quantity<input id="qty" name="qty" inputmode="numeric" value="1"></label>
 </div>
 <button type="submit">Add</button>
-<p id="add-note" class="muted"></p>
-<p class="empty-cta"><a class="tap quiet" href="/sets">Browse sets</a> <a class="tap quiet" href="/search">Search the catalogue</a></p>
+<p id="add-note" class="muted" role="status"></p>
+<p class="empty-cta"><button type="button" class="tap" id="empty-sample">Try a sample collection</button> <a class="tap quiet" href="/sets">Browse sets</a> <a class="tap quiet" href="/search">Search the catalogue</a></p>
 </form>
 <section id="brief" class="rowcard" aria-labelledby="brief-h">
 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><h2 id="brief-h" style="margin:0">Morning Brief</h2></div>
 <p class="muted">What changed for your goal. Pin or hide a section. Source and date stay on each number.</p>
-<div id="brief-body"><p class="muted">Add your first card above to open your Morning Brief.</p><p class="empty-cta"><a class="tap" href="#add-form">Add a card</a> <a class="tap quiet" href="/sets">Or browse a set</a></p></div>
+<div id="brief-body" aria-live="polite"><p class="muted">Add your first card above to open your Morning Brief.</p><p class="empty-cta"><a class="tap" href="#add-form">Add a card</a> <a class="tap quiet" href="/sets">Or browse a set</a></p></div>
 </section>
 <section id="focus-set" class="rowcard" aria-labelledby="focus-h" hidden>
 <h2 id="focus-h">This set</h2>
@@ -334,7 +365,7 @@ ${check}
 <p><a class="tap quiet" id="focus-back" href="/sets">Back to sets</a> <button type="button" class="quiet" id="focus-clear">Clear set focus</button></p>
 </section>
 <section id="panel" class="rowcard" aria-labelledby="panel-h">
-<h2 id="panel-h">For you</h2>
+<h2 id="panel-h">For your goal</h2>
 <div id="panel-body"><p class="muted">Your collecting, selling, or growth view lands here once you add items.</p><p class="empty-cta"><a class="tap quiet" href="#add-form">Add a card</a></p></div>
 </section>
 <details id="brief-email" class="rowcard brief-email">
@@ -356,8 +387,17 @@ ${check}
 <button type="button" id="csv-confirm" hidden>Save previewed rows</button>
 </details>
 <div id="skel" class="skel" aria-hidden="true"></div>
-<p id="total"></p>
+<p id="total" aria-live="polite"></p>
 <p id="windows"></p>
+<section id="empty-cta" class="empty-cta" hidden>
+<h2>Nothing saved yet</h2>
+<p class="muted">Try a sample, search for a card you own, or import a CSV. Your Morning Brief stays empty until the first save.</p>
+<p>
+<button type="button" class="tap" id="empty-sample">Try a sample collection</button>
+<a class="tap quiet" href="/sets">Browse sets</a>
+</p>
+</section>
+<div id="celebrate" class="celebrate" role="status" aria-live="polite"></div>
 <h2>Top movers</h2>
 <div id="movers"></div>
 <h2>Saved</h2>
@@ -491,7 +531,7 @@ function paintBrief(brief){
     var card=document.createElement("article");
     card.className="brief-sec";
     var pinOn=prefs.pinned.indexOf(sec.id)>=0;
-    var tools="<div><button type=\\"button\\" class=\\"quiet\\" data-pin=\\""+esc(sec.id)+"\\">"+(pinOn?"Unpin":"Pin")+"</button> <button type=\\"button\\" class=\\"quiet\\" data-hide=\\""+esc(sec.id)+"\\">Hide</button></div>";
+    var tools="<div><button type=\\"button\\" class=\\"quiet\\" data-pin=\\""+esc(sec.id)+"\\" aria-label=\\""+(pinOn?"Unpin ":"Pin ")+esc(sec.title)+"\\">"+(pinOn?"Unpin":"Pin")+"</button> <button type=\\"button\\" class=\\"quiet\\" data-hide=\\""+esc(sec.id)+"\\" aria-label=\\"Hide "+esc(sec.title)+"\\">Hide</button></div>";
     var body="";
     if(sec.id==="moved"){
       body=(sec.rows&&sec.rows.length)?sec.rows.map(function(r){ return "<p>"+rowLink(r)+": "+esc(money(r.from))+" to "+esc(money(r.to))+" ("+(r.pct>0?"+":"")+r.pct+"%). "+esc(r.source)+(r.asOf?", "+dayLabel(r.asOf):"")+".</p>"; }).join(""):("<p class=\\"muted\\">"+esc(sec.empty)+"</p>");
@@ -715,7 +755,10 @@ function paint(rows, summary){
   if(!(summary&&summary.top&&summary.top.length)) movers.innerHTML="<p class=\\"muted\\">No 7-day move on file.</p>";
   var box=document.getElementById("saved");
   box.innerHTML="";
-  if(!rows.length) box.innerHTML="<p class=\\"muted\\">Nothing saved yet.</p>";
+  var empty=document.getElementById("empty-cta");
+  if(empty) empty.hidden=!!rows.length;
+  syncOnboard(rows);
+  if(!rows.length) box.innerHTML="<p class=\\"muted\\">Nothing saved yet. Use the guide above or add one card.</p>";
   rows.forEach(function(row){
     var card=document.createElement("article");
     card.className="rowcard";
@@ -888,7 +931,8 @@ document.getElementById("q").oninput=function(){
   if(q.length<2) return;
   catalogue.filter(function(row){ return String(row.name||"").toLowerCase().indexOf(q)>=0 || String(row.sku||"")===q; }).slice(0,6).forEach(function(row){
     var b=document.createElement("button");
-    b.type="button"; b.className="quiet"; b.textContent=row.name+" "+(money(row.price)||"");
+    b.type="button"; b.className="quiet"; b.setAttribute("role","option"); b.setAttribute("aria-label",(row.name||"")+" "+(money(row.price)||""));
+    b.textContent=row.name+" "+(money(row.price)||"");
     b.onclick=function(){ document.getElementById("q").dataset.sku=row.sku; document.getElementById("q").dataset.set=row.set||""; document.getElementById("q").dataset.setSlug=row.setSlug||""; document.getElementById("q").value=row.name; document.getElementById("kind").value=row.kind==="sealed"?"sealed":"single"; document.getElementById("kind").onchange(); box.innerHTML=""; };
     box.appendChild(b);
   });
@@ -921,6 +965,78 @@ document.getElementById("add-form").onsubmit=function(ev){
     document.getElementById("add-note").textContent="Saved on this device.";
   });
 };
+function onboardDismissed(){ try { return localStorage.getItem("catchem-onboard")==="done"; } catch(err){ return false; } }
+function setOnboardDone(){ try { localStorage.setItem("catchem-onboard","done"); } catch(err){} }
+function syncOnboard(rows){
+  var box=document.getElementById("onboard");
+  if(!box) return;
+  var show=!onboardDismissed() && !(rows&&rows.length);
+  box.hidden=!show;
+}
+var SAMPLE_SKUS=["tcgcsv-42402","tcgcsv-250320","tcgcsv-250332","tcgcsv-223073"];
+function sampleHoldings(){
+  var bySku={};
+  catalogue.forEach(function(row){ if(row&&row.sku) bySku[row.sku]=row; });
+  var fallback=[
+    {sku:"tcgcsv-42402",name:"Pikachu",kind:"single",set:"Base Set",setSlug:"base-set",price:12.5,asOf:"2026-10-28",change7:16.7},
+    {sku:"tcgcsv-250320",name:"Charizard",kind:"single",set:"Celebrations: Classic Collection",setSlug:"celebrations-classic-collection",price:129.63,asOf:"2026-10-28",change7:-8.8},
+    {sku:"tcgcsv-250332",name:"Umbreon Star",kind:"single",set:"Celebrations: Classic Collection",setSlug:"celebrations-classic-collection",price:73.89,asOf:"2026-10-28",change7:-3.1},
+    {sku:"tcgcsv-223073",name:"Charizard VMAX (Secret)",kind:"single",set:"Champion's Path",setSlug:"champion-s-path",price:188.13,asOf:"2026-10-28",change7:-6.1}
+  ];
+  return SAMPLE_SKUS.map(function(sku,i){
+    var hit=bySku[sku]||fallback[i];
+    if(!hit) return null;
+    return {
+      id:hit.sku||sku, sku:hit.sku||sku, name:hit.name, kind:hit.kind==="sealed"?"sealed":"single",
+      condition:hit.kind==="sealed"?null:"NM", qty:1,
+      price:Number(hit.price)>0?Number(hit.price):null, asOf:hit.asOf||"",
+      change7:hit.change7!=null?hit.change7:null, change30:hit.change30!=null?hit.change30:null, change90:hit.change90!=null?hit.change90:null,
+      set:hit.set||"", setSlug:hit.setSlug||"",
+      listings:hit.listings!=null?hit.listings:null, listingsAsOf:hit.listingsAsOf||"",
+      href:(hit.kind==="sealed"?"/p/":"/c/")+(hit.sku||sku), source:"TCGplayer market price"
+    };
+  }).filter(Boolean);
+}
+function loadSample(){
+  var rows=sampleHoldings();
+  if(!rows.length){
+    var note=document.getElementById("onboard-note");
+    if(note) note.textContent="Sample is not ready yet. Search for a card you own.";
+    return;
+  }
+  setOnboardDone();
+  if(!state.goal) { state.goal="collecting"; saveGoal("collecting"); }
+  signedIn().then(function(view){
+    if(view&&view.signedIn){
+      fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"merge",rows:rows})})
+        .then(function(r){ return r.json(); })
+        .then(function(me){
+          var note=document.getElementById("onboard-note");
+          if(note) note.textContent="Sample saved to the account. Scroll to your Morning Brief.";
+          if(me&&me.collection) paint(me.collection, me.summary||summarise(me.collection));
+          maybeCelebrate(me&&me.collection||rows);
+        });
+      return;
+    }
+    saveLocal(rows); paint(rows, summarise(rows));
+    var note=document.getElementById("onboard-note");
+    if(note) note.textContent="Sample saved on this device. Scroll to your Morning Brief.";
+    maybeCelebrate(rows);
+  });
+}
+function maybeCelebrate(rows){
+  var el=document.getElementById("celebrate");
+  if(!el||!(rows&&rows.length)) return;
+  el.textContent="Nice. "+rows.length+" item"+(rows.length===1?"":"s")+" on file. Your Morning Brief is ready.";
+  el.className="celebrate is-on";
+}
+var sampleBtn=document.getElementById("sample-load");
+if(sampleBtn) sampleBtn.onclick=function(){ loadSample(); };
+var emptySample=document.getElementById("empty-sample");
+if(emptySample) emptySample.onclick=function(){ loadSample(); };
+var skipBtn=document.getElementById("onboard-skip");
+if(skipBtn) skipBtn.onclick=function(){ setOnboardDone(); syncOnboard(state.rows||[]); var note=document.getElementById("onboard-note"); if(note) note.textContent="Guide hidden. Add a card any time."; };
+syncOnboard([]);
 signedIn().then(function(view){
   if(view && view.signedIn){
     var local=localRows();
