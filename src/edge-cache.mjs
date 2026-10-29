@@ -38,6 +38,13 @@ export function cacheKeyUrl(href) {
   const url = new URL(href);
   url.hash = "";
   for (const k of [...url.searchParams.keys()]) if (TRACKING.test(k)) url.searchParams.delete(k);
+  // Feed filters (?f=, ?set=) are applied in the browser on the same HTML.
+  // Keeping them in the edge key forced a cold Worker render per chip and
+  // tripped Cloudflare 1102 / 503 on /feed?f=sealed|singles|prices|signals|news.
+  if (url.pathname === "/feed" || url.pathname.startsWith("/feed/")) {
+    url.searchParams.delete("f");
+    url.searchParams.delete("set");
+  }
   url.searchParams.sort();
   return url.toString();
 }
