@@ -1664,9 +1664,20 @@ const DOCK_ICON = {
   indexes: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 2 5-6"/>',
   practice: '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6"/>',
   premium: '<path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
+  heatmap: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="10" height="6" rx="1"/><rect x="3" y="11" width="10" height="10" rx="1"/><rect x="15" y="11" width="6" height="10" rx="1"/>',
+  rip: '<path d="M12 3l2 6h6l-5 4 2 6-5-3-5 3 2-6-5-4h6z"/>',
+  reads: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4z"/><path d="M8 4v16"/>',
+  releases: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M4 9h16"/>',
 };
 function dockNav(active, feed) {
-  const rows = [feed ? ["/feed", "Feed", "feed"] : ["/", "Home", "home"], ["/sets", "Sets", "sets"], ["/collection", "Collection", "collection", "My collection"], ["/search", "Search", "search"], ["/premium", "Premium", "premium", "Discord Premium"]];
+  const rows = [
+    ["/feed", "Feed", "feed"],
+    ["/collection", "Collection", "collection", "My collection"],
+    ["/heatmap", "Heatmap", "heatmap"],
+    ["/rip", "Rip", "rip", "Rip value"],
+    ["/reads", "Reads", "reads"],
+    ["/releases", "Releases", "releases"],
+  ];
   return rows.map(([href, label, icon, match]) => `<a href="${href}"${active === label || (match && active === match) ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DOCK_ICON[icon]}</svg><span>${label}</span></a>`).join("");
 }
 
@@ -1688,7 +1699,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
 <style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/sets", "Sets")}${item("/promos", "Promos")}${item("/search", "Search")}${item("/indexes", "Indexes")}${item("/releases", "Releases")}${item("/rip", "Rip value")}${item("/heatmap", "Heatmap")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/collection", "My collection")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/reads", "Reads")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}</div></details>${item("/premium", "Discord Premium")}
+${feedLink}${item("/collection", "Collection")}${item("/heatmap", "Heatmap")}${item("/rip", "Rip value")}${item("/reads", "Reads")}${item("/releases", "Releases")}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/sets", "Sets")}${item("/search", "Search")}${item("/promos", "Promos")}${item("/indexes", "Indexes")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeLink}${item("/premium", "Premium")}</div></details>
 </nav></header>
 ${banner}
 ${fresh}
