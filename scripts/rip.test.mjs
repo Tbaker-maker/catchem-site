@@ -42,7 +42,7 @@ const fetchImpl = async (url) => {
 
 t("page kind", pageKind("/rip") === "rip" && pageKind("/rip/") === "rip");
 const bare = ripBody(null);
-t("missing file hides the list", bare.includes("<h1>Rip value</h1>") && !bare.includes("rip-row") && !/No data/i.test(bare));
+t("missing file explains and hides the list", bare.includes("<h1>Rip value</h1>") && bare.includes("The published rip file did not load") && !bare.includes("rip-row") && !/No data/i.test(bare));
 const body = ripBody(doc, {
   eras: { sv09: "Scarlet & Violet", "sv-prism": "Scarlet & Violet", "sw-lost": "Sword & Shield" },
   logos: { sv09: "https://images.pokemontcg.io/sv9/logo.png", "sv-prism": "/img/sv8pt5/logo.png" },
@@ -60,6 +60,11 @@ resetJsonCache();
 const res = await renderPath("/rip", fetchImpl, {});
 const html = await res.text();
 t("route renders", res.status === 200 && html.includes("<h1>Rip value</h1>") && html.includes('href="/rip"') && html.includes("aria-current=\"page\"") && html.includes("$96.48") && html.includes("Shield"));
+t("top nav lists Rip value and Heatmap", (() => {
+  const nav = (html.match(/<nav id="site-nav"[\s\S]*?<\/nav>/) || [""])[0];
+  const more = (nav.match(/nav-more-list[\s\S]*?<\/div>/) || [""])[0];
+  return nav.includes('href="/rip"') && nav.includes(">Rip value<") && nav.includes('href="/heatmap"') && nav.includes(">Heatmap<") && !more.includes('href="/rip"') && !more.includes('href="/heatmap"');
+})());
 t("route copy stays clean", !/[\u2014\u2013]/.test(visible(html)) && !BANNED.test(visible(html).replace(/support@catchemtcg\.com/g, "")) && !/No data/i.test(html));
 
 if (fail) { console.log(`rip: ${fail} failed`); process.exit(1); }

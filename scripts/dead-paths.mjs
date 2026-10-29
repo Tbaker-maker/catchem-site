@@ -11,6 +11,11 @@ const STATIC = new Set([
   "/og.png",
   "/robots.txt",
   "/sitemap.xml",
+  // Served by site-entry (sealed pulse), not pageKind in index.mjs.
+  "/heatmap",
+  "/sealed-pulse",
+  "/heat",
+  "/brand-visuals",
 ]);
 
 export function localPaths(html) {
