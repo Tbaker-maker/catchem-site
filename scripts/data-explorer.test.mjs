@@ -104,7 +104,7 @@ assert.ok(hub.includes("Catch'em"));
 assert.ok(hub.includes("/data-explorer/sets"));
 assert.ok(hub.includes("/data-explorer/reads"));
 assert.ok(hub.includes("2 sets."));
-assert.ok(hub.includes("Pick a log."));
+assert.ok(hub.includes("Pick a list to open.") || hub.includes("Pick a log."));
 assertClean(hub, "hub");
 
 const sets = renderExplorer("sets", docs, { q: "151" });

@@ -1857,6 +1857,8 @@ export function renderSetShell(slug, stamp, opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1 id="title">Set</h1>
 ${opts.meterHtml || ""}
 <p class="muted" id="completion"></p>
+<p id="my-set-jump" class="set-jumps"><a class="tap" href="/collection?set=${encodeURIComponent(slug)}">My missing cards</a> <span class="muted">Completion, cost to finish, cheapest and rarest gaps.</span></p>
+<p id="variant-jump" class="set-jumps"><a class="tap" href="/variants?set=${encodeURIComponent(slug)}">Track variants</a> <span class="muted">Every printing and finish for this set.</span></p>
 ${typeof opts.rotationHtml === "string" ? opts.rotationHtml : setRotationBlock(slug)}
 ${opts.setValueHtml || ""}
 <style>.st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.st-tile{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:18px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none;min-width:0}.st-k{font:600 12px/1.2 var(--sans);color:var(--gold)}.st-tile b{font:650 20px/1.1 var(--sans)}.st-n{font:500 12px/1.3 var(--sans);opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:600px){.st-tiles{grid-template-columns:1fr 1fr}.st-tile:last-child{grid-column:1/-1}}.jump{position:sticky;top:56px;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:8px 0;margin:8px 0;background:#12100e;scrollbar-width:none}.jump a{flex:0 0 auto;padding:8px 16px;border-radius:999px;border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}</style>
@@ -1866,7 +1868,7 @@ ${opts.setValueHtml || ""}
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><p class="muted" id="mine-line"></p><p id="my-set-jump"><a class="tap" href="/collection?set=${encodeURIComponent(slug)}">My missing cards</a> <span class="muted">Completion, cost to finish, cheapest and rarest gaps.</span></p><p id="variant-jump"><a class="tap" href="/variants?set=${encodeURIComponent(slug)}">Track variants</a> <span class="muted">Every printing and finish for this set.</span></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
+</div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;

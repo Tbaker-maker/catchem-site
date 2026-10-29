@@ -42,7 +42,7 @@ for (const line of [variantSummaryLine(tracker), "No set on file."]) {
 
 t("page kind", pageKind("/variants") === "variants");
 const page = renderVariants("", { set: "demo-set" });
-t("variants page shell", page.includes("<h1>Variant tracker</h1>") && page.includes('id="set-slug"') && page.includes('value="demo-set"') && page.includes("/api/collection/variants") && !/[\u2013\u2014]/.test(page));
+t("variants page shell", page.includes("<h1>Variant tracker</h1>") && page.includes('id="set-slug"') && page.includes('value="demo-set"') && page.includes('id="set-search"') && page.includes("Find a set") && page.includes("/api/collection/variants") && !/[\u2013\u2014]/.test(page));
 const api = await handleVariantTracker(new Request("https://catchemtcg.com/api/collection/variants", {
   method: "POST",
   headers: { "content-type": "application/json" },
