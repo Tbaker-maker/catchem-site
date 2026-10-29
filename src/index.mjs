@@ -12,6 +12,7 @@ import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDoc
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
 import { handleMe, handleSmartCollection, handleCollectionImport, renderAccount, renderAlerts, renderCollection } from "./member.mjs";
+import { handleVariantTracker, renderVariants } from "./variant-tracker.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
@@ -173,6 +174,7 @@ export function pageKind(pathname) {
   if (path === "/premium") return "premium";
   if (path === "/meter") return "meter";
   if (path === "/collection") return "collection";
+  if (path === "/variants") return "variants";
   if (path === "/alerts") return "alerts";
   if (path === "/me") return "account";
   if (path === "/supply") return "supply";
@@ -735,6 +737,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderFeed(freshBundle, "", stamp, withDive));
   }
   if (kind === "collection") return html(renderCollection(stamp, pageOpts));
+  if (kind === "variants") return html(renderVariants(stamp, { ...pageOpts, set: opts.set || "" }));
   if (kind === "alerts") return html(renderAlerts(stamp, pageOpts));
   if (kind === "account") return html(renderAccount(stamp, pageOpts));
   if (kind === "sets") {
@@ -1524,6 +1527,7 @@ const worker = {
       if (url.pathname === "/api/me" || url.pathname === "/api/me/export") return handleMe(request, env);
       if (url.pathname === "/api/collection/smart") return handleSmartCollection(request);
       if (url.pathname === "/api/collection/import") return handleCollectionImport(request);
+      if (url.pathname === "/api/collection/variants") return handleVariantTracker(request);
       if (url.pathname === "/api/follow") return handleFollow(request, env);
       if (url.pathname === "/api/reads") return handleReads(request, env);
       if (url.pathname === "/api/reads/click") return handleReadsClick(request, env);
