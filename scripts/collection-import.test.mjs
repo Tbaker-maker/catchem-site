@@ -7,6 +7,9 @@ import {
   previewImport,
   holdingsFromPreview,
   validSku,
+  csvTemplateText,
+  isExampleRow,
+  CSV_TEMPLATE_HEADERS,
 } from "../src/collection-import.mjs";
 
 let fail = 0;
@@ -41,12 +44,25 @@ t("sealed drops NM", preview.rows.some((r) => r.ok && r.holding.kind === "sealed
 t("setSlug filled", preview.rows.filter((r) => r.ok).every((r) => r.holding.setSlug === "demo-set"));
 t("preview note", /Preview only/i.test(preview.note));
 
+
+const template = csvTemplateText();
+t("template has header and two example rows", template.startsWith(CSV_TEMPLATE_HEADERS.join(",")) && template.split("\n").filter(Boolean).length === 3);
+t("template marks examples", /note/.test(template) && (template.match(/example/g) || []).length >= 2);
+const templatePreview = previewImport({ text: template, catalogue });
+t("importer accepts template examples", templatePreview.ok && templatePreview.accepted === 2 && templatePreview.rejected === 0);
+t("example flag on accepted rows", templatePreview.rows.every((r) => r.ok && r.holding.example === true));
+const mappedEx = mapCsvRow(["id","name","note"], ["tcgcsv-1","Alpha","example"]);
+t("isExampleRow", isExampleRow(mappedEx, ["id","name","note"], ["tcgcsv-1","Alpha","example"]));
+
 const holdings = holdingsFromPreview(preview);
 t("holdings from preview", holdings.length === 3 && holdings[0].id === "tcgcsv-1");
 
 const src = readFileSync(new URL("../src/collection-import.mjs", import.meta.url), "utf8");
 t("no em dash", !/[\u2013\u2014]/.test(src));
 t("no sold claim", !/\bsold\b/i.test(src));
+const memberSrc = readFileSync(new URL("../src/member.mjs", import.meta.url), "utf8");
+t("collection page offers template download", memberSrc.includes("csv-template") && memberSrc.includes("catchem-collection-template.csv"));
+
 for (const line of [preview.note, "No catalogue match.", "Missing id or name."]) {
   t("advice clean: " + line, flagLine(line).length === 0);
 }
