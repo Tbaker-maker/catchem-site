@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL } from "../src/edge-cache.mjs";
+import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL, cacheKeyUrl } from "../src/edge-cache.mjs";
 
 const store = new Map();
 globalThis.caches = { default: {
@@ -61,5 +61,24 @@ assert.equal(r.headers.get("x-data-version"), "2026-10-27");
 r = await edgeFetch(render, req("/p/tcgcsv-9"), {}, {}, { dataVersion: "2026-10-28" });
 assert.equal(renders, 2);
 assert.equal(r.headers.get("x-data-version"), "2026-10-28");
+
+
+// Feed ?f= / ?set= are client filters: same HTML, one edge key (stops cold 1102 per chip).
+assert.equal(cacheKeyUrl("https://catchemtcg.com/feed?f=sealed"), "https://catchemtcg.com/feed");
+assert.equal(cacheKeyUrl("https://catchemtcg.com/feed?f=signals&set=mew"), "https://catchemtcg.com/feed");
+assert.equal(cacheKeyUrl("https://catchemtcg.com/feed?f=news"), cacheKeyUrl("https://catchemtcg.com/feed?f=prices"));
+assert.equal(cacheKeyUrl("https://catchemtcg.com/sets?set=mew"), "https://catchemtcg.com/sets?set=mew");
+
+
+// Cold filter URLs must reuse the bare /feed edge entry (one render, not one per chip).
+store.clear(); renders = 0;
+await edgeFetch(render, req("/feed?f=signals"), {}, {}, { dataVersion: "2026-10-28" });
+assert.equal(renders, 1);
+r = await edgeFetch(render, req("/feed?f=sealed"), {}, {}, { dataVersion: "2026-10-28" });
+assert.equal(renders, 1);
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+r = await edgeFetch(render, req("/feed"), {}, {}, { dataVersion: "2026-10-28" });
+assert.equal(renders, 1);
+assert.equal(r.headers.get("x-edge-cache"), "hit");
 
 console.log("edge-cache ok");
