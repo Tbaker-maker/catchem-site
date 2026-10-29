@@ -11,6 +11,8 @@ import {
   normalizeGoal,
   setGaps,
   briefSectionOrder,
+  focusSetPanel,
+  normalizeFocusSlug,
 } from "../src/smart-collection.mjs";
 
 let fail = 0;
@@ -90,6 +92,14 @@ const payload = buildSmartPayload({ holdings, goal: "collecting", setDocs: [setD
 t("smart payload ok", payload.ok === true && payload.score.score >= 0 && payload.panels.collecting.closest);
 
 const orderPinned = briefSectionOrder("collecting", { pinned: ["rarest", "gaps"], hidden: ["moved"] });
+
+t("focus slug normalize", normalizeFocusSlug("Demo-Set") === "demo-set" && normalizeFocusSlug("bad slug") === "");
+const focused = focusSetPanel(holdings, [setDoc], "demo-set");
+t("focus set panel has gaps", focused && focused.slug === "demo-set" && focused.singles.missing === 2 && focused.singles.cheapest[0]?.id === "tcgcsv-11" && focused.singles.rarest[0]?.id === "tcgcsv-3");
+const focusPayload = buildSmartPayload({ holdings, goal: "collecting", setDocs: [setDoc], focusSet: "demo-set" });
+t("smart payload carries focus set", focusPayload.focusSet && focusPayload.focusSet.singles.cost === 84 && focusPayload.panels.collecting.focus.slug === "demo-set");
+const focusBrief = morningBrief({ holdings, goal: "collecting", setDocs: [setDoc], focusSet: "demo-set" });
+t("focus brief uses that set for gaps", focusBrief.sections.some((s) => s.id === "gaps" && s.closest && s.closest.slug === "demo-set"));
 t("pin and hide order", orderPinned[0] === "rarest" && orderPinned[1] === "gaps" && !orderPinned.includes("moved"));
 
 // Copy rules on module + sample brief text

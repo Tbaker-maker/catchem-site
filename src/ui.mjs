@@ -1866,7 +1866,7 @@ ${opts.setValueHtml || ""}
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
+</div><p class="muted" id="mine-line"></p><p id="my-set-jump"><a class="tap" href="/collection?set=${encodeURIComponent(slug)}">My missing cards</a> <span class="muted">Completion, cost to finish, cheapest and rarest gaps.</span></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
@@ -1954,7 +1954,7 @@ function paintMine(){
     if(!got){ cost+=price; leftPriced++; }
   });
   var pct=total?Math.round((have/total)*1000)/10:0;
-  var costText=leftPriced?cash(cost):"—";
+  var costText=leftPriced?cash(cost):"not on file";
   var mode=scope==="grand"?"Grand master. ":scope==="master"?"Master set. ":scope==="base"?"Base set. ":"";
   var noun=unpriced===1?"card unpriced.":"cards unpriced.";
   el.textContent=mode+"Owned "+have+" of "+total+" ("+pct+"%). Cost to complete "+costText+". "+unpriced+" "+noun;
