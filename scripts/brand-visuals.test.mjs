@@ -79,7 +79,7 @@ export function runBrandVisualTests() {
 
   t("october box and a missing month stay the figures on file", heat.includes("-5.1%") && heat.includes("No reading") && heat.includes("2214") === false && heat.includes("-6.4%"));
   t("median is the october figure", pctLabel(-1.6587) === "-1.7%" && heat.includes("-1.7%"));
-  t("down months get a red wash", heat.includes("bv-cell bv-down") && /bv-down" style="--wash:0\.[1-4]/.test(heat));
+  t("down months get a red wash", heat.includes("bv-cell bv-down") && /bv-down" style="--wash:0\.[4-8]/.test(heat));
   t("no em or en dash, no advice, no sold", !DASH.test(text) && !guard.test(text) && !SOLD.test(text));
   t("sealed share has no NM", sealed.sealed === true && pulse.sealed === true && !NM.test(sealedSvg) && !NM.test(pulseSvg) && !NM.test(visible(heat)));
   t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/sealed-pulse") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="156"'));
@@ -92,7 +92,7 @@ export function runBrandVisualTests() {
   t("public share card uses the same gold and font", og.includes(BRAND.gold) && og.includes(BRAND.font) && og.includes("Catch'em") && !og.includes("#d4af37") && !og.includes("Georgia") && !NM.test(og));
   t("before is the old equal square", legacy.includes("height:36px") && legacy.includes("#3ddc84") && legacy.includes("#ff7b72") && !legacy.includes(BRAND.gold) && !legacy.includes("data-h=\"72\""));
 
-  t("phone layout has no sticky column to overlap", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{grid-column:1\/-1;position:static/.test(page) && page.includes("min-width:0}"));
+  t("phone layout has no sticky column to overlap", /@media \(max-width:520px\)\{[\s\S]*\.bv-name\{grid-column:1\/-1;position:static/.test(page) && page.includes("minmax(72px,1fr)"));
   const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
   t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
   t("page date stays Oct 27, 2026", visible(page).includes("Oct 27, 2026"));
@@ -127,6 +127,10 @@ export function runBrandVisualTests() {
   t("brand page shows mirror note and footer", page.includes(MIRROR_NOTE) && page.includes(SITE_FOOTER) && livePage.includes(SITE_FOOTER));
   t("footer has no sold wording", !/\bsold\b/i.test(SITE_FOOTER) && !/[\u2013\u2014]/.test(SITE_FOOTER + MIRROR_NOTE));
   t("mirrored cell names source and read date", livePage.includes("mirrored third-party") && livePage.includes("archived-market"));
+  t("color scale legend is on the page", page.includes("bv-legend") && page.includes("Month change") && page.includes("bv-swatch-up") && page.includes("aria-label=\"Color scale for month change\""));
+  t("cell tip carries a price when present", livePage.includes("$2,178.94") && livePage.includes('title="') && /title="[^"]*\$2,178\.94 -5\.1%/.test(livePage));
+  t("near-zero prints as 0.0%", pctLabel(-0.04) === "0.0%" && pctLabel(0) === "0.0%" && pctLabel(-0.2) === "-0.2%");
+  t("phone keeps horizontal scroll for many months", /@media \(max-width:520px\)\{[\s\S]*overflow-x:auto/.test(page));
 
   if (fail) console.log(`brand visuals: ${fail} failed`);
   else console.log("brand visuals: all passed");
