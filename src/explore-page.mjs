@@ -62,7 +62,7 @@ export function keepRow(pathname) {
 export function exploreMain() {
   const tabs = TABS.map((tab, i) => `<button type="button" class="tf-tab" data-tab="${esc(tab)}" aria-pressed="${i === 0 ? "true" : "false"}">${esc(tab)}</button>`).join("");
   const chips = CHIPS.map((chip) => `<button type="button" class="tf-chip" data-chip="${esc(chip)}" aria-pressed="false">${esc(chip)}</button>`).join("");
-  const items = CATALOG.map((row) => `<li data-tab="${esc(row.tab)}" data-era="${esc(row.era)}" data-price="${esc(row.price)}" data-name="${esc(row.name)}"><a href="${esc(row.href)}">${esc(row.name)}</a><span>${esc(row.price)}${row.price === "Has a price" ? ". " + esc(row.source) + "." : ""}</span></li>`).join("");
+  const items = CATALOG.map((row) => `<li data-tab="${esc(row.tab)}" data-era="${esc(row.era)}" data-price="${esc(row.price)}" data-name="${esc(row.name)}"><a href="${esc(row.href)}">${esc(row.name)}</a><span>${esc(row.price)}</span></li>`).join("");
   const now = INTERESTING.map((row) => `<a href="${esc(row.href)}">${esc(row.name)}</a>`).join("");
   return `<main id="main" class="tf-explore">
     <p class="kicker">Explore</p>
