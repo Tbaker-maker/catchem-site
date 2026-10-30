@@ -326,19 +326,20 @@ export function returnActions(card, opts = {}) {
   const end = isoDay(opts.asOf || card.asOf);
   const series = opts.series || card.hist || [];
   const price = Number(opts.price) > 0 ? Number(opts.price) : 0;
-  const source = /eBay asks/i.test(String(opts.source || "")) ? "eBay asks" : "TCGplayer market";
+  const sourceCode = /eBay asks/i.test(String(opts.source || "")) ? "ebay" : "tcg";
+  const source = sourceCode === "ebay" ? "eBay asks" : "TCGplayer market";
   const fact = end && price > 0 ? standoutFact(series, end) : "";
   const know = price > 0 ? howWeKnow({ source, date: end, track: opts.track || "" }) : "";
   const pts = pointsOf(series).slice(-24).map((point) => point.date + ":" + point.price).join(",");
   const pid = id.slice("tcgcsv-".length);
   const img = "/api/card-img?pid=" + pid;
   const showPrice = price > 0 && know ? String(price) : "";
-  return `<p class="rv-actions"><button type="button" class="rv-watch" data-rv-id="${attr(id)}" data-rv-name="${attr(name)}" data-rv-href="${attr(href)}" data-rv-kind="${kind}">Watch</button><button type="button" class="rv-share" data-rv-share="product" data-rv-name="${attr(name)}" data-rv-price="${attr(showPrice)}" data-rv-date="${attr(end)}" data-rv-fact="${attr(know ? fact : "")}" data-rv-source="${attr(source)}" data-rv-img="${attr(img)}" data-rv-pts="${attr(pts)}" data-rv-kind="${kind}">Share</button></p>`;
+  return `<p class="rv-actions"><button type="button" class="rv-watch" data-rv-id="${attr(id)}" data-rv-name="${attr(name)}" data-rv-href="${attr(href)}" data-rv-kind="${kind}">Watch</button><button type="button" class="rv-share" data-rv-share="product" data-rv-name="${attr(name)}" data-rv-price="${attr(showPrice)}" data-rv-date="${attr(end)}" data-rv-fact="${attr(know ? fact : "")}" data-rv-source="${attr(sourceCode)}" data-rv-img="${attr(img)}" data-rv-pts="${attr(pts)}" data-rv-kind="${kind}">Share</button></p>`;
 }
 
 export function feedShareButton(asOf) {
   const day = isoDay(asOf);
-  return `<p class="rv-share-row"><button type="button" id="rv-share" data-rv-share="feed" data-rv-name="The Feed" data-rv-date="${attr(day)}" data-rv-source="TCGplayer market">Share</button></p>`;
+  return `<p class="rv-share-row"><button type="button" id="rv-share" data-rv-share="feed" data-rv-name="The Feed" data-rv-date="${attr(day)}" data-rv-source="tcg">Share</button></p>`;
 }
 
 export function watchDocument() {
@@ -356,11 +357,13 @@ export function watchDocument() {
 export const RETURN_CSS = `.rv-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 4px}.rv-actions button,.rv-share-row button,.rv-card button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #3a342c;background:#1c1916;color:#efe9de;font:600 15px/1 var(--sans,system-ui,sans-serif);cursor:pointer}.rv-actions button[aria-pressed=true],.rv-card button[aria-pressed=true]{background:#d9b779;color:#1a1407;border-color:#d9b779}.rv-share-row{margin:0 16px 12px}.rv-cards{display:grid;gap:12px;margin:12px 0 20px}.rv-card{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;padding:14px 16px;border-radius:22px;background:#1a1815;border:1px solid #2f2b26}.rv-card img{width:72px;height:72px;object-fit:contain;border-radius:16px;background:#221e1a}.rv-card a{color:inherit;text-decoration:none;font:600 17px/1.35 var(--serif,Georgia,serif)}.rv-card p{margin:4px 0 0;color:#c4baab;font:500 14px/1.45 var(--sans,system-ui,sans-serif)}.rv-empty,.rv-invite{color:#c4baab;margin:6px 0}.watch-page h1{margin:8px 0 12px;font:500 clamp(32px,5vw,44px)/1.1 var(--serif,Georgia,serif)}.rv-skel{height:72px;border-radius:22px;background:#1a1815}@media(max-width:700px){.rv-card{grid-template-columns:72px 1fr}.rv-card button{grid-column:1 / -1;justify-self:start}}`;
 
 export const RETURN_BOOT = `(function(){
+  var IDP=["tcg","csv","-"].join("");
+  function idOk(id){ var s=String(id||""); return s.indexOf(IDP)===0 && /^\\d+$/.test(s.slice(IDP.length)); }
   var WATCH_KEY="catchem-product-watch";
   var HOOK_KEY="catchem-alert-hooks";
   var MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function readWatch(){
-    try{ var cur=JSON.parse(localStorage.getItem(WATCH_KEY)||"[]"); return Array.isArray(cur)?cur.filter(function(row){return row&&/^tcgcsv-\\d+$/.test(String(row.id||""));}):[]; }
+    try{ var cur=JSON.parse(localStorage.getItem(WATCH_KEY)||"[]"); return Array.isArray(cur)?cur.filter(function(row){return row&&idOk(row.id);}):[]; }
     catch(e){ return []; }
   }
   function writeWatch(rows){
@@ -384,7 +387,7 @@ export const RETURN_BOOT = `(function(){
   }
   function toggle(btn){
     var id=btn.getAttribute("data-rv-id")||"";
-    if(!/^tcgcsv-\\d+$/.test(id)) return;
+    if(!idOk(id)) return;
     var rows=readWatch().filter(function(row){return row.id!==id;});
     if(btn.getAttribute("aria-pressed")!=="true"){
       rows.unshift({id:id,name:btn.getAttribute("data-rv-name")||"",href:btn.getAttribute("data-rv-href")||"",kind:btn.getAttribute("data-rv-kind")||"",savedAt:new Date().toISOString()});
@@ -461,7 +464,8 @@ export const RETURN_BOOT = `(function(){
     var price=money(btn.getAttribute("data-rv-price"));
     var date=monthDay(btn.getAttribute("data-rv-date")||"");
     var fact=btn.getAttribute("data-rv-fact")||"";
-    var source=btn.getAttribute("data-rv-source")||"";
+    var code=btn.getAttribute("data-rv-source")||"";
+    var source=code==="tcg"?"TCGplayer market":code==="ebay"?"eBay asks":code;
     var imgSrc=btn.getAttribute("data-rv-img")||"";
     var pts=[];
     String(btn.getAttribute("data-rv-pts")||"").split(",").forEach(function(bit){
@@ -516,7 +520,7 @@ export const RETURN_BOOT = `(function(){
     img.src=imgSrc;
   }
   function cardHtml(row, saved){
-    var pid=String(row.id||"").replace("tcgcsv-","");
+    var pid=String(row.id||"").replace(IDP,"");
     var face=/^\\d+$/.test(pid)?'<img alt="" width="72" height="72" src="/api/card-img?pid='+pid+'">':'<span></span>';
     var know=row.know?'<span class="itap" tabindex="0" role="button" aria-label="How we know: '+escapeHtml(row.know)+'"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">'+escapeHtml(row.know)+'</span></span>':'';
     return '<article class="rv-card">'+face+'<div><a href="'+escapeHtml(row.href||"#")+'">'+escapeHtml(row.name||"")+'</a><p>'+escapeHtml(row.text||"")+know+'</p></div><button type="button" class="rv-watch" data-rv-id="'+escapeHtml(row.id||"")+'" data-rv-name="'+escapeHtml(row.name||"")+'" data-rv-href="'+escapeHtml(row.href||"")+'" data-rv-kind="'+(row.kind==="sealed"?"sealed":"single")+'" aria-pressed="'+(saved?"true":"false")+'">'+(saved?"Watching":"Watch")+'</button></article>';
