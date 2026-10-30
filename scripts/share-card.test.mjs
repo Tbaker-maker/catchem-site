@@ -6,6 +6,7 @@ import worker from "../src/index.mjs";
 import { handleShareCard, readShareUrl, safeImagePath, setCompleteShareUrl, shareCardUrl, shareSvg } from "../src/share-card.mjs";
 import { renderFeed, shownRead } from "../src/ui.mjs";
 import { priceBits } from "../src/read-sheet.mjs";
+import { runSharePostTests } from "./share-posts.test.mjs";
 
 let fail = 0;
 const t = (name, cond) => { console.log(`${cond ? "  ok " : "  FAIL"} ${name}`); if (!cond) fail++; };
@@ -96,6 +97,7 @@ const sealedPrice = priceBits({ kind: "sealed", prices: [{ amount: 24.71, date: 
 t("a sealed price chip has no NM", !NMX.test(JSON.stringify(sealedPrice)));
 const sealedSvg = shareSvg(new URL(shareCardUrl({ name: "Delta Reign Elite Trainer Box", price: "121.52", sealed: true })).search);
 t("a sealed share card has no NM", !NMX.test(sealedSvg) && sealedSvg.includes("TCGplayer market"));
+fail += runSharePostTests();
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("share card: all passed");

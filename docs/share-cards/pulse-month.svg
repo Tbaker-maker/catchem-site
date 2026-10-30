@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img">
+<title>Pulse, one month</title>
+<rect width="1080" height="1350" rx="48" fill="#12100e"/>
+<rect x="28" y="28" width="1024" height="1294" rx="36" fill="none" stroke="#d9b779" stroke-width="8"/>
+<text x="540" y="760" text-anchor="middle" fill="#efe9de" fill-opacity="0.07" font-family="Georgia, serif" font-size="168">Catch'em</text>
+<text x="72" y="120" fill="#d9b779" font-family="Georgia, serif" font-size="40" font-weight="600">Catch&apos;em</text>
+<text x="72" y="200" fill="#d9b779" font-family="Georgia, serif" font-size="32" font-weight="500">Pulse, one month</text>
+<text x="72" y="460" fill="#efe9de" font-family="Georgia, serif" font-size="168" font-weight="600">69</text>
+<text x="72" y="560" fill="#efe9de" font-family="Georgia, serif" font-size="56" font-weight="600">Label: Greed</text>
+<text x="72" y="780" fill="#efe9de" font-family="Georgia, serif" font-size="36" font-weight="500">Mood 17 on Sep 23</text><text x="72" y="844" fill="#efe9de" font-family="Georgia, serif" font-size="36" font-weight="500">to 69 on Oct 23</text><text x="72" y="908" fill="#efe9de" font-family="Georgia, serif" font-size="36" font-weight="500">Heat 26 to 41, Cool</text><text x="72" y="972" fill="#efe9de" font-family="Georgia, serif" font-size="36" font-weight="500">Label only. Not a prompt.</text>
+<text x="72" y="1120" fill="#b7b1a6" font-family="Georgia, serif" font-size="32" font-weight="500">TCGplayer market indexes</text>
+<text x="72" y="1172" fill="#b7b1a6" font-family="Georgia, serif" font-size="32" font-weight="500">Oct 23, 2026</text>
+<text x="72" y="1248" fill="#d9b779" font-family="Georgia, serif" font-size="32" font-weight="500">catchemtcg.com/meter</text>
+</svg>
