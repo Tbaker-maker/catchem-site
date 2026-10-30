@@ -53,7 +53,8 @@ export function tabBar(active) {
 
 export const TAB_CSS = `
 .tf-dock{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#1a1815;border-top:1px solid #2f2b26;border-radius:20px 20px 0 0}
-.tf-dock a,.tf-more{flex:1 1 0;min-height:48px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:4px 2px;border-radius:14px;color:#c4baab;text-decoration:none;background:transparent;border:0;font:600 11px/1.1 "IBM Plex Sans",system-ui,sans-serif}
+.tf-dock a,.tf-more{flex:1 1 0;min-height:48px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:4px 2px;border-radius:14px;color:#c4baab;text-decoration:none;background:transparent;border:0;font:600 11px/1.1 "IBM Plex Sans",system-ui,sans-serif;text-align:center}
+@media (max-width:700px){.tf-dock{flex-wrap:wrap}.tf-dock a,.tf-more{flex:1 1 30%}}
 .tf-dock a[aria-current="page"]{color:${GOLD}}
 .tf-more-sheet{position:fixed;inset:0;z-index:7;background:rgba(18,16,14,.55);display:flex;align-items:flex-end}
 .tf-more-sheet[hidden]{display:none}
