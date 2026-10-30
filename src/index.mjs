@@ -56,6 +56,7 @@ import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { exploreOn, exploreResponse, paintExplore } from "./explore-page.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
 async function withPremium(card, fetchImpl) {
@@ -1310,7 +1311,11 @@ const worker = {
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     const dataVersion = await publicDataVersion(fetchImpl);
     setDataVersion(dataVersion);
-    return edgeFetch(worker.render, request, env, ctx, { dataVersion });
+    return edgeFetch(async (request, env, ctx) => {
+      const res = await worker.render(request, env, ctx);
+      if (!exploreOn(env)) return res;
+      return paintExplore(res, request);
+    }, request, env, ctx, { dataVersion });
   },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
@@ -1318,6 +1323,9 @@ const worker = {
     setRawKv(env?.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
     const url = new URL(request.url);
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
+    if (exploreOn(env) && (request.method === "GET" || request.method === "HEAD") && norm(url.pathname) === "/explore") {
+      return exploreResponse(request);
+    }
     // Keep version set for product-html / prodrow keys even on non-edge paths.
     if (!currentDataVersion()) {
       setDataVersion(await publicDataVersion(fetchImpl));
