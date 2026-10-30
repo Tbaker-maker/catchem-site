@@ -82,3 +82,4 @@ jobs:
       - run: node scripts/heatmap-mount.test.mjs
       - run: node scripts/lock-regression.test.mjs
       - run: node scripts/product-cold.test.mjs
+      - run: node scripts/tab-bar.test.mjs
