@@ -1277,11 +1277,16 @@ function paintGuidedHits(q){
   rows.forEach(function(row){
     var b=document.createElement("button");
     b.type="button"; b.className="quiet"; b.setAttribute("role","option");
+    var setName=String(row.set||"").trim();
     var price=money(row.price)||"price not on file";
     var when=dayLabel(row.asOf);
-    var label=(row.name||"")+" · "+price+(when?" · "+when:"");
-    b.setAttribute("aria-label","Add "+(row.name||"card")+", "+price+(when?", "+when:"")+", TCGplayer market");
-    b.innerHTML="<span>"+esc(row.name||"")+"</span><span class=\\"meta\\">"+esc(price)+(when?" · "+esc(when):"")+" · TCGplayer</span>";
+    var bits=[];
+    if(setName) bits.push(setName);
+    bits.push(price);
+    if(when) bits.push(when);
+    bits.push("TCGplayer");
+    b.setAttribute("aria-label","Add "+(row.name||"card")+(setName?", "+setName:"")+", "+price+(when?", "+when:"")+", TCGplayer market");
+    b.innerHTML="<span>"+esc(row.name||"")+"</span><span class=\\"meta\\">"+esc(bits.join(" · "))+"</span>";
     b.onclick=function(){ addGuidedCard(row); };
     box.appendChild(b);
   });

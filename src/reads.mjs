@@ -517,6 +517,11 @@ export function renderReadsPage(state = {}) {
   }
   const catalogJson = JSON.stringify(catalog).replace(/</g, "\\u003c");
   const lineJson = JSON.stringify(lineMap).replace(/</g, "\\u003c");
+  const published = !String(sample).startsWith("Sample read.");
+  const sampleHead = published ? "One published read" : "Sample read";
+  const sampleNote = published
+    ? "TCGplayer market. The date is in the line. Saving still needs Discord."
+    : "The night file has not loaded a published read yet.";
   const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
     const label = row.name || row.id || "Saved product";
@@ -550,18 +555,34 @@ export function renderReadsPage(state = {}) {
 .rd-mail input{display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:6px;border:0;border-radius:16px;background:#f2f2f7;padding:0 14px;font-size:16px}
 </style>
 <h1>Your reads</h1>
-<p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
-${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
-${sign}
 <section class="rd-card" id="rd-preview">
-<h2>Sample read</h2>
+<h2 id="rd-sample-h">${sampleHead}</h2>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
+<p class="rd-note" id="rd-sample-note">${sampleNote}</p>
 <style>${SIGNAL_CSS}</style>
 <div id="rd-chip">${matched ? signalRowHtml(matched, { href: "", light: true, asOf }) : ""}</div>
 <script>${TILE_JS}</script>
 <script type="application/json" id="rd-lines">${lineJson}</script>
 <script type="application/json" id="rd-chip-catalog">${catalogJson}</script>
+<script>
+(function(){
+  var out = document.getElementById("rd-sample");
+  var head = document.getElementById("rd-sample-h");
+  var note = document.getElementById("rd-sample-note");
+  if (!out || out.textContent.indexOf("Sample read.") !== 0) return;
+  fetch("/data/reads-preview.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(doc){
+    var line = doc && doc.lines && doc.lines["set:me-30th-celebration"];
+    if (typeof line !== "string" || !line || out.textContent.indexOf("Sample read.") !== 0) return;
+    window.__cePublishedRead = line;
+    out.textContent = line;
+    if (head) head.textContent = "One published read";
+    if (note) note.textContent = "TCGplayer market. The date is in the line. Saving still needs Discord.";
+  }).catch(function(){});
+})();
+</script>
 </section>
+<p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
+${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
 <h2>Quick start</h2>
 <div class="rd-chips">${PRESETS.map((row) => `<button type="button" class="rd-preset" data-preset="${row.id}" title="${esc(row.note)}">${esc(row.label)}</button>`).join("")}</div>
@@ -602,6 +623,7 @@ ${choice("games", "1", "Video games", shown.addons?.games === true)}
 ${choice("all", "1", "All in one", shown.addons?.all === true)}
 </div>
 <p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>
+${sign}
 <button type="submit">Save</button>
 </form>
 <script>
@@ -636,7 +658,12 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
       var parts = String(keeps[n].value || "").split(":");
       if (parts[1]) add((parts[0] === "sealed" ? "sealed:" : "card:") + parts[1]);
     }
-    out.textContent = bits.length ? bits.slice(0, 6).join("\\n\\n") : "Sample read. The night file fills the dated lines.";
+    out.textContent = bits.length ? bits.slice(0, 6).join("\\n\\n") : (window.__cePublishedRead || "Sample read. The night file fills the dated lines.");
+    var head = document.getElementById("rd-sample-h");
+    var note = document.getElementById("rd-sample-note");
+    var real = out.textContent.indexOf("Sample read.") !== 0;
+    if (head) head.textContent = real ? "One published read" : "Sample read";
+    if (note) note.textContent = real ? "TCGplayer market. The date is in the line. Saving still needs Discord." : "The night file has not loaded a published read yet.";
     var catalog = [];
     try { catalog = JSON.parse(document.getElementById("rd-chip-catalog").textContent || "[]"); } catch (e) { catalog = []; }
     var sample = out.textContent || "";

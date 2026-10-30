@@ -57,6 +57,23 @@ function moodInk(band) {
   return "#efe9de";
 }
 
+function spokenDay(iso) {
+  const s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[Number(s.slice(5, 7)) - 1];
+  if (!month) return "";
+  return `${month} ${Number(s.slice(8, 10))}`;
+}
+
+// One plain line under the number. Breadth is how many tracked sets are up.
+// The score also uses other set moves, so the line does not call the number a count.
+export function meterPlainExplain(asOf = "") {
+  const day = spokenDay(asOf);
+  const line = `A score of how tracked sets are moving, including how many are up.${day ? ` ${day}.` : ""}`;
+  return adviceFree(line) ? line : "";
+}
+
 function whyLine(reasons) {
   const lines = (reasons || []).map((s) => String(s || "").trim()).filter((s) => s && adviceFree(s)).slice(0, 3);
   if (!lines.length) return "";
@@ -80,6 +97,7 @@ export function gaugeHtml(slice, { href = "/meter", asOf = "", published = true,
   const label = `${kicker}: ${slice.moodBand} ${mood}, Heat ${slice.heatBand}. ${used} components${when ? ` on ${when}` : ""}.`;
   if (!adviceFree(label) || (why && !adviceFree(why))) return "";
   const ink = moodInk(slice.moodBand);
+  const explain = meterPlainExplain(when);
   return `${CSS}<a class="ce-meter" id="market-meter" href="${esc(href)}" aria-label="${esc(label)}" style="display:block;min-height:188px;margin:14px 0;padding:14px 16px 12px;border-radius:22px;background:#1a1815;border:1px solid #2c2823;color:#efe9de;text-decoration:none">
 <div style="display:flex;align-items:flex-end;gap:12px">
 <div style="flex:1;min-width:0">
@@ -96,6 +114,7 @@ export function gaugeHtml(slice, { href = "/meter", asOf = "", published = true,
 </div>
 <div style="flex:0 0 auto;margin-bottom:6px;border-radius:999px;padding:8px 12px;background:#2a2118;color:#f0a05a;font:600 13px/1.2 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;white-space:nowrap"><svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M6 13c3 0 5-2.2 5-5.1C11 5.2 8.2 3 7.2 1.2 7 1 6.6.6 6.2 1.1 5.6 2.6 4 3.4 3.2 4.6 2.2 6.1 1 7.2 1 8.6 1 11 3.2 13 6 13z" fill="#f0a05a"/></svg>Heat ${esc(slice.heatBand)} ${heat}</div>
 </div>
+${explain ? `<p id="market-meter-plain" style="margin:10px 0 0;font:400 15px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;color:#efe9de">${esc(explain)}</p>` : ""}
 ${why ? `<p id="market-meter-why" style="margin:10px 0 0;font:400 14px/1.45 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;color:#cfc6b6">${esc(why)}</p>` : ""}
 <p style="margin:4px 0 0;font:500 12px/1.3 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;color:#a89f90">${used} components.${when ? ` ${esc(when)}.` : ""}</p>
 </a>`;

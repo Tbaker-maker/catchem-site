@@ -21,7 +21,7 @@ t("discord stays on and email stays off", parsed.plan.channels.discord === true 
 const page = renderReadsPage({ signedIn: false, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 const armedPage = renderReadsPage({ signedIn: false, emailArmed: true, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 t("email is coming soon until the key is set", page.includes("Email delivery is coming soon.") && !page.includes('name="email"') && !page.includes('name="email_on"') && !page.includes('type="radio" name="length"'));
-t("the picker offers Email next to Discord DM", armedPage.includes("Discord DM") && armedPage.includes(">Email<") && armedPage.includes('name="email"') && armedPage.includes('name="email_on"') && !armedPage.includes('name="email_on" value="1" checked') && !armedPage.includes("coming soon") && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads") && page.includes("Scarlet and Violet") && page.includes("Sample read."));
+t("the picker offers Email next to Discord DM", armedPage.includes("Discord DM") && armedPage.includes(">Email<") && armedPage.includes('name="email"') && armedPage.includes('name="email_on"') && !armedPage.includes('name="email_on" value="1" checked') && !armedPage.includes("coming soon") && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads") && page.includes("Scarlet and Violet") && page.includes("Sample read.") && page.indexOf('id="rd-preview"') < page.indexOf('id="rd-form"') && page.indexOf('id="rd-sample"') < page.indexOf("/auth/discord") && page.includes('<h2 id="rd-sample-h">Sample read</h2>'));
 t("one save button", (page.match(/<button type="submit"/g) || []).length === 1);
 t("a blank picker starts on the recommended set", renderReadsPage({ signedIn: false }).includes("ME: 30th Celebration") && renderReadsPage({ signedIn: false }).includes("me-30th-celebration"));
 t("a saved plan is one Discord follow", (() => {
@@ -54,7 +54,7 @@ t("a sealed pick shows the sealed sample and not a card line", sampleRead({ prod
 t("an empty pool still says the night file fills the line", sampleRead(picked, {}).startsWith("Sample read."));
 const previewPage = renderReadsPage({ signedIn: false, plan: picked, preview: { lines: poolLines } });
 const previewSample = previewPage.split('id="rd-sample">')[1].split("</p>")[0];
-t("the reads preview renders one pool line per pick", previewSample.includes("Umbreon ex 161/131, Prismatic Evolutions") && previewSample.includes("#161/131") && !previewSample.includes("listings counted") && previewPage.includes("id=\"rd-lines\""));
+t("the reads preview renders one pool line per pick", previewSample.includes("Umbreon ex 161/131, Prismatic Evolutions") && previewSample.includes("#161/131") && !previewSample.includes("listings counted") && previewPage.includes("id=\"rd-lines\"") && previewPage.includes('<h2 id="rd-sample-h">One published read</h2>') && previewPage.indexOf('id="rd-preview"') < previewPage.indexOf('id="rd-form"'));
 t("the preview copy is clean", preSend(previewPage.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).ok);
 const foreignChip = { name: "Leafeon (Call of Legends) 13/95", signals: [{ kind: "move", dir: "up", text: "18% 7D", label: "Price up 18 percent over 7 days" }], blurb: "TCGplayer market is up 18% over 7 days, as of Oct 17." };
 const chipDoc = { asOf: "2026-10-17", byId: { leaf: foreignChip } };
