@@ -27,6 +27,7 @@ t("does not say sold", !/\bsold\b/i.test(page));
 t("heatmap has skip and main", /Skip to content/.test(page) && page.includes('<main id="main"'));
 t("heatmap cell text uses ink for contrast", brandSrc.includes("color:${BRAND.ink}"));
 t("heatmap respects reduced motion", brandSrc.includes("prefers-reduced-motion"));
+t("heatmap starts at the latest months on phones too", brandSrc.includes("if(!reduce)s.scrollLeft=s.scrollWidth") && !brandSrc.includes("!phone"));
 
 if (fail) {
   console.error(`${fail} failed`);
