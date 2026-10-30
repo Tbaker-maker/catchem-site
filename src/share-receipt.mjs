@@ -90,7 +90,7 @@ export const INTERESTING_NOW = [
   },
   {
     id: "news-delta-reign",
-    text: "Mega Evolution, Delta Reign. PokeGuardian. Set file release Nov 6, 2026. Elite Trainer Box $106.19 on Oct 23, 2026.",
+    text: "Mega Evolution, Delta Reign. Set file release Nov 6, 2026. Elite Trainer Box $106.19 on Oct 23, 2026. TCGplayer market.",
     href: "https://catchemtcg.com/sets/me06-delta-reign",
     source: "TCGplayer market",
     date: "Oct 23, 2026",
@@ -101,7 +101,7 @@ const BRAG = /\b(called it|nailed it|winner|to the moon|load up|easy money|guara
 const SOLD = /\bsolds?\b|\bsales\b/i;
 const DASH = /[\u2014\u2013]/;
 const COND = /\b(NM|LP|MP|HP|Near Mint|Lightly Played|Moderately Played|Heavily Played|Damaged)\b/;
-const CREATOR = /\bCollectr\b/i;
+const CREATOR = /\b(Collectr|PokeGuardian)\b/i;
 
 export function skeptic(card) {
   const text = [card?.kicker, card?.big, card?.title, ...(card?.lines || []), card?.source, card?.date, card?.text].filter(Boolean).join("\n");
@@ -179,7 +179,7 @@ export const SAMPLE_POSTS = [
   {
     id: "rumor",
     when: "Wed",
-    text: "PokeGuardian names Mega Evolution, Delta Reign. The set file says release Nov 6, 2026. Elite Trainer Box is $106.19. TCGplayer market, Oct 23, 2026. https://catchemtcg.com/sets/me06-delta-reign",
+    text: "Mega Evolution, Delta Reign. The set file says release Nov 6, 2026. Elite Trainer Box is $106.19. TCGplayer market, Oct 23, 2026. https://catchemtcg.com/sets/me06-delta-reign",
     source: "TCGplayer market",
     date: "Oct 23, 2026",
     href: "https://catchemtcg.com/sets/me06-delta-reign",

@@ -14,7 +14,7 @@ Market meter history, Sep 23, 2026 to Oct 23, 2026. Mood 17 to 69. The meter lab
 
 Page: https://catchemtcg.com/sets/me06-delta-reign
 
-The home Today line names Mega Evolution, Delta Reign, from PokeGuardian, with Nov 6, 2026 in the line. That line has no price. The set file the same day prices the Elite Trainer Box at $106.19, TCGplayer market, Oct 23, 2026. Sealed, so no condition.
+The home Today line names Mega Evolution, Delta Reign, with Nov 6, 2026 in the line. That line has no price. The set file the same day prices the Elite Trainer Box at $106.19, TCGplayer market, Oct 23, 2026. Sealed, so no condition.
 
 ## Read ledger
 
@@ -50,7 +50,7 @@ This calendar is a draft. It is not scheduled and nothing is posted.
 
 2. Scarlet & Violet 151, about 30 days: 2 of 30 priced cards up 10% or more, 12 down 10% or more. Sep 26 to Oct 23, 2026. TCGplayer market. https://catchemtcg.com/c/tcgcsv-517046
 
-3. PokeGuardian names Mega Evolution, Delta Reign. The set file says release Nov 6, 2026. Elite Trainer Box is $106.19. TCGplayer market, Oct 23, 2026. https://catchemtcg.com/sets/me06-delta-reign
+3. Mega Evolution, Delta Reign. The set file says release Nov 6, 2026. Elite Trainer Box is $106.19. TCGplayer market, Oct 23, 2026. https://catchemtcg.com/sets/me06-delta-reign
 
 4. Found in the Explorer. Oct 23, 2026. The three Today lines above, in that order, each with its page.
 
