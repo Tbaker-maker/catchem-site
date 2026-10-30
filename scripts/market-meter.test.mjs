@@ -1,6 +1,6 @@
 // Market meter gauge, page, and the email line. No advice wording. No em dash.
 import { readFileSync } from "node:fs";
-import { gaugeHtml, renderMeterPage, meterEmailBlock, meterPlainLine, historyWindow, adviceFree } from "../src/market-meter.mjs";
+import { gaugeHtml, renderMeterPage, meterEmailBlock, meterPlainLine, meterPlainExplain, historyWindow, adviceFree } from "../src/market-meter.mjs";
 import { pageKind } from "../src/index.mjs";
 import { meterEmailBlock as blockAgain } from "../src/market-meter.mjs";
 import { runBrandVisualTests } from "./brand-visuals.test.mjs";
@@ -19,6 +19,7 @@ t("needle animates once", html.includes("ce-meter-swing") && html.includes("pref
 t("fear is blue and greed is gold", html.includes("#8eb7ff") && html.includes("#d9b779"));
 t("heat pill is beside the score", html.includes("Heat Cool 28") && html.includes("68"));
 t("why line uses the real numbers", html.includes("6 of 78") && html.includes("+0.1%") && html.includes("145 of 276") && html.includes("4 components") && html.includes("2026-10-19"));
+t("plain line sits under the number", html.includes('id="market-meter-plain"') && html.indexOf("Fear and greed") < html.indexOf('id="market-meter-plain"') && html.indexOf("68 <span") < html.indexOf('id="market-meter-plain"') && meterPlainExplain("2026-10-19") === "A score of how tracked sets are moving, including how many are up. Oct 19." && html.includes(meterPlainExplain("2026-10-19")) && adviceFree(meterPlainExplain("2026-10-19")) && meterPlainExplain("") === "A score of how tracked sets are moving, including how many are up.");
 t("no advice and no em dash", adviceFree(html) && !/[\u2014\u2013]/.test(html) && !/\b(buy|sell|load up|time to)\b/i.test(html));
 t("a missing slice draws nothing", gaugeHtml(null) === "" && gaugeHtml({ mood: null, heat: 10, heatBand: "Cold" }) === "");
 t("unpublished meter draws nothing", gaugeHtml(slice, { published: false }) === "");

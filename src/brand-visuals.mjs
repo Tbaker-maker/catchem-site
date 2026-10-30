@@ -216,6 +216,9 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
 export const BRAND_CSS = `
 .bv-page{margin:0;background:${BRAND.paper};color:${BRAND.ink};font:16px/1.4 ${BRAND.font};padding:20px 16px 48px}
 .bv-mark{color:${BRAND.gold};font:600 28px/1 ${BRAND.font};letter-spacing:-0.03em;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+.bv-nav{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.bv-nav a{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;border:1px solid ${BRAND.line};color:${BRAND.ink};text-decoration:none;font:600 15px/1 ${BRAND.font}}
+.bv-nav a[aria-current="page"]{background:${BRAND.gold};color:#1a1407;border-color:${BRAND.gold}}
 .bv-kicker{margin:14px 0 0;color:${BRAND.gold};font:600 12px/1 ${BRAND.font};letter-spacing:.08em;text-transform:uppercase}
 .bv-page h1{margin:8px 0 6px;font:600 34px/1.05 ${BRAND.font};letter-spacing:-0.03em}
 .bv-src{margin:0 0 16px;color:${BRAND.dim};font:15px/1.4 ${BRAND.font}}
@@ -341,6 +344,13 @@ export function brandPageFromDoc(doc) {
 </style></head><body class="bv-page">
 <a class="bv-skip" href="#main">Skip to content</a>
 <a class="bv-mark" href="https://catchemtcg.com/">${esc(BRAND.wordmark)}</a>
+<nav class="bv-nav" aria-label="Site">
+  <a href="/">Back</a>
+  <a href="/collection">Collection</a>
+  <a href="/heatmap" aria-current="page">Heatmap</a>
+  <a href="/rip">Rip value</a>
+  <a href="/reads">Reads</a>
+</nav>
 <main id="main" tabindex="-1">
 <p class="bv-kicker">Sealed Market Pulse</p>
 <h1>Month end market.</h1>

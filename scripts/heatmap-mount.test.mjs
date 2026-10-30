@@ -24,7 +24,7 @@ t("brand page names TCGplayer market source", /TCGplayer market/.test(page));
 t("no em or en dash in brand page", !/[\u2013\u2014]/.test(page));
 t("no NM on sealed copy", !/\bNM\b/.test(page));
 t("does not say sold", !/\bsold\b/i.test(page));
-t("heatmap has skip and main", /Skip to content/.test(page) && page.includes('<main id="main"'));
+t("heatmap has a back link and short nav", page.includes('class="bv-nav"') && page.includes('href="/"') && page.includes(">Back<") && page.includes('href="/collection"') && page.includes('aria-current="page"') && page.includes(">Heatmap<") && page.includes('href="/reads"') && page.includes('href="/rip"') && page.includes("flex-wrap:wrap") && page.includes("border-radius:999px"));
 t("heatmap cell text uses ink for contrast", brandSrc.includes("color:${BRAND.ink}"));
 t("heatmap respects reduced motion", brandSrc.includes("prefers-reduced-motion"));
 t("heatmap starts at the latest months on phones too", brandSrc.includes("if(!reduce)s.scrollLeft=s.scrollWidth") && !brandSrc.includes("!phone"));
