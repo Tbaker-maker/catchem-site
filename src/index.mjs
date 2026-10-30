@@ -2,6 +2,8 @@ import { edgeFetch } from "./edge-cache.mjs";
 import { setStripAssets, stripSlugFor, stripPageFor } from "./strip-index.mjs";
 import { withShareMeta } from "./seo.mjs";
 import { handleShareCard } from "./share-card.mjs";
+import { handleFrame } from "./return-share.mjs";
+import { feedShareButton, handleReturnVisit } from "./return-visit.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { applySetSpark } from "./set-spark.mjs";
@@ -49,7 +51,7 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, renderWatch, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 import { postOfficeOn, paintHomePostOffice } from "./post-office-flag.mjs";
 import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
@@ -179,6 +181,7 @@ export function pageKind(pathname) {
   if (path === "/collection") return "collection";
   if (path === "/heatmap" || path === "/heat" || path === "/sealed-pulse") return "heatmap";
   if (path === "/variants") return "variants";
+  if (path === "/watch") return "watch";
   if (path === "/alerts") return "alerts";
   if (path === "/me") return "account";
   if (path === "/supply") return "supply";
@@ -668,7 +671,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   const trackOpen = trackRecordIsOpen(trackDoc);
   setTrackRecordOpen(trackOpen);
-  const pageOpts = { ...opts, asOf, postOffice: opts.postOffice === true || postOfficeOn(opts) };
+  const rawTrack = trackOpen && typeof trackDoc?.windows?.d90?.line === "string" ? trackDoc.windows.d90.line.replace(/\s+/g, " ").trim() : "";
+  const trackLine = rawTrack && !/[\u2014\u2013]/.test(rawTrack) && !/\bsolds?\b/i.test(rawTrack) ? rawTrack.slice(0, 180) : "";
+  const pageOpts = { ...opts, asOf, trackLine, postOffice: opts.postOffice === true || postOfficeOn(opts) };
   setPostOfficeOpen(pageOpts.postOffice);
   if (kind === "data") {
     const rel = path.slice("/data/".length);
@@ -703,11 +708,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       if (Array.isArray(order?.ids)) leadIds = order.ids.filter((id) => typeof id === "string");
     } catch { leadIds = []; }
     const withDive = { ...pageOpts, diveMap, soldOn, news: liveNews, leadIds };
+    const feedPage = (body) => html(String(body).includes('id="rv-share"') ? body : String(body).replace("<main", feedShareButton(asOf) + "<main"));
     if (path === "/feed/all") return html(renderAll(freshBundle, stamp, withDive));
     if (path === "/feed/mine") return html(renderMine(stamp, withDive));
     if (path.startsWith("/feed/s/")) {
       const section = decodeURIComponent(path.slice("/feed/s/".length));
-      return html(renderFeed(freshBundle, "", stamp, { ...withDive, section }));
+      return feedPage(renderFeed(freshBundle, "", stamp, { ...withDive, section }));
     }
     const id = path.startsWith("/feed/r/") ? decodeURIComponent(path.slice("/feed/r/".length)) : "";
     if (id) {
@@ -736,9 +742,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       let facts = await factsP;
       if (facts && facts.setMomentum) facts = applySetSpark(facts, slug, sparkP ? await sparkP : null);
       if (!rotation && facts?.rotation && (facts.rotation.mark || facts.rotation.status)) rotation = { mark: facts.rotation.mark || "", status: facts.rotation.status || "", asOf: facts.rotation.asOf || "", until: "", daysLeft: null };
-      return html(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation, facts }));
+      return feedPage(renderFeed(freshBundle, id, stamp, { ...withDive, page: "read", readYear, logo, rotation, facts }));
     }
-    return html(renderFeed(freshBundle, "", stamp, withDive));
+    return feedPage(renderFeed(freshBundle, "", stamp, withDive));
   }
   if (kind === "collection") return html(renderCollection(stamp, pageOpts));
   if (kind === "variants") return html(renderVariants(stamp, { ...pageOpts, set: opts.set || "" }));
@@ -1149,6 +1155,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderMovers(painted, stamp, pageOpts));
   }
   if (kind === "search") return html(renderSearch(pageOpts));
+  if (kind === "watch") return html(renderWatch(stamp, pageOpts));
   if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
@@ -1418,6 +1425,12 @@ const worker = {
           "access-control-allow-origin": "*",
         },
       });
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/og/frame.svg") {
+      return handleFrame(request, url);
+    }
+    if (request.method === "GET" && url.pathname === "/api/return-visit") {
+      return handleReturnVisit(url, fetchImpl);
     }
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/og/card.svg") {
       return handleShareCard(request, url);

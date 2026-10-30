@@ -2,7 +2,7 @@
 // Every page gets a description, canonical URL, and Open Graph / Twitter tags.
 // The share image is Catch'em's own og.png, or for a card or product page the
 // picture the site itself serves on that page (a same-origin path), never a store URL.
-import { shareCardUrl } from "./share-card.mjs";
+import { frameUrl, prettyDateToIso } from "./return-share.mjs";
 
 const ORIGIN = "https://catchemtcg.com";
 const OG_IMAGE = `${ORIGIN}/og.png`;
@@ -63,26 +63,37 @@ export function pageDescription(html, kind, name) {
 
 function brandedShare(html, kind, name, pic) {
   const s = String(html || "");
-  let num = "";
-  const numbered = s.match(/\bNumber ([^<·]+)/);
-  if (numbered) num = unesc(numbered[1]).trim();
-  if (!num || /^not in the file$/i.test(num)) {
-    const hash = s.match(/class="cp-set"[\s\S]{0,500}?(#[A-Za-z0-9][A-Za-z0-9./-]*)/);
-    num = hash ? unesc(hash[1]).trim() : "";
-  }
-  if (/^not in the file$/i.test(num)) num = "";
+  const rvDate = (s.match(/data-rv-date="(\d{4}-\d{2}-\d{2})"/) || [])[1] || "";
+  const rvPrice = (s.match(/data-rv-price="([0-9]+(?:\.[0-9]{1,2})?)"/) || [])[1] || "";
+  const rvFact = unesc((s.match(/data-rv-fact="([^"]*)"/) || [])[1] || "");
+  const rvImg = unesc((s.match(/data-rv-img="([^"]+)"/) || [])[1] || "");
   const priceM = headerPriceHtml(s).match(/\$([0-9][0-9,]*(?:\.[0-9]{2})?)/);
-  const changeM = s.match(/\b30[dD]\s+([+-]?[0-9]+(?:\.[0-9]+)?)%/);
-  const setM = s.match(/href="\/sets\/[^"]+">([^<]+)</);
-  return shareCardUrl({
-    kind: "card",
+  const dateM = headerPriceHtml(s).match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
+  let points = [];
+  const ptsAttr = unesc((s.match(/data-rv-pts="([^"]*)"/) || [])[1] || "");
+  if (ptsAttr) {
+    points = ptsAttr.split(",").filter(Boolean);
+  } else {
+    const chart = s.match(/data-chart="([^"]+)"/);
+    if (chart) {
+      try {
+        const raw = chart[1].replace(/\u0026quot;/g, '"').replace(/\u0026#39;/g, "'").replace(/\u0026amp;/g, "\u0026");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) points = parsed.slice(-24);
+      } catch {
+        points = [];
+      }
+    }
+  }
+  return frameUrl({
     name,
-    num,
-    price: priceM ? priceM[1].replace(/,/g, "") : "",
-    change: changeM ? changeM[1] : "",
-    img: pic,
-    setName: setM ? unesc(setM[1]).trim() : "",
+    price: rvPrice || (priceM ? priceM[1].replace(/,/g, "") : ""),
+    date: rvDate || (dateM ? prettyDateToIso(dateM[1]) : ""),
+    img: rvImg || pic,
+    fact: rvFact,
     sealed: kind === "product",
+    source: "TCGplayer market",
+    points,
   });
 }
 
@@ -99,7 +110,10 @@ export function addShareMeta(html, pathname, kind) {
   const pic = pageImage(s, kind);
   const branded = kind === "card" || kind === "product" ? brandedShare(s, kind, name, pic) : "";
   const image = branded || pic || OG_IMAGE;
-  const size = `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
+  const tall = kind === "card" || kind === "product";
+  const size = tall
+    ? `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="675">`
+    : `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
   const alt = pic ? name : "Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.";
   const tags = `<meta name="description" content="${escAttr(desc)}">
 <link rel="canonical" href="${escAttr(url)}">
