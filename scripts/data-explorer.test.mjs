@@ -214,6 +214,7 @@ const wrangler = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "ut
 assert.equal(indexSrc.includes("data-explorer"), false);
 assert.ok(entrySrc.includes("dataExplorerResponse"));
 assert.ok(wrangler.includes("src/site-entry.mjs"));
-assert.equal(indexSrc.includes("return-visit"), false);
+assert.ok(indexSrc.includes('from "./return-visit.mjs"'));
+assert.ok(indexSrc.includes('"/api/return-visit"'));
 
 console.log("data-explorer tests passed");
