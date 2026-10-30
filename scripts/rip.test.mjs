@@ -47,7 +47,7 @@ const body = ripBody(doc, {
   eras: { sv09: "Scarlet & Violet", "sv-prism": "Scarlet & Violet", "sw-lost": "Sword & Shield" },
   logos: { sv09: "https://images.pokemontcg.io/sv9/logo.png", "sv-prism": "/img/sv8pt5/logo.png" },
 });
-t("ranking order", body.indexOf("Prismatic Pack") < body.indexOf("Journey Together") && body.indexOf("Journey Together") < body.indexOf("Thin Product"));
+t("ranking order", body.indexOf("Prismatic Pack") < body.indexOf("Journey Together Booster Box") && body.indexOf("Journey Together Booster Box") < body.indexOf("Thin Product"));
 t("file numbers", body.includes("$96.48") && body.includes("$191.93") && body.includes("-49.7%") && body.includes("9.1%") && body.includes("$69.66") && body.includes("22%"));
 t("labels and dates", body.includes("Average pull value") && body.includes("Chance an opening beats the price") && body.includes("Typical opening") && body.includes("As of Oct 13, 2026") && body.includes("Pull rates updated Oct 12, 2026") && body.includes("TCGplayer market, Oct 13, 2026"));
 t("image and set link", body.includes('href="/sets/sv09"') && body.includes("https://images.pokemontcg.io/sv9/logo.png") && body.includes("/img/sv8pt5/logo.png"));
@@ -55,6 +55,33 @@ const thin = body.split('data-type="etb"')[1] || "";
 t("empty fields stay off the thin row", !thin.includes("Average pull value") && !thin.includes("Chance an opening beats the price") && !thin.includes("Typical opening") && !thin.includes("ROI") && thin.includes("$40.00"));
 t("filters", body.includes('aria-label="Era"') && body.includes("Violet") && body.includes("Booster box") && body.includes("Under $25") && body.includes("$100 to $249") && body.includes("Sword"));
 t("no dash, no banned words, no No data", !/[\u2014\u2013]/.test(body) && !BANNED.test(visible(body)) && !/No data/i.test(body));
+t("source prints the date and not the author", body.includes("Sep 15, 2026") && !body.includes("Ada"));
+const journey = body.slice(body.indexOf("Journey Together Booster Box"), body.indexOf("Thin Product"));
+t("price and average pull value lead, roi stays smaller", journey.indexOf(">Price<") >= 0 && journey.indexOf(">Price<") < journey.indexOf(">Average pull value<") && journey.indexOf(">Average pull value<") < journey.indexOf(">ROI<") && body.includes(".rip-lead dd{font:650 22px") && body.includes(".rip-more dd{font:600 13px"));
+const setHtml = (body.match(/aria-label="Set"[\s\S]*?<\/select>/) || [""])[0];
+t("set select is sorted and stamped on each row", setHtml.includes(">All sets<") && setHtml.indexOf("Journey Together") < setHtml.indexOf("Lost Origin") && setHtml.indexOf("Lost Origin") < setHtml.indexOf("Prismatic Evolutions") && body.includes('data-set="sv09"') && body.includes('data-set="sv-prism"') && body.includes('data-set="sw-lost"'));
+const clearTag = (body.match(/<button[^>]*id="rip-clear"[^>]*>/) || [""])[0];
+const filterScript = (body.match(/<script>([\s\S]*?)<\/script>/) || ["", ""])[1];
+t("clear starts hidden and only the active filter path shows it", clearTag.includes("hidden") && clearTag.includes('class="rip-clear"') && body.includes("min-height:44px") && body.includes("border-radius:999px") && filterScript.includes("clearBtn.hidden=!active") && filterScript.includes('el.value=""'));
+t("filter scrolls to the count before show or hide", filterScript.includes("scrollIntoView") && filterScript.indexOf("scrollIntoView") < filterScript.indexOf("row.hidden") && filterScript.includes('getAttribute("data-set")') && body.includes("@media(max-width:700px)") && body.includes("width:100%") && body.includes("@media(min-width:1280px)") && body.includes("flex-direction:row"));
+const objBody = ripBody({
+  ...doc,
+  ranking: [
+    { rank: 1, id: "thin", name: "Thin Product" },
+    { rank: 2, id: "pack-a", name: "Journey Together Booster Box" },
+    { rank: 3, id: "box-b", name: "Prismatic Pack" },
+  ],
+}, {
+  eras: { sv09: "Scarlet & Violet", "sv-prism": "Scarlet & Violet", "sw-lost": "Sword & Shield" },
+});
+t("object ranking follows entry.id, not rows order", objBody.indexOf("Thin Product") < objBody.indexOf("Journey Together Booster Box") && objBody.indexOf("Journey Together Booster Box") < objBody.indexOf("Prismatic Pack"));
+const hostBody = ripBody({
+  asOf: "2026-10-13",
+  rows: [{ id: "pack-a", name: "Journey Together Booster Box", set: "Journey Together", setSlug: "sv09", subtype: "booster-box", price: 10, priceAsOf: "2026-10-13", priceSource: "TCGplayer market" }],
+  sources: [{ url: "https://example.com/rates", author: "Ada" }],
+}, { eras: { sv09: "Scarlet & Violet" } });
+const hostLink = (hostBody.match(/<a href="https:\/\/example.com\/rates"[^>]*>[^<]*<\/a>/) || [""])[0];
+t("source with no date prints the host and not the author", hostLink.includes(">example.com<") && !hostBody.includes("Ada"));
 
 resetJsonCache();
 const res = await renderPath("/rip", fetchImpl, {});
