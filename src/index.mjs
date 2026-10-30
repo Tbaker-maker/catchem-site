@@ -56,6 +56,7 @@ import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { receiptOn, paintReceipt } from "./receipt-sheet.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
 async function withPremium(card, fetchImpl) {
@@ -1310,7 +1311,11 @@ const worker = {
     const fetchImpl = env?.PUBLIC_FETCH || fetch;
     const dataVersion = await publicDataVersion(fetchImpl);
     setDataVersion(dataVersion);
-    return edgeFetch(worker.render, request, env, ctx, { dataVersion });
+    return edgeFetch(async (request, env, ctx) => {
+      const res = await worker.render(request, env, ctx);
+      if (!receiptOn(env)) return res;
+      return paintReceipt(res, request);
+    }, request, env, ctx, { dataVersion });
   },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
