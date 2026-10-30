@@ -56,6 +56,7 @@ export const TAB_CSS = `
 .tf-dock a,.tf-more{flex:1 1 0;min-height:48px;min-width:44px;display:flex;align-items:center;justify-content:center;padding:4px 2px;border-radius:14px;color:#c4baab;text-decoration:none;background:transparent;border:0;font:600 11px/1.1 "IBM Plex Sans",system-ui,sans-serif}
 .tf-dock a[aria-current="page"]{color:${GOLD}}
 .tf-more-sheet{position:fixed;inset:0;z-index:7;background:rgba(18,16,14,.55);display:flex;align-items:flex-end}
+.tf-more-sheet[hidden]{display:none}
 .tf-more-panel{width:min(520px,100%);margin:0 auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:${INK};color:${IVORY};border-radius:22px 22px 0 0;display:grid;gap:8px}
 .tf-more-panel a,.tf-more-close{min-height:44px;display:flex;align-items:center;padding:0 12px;border-radius:14px;color:${IVORY};text-decoration:none;background:#1a1815;border:0;font:600 16px/1 "IBM Plex Sans",system-ui,sans-serif}
 html[data-theme="light"] .tf-dock{background:${IVORY};border-top-color:#e2dacb}

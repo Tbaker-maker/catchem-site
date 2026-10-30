@@ -12,6 +12,7 @@ for (const label of ["Feed", "Collection", "Heatmap", "Rip value", "Reads", "Rel
 const primary = bar.split('id="tf-more"')[0];
 t("indexes is not a primary tab", !primary.includes("Indexes") && bar.includes('href="/indexes"'));
 t("more holds search sets and watchlist", bar.includes('href="/search"') && bar.includes('href="/sets"') && bar.includes('href="/watchlist"'));
+t("more sheet starts closed", previewPage("dark").includes(".tf-more-sheet[hidden]{display:none}"));
 t("tap target css", bar && previewPage("dark").includes("min-height:48px") && previewPage("dark").includes("min-width:44px"));
 t("watchlist empty state", previewPage("light", "watch").includes("Nothing saved on this device yet.") && previewPage("light", "watch").includes("Sign in is optional"));
 t("wordmark", previewPage("dark").includes("Catch'em"));
