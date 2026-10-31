@@ -16,7 +16,10 @@ const doc = {
 
 const pack = sealedCutoutSrc({ id: "swsh5-pack", kind: "sealed", tcgPlayerId: 229276 }, doc);
 t("a passed cutout is the /data file", pack && pack.src === "/data/cutouts/swsh5-pack.webp" && pack.crop === false);
-t("CDN stays as the alt", pack && pack.alts.join() === "/api/card-img?pid=229276");
+t("a passed cutout has no studio JPEG alt", pack && pack.alts.length === 0 && !String(pack.src).includes("card-img") && !/\.jpe?g/i.test(pack.src));
+t("a jpeg file is not a cutout", sealedCutoutSrc({ id: "swsh5-pack", kind: "sealed", tcgPlayerId: 229276 }, {
+  products: [{ id: "swsh5-pack", pass: true, file: "cutouts/swsh5-pack.jpg", tcgPlayerId: 229276 }],
+}) === null);
 t("a failed cutout is not used", sealedCutoutSrc({ id: "sv8-etb", kind: "sealed", tcgPlayerId: 1 }, doc) === null);
 t("no doc keeps the old path", sealedCutoutSrc({ id: "swsh5-pack", kind: "sealed", tcgPlayerId: 229276 }, null) === null);
 
