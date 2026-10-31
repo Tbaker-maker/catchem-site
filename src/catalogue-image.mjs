@@ -93,8 +93,8 @@ export function productTypeLabel(row) {
 }
 
 
-// A passed sealed cutout beats the TCGplayer studio photo. Fails keep the CDN
-// image. Paths are under research/assets/public and served as /data/...
+// A passed sealed cutout is the only picture this returns. A miss is null.
+// Never a studio JPEG and never the card-img proxy.
 export function sealedCutoutSrc(row, cutDoc) {
   if (!row || !cutDoc || !Array.isArray(cutDoc.products)) return null;
   const id = String(row.id || "");
@@ -112,9 +112,8 @@ export function sealedCutoutSrc(row, cutDoc) {
   const file = String(hit.file).replace(/^\/+/, "");
   if (!/^cutouts\/[A-Za-z0-9._-]+\.(webp|png)$/.test(file)) return null;
   const src = "/data/" + file;
-  const alts = [];
-  if (pid) alts.push("/api/card-img?pid=" + pid);
-  return { src, crop: false, alts };
+  if (/\.jpe?g(?:$|\?)/i.test(src) || src.includes("/api/card-img")) return null;
+  return { src, crop: false, alts: [] };
 }
 
 export function officialSrc(row, map, opts) {

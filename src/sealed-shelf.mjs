@@ -25,11 +25,17 @@ export const SEALED_SHELF_CSS = `
 
 const TYPE_LABEL = {
   "booster-pack": "Booster pack",
+  "sleeved-pack": "Sleeved pack",
+  "prize-pack": "Prize pack",
+  blister: "Blister",
+  "mini-tin": "Mini tin",
   "booster-box": "Booster box",
   "booster-bundle": "Booster bundle",
   etb: "ETB",
   "pc-etb": "PC ETB",
   tin: "Tin",
+  deck: "Deck",
+  "build-battle": "Build and Battle",
   "special-collection": "Collection",
   upc: "UPC",
   case: "Case",
