@@ -7,7 +7,7 @@ assert.equal(tcgPid({ id: "tcgcsv-5", tcgPlayerId: "9" }), 5);
 console.log("sealed pid ok");
 
 // Store links (TCGplayer by id, eBay search by exact product) + disclosure.
-import { SHOP_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, productLink, setAffiliateConfig, storeLinksHtml, tcgStoreUrl } from "../src/pokemon.mjs";
+import { LISTING_NOTE, SHOP_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, productLink, setAffiliateConfig, storeLinksHtml, tcgStoreUrl } from "../src/pokemon.mjs";
 import { quickView, renderCard, renderSearch, esc } from "../src/ui.mjs";
 assert.equal(productLink({ id: "tcgcsv-229277" }), "https://www.tcgplayer.com/product/229277");
 assert.equal(productLink({ id: "sv1-pc-etb", tcgPlayerId: null }), "", "no id, no TCG link");
@@ -22,12 +22,14 @@ assert.ok(ebaySearchUrl({ name: "Lost Origin Booster Bundle", set: "SWSH11: Lost
 assert.equal(storeLinksHtml({}, esc), "", "both missing: the line is hidden");
 const both = storeLinksHtml({ id: "tcgcsv-1", name: "A", kind: "sealed" }, esc);
 assert.ok(both.includes(">Buy on TCGplayer</a>") && both.includes(">Buy on eBay</a>") && both.includes(SHOP_NOTE));
+assert.ok(both.includes(LISTING_NOTE) && both.indexOf(LISTING_NOTE) < both.indexOf(SHOP_NOTE), "listing note sits on the buttons, before the commission line");
+assert.ok(!/[\u2014\u2013]/.test(LISTING_NOTE));
 const onlyEbay = storeLinksHtml({ id: "sv1-pc-etb", name: "A", kind: "sealed" }, esc);
-assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("Buy on eBay") && onlyEbay.includes(SHOP_NOTE));
+assert.ok(!onlyEbay.includes("TCGplayer") && onlyEbay.includes("Buy on eBay") && onlyEbay.includes(SHOP_NOTE) && onlyEbay.includes(LISTING_NOTE));
 const qv = quickView({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", hist: [] });
 assert.ok(qv.tcgUrl.endsWith("/229277") && qv.ebayUrl.includes("ebay.com/sch"));
 const page = renderCard({ id: "tcgcsv-229277", name: "Battle Styles Booster Box", set: "SWSH05: Battle Styles", kind: "sealed", price: 283.93, hist: [] }, {}, {});
-assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes('class="shop-block"') && page.includes(SHOP_NOTE));
+assert.ok(page.includes("tcgplayer.com/product/229277") && page.includes("ebay.com/sch/i.html") && page.includes('class="shop-block"') && page.includes(SHOP_NOTE) && page.includes(LISTING_NOTE));
 const sr = renderSearch({});
 assert.ok(sr.includes("function storeLinks(r)") && sr.includes("Paid link"));
 console.log("store links ok");

@@ -418,6 +418,8 @@ export function tcgStoreUrl(card, cfg = AFF) {
 // Hidden when neither exists. "Buy on TCGplayer" and "Buy on eBay" are on the
 // allowed list in Catchem-data rules/advice-phrases.json (src/advice-rules.mjs).
 export const SHOP_NOTE = "Catch'em may earn a small commission, at no extra cost to you.";
+// Sits on the button row so a first visit does not read the price as a sale.
+export const LISTING_NOTE = "listing, not a sale";
 export function storeLinksHtml(card, esc) {
   const tcg = tcgStoreUrl(card);
   const ebay = ebaySearchUrl(card);
@@ -425,5 +427,5 @@ export function storeLinksHtml(card, esc) {
   const bits = [];
   if (tcg) bits.push(`<a class="shop-btn shop-tcg" href="${esc(tcg)}" rel="sponsored noopener" target="_blank">Buy on TCGplayer</a>`);
   if (ebay) bits.push(`<a class="shop-btn shop-ebay" href="${esc(ebay)}" rel="sponsored noopener" target="_blank">Buy on eBay</a>`);
-  return `<div class="shop-block"><div class="shop-btns">${bits.join("")}</div><p class="shop-note">${SHOP_NOTE}</p></div>`;
+  return `<div class="shop-block"><div class="shop-btns">${bits.join("")}</div><p class="shop-note">${LISTING_NOTE}</p><p class="shop-note">${SHOP_NOTE}</p></div>`;
 }
