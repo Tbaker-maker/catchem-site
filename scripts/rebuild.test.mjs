@@ -272,6 +272,14 @@ t("board, receipts, and accuracy are hidden without the flag",
   && (await renderPath("/receipts", fetchImpl)).headers.get("location") === "/"
   && (await renderPath("/accuracy", fetchImpl)).status === 302
   && (await renderPath("/feed/r/box-etb", fetchImpl)).status === 302);
+t("receipts redirects home even when the feed is on",
+  (await renderPath("/receipts", fetchImpl, { feed: true })).status === 302
+  && (await renderPath("/receipts", fetchImpl, { feed: true })).headers.get("location") === "/");
+t("accuracy redirects home even when the feed is on",
+  (await renderPath("/accuracy", fetchImpl, { feed: true })).status === 302
+  && (await renderPath("/accuracy", fetchImpl, { feed: true })).headers.get("location") === "/");
+const fedNav = await (await renderPath("/feed", fetchImpl, { feed: true })).text();
+t("feed nav does not link receipts", fedNav.includes('href="/feed"') && !/href="\/receipts"/.test(fedNav) && !/href="\/accuracy"/.test(fedNav));
 const feed = await renderPath("/feed", fetchImpl, { feed: true });
 const feedHtml = await feed.text();
 t("the feed is a sectioned list", feed.status === 200 && feedHtml.includes("Today") && feedHtml.includes(" · <span>") && feedHtml.includes("See all") && feedHtml.includes(">Track<") && !feedHtml.includes("What this means") && feedHtml.includes("Where's it heading?") && feedHtml.includes("Tracking. We'll DM you.") && feedHtml.includes("We'll DM you on Discord.") && feedHtml.includes("You said ") && feedHtml.includes("Community: ") && !feedHtml.includes("Track this") && !feedHtml.includes(">Change<") && !feedHtml.includes("Load more") && !feedHtml.includes(">Loading") && !feedHtml.includes("IntersectionObserver") && !feedHtml.includes(">0<") && !feedHtml.includes("Follow") && !feedHtml.includes("Set alert") && feedHtml.includes("Flagged ") && feedHtml.includes(">Up<") && feedHtml.includes("Sideways") && feedHtml.includes("Watches") && feedHtml.includes("Cooks") && feedHtml.includes("Movers") && feedHtml.includes("Tracked") && feedHtml.includes("4.2%") && feedHtml.includes("height:180px") && !feedHtml.includes("$undefined") && !feedHtml.includes("NaN") && !feedHtml.includes("scroll-snap-type"));

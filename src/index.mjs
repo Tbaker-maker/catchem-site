@@ -50,8 +50,8 @@ import { patternSentence, priceBits } from "./read-sheet.mjs";
 import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
-  clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderAccuracy, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderReceipts, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, renderWatch, setPriceBanner, quickView, cardPriceSeries,
+  clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
+  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, renderWatch, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 import { postOfficeOn, paintHomePostOffice } from "./post-office-flag.mjs";
 import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
@@ -639,6 +639,7 @@ async function compareItem(id, fetchImpl) {
 
 export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   const path = norm(pathname);
+  if (path === "/receipts" || path === "/accuracy") return home302();
   if (!feedEnabled(opts) && gatedFeedPath(path)) return home302();
   const kind = pageKind(path);
   let stamp = "";
@@ -1156,7 +1157,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "search") return html(renderSearch(pageOpts));
   if (kind === "watch") return html(renderWatch(stamp, pageOpts));
-  if (kind === "receipts") return html(renderReceipts(await loadJson("receipts.json", fetchImpl), stamp, pageOpts));
+  if (kind === "receipts") return home302();
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
   if (kind === "rotation") return html(renderRotation(stamp, pageOpts));
   if (kind === "legal") return html(renderLegal(LEGAL_PATHS[path], stamp, pageOpts));
@@ -1175,7 +1176,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const setsDoc = await loadJson("sets.json", fetchImpl).catch(() => null);
     return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay(), sets: setsDoc?.sets || [] }));
   }
-  if (kind === "accuracy") return html(renderAccuracy(await loadJson("accuracy.json", fetchImpl).catch(() => ({ scored: 0, hits: 0, misses: 0, rows: [] })), stamp, pageOpts));
+  if (kind === "accuracy") return home302();
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
     if (!pageOpts.postOffice) return noindex(html(renderPostClosed(pageOpts)));
