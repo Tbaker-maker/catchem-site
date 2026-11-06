@@ -34,7 +34,7 @@ export function runSharePostTests() {
     t(`${card.id} copy is clean`, !DASH.test(svg) && !BANNED.test(svg) && skeptic(card).length === 0);
   }
   t("sealed cards do not carry a condition", !/\bNM\b|Near Mint/.test(receiptSvg(RUMOR_PRICE) + receiptSvg(LEDGER_MISS)));
-  t("the ledger card shows a miss, not a win", LEDGER_MISS.big === "Miss" && receiptSvg(LEDGER_MISS).includes("8 misses"));
+  t("the ledger card shows a miss, not a win", LEDGER_MISS.big === "Miss" && receiptSvg(LEDGER_MISS).includes("Miss") && !receiptSvg(LEDGER_MISS).includes("hits") && !receiptSvg(LEDGER_MISS).includes("misses"));
   t("pulse is the month endpoints, not a picked card", PULSE_MONTH.big === "69" && PULSE_MONTH.lines[0].includes("17") && PULSE_MONTH.href.endsWith("/meter"));
 
   const week = foundInExplorer();

@@ -2732,6 +2732,11 @@ const SINGLE_CSS = `
   .cp-date{font-size:12px}
   .yr-line{font-size:11px;letter-spacing:-.03em}
 }
+@media(max-width:767px){
+  .cp-photo{width:min(168px,46vw)}
+  .cp-photo img,.cp-photo .tile{max-height:148px;width:auto;object-fit:contain}
+  .card-page{padding-bottom:96px}
+}
 @media(min-width:768px){
   .cp-head{flex-direction:row;align-items:flex-start;text-align:left;gap:28px}
   .cp-photo{width:240px;flex:none}
@@ -3261,6 +3266,11 @@ export function renderCard(card, stamp, opts = {}) {
 .glance-photo{display:flex;align-items:center;justify-content:center;width:min(320px,100%);aspect-ratio:1/1;padding:18px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
 .glance-photo img{border-radius:12px;max-height:100%}
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
+@media (max-width:767px){
+  .product-glance{padding-bottom:16px}
+  .glance-photo{width:min(156px,42vw);padding:8px}
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(140px,100%)}
+}
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
 .sealed-ask{margin:8px 0;font:600 16px/1.35 var(--sans)}
@@ -4010,7 +4020,7 @@ ${err}
 export function renderSearch(opts = {}) {
   const body = `<main id="main" tabindex="-1" class="wrap"><h1>Search</h1><p class="muted">Nicknames, numbers, and set shorthand. 151 ETB means the Elite Trainer Box, not a warehouse bundle. <a href="/search?q=costco">Costco exclusive</a></p>
 <div class="art-chips" id="art-chips" role="group" aria-label="Art type"><button type="button" data-art="" aria-pressed="true">All</button><button type="button" data-art="Special Illustration Rare">Special Illustration Rare</button><button type="button" data-art="Illustration Rare">Illustration Rare</button><button type="button" data-art="Full Art">Full Art</button><button type="button" data-art="Alt Art">Alt Art</button><button type="button" data-art="Trainer Gallery">Trainer Gallery</button><button type="button" data-art="Textured or Etched">Textured or Etched</button><button type="button" data-art="Holo">Holo</button><button type="button" data-art="Reverse Holo">Reverse Holo</button><button type="button" data-art="Regular">Regular</button></div><div class="filters"><input id="q" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finder" aria-label="Search the catalog" placeholder="Moonbreon, 215/203, or Evolving Skies" autofocus><select id="vtag" aria-label="Variant"><option value="">All variants</option><option value="Special Illustration Rare">Special Illustration Rare</option><option value="Illustration Rare">Illustration Rare</option><option value="Tag Team (Alternate Art)">Tag Team (Alternate Art)</option><option value="Alternate Art">Alternate Art</option><option value="Trainer Gallery">Trainer Gallery</option><option value="Galarian Gallery">Galarian Gallery</option><option value="Shiny Vault">Shiny Vault</option><option value="Gold">Gold</option><option value="Rainbow Rare">Rainbow Rare</option><option value="Full Art">Full Art</option><option value="Tag Team">Tag Team</option><option value="Radiant">Radiant</option><option value="Prism Star">Prism Star</option><option value="Amazing Rare">Amazing Rare</option><option value="Shiny">Shiny</option><option value="Classic Collection">Classic Collection</option><option value="Black &amp; White Rare">Black &amp; White Rare</option><option value="ACE SPEC">ACE SPEC</option><option value="Cosmos Holo">Cosmos Holo</option><option value="Cracked Ice Holo">Cracked Ice Holo</option><option value="Poké Ball Pattern">Poké Ball Pattern</option><option value="Master Ball Pattern">Master Ball Pattern</option><option value="Delta Species">Delta Species</option><option value="Promo">Promo</option><option value="Reverse Holo">Reverse Holo</option></select><div id="finder" class="finder" role="listbox" hidden></div></div>
-<style>.filters{position:relative}.finder{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:8px;background:#1a1815;border:1px solid #2f2b26;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.45);max-height:min(70vh,420px);overflow:auto;padding:6px}.finder[hidden]{display:none}.finder-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:12px;color:inherit;text-decoration:none}.finder-opt[aria-selected="true"],.finder-opt:hover{background:rgba(255,255,255,.06)}.finder-opt img{width:36px;height:50px;object-fit:contain;border-radius:6px;background:#12100e;flex:none}.finder-copy{min-width:0;display:flex;flex-direction:column}.finder-copy b,.finder-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.finder-copy span{color:var(--dim);font:500 13px/1.2 var(--sans)}.finder-type{margin-left:auto;flex:none;font:600 12px/1 var(--sans);color:var(--gold);background:rgba(217,183,121,.12);border-radius:999px;padding:6px 8px}.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
+<style>.filters{position:relative}.finder{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:8px;background:#1a1815;border:1px solid #2f2b26;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.45);max-height:min(70vh,420px);overflow:auto;padding:6px}.finder[hidden]{display:none}.finder-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:12px;color:inherit;text-decoration:none}.finder-opt[aria-selected="true"],.finder-opt:hover{background:rgba(255,255,255,.06)}.finder-opt img{width:36px;height:50px;object-fit:contain;border-radius:6px;background:#12100e;flex:none}.finder-copy{min-width:0;display:flex;flex-direction:column}.finder-copy b,.finder-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.finder-copy span{color:var(--dim);font:500 13px/1.2 var(--sans)}.finder-type{margin-left:auto;flex:none;font:600 12px/1 var(--sans);color:var(--gold);background:rgba(217,183,121,.12);border-radius:999px;padding:6px 8px}.sugg{margin:6px 0 14px}.sugg[hidden]{display:none}.sg-h{margin:12px 0 6px;font:600 13px/1.2 var(--sans);color:var(--dim)}.sg-row{display:flex;flex-wrap:wrap;gap:8px}.sg-chip,.sg-clear{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#1a1815;color:inherit;font:500 15px/1 var(--sans);cursor:pointer}.sg-clear{background:transparent;color:var(--dim)}.filters:has(#finder:not([hidden])) ~ #meta,.filters:has(#finder:not([hidden])) ~ #list{visibility:hidden}</style><div id="sugg" class="sugg" aria-label="Recent and suggested searches"></div><p class="muted" id="meta">Type at least 2 letters.</p><div id="list"></div>
 <script type="module">
 const rankApi=(${createRank.toString()})();
 const rankCatalog=rankApi.rankCatalog;
@@ -4831,6 +4841,10 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   .mine-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding:12px 0}
   .mine-row a{font:600 18px/1.3 var(--serif);flex:1;min-width:160px}
   .mine-row button{min-height:44px}
+  @media (max-height:900px){
+    .feed-card img.card-face,.feed-card>.tile{height:148px}
+    .feed-card :where(img:not(.card-face,.card-thumb)){max-height:148px}
+  }
   @media (max-width:420px){.feed-card h2{font-size:20px}}
   `;
   const titles = { today: "Today", watches: "Watches", watch: "Watches", cooks: "Cooks", cook: "Cooks", movers: "Movers", tracked: "Tracked" };

@@ -187,7 +187,10 @@ footer a{color:var(--gold)}
   .site-bar nav.open{display:flex}
 }
 @media (min-width:1024px){.dock{display:none}body{padding-bottom:24px}}
-@media (min-width:1280px){.site-bar nav{display:flex;flex-wrap:wrap;gap:8px 16px}}
+@media (min-width:1280px){
+  .site-bar{height:auto;min-height:56px}
+  .site-bar nav{display:flex;flex:1 1 auto;min-width:0;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px}
+}
 .since{margin:18px 0 8px}
 .since-kicker{margin:0 0 10px;font:600 13px/1.2 var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--gold)}
 .since-list{display:grid;gap:10px}
