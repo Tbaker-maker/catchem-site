@@ -1,20 +1,23 @@
-// Edge cache for public HTML pages (fix for Cloudflare 1102 "Worker exceeded resource limits").
+// Edge and CDN cache for public HTML.
 //
-// Card, sealed, set and feed pages were rendered on every hit with no-store, so a cold
-// isolate parsed several large JSON files (search-lite, reads, ir-cycle) per request and
-// ran past the CPU/memory limit. Anonymous GETs of render pages are now kept in the
-// Cloudflare cache for EDGE_TTL seconds, so most hits never run the render at all.
-// Signed-in visitors (ce_session cookie) always get a fresh render.
-// The browser still sees no-store; only the edge copy is reused.
+// Card, sealed, set, feed and home pages were rendered on every hit with
+// no-store, so a cold isolate parsed large JSON on the request and hit the
+// Worker CPU limit. Anonymous GETs of those pages are cached here and sent
+// with a long Cache-Control plus stale-while-revalidate, so repeat views do
+// not run the Worker. Signed-in visitors (ce_session cookie) always render.
+// A soft error page stays uncached.
 
-export const EDGE_TTL = 86400; // 24h soft TTL; publish bumps counts.asOf → new cache key (never stale prices)
+export const EDGE_TTL = 86400; // 24h inside this colo. counts.asOf is part of the key.
+export const PUBLIC_CACHE = "public, max-age=120, stale-while-revalidate=86400";
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
+const EXACT = new Set(["/", "/search", "/promos", "/today", "/compare", "/faq", "/supply", "/set-value"]);
 
 function edgeCache() {
   try { return typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { return null; }
 }
 
 export function cacheablePath(pathname) {
+  if (EXACT.has(pathname)) return true;
   return CACHEABLE.test(pathname);
 }
 
@@ -22,10 +25,9 @@ export function cacheableRequest(request) {
   if (request.method !== "GET") return false;
   const url = new URL(request.url);
   if (!cacheablePath(url.pathname)) return false;
-  // ?prewarm=1 must always hit render so warmBucket can seed FEED_KV.
-  // If we served an edge HIT here, seed never ran (p95 stayed cold).
-  // Seed-only must always render. prewarm=html should populate the edge Cache
-  // API so first user hits stay fast even when FEED_KV writes are rate-limited.
+  // ?prewarm=1 must always hit render so the bucket key can be checked.
+  // Seed-only must always render. prewarm=html should populate this cache
+  // so the first visitor does not pay for the render when KV writes are limited.
   if (url.searchParams.get("prewarm") === "1") return false;
   const cookie = request.headers.get("cookie") || "";
   if (/(?:^|;\s*)ce_(session|oauth)=/.test(cookie)) return false;
@@ -39,8 +41,7 @@ export function cacheKeyUrl(href) {
   url.hash = "";
   for (const k of [...url.searchParams.keys()]) if (TRACKING.test(k)) url.searchParams.delete(k);
   // Feed filters (?f=, ?set=) are applied in the browser on the same HTML.
-  // Keeping them in the edge key forced a cold Worker render per chip and
-  // tripped Cloudflare 1102 / 503 on /feed?f=sealed|singles|prices|signals|news.
+  // Keeping them in the edge key forced a cold Worker render per chip.
   if (url.pathname === "/feed" || url.pathname.startsWith("/feed/")) {
     url.searchParams.delete("f");
     url.searchParams.delete("set");
@@ -59,9 +60,6 @@ function cacheKey(request, dataVersion = "") {
   return new Request(url.toString(), { method: "GET" });
 }
 
-// Graceful HTML for catchable render failures. Status 200 so visitors never see a
-// hard error page from us. Cloudflare 1102 (CPU kill) cannot be caught in-process;
-// longer EDGE_TTL + paced prewarm keep those off the critical path.
 export function errorPage() {
   const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Catch'em · One moment</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d12;color:#e9ecf2;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -82,13 +80,26 @@ async function safeRender(render, request, env, ctx) {
   }
 }
 
+function cacheableBody(res) {
+  if (!res || res.status !== 200) return false;
+  if (res.headers.get("x-catchem-soft")) return false;
+  if (res.headers.has("set-cookie")) return false;
+  return (res.headers.get("content-type") || "").includes("text/html");
+}
+
+function withPublicCache(res, extra) {
+  const h = new Headers(res.headers);
+  h.set("cache-control", PUBLIC_CACHE);
+  h.delete("cdn-cache-control");
+  if (extra) for (const [k, v] of Object.entries(extra)) h.set(k, v);
+  return new Response(res.body, { status: res.status, headers: h });
+}
+
 function asEdgeHit(hit, soft = false, dataVersion = "") {
-  const h = new Headers(hit.headers);
-  h.set("cache-control", "no-store");
-  h.set("x-edge-cache", soft ? "stale" : "hit");
-  if (soft) h.set("x-catchem-soft", "stale");
-  if (dataVersion) h.set("x-data-version", dataVersion);
-  return new Response(hit.body, { status: 200, headers: h });
+  const extra = { "x-edge-cache": soft ? "stale" : "hit" };
+  if (soft) extra["x-catchem-soft"] = "stale";
+  if (dataVersion) extra["x-data-version"] = dataVersion;
+  return withPublicCache(hit, extra);
 }
 
 export async function edgeFetch(render0, request, env, ctx, opts = {}) {
@@ -128,16 +139,13 @@ export async function edgeFetch(render0, request, env, ctx, opts = {}) {
     } catch { /* fall through */ }
     return errorPage();
   }
-  if (res.status === 200 && type.includes("text/html") && !res.headers.has("set-cookie")) {
+  if (cacheableBody(res)) {
     try {
-      const stored = res.clone();
-      const h = new Headers(stored.headers);
-      h.set("cache-control", `public, max-age=${EDGE_TTL}`);
-      if (dataVersion) h.set("x-data-version", dataVersion);
-      h.delete("cdn-cache-control");
-      const put = cache.put(key, new Response(stored.body, { status: 200, headers: h })).catch(() => {});
+      const stored = withPublicCache(res.clone(), dataVersion ? { "x-data-version": dataVersion } : null);
+      const put = cache.put(key, stored).catch(() => {});
       if (ctx?.waitUntil) ctx.waitUntil(put); else await put;
     } catch { /* never block the page on the cache */ }
+    return withPublicCache(res, dataVersion ? { "x-data-version": dataVersion } : null);
   }
   if (dataVersion && res.status === 200) {
     const h = new Headers(res.headers);

@@ -30,7 +30,7 @@ assert.match(index, /publicDataVersion/);
 assert.match(index, /signal-chips\.json ~422KB/);
 setDataVersion("2026-10-28");
 assert.equal(currentDataVersion(), "2026-10-28");
-assert.match(index, /seeds prodrow KV and returns immediately/);
+assert.match(index, /checks the one bucket key and returns immediately/);
 assert.match(index, /warmBucket/);
 assert.match(index, /cardImagesSealed/);
 
@@ -39,9 +39,9 @@ assert.match(data, /prodrow:v3:/);
 assert.match(data, /rawpub:v3:/);
 assert.match(data, /publicDataVersion/);
 assert.match(data, /warmBucket/);
-assert.match(data, /prodrow-bucket:v3:/);
+assert.match(data, /putIfChanged/);
 assert.match(data, /extractAllRows/);
-assert.match(data, /i \+= 5/);
+assert.doesNotMatch(data, /i \+= 5/);
 assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
 
