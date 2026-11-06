@@ -17,7 +17,7 @@ assert.equal(officialSrc({ id: "tcgcsv-42" }, {}).src, "/api/card-img?pid=42");
 const stamp = "2026-10-10T10:32:00.413Z";
 const at = Date.parse(stamp);
 assert.equal(priceBannerLine(stamp, at + 36 * 3600 * 1000), "");
-assert.equal(priceBannerLine(stamp, at + 36 * 3600 * 1000 + 1), "Prices last updated 2026-10-10.");
+assert.equal(priceBannerLine(stamp, at + 36 * 3600 * 1000 + 1), "Prices updating");
 assert.equal(priceBannerLine("", at), "");
 
 assert.equal(renderFacts({}), "");
