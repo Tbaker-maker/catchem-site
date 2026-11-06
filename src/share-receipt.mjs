@@ -52,7 +52,7 @@ export const RUMOR_PRICE = {
   sealed: true,
 };
 
-// receipts.json receipt-2026-10-14-sealed-sv3pt5-etb. accuracy.json: 2 hits, 8 misses.
+// receipts.json receipt-2026-10-14-sealed-sv3pt5-etb. The score stays off this card.
 export const LEDGER_MISS = {
   id: "read-ledger",
   kicker: "Read ledger",
@@ -62,7 +62,6 @@ export const LEDGER_MISS = {
     "$570.00 written down Oct 14",
     "$571.67 asking price Oct 15",
     "The other way.",
-    "2 hits. 8 misses. Rate hidden.",
   ],
   source: "eBay asking prices",
   date: "Oct 15, 2026",
@@ -188,7 +187,7 @@ export const SAMPLE_POSTS = [
   {
     id: "ledger",
     when: "Fri",
-    text: "Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. 10 scored. 2 hits. 8 misses. The rate stays hidden until 20. eBay asking prices. https://catchemtcg.com/",
+    text: "Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. eBay asking prices. https://catchemtcg.com/",
     source: "eBay asking prices",
     date: "Oct 15, 2026",
     href: "https://catchemtcg.com/",

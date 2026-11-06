@@ -20,7 +20,7 @@ The home Today line names Mega Evolution, Delta Reign, with Nov 6, 2026 in the l
 
 Page: https://catchemtcg.com/
 
-151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00, after a higher one. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. Miss. The file scores 10 calls: 2 hits, 8 misses. The rate stays hidden until 20. Sealed, so no condition.
+151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00, after a higher one. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. Miss. The score stays off this card. Sealed, so no condition.
 
 ## Found in the Explorer
 
@@ -54,4 +54,4 @@ This calendar is a draft. It is not scheduled and nothing is posted.
 
 4. Found in the Explorer. Oct 23, 2026. The three Today lines above, in that order, each with its page.
 
-5. Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. 10 scored. 2 hits. 8 misses. The rate stays hidden until 20. eBay asking prices. https://catchemtcg.com/
+5. Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. eBay asking prices. https://catchemtcg.com/
