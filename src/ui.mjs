@@ -3266,6 +3266,11 @@ export function renderCard(card, stamp, opts = {}) {
 .glance-photo{display:flex;align-items:center;justify-content:center;width:min(320px,100%);aspect-ratio:1/1;padding:18px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
 .glance-photo img{border-radius:12px;max-height:100%}
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
+@media (max-width:767px){
+  .product-glance{padding-bottom:16px}
+  .glance-photo{width:min(156px,42vw);padding:8px}
+  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(140px,100%)}
+}
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
 .sealed-ask{margin:8px 0;font:600 16px/1.35 var(--sans)}
