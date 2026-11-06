@@ -58,6 +58,7 @@ import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { buildFreshnessDoc, listingsAsOf } from "./freshness.mjs";
 import { exploreOn, exploreResponse, paintExplore } from "./explore-page.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
@@ -1533,6 +1534,28 @@ const worker = {
     if (request.method === "POST" && url.pathname === "/api/ideas") return handleIdeas(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/post-text") return handlePostText(request, env, fetchImpl);
     if (request.method === "POST" && url.pathname === "/api/video/quota") return handleVideoQuota(request, env);
+    if (request.method === "GET" && url.pathname === "/api/ops/freshness") {
+      const pick = async (job) => { try { return await job(); } catch { return null; } };
+      const [counts, listings, pulse, news] = await Promise.all([
+        pick(() => loadJson("counts.json", fetchImpl)),
+        pick(() => loadJson("listings-counted.json", fetchImpl)),
+        pick(() => loadJson("sealed-market-pulse.json", fetchImpl)),
+        pick(() => loadFeedNews(fetchImpl)),
+      ]);
+      const body = buildFreshnessDoc({
+        prices: counts?.asOf || "",
+        listings: listingsAsOf(listings),
+        pulse: pulse?.asOf || "",
+        news: news?.asOf || "",
+      });
+      return new Response(request.method === "HEAD" ? null : JSON.stringify(body), {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+          "x-robots-tag": "noindex",
+        },
+      });
+    }
     if (request.method === "GET" && url.pathname === "/api/pocket-lite") {
       try {
         const rows = await pocketRows(fetchImpl);
@@ -1671,6 +1694,9 @@ const worker = {
         let text = await robot.text();
         if (!/Disallow:\s*\/post-office/i.test(text)) {
           text = text.replace(/\s*$/, "\n") + "Disallow: /post-office\nDisallow: /build\n";
+        }
+        if (!/Disallow:\s*\/api\/ops\//i.test(text)) {
+          text = text.replace(/\s*$/, "\n") + "Disallow: /api/ops/\n";
         }
         const headers = new Headers(robot.headers);
         headers.set("content-type", "text/plain; charset=utf-8");
