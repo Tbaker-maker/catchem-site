@@ -66,7 +66,7 @@ export const LEDGER_MISS = {
   ],
   source: "eBay asking prices",
   date: "Oct 15, 2026",
-  href: "https://catchemtcg.com/receipts",
+  href: "https://catchemtcg.com/",
   sealed: true,
 };
 
@@ -188,10 +188,10 @@ export const SAMPLE_POSTS = [
   {
     id: "ledger",
     when: "Fri",
-    text: "Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. 10 scored. 2 hits. 8 misses. The rate stays hidden until 20. eBay asking prices. https://catchemtcg.com/receipts",
+    text: "Miss. 151 Elite Trainer Box. Written down Oct 14, 2026 at $570.00. Next eBay asking price on Oct 15, 2026 was $571.67. The other way. 10 scored. 2 hits. 8 misses. The rate stays hidden until 20. eBay asking prices. https://catchemtcg.com/",
     source: "eBay asking prices",
     date: "Oct 15, 2026",
-    href: "https://catchemtcg.com/receipts",
+    href: "https://catchemtcg.com/",
     sealed: true,
   },
   {
@@ -221,7 +221,7 @@ export const WEEK_CALENDAR = [
   { day: "Tue Oct 27", post: "151 thirty day count, more down than up", href: "https://catchemtcg.com/c/tcgcsv-517046" },
   { day: "Wed Oct 28", post: "Rumor vs price, Delta Reign", href: "https://catchemtcg.com/sets/me06-delta-reign" },
   { day: "Thu Oct 29", post: "Found in the Explorer", href: "https://catchemtcg.com/" },
-  { day: "Fri Oct 30", post: "Read ledger miss", href: "https://catchemtcg.com/receipts" },
+  { day: "Fri Oct 30", post: "Read ledger miss", href: "https://catchemtcg.com/" },
   { day: "Sat Oct 31", post: "No post", href: "" },
   { day: "Sun Nov 1", post: "No post", href: "" },
 ];
