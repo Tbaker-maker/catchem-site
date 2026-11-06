@@ -1,4 +1,5 @@
 import { buildPokemonPages } from "./pokemon.mjs";
+import { putIfChanged } from "./kv-once.mjs";
 
 // One place for Catchem-data raw URLs. public-data is tried first.
 // A 404 or a network error falls back to main. After the first miss, the
@@ -328,9 +329,14 @@ export async function publicDataVersion(fetchImpl = fetch) {
   return dataVersion || "";
 }
 function rawKvKey(path) {
-  const v = dataVersion || "na";
-  return `rawpub:v3:${v}:${path}`;
+  // Stable key. putIfChanged skips the write when the bytes did not change.
+  return `rawpub:v3:${path}`;
 }
+function rawVerKey(path) {
+  return `rawpub:v3:ver:${path}`;
+}
+
+const RAW_KEEP = 7 * 24 * 3600;
 
 async function rawText(rel, fetchImpl) {
   const path = `research/assets/public/${rel}`;
@@ -343,29 +349,43 @@ async function rawText(rel, fetchImpl) {
       if (hit) return await hit.text();
     } catch { /* miss */ }
   }
+  const ver = dataVersion || "na";
   if (rawKv) {
     try {
-      const hit = await rawKv.get(rawKvKey(path));
-      if (hit) {
-        if (edge) {
-          try { void edge.put(key, new Response(hit, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {}); } catch {}
+      const seen = await rawKv.get(rawVerKey(path));
+      if (seen === ver) {
+        const hit = await rawKv.get(rawKvKey(path));
+        if (hit) {
+          if (edge) {
+            try { void edge.put(key, new Response(hit, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {}); } catch {}
+          }
+          return hit;
         }
-        return hit;
       }
     } catch { /* miss */ }
   }
-  const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: 120, cacheEverything: true } });
-  if (!res.ok) throw new Error(`${rel} ${res.status}`);
-  const text = await res.text();
-  if (text) {
-    if (rawKv) {
-      try { void rawKv.put(rawKvKey(path), text, { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
+  let text = "";
+  try {
+    const res = await fetchRepo(path, fetchImpl, { cf: { cacheTtl: 120, cacheEverything: true } });
+    if (res && res.ok) text = await res.text();
+  } catch { text = ""; }
+  if (!text && rawKv) {
+    try {
+      const last = await rawKv.get(rawKvKey(path));
+      if (last) return last;
+    } catch { /* no last copy */ }
+  }
+  if (!text) throw new Error(`${rel} missing`);
+  if (rawKv) {
+    const status = await putIfChanged(rawKv, rawKvKey(path), text, RAW_KEEP);
+    if (status !== "fail") {
+      try { await rawKv.put(rawVerKey(path), ver, { expirationTtl: RAW_KEEP }); } catch { /* page still has text */ }
     }
-    if (edge) {
-      try {
-        void edge.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {});
-      } catch { /* never block */ }
-    }
+  }
+  if (edge) {
+    try {
+      void edge.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${RAW_TTL}` } })).catch(() => {});
+    } catch { /* never block */ }
   }
   return text;
 }
@@ -422,40 +442,25 @@ export function extractAllRows(text) {
   return out;
 }
 
-/** Seed tiny per-id KV rows from a bucket body so later /p/ hits skip the ~1MB read. */
+/** One bucket body in KV, not one put per row. Per-row puts used the daily write cap. */
 export async function seedProdRowsFromBucket(text, kv, ttl = RAW_TTL) {
   if (!kv || !text) return 0;
-  const rows = extractAllRows(text);
-  const puts = [];
-  for (const row of rows) {
-    if (!row || !row.id) continue;
-    puts.push(kv.put(prodrowKey(row.id), JSON.stringify(row), { expirationTtl: ttl }).catch(() => {}));
-  }
-  for (let i = 0; i < puts.length; i += 5) {
-    await Promise.all(puts.slice(i, i + 5));
-  }
-  return puts.length;
+  void ttl;
+  return 0;
 }
 
-function prodrowBucketKey(pad) {
-  const v = dataVersion || "na";
-  return `prodrow-bucket:v3:${v}:${pad}`;
-}
-
-/** Load one bucket file and seed every prodrow into FEED_KV (for /api/prewarm-buckets or ?prewarm=1). */
+/** Load one bucket file. The body is one hash-checked KV write inside rawText. */
 export async function warmBucket(bucketPad, fetchImpl = fetch) {
   const pad = String(bucketPad || "").padStart(2, "0");
+  const path = `research/assets/public/buckets/${pad}.json`;
   if (rawKv) {
     try {
-      if (await rawKv.get(prodrowBucketKey(pad))) return { bytes: 0, rows: 0, skipped: true };
-    } catch { /* seed anyway */ }
+      const ver = dataVersion || "na";
+      if ((await rawKv.get(`rawpub:v3:ver:${path}`)) === ver) return { bytes: 0, rows: 0, skipped: true };
+    } catch { /* load the file */ }
   }
   const text = await rawText(`buckets/${pad}.json`, fetchImpl);
-  const n = await seedProdRowsFromBucket(text, rawKv);
-  if (rawKv && n > 0) {
-    try { await rawKv.put(prodrowBucketKey(pad), String(n), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
-  }
-  return { bytes: text.length, rows: n };
+  return { bytes: text.length, rows: 0, skipped: false };
 }
 
 
@@ -471,10 +476,7 @@ export async function bucketRow(id, fetchImpl = fetch) {
     }
     const text = await rawText(`buckets/${bucketOf(id)}.json`, fetchImpl);
     const row = extractRow(text, id);
-    if (row && rawKv) {
-      try { void rawKv.put(prodrowKey(id), JSON.stringify(row), { expirationTtl: RAW_TTL }).catch(() => {}); } catch {}
-    }
-    // Full-bucket prodrow seeding only via warmBucket / ?prewarm=1 (not on every hit).
+    // Do not put one KV row per id. A stored prodrow, if one is still there, was read above.
     return row;
   });
 }
