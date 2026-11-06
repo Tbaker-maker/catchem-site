@@ -19,6 +19,10 @@ import {
   rowsFromPulseDoc,
   brandPageFromDoc,
   MIRROR_NOTE, SITE_FOOTER,
+  releaseForSet,
+  quietBlank,
+  visibleMomentum,
+  momentumOn,
 } from "../src/brand-visuals.mjs";
 
 const DASH = /[\u2014\u2013]/;
@@ -66,16 +70,19 @@ export function runBrandVisualTests() {
   t("kind heights stay ordered", kindHeight("booster-box") > kindHeight("pc-etb") && kindHeight("pc-etb") > kindHeight("etb"));
 
   const srcs = [...heat.matchAll(/src="([^"]+)"/g)].map((m) => m[1]);
-  t("product images use allowed hosts only", srcs.length === 4 && srcs.every((src) => {
-    try {
-      return ALLOWED_IMAGE_HOSTS.includes(new URL(src).hostname);
-    } catch {
-      return false;
-    }
-  }));
+  t("sample rows use a neutral tile, never a CDN jpg", srcs.length === 0 && heat.includes("bv-ph") && !heat.includes("tcgplayer-cdn") && !heat.includes("card-img"));
   t("a foreign image is dropped", productImage({ image: "https://i.ebayimg.com/images/g/x.jpg", tcgPlayerId: null }) === "" && allowedImageUrl("https://evil.example/a.png") === "");
   const blocked = heatmapHtml([{ ...PULSE_SAMPLE[0], tcgPlayerId: null, image: "https://i.ebayimg.com/images/g/x.jpg", logo: "http://images.pokemontcg.io/swsh7/logo.png" }]);
-  t("ebay and plain http never render", !blocked.includes("ebayimg") && !blocked.includes("<img") && !blocked.includes("http://images.pokemontcg.io"));
+  t("ebay and plain http never render", !blocked.includes("ebayimg") && !blocked.includes("http://images.pokemontcg.io") && !blocked.includes("tcgplayer-cdn"));
+  const cutDoc = {
+    products: [
+      { id: "tcgcsv-242436", siteId: "tcgcsv-242436", tcgPlayerId: 242436, pass: true, file: "cutouts/swsh7-booster-box.webp" },
+      { id: "tcgcsv-593355", siteId: "tcgcsv-593355", tcgPlayerId: 593355, pass: false, file: null },
+    ],
+  };
+  const cutHeat = heatmapHtml(PULSE_SAMPLE, { cutouts: cutDoc });
+  t("a passing cutout is the product picture", cutHeat.includes('src="/data/cutouts/swsh7-booster-box.webp"') && !cutHeat.includes("tcgplayer-cdn") && !cutHeat.includes(".jpg"));
+  t("a failed cutout stays a neutral tile", (cutHeat.match(/bv-ph/g) || []).length === 3);
 
   t("october box and a missing month stay the figures on file", heat.includes("-5.1%") && heat.includes("No reading") && heat.includes("2214") === false && heat.includes("-6.4%"));
   t("median is the october figure", pctLabel(-1.6587) === "-1.7%" && heat.includes("-1.7%"));
@@ -84,7 +91,15 @@ export function runBrandVisualTests() {
   t("sealed share has no NM", sealed.sealed === true && pulse.sealed === true && !NM.test(sealedSvg) && !NM.test(pulseSvg) && !NM.test(visible(heat)));
   t("share cards use the same mark", pulseSvg.includes(BRAND.gold) && pulseSvg.includes(BRAND.paper) && pulseSvg.includes("Catch'em") && pulseSvg.includes("catchemtcg.com/sealed-pulse") && pulseSvg.includes(pulse.source) && pulseSvg.includes(pulse.date) && pulseSvg.includes('font-size="156"'));
   t("share cards stay compact with no giant watermark", pulseSvg.includes('viewBox="0 0 1080 1080"') && !pulseSvg.includes('fill-opacity="0.07"') && sealedSvg.includes('viewBox="0 0 1080 1080"'));
-  t("sealed share carries a product image", Boolean(sealed.imageUrl) && sealedSvg.includes("<image ") && sealedSvg.includes("tcgplayer-cdn"));
+  t("sealed share carries a cutout when one passed, never the old jpg", (() => {
+    const pageWithCut = brandPageFromDoc({
+      asOf: "2026-10-27",
+      source: "TCGplayer market",
+      marketMedian: { "2026-10": -1.6587 },
+      rows: [PULSE_SAMPLE[0]],
+    }, { cutouts: cutDoc });
+    return pageWithCut.includes("/data/cutouts/swsh7-booster-box.webp") && !pageWithCut.includes("tcgplayer-cdn") && !pageWithCut.includes("_in_400x400");
+  })());
   t("product images get a drop shadow so white boxes read", page.includes("drop-shadow"));
   t("stage plate keeps white ETBs readable", page.includes("rgba(239,233,222,.06)") && KIND_HEIGHT.etb >= 54);
 
@@ -96,6 +111,47 @@ export function runBrandVisualTests() {
   const dates = (svg) => (visible(svg).match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}/g) || []);
   t("one date per share card", dates(sealedSvg).length === 1 && dates(pulseSvg).length === 1);
   t("page date stays Oct 27, 2026", visible(page).includes("Oct 27, 2026"));
+  t("data date is explicit", page.includes('class="bv-asof"') && page.includes('data-as-of="2026-10-27"') && page.includes("Data date"));
+
+  const pre = heatmapHtml([{
+    id: "me2pt5-etb",
+    name: "Ascended Heroes Elite Trainer Box",
+    set: "Ascended Heroes",
+    type: "etb",
+    release: "2026-01-30",
+    cells: [
+      { month: "2025-11", pct: null, price: null, missing: "no price" },
+      { month: "2025-12", pct: null, price: 80, priceDate: "2025-12-31", missing: "no prior month" },
+      { month: "2026-01", pct: 19.4, price: 95, priceDate: "2026-01-31", direction: "up" },
+    ],
+  }]);
+  t("months before release are quiet blanks", (pre.match(/class="bv-blank"/g) || []).length === 2 && pre.includes('class="bv-blank" data-month="2025-11"') && pre.includes('class="bv-blank" data-month="2025-12"') && !pre.includes(">No reading</button>"));
+  t("a percent on the release month still shows", pre.includes("+19.4%"));
+  t("a missing reason of before release is blank", quietBlank({ month: "2025-11", pct: null, missing: "before release" }, "") === true);
+  t("a real gap after release still says No reading", heatmapHtml([{
+    id: "sm5-booster-box",
+    set: "Ultra Prism",
+    type: "booster-box",
+    release: "2018-02-02",
+    cells: [{ month: "2026-09", pct: null, price: null, missing: "no price" }],
+  }]).includes(">No reading<"));
+  t("release names match the set file", releaseForSet("Chaos Rising", [{ name: "ME04: Chaos Rising", release: "2026-05-22" }]) === "2026-05-22" && releaseForSet("Ultra Prism", [{ name: "SM - Ultra Prism", release: "2018-02-02" }]) === "2018-02-02" && releaseForSet("Sun & Moon", [{ name: "SM Base Set", release: "2017-02-03" }]) === "2017-02-03" && releaseForSet("151", [{ name: "SV: Scarlet & Violet 151", release: "2023-09-22" }]) === "2023-09-22");
+
+  const momRow = {
+    id: "swsh7-booster-box",
+    set: "Evolving Skies",
+    type: "booster-box",
+    momentum: [
+      { id: "momentum-picking-up", label: "Picking up", proven: true },
+      { id: "momentum-slowing", label: "Slowing", proven: false },
+      { id: "not-a-signal", label: "Nope label", proven: true },
+    ],
+    cells: [{ month: "2026-10", pct: -5.1, direction: "down", price: 10, priceDate: "2026-10-27" }],
+  };
+  const momOff = heatmapHtml([momRow], { momentum: false });
+  const momOn = heatmapHtml([momRow], { momentum: true });
+  t("momentum stays off unless the pulse flag is on", !momOff.includes("Picking up") && !momOff.includes("Slowing") && momentumOn({}) === false && momentumOn({ flag: "off" }) === false && momentumOn({ flag: "on" }) === true);
+  t("only a proven known label shows", momOn.includes("Picking up") && !momOn.includes("Slowing") && !momOn.includes("Nope label") && visibleMomentum(momRow, true).length === 1);
 
   const liveDoc = {
     asOf: "2026-10-27",
