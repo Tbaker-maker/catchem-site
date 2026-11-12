@@ -3462,6 +3462,14 @@ ${rest.length ? `<details><summary>Show all ${cards.length}</summary>${rest.map(
   return chrome("Artists", body, doc.name, stamp, "", feedNav(opts));
 }
 
+// movers.json before Nov 12 said "one day", but every change on it is a 7 or
+// 30 day move. Never print a month's % as one day's.
+export function moversNote(note) {
+  const text = String(note || "");
+  if (/one day/i.test(text)) return "TCGplayer market. Each change is over 7 or 30 days. Slabs stay off this list.";
+  return text;
+}
+
 export function renderMovers(doc, stamp, opts = {}) {
   const spark = (hist) => {
     const pts = (hist || []).map((p) => Number(Array.isArray(p) ? p[1] : p?.v)).filter((n) => n > 0);
@@ -3472,13 +3480,15 @@ export function renderMovers(doc, stamp, opts = {}) {
     return `<svg width="96" height="36" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="#d9b779" stroke-width="2"/></svg>`;
   };
   const row = (r, withSpark) => {
-    const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%` : "";
+    // The change is the bigger of 7 and 30 days (bestMove), so name the window.
+    const win = Number.isInteger(r.windowDays) && r.windowDays > 0 ? ` ${r.windowDays}D` : "";
+    const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%${win}` : "";
     const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
     return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || naChip()} <span class="muted">${pct}</span></b></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
-  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(doc?.note || "")}</p>
+  const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(moversNote(doc?.note))}</p>
 <h1>Movers</h1>
 <div id="index-charts"></div>
 <div class="filters"><button type="button" data-tab="singles" aria-pressed="true">Singles</button><button type="button" data-tab="sealed">Sealed</button><button type="button" data-tab="slabs">Slabs</button></div>
