@@ -35,7 +35,7 @@ const daily = gatePlan({ frequency: "daily", sets: ["me-30th-celebration"], leng
 t("reads keep daily and deep", daily.plan.frequency === "daily" && daily.plan.length === "deep" && daily.plan.deep === true);
 
 const readsPage = renderReadsPage({ signedIn: false, premium: false });
-t("reads page has no Premium CTA", !/href="\/premium"/.test(readsPage) && !/in Premium/.test(readsPage) && /daily read and up to 25 follows/.test(readsPage));
+t("reads page has no Premium CTA", !/href="\/premium"/.test(readsPage) && !/in Premium/.test(readsPage) && /This read is free\./.test(readsPage) && !/daily read and up to 25 follows/.test(readsPage));
 
 t("quota uses the paid cap", peek({ sub: "u1", premium: false }, "ideas", {}).cap === 50 && peek({ sub: "u1", premium: false }, "post-text", {}).cap === 100);
 t("quota restores the free cap when the switch is off", peek({ sub: "u1", premium: false }, "ideas", { OPEN_ACCESS: "false" }).cap === 3);

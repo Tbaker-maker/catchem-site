@@ -48,8 +48,8 @@ const paintedOpen = paintPublicHtml(home, "/", {});
 t("open access strips the club and the Premium nav", !paintedOpen.includes("Join the Catch'em Club") && !paintedOpen.includes("Join the Premium waitlist") && !paintedOpen.includes("See Premium") && !paintedOpen.includes("$14.99") && !paintedOpen.includes("Discord Premium") && !paintedOpen.includes("<span>Premium</span>") && checkoutLeak(paintedOpen) === "" && paintedOpen.includes(">Discord<"));
 const gated = { OPEN_ACCESS: "false" };
 const painted = paintPublicHtml(home, "/", gated);
-t("switch off: home rewrite drops First 222 and the price", painted.includes("Join the Premium waitlist") && !painted.includes("$14.99") && !painted.includes("First 222") && checkoutLeak(painted) === "" && painted.includes('href="/premium" rel="noopener">Discord Premium') && painted.includes(">Join Discord<"));
-t("switch off + live home is unchanged", paintPublicHtml(home, "/", { PREMIUM_MODE: "live", OPEN_ACCESS: "false" }).includes("See Premium") && paintPublicHtml(home, "/", { PREMIUM_MODE: "live", OPEN_ACCESS: "false" }).includes("First 222"));
+t("switch off: baked home has no club to rewrite", !painted.includes("Join the Premium waitlist") && !painted.includes("Join the Catch'em Club") && !painted.includes("$14.99") && !painted.includes("First 222") && checkoutLeak(painted) === "" && !painted.includes("Discord Premium") && painted.includes(">Discord<") && painted.includes(">Join the Discord"));
+t("switch off + live home has no baked club", !paintPublicHtml(home, "/", { PREMIUM_MODE: "live", OPEN_ACCESS: "false" }).includes("See Premium") && !paintPublicHtml(home, "/", { PREMIUM_MODE: "live", OPEN_ACCESS: "false" }).includes("First 222") && !paintPublicHtml(home, "/", { PREMIUM_MODE: "live", OPEN_ACCESS: "false" }).includes("Join the Catch'em Club"));
 
 const block = premiumEmailBlock("waitlist");
 const liveBlock = premiumEmailBlock("live");
@@ -123,7 +123,7 @@ const premium = await worker.fetch(new Request("https://catchemtcg.com/premium")
 const premiumHtml = await premium.text();
 t("switch off: worker premium is the waitlist", pageKind("/premium") === "premium" && premium.status === 200 && premiumHtml.includes("Join the Premium waitlist") && checkoutLeak(premiumHtml) === "");
 const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/"), gatedEnv)).text();
-t("switch off: worker home is the waitlist club", homeOff.includes("Join the Premium waitlist") && checkoutLeak(homeOff) === "" && !homeOff.includes(">Get Premium<"));
+t("switch off: worker home has no baked club", !homeOff.includes("Join the Premium waitlist") && !homeOff.includes("Join the Catch'em Club") && checkoutLeak(homeOff) === "" && !homeOff.includes(">Get Premium<") && !homeOff.includes("Discord Premium"));
 const live = await (await worker.fetch(new Request("https://catchemtcg.com/premium"), { ...env, PREMIUM_MODE: "live", OPEN_ACCESS: "false" })).text();
 t("switch off + live worker premium restores Get Premium", live.includes(">Get Premium</a>") && live.includes("https://discord.gg/fUSjxDX4Hy"));
 

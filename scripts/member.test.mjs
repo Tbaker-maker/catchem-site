@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { signSession, readUser } from "../src/quota.mjs";
 import { beginDiscord, finishDiscord } from "../src/auth.mjs";
-import { handleAlert, watchRowsForBot } from "../src/feed-api.mjs";
+import { handleAlert, handleFollow, handleVote, watchRowsForBot } from "../src/feed-api.mjs";
 import { handleMe, handleSmartCollection, handleCollectionImport, normalizeHolding, collectionSummary, renderCollection, renderAlerts, renderAccount } from "../src/member.mjs";
 import { renderSetShell } from "../src/ui.mjs";
 import { pageKind, renderPath } from "../src/index.mjs";
@@ -33,7 +33,7 @@ t("first-run guide chrome", collection.includes('data-onboard="1"') && collectio
 t("guided hits name the set on the second line", collection.includes("var setName=String(row.set||\"\").trim()") && collection.includes("if(setName) bits.push(setName)") && collection.includes("bits.push(\"TCGplayer\")") && !/[—–]/.test(collection));
 t("add cheapest missing chrome", collection.includes("addCheapestMissing") && collection.includes("cheapestAddButton") && collection.includes("data-add-cheap") && collection.includes("Add cheapest") && collection.includes("Undo last add") && collection.includes("showToast") && !/[—–]/.test(collection));
 t("check slot stays off", !renderCollection("").includes("/collection-check") && renderCollection("", { collectionCheck: true }).includes('href="/collection-check"'));
-t("alert settings are on the page", alerts.includes("<h1>Alert settings</h1>") && alerts.includes("Pause all alerts") && alerts.includes('type="time"') && alerts.includes('class="skel"') && !/[\u2014\u2013]/.test(alerts));
+t("alert settings are on the page", alerts.includes("<h1>Alert settings</h1>") && alerts.includes("Pause all alerts") && alerts.includes('type="time"') && alerts.includes('class="skel"') && alerts.includes("Alert notes save on this device. Discord is optional, and it is not a paid plan.") && alerts.includes("catchem-watch") && !alerts.includes("/auth/discord?next=/alerts") && !/[\u2014\u2013]/.test(alerts));
 t("account has export and delete", account.includes("Export my data") && account.includes("Delete my account") && account.includes("Sign-in is optional") === false && !/[\u2014\u2013]/.test(account));
 
 const sealed = normalizeHolding({ sku: "tcgcsv-9", name: "Box NM", kind: "sealed", condition: "NM", qty: 2, price: 10, asOf: "2026-10-16", listings: 22, listingsAsOf: "2026-10-16" });
@@ -87,6 +87,30 @@ for (let i = 0; i < 26; i++) {
   last = res.status;
 }
 t("the 26th alert stops at 25", last === 429);
+
+const unsignedAlertGet = await handleAlert(new Request("https://catchemtcg.com/api/alerts"), env);
+const unsignedAlertGetBody = await unsignedAlertGet.json();
+t("unsigned alerts GET is device only", unsignedAlertGet.status === 200 && unsignedAlertGetBody.ok === true && unsignedAlertGetBody.deviceOnly === true && Array.isArray(unsignedAlertGetBody.rows) && unsignedAlertGetBody.rows.length === 0);
+const unsignedAlertPost = await handleAlert(new Request("https://catchemtcg.com/api/alerts", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ id: "read-x", sku: "tcgcsv-9", price: 10, name: "X", direction: "above" }),
+}), env);
+const unsignedAlertPostBody = await unsignedAlertPost.json();
+t("unsigned alerts POST does not write or demand Discord", unsignedAlertPost.status === 200 && unsignedAlertPostBody.ok === true && unsignedAlertPostBody.deviceOnly === true && (await env.FEED_KV.get("alerts:anon")) == null);
+const vote = await handleVote(new Request("https://catchemtcg.com/api/vote", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ id: "r1", vote: "up" }),
+}), env);
+t("votes still need Discord", vote.status === 401);
+const follow = await handleFollow(new Request("https://catchemtcg.com/api/follow", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ id: "r1", sku: "tcgcsv-9" }),
+}), env);
+t("follows still need Discord", follow.status === 401);
+
 const botRows = watchRowsForBot(Array.from({ length: 30 }, (_, i) => ({ sku: "tcgcsv-" + i, name: "N", price: 5, direction: "up", kind: i === 0 ? "sealed" : "single" })));
 t("bot payload uses the same cap", botRows.length === 25 && botRows[0].price_dir === "above" && botRows[0].kind === "sealed");
 
@@ -172,6 +196,13 @@ function evalTemplate(s) {
 let clientOk = false;
 try { new Function(evalTemplate(clientLit)); clientOk = true; } catch { clientOk = false; }
 t("collection CLIENT script parses", clientOk);
+
+const alertStart = collectionSrc.indexOf("const ALERT_JS = `");
+const alertEnd = collectionSrc.indexOf("`;\n", alertStart);
+const alertExpr = collectionSrc.slice(alertStart + "const ALERT_JS = ".length, alertEnd + 1);
+let alertOk = false;
+try { new Function(Function("return (" + alertExpr + ")")()); alertOk = true; } catch { alertOk = false; }
+t("ALERT_JS script parses", alertOk);
 
 const vtSrc = readFileSync(new URL("../src/variant-tracker.mjs", import.meta.url), "utf8");
 const vtBodyStart = vtSrc.indexOf("const body = `");

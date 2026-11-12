@@ -1,7 +1,7 @@
-// Product page chart: switchable views from published series only. No sales, sold,
-// demand, or MSRP view (none is published). Listings are bars on real nights only.
+// Product page chart: switchable views from published series only. These checks run
+// without sold data: the Sold view (eBay sold comps) is covered in market-depth.test.mjs.
 import vm from "node:vm";
-import { productChart, chartViews, defaultView, listingPoints, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
+import { productChart, chartViews, defaultView, listingPoints, chartWindow, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
 let fail = 0;
@@ -78,4 +78,38 @@ t("sealed camera watermark uses the product slug", sealedSlug.includes('class="p
 const card = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 5, asOf: "2026-10-12", hist: [["2026-10-01", 4], ["2026-10-12", 5]] }, "stamp", {});
 t("card page has price and % change only, opening on Price", card.includes('<figure class="hc pc"') && /<figure class="hc pc" id="chart" data-view="price"/.test(card) && card.includes('data-view="change"') && !card.includes('data-view="listings"'));
 t("chart script waits until the figure is near the viewport", html.includes("IntersectionObserver") && html.includes('rootMargin:"240px"') && html.includes("getElementById(\"chart\")") && html.includes(PRODUCT_CHART_JS));
+
+// All on Price + listings must show the full price history. Listings bars start
+// later; they must not clip the x-axis. Same rule for 1Y / 6M / 3M / 1M.
+const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+const longPrice = [
+  ["2025-09-30", 968.74, "f"],
+  ["2025-12-01", 1000, "f"],
+  ["2026-06-01", 1100, "f"],
+  ["2026-10-10", 1230.1, "n"],
+  ["2026-11-12", 1142.66, "n"],
+];
+const lateList = [["2026-10-10", 7], ["2026-10-30", 7]];
+const allBoth = chartWindow("both", 0, longPrice, lateList);
+t("All on Price + listings starts at the first price day, not the first listings day", iso(allBoth.t0) === "2025-09-30" && allBoth.p[0][0] === "2025-09-30" && allBoth.p.length === 5);
+t("All on Price + listings ends on the last price day", iso(allBoth.t1) === "2026-11-12");
+t("All on Price + listings still draws listings from the first listings night", allBoth.l[0][0] === "2026-10-10" && allBoth.l.length === 2);
+
+const yBoth = chartWindow("both", 366, longPrice, lateList);
+t("1Y on Price + listings is not clamped to the listings start", yBoth.p[0][0] === "2025-12-01" && iso(yBoth.t0) === "2025-12-01");
+const sixBoth = chartWindow("both", 183, longPrice, lateList);
+t("6M on Price + listings includes prices before listings start", sixBoth.p[0][0] === "2026-06-01" && iso(sixBoth.t0) === "2026-06-01");
+const threeBoth = chartWindow("both", 92, longPrice, lateList);
+t("3M on Price + listings starts at the first point inside the window", threeBoth.p[0][0] === "2026-10-10");
+const monthBoth = chartWindow("both", 31, longPrice, lateList);
+t("1M on Price + listings counts back from the last price day", iso(monthBoth.t1) === "2026-11-12" && monthBoth.p.some((row) => row[0] === "2026-11-12"));
+
+const allPrice = chartWindow("price", 0, longPrice, lateList);
+const allChange = chartWindow("change", 0, longPrice, lateList);
+t("All on Price and % change show the full price history", iso(allPrice.t0) === "2025-09-30" && iso(allChange.t0) === "2025-09-30" && allPrice.l.length === 0 && allChange.l.length === 0);
+const allList = chartWindow("listings", 0, longPrice, lateList);
+t("All on Listings stays on the listings series", iso(allList.t0) === "2026-10-10" && iso(allList.t1) === "2026-10-30" && allList.p.length === 0);
+
+t("client chart uses the shared window function and does not clamp All to listings", PRODUCT_CHART_JS.includes("var chartWindow=function chartWindow(") && PRODUCT_CHART_JS.includes("chartWindow(view,days,P,L)") && !/from=Math\.max\(from,ms\(L\[0\]\[0\]\)\)/.test(PRODUCT_CHART_JS));
+
 if (fail) process.exit(1); else console.log("product chart ok");

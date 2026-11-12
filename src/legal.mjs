@@ -3,7 +3,7 @@ import { LEGAL_TEXT } from "./legal-text.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { pageChrome } from "./ui.mjs";
 
-export const LEGAL_UPDATED = "Last updated: 13 October 2026";
+export const LEGAL_UPDATED = "Last updated: 11 November 2026";
 export const LEGAL_PATHS = { "/terms": "terms", "/privacy": "privacy", "/disclaimer": "disclaimer" };
 const TITLES = { terms: "Terms of Service", privacy: "Privacy Policy", disclaimer: "Disclaimer" };
 

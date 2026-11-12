@@ -1,11 +1,12 @@
 import { openDataHref, ITEM_SECTIONS } from "./open-data.mjs";
-import { artType } from "./art-type.mjs";
+import { artType, artTypeSource } from "./art-type.mjs";
 import { marketOverMsrp, msrpSourceLabel } from "./msrp.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { productChart } from "./product-chart.mjs";
+import { marketDepthHtml, soldSeries } from "./market-depth.mjs";
 import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
@@ -14,7 +15,7 @@ import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, phoneCardHeroImg, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
-import { SEALED_SHELF_CSS, shelfClientSource } from "./sealed-shelf.mjs";
+import { SEALED_SHELF_CSS, sealedFrameRel, shelfClientSource } from "./sealed-shelf.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
@@ -774,7 +775,9 @@ function receiptBacked(row) {
 
 // Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
 // that carry their own source line and date. Behind reads.library in that repo.
-const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep", "rip", "release-cycle", "season", "pattern-forming", "pattern-ending", "year-ago", "year-range"]);
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep", "rip", "release-cycle", "season", "pattern-forming", "pattern-ending", "year-ago", "year-range",
+  // PkmnPrices pathways (Catchem-data scripts/lib/ppp-reads): dated facts with their source.
+  "sold-gap", "sold-pace", "sold-trend", "sell-through", "msrp-sold", "pop-growth", "gem-rate", "low-pop", "graded-spread", "eu-gap", "jp-en", "range52"]);
 export function isBoardV3Row(row) {
   if (!row || typeof row !== "object" || (row.board !== "v3" && !(row.board === "hist" && (row.readKind || row.kind) === "set"))) return false;
   if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
@@ -1895,7 +1898,7 @@ ${opts.setValueHtml || ""}
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
+</div><p class="muted" id="filter-count" aria-live="polite"></p><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
@@ -1912,7 +1915,7 @@ function html(s){
   });
 }
 let rows=[], shown=48, setLogo="", shelfIds={};
-${artType.toString()}
+${artTypeSource()}
 let catImages={};
 ${cataloguePath.toString()}
 ${browserAssetUrl.toString()}
@@ -2037,7 +2040,7 @@ function draw(){
   const vtag=vsel?vsel.value:"";
   var artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
   var artWant=artOn?String(artOn.getAttribute("data-art")||""):"";
-  if(artWant) list=list.filter(function(r){return r.kind==="sealed"||artType(r)===artWant;});
+  if(artWant) list=list.filter(function(r){return r.kind!=="sealed" && artType(r)===artWant;});
   if(vtag) list=list.filter(r=>(r.tags||[]).indexOf(vtag)>=0);
   if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")+" "+(r.tags||[]).join(" ")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
@@ -2051,6 +2054,13 @@ function draw(){
   });
   const view=main.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(rowHtml).join("") || (order.length?"":'<p class="muted">Nothing matches.</p>');
+  var countEl=document.getElementById("filter-count");
+  if(countEl){
+    var n=list.length;
+    var line="Showing "+n+(n===1?" match.":" matches.");
+    if(artWant) line+=" "+artWant+".";
+    countEl.textContent=line;
+  }
   document.getElementById("sections").innerHTML=order.map(function(name){
     const id=String(name).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
     const cards=grouped[name];
@@ -2125,9 +2135,10 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   setLogo=logoSrc||"";
   document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+setTiles(data);
   const hasIdx=function(a){ return Array.isArray(a) && a.filter(function(p){ return p && p.v!=null && Number(p.n)>0; }).length>=2; };
-  const boxSingle='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
-  const boxSealed='<div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
-  document.getElementById("charts").innerHTML=(hasIdx(data.singleIndex)?boxSingle:"")+(hasIdx(data.sealedIndex)?boxSealed:"");
+  const chartScope='<p class="muted" id="chart-scope">This chart is the whole set. The chips below filter the card list.</p>';
+  const boxSingle='<div class="chart-box"><p class="muted">Singles index for the whole set</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  const boxSealed='<div class="chart-box"><p class="muted">Sealed index for the whole set</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  document.getElementById("charts").innerHTML=((hasIdx(data.singleIndex)||hasIdx(data.sealedIndex))?chartScope:"")+(hasIdx(data.singleIndex)?boxSingle:"")+(hasIdx(data.sealedIndex)?boxSealed:"");
   const sc=document.getElementById("single-chart"), dc=document.getElementById("sealed-chart");
   if(sc){ sc.setAttribute("data-chart", JSON.stringify(data.singleIndex||[])); sc.setAttribute("data-release", data.release||""); }
   if(dc){ dc.setAttribute("data-chart", JSON.stringify(data.sealedIndex||[])); dc.setAttribute("data-release", data.release||""); }
@@ -2148,7 +2159,13 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   var title=document.getElementById("title");
   if(title && title.textContent==="Set") title.textContent="This set did not load.";
 });
-["kind","q","sort","scope","vtag"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
+["kind","sort","scope","vtag"].forEach(function(id){
+  var el=document.getElementById(id);
+  function go(){ shown=48; draw(); }
+  el.addEventListener("input", go);
+  el.addEventListener("change", go);
+});
+document.getElementById("q").addEventListener("input", function(){ shown=48; draw(); });
 document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});shown=48;draw();});
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 document.getElementById("mine-toggle").addEventListener("click", function(){
@@ -2850,7 +2867,7 @@ function readLink(card) {
 
 // Item page sections shared by singles and sealed: where it ranks, every read
 // about it, related items, and a jump row. A section is left out when its numbers are missing.
-const KIND_LABEL = { deep: "Deep read", listings: "Listings counted", breadth: "Listings counted", rotation: "Rotation", release: "Release", "release-cycle": "Release cycle", season: "Season", rip: "Rip value", high: "New high", low: "New low", year: "Year", "year-range": "Year range", "year-ago": "A year ago", backto: "Back to", "rarity-band": "Rarity band", "artist-band": "Artist band", set: "Set", streak: "Streak", "pattern-forming": "Pattern", "pattern-ending": "Pattern", "past-cases": "Past cases", mixed: "Mixed", plain: "Price move", mktmove: "Price move" };
+const KIND_LABEL = { deep: "Deep read", listings: "Listings counted", breadth: "Listings counted", rotation: "Rotation", release: "Release", "release-cycle": "Release cycle", season: "Season", rip: "Rip value", high: "New high", low: "New low", year: "Year", "year-range": "Year range", "year-ago": "A year ago", backto: "Back to", "rarity-band": "Rarity band", "artist-band": "Artist band", set: "Set", streak: "Streak", "pattern-forming": "Pattern", "pattern-ending": "Pattern", "past-cases": "Past cases", mixed: "Mixed", plain: "Price move", mktmove: "Price move", "sold-gap": "eBay sold", "sold-pace": "eBay sales pace", "sold-trend": "eBay sold", "sell-through": "Sold per listing", "msrp-sold": "Sold vs MSRP", "pop-growth": "Graded pop", "gem-rate": "Gem rate", "low-pop": "Graded pop", "graded-spread": "PSA 10 vs raw", "eu-gap": "Cardmarket", "jp-en": "Japanese vs English", "range52": "52-week range" };
 const ITEM_CSS = `.item-jump{display:flex;gap:8px;overflow-x:auto;margin:14px 0 4px;padding:2px 0 6px;scrollbar-width:none}.item-jump::-webkit-scrollbar{display:none}
 .item-jump a{flex:0 0 auto;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}
 .item-sec{margin:16px 0;padding:16px;border-radius:20px;background:#15130f;border:1px solid #2f2b26}.item-sec>h2{margin:0 0 10px;font-size:18px}
@@ -3024,7 +3041,8 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   // One switchable chart: price, listings counted, both, % change (only views with data).
-  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, asOf: endDay, path: chartPath(card, opts) });
+  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, sold: held ? [] : soldSeries(opts.marketDepth), soldSource: opts.marketDepth?.source, asOf: endDay, path: chartPath(card, opts) });
+  const depthHtml = held ? "" : marketDepthHtml(opts.marketDepth, { kind: "single" });
   const chartOn = !!(priceChart || rangeRow);
   const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
   const boardSrc = Array.isArray(opts.boardReads) ? opts.boardReads : (opts.productReads || []);
@@ -3081,6 +3099,7 @@ ${ebayBlock(opts.priceRead)}
 </div>
 </header>
 ${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div><script>${HISTORY_JS}</script>` : ""}
+${depthHtml}
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
@@ -3265,7 +3284,8 @@ export function renderCard(card, stamp, opts = {}) {
   // wins on overlap, so fill only covers days after its last point.
   const priceSeries = cardPriceSeries(card, hist, sealed);
   // One switchable chart for the sealed page: price, eBay listings counted, both, % change.
-  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull", path: chartPath(card, opts) }) || historyChart(priceSeries, { asOf: endDay });
+  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], sold: held ? [] : soldSeries(opts.marketDepth), soldSource: opts.marketDepth?.source, asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull", path: chartPath(card, opts) }) || historyChart(priceSeries, { asOf: endDay });
+  const depthHtml = held ? "" : marketDepthHtml(opts.marketDepth, { kind: sealed ? "sealed" : "single" });
   // Quick-view sheets on this page still mount the shared history chart.
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
@@ -3304,13 +3324,12 @@ export function renderCard(card, stamp, opts = {}) {
 <style>
 .glance{display:block;max-width:100%}
 .glance-photo{max-width:100%}
-.glance-photo{display:flex;align-items:center;justify-content:center;width:min(320px,100%);aspect-ratio:1/1;padding:18px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
-.glance-photo img{border-radius:12px;max-height:100%}
-.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
+.glance-photo{display:flex;align-items:flex-end;justify-content:center;width:min(280px,100%);height:300px;padding:12px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
+.glance-photo img,.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:auto;max-width:100%;height:calc(var(--rel, 0.88) * 260px);max-height:100%;object-fit:contain;object-position:center bottom;border-radius:12px}
 @media (max-width:767px){
   .product-glance{padding-bottom:16px}
-  .glance-photo{width:min(156px,42vw);padding:8px}
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(140px,100%)}
+  .glance-photo{width:min(240px,78vw);height:280px;padding:10px}
+  .glance-photo img,.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{height:calc(var(--rel, 0.88) * 240px)}
 }
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
@@ -3323,11 +3342,7 @@ export function renderCard(card, stamp, opts = {}) {
 .sealed-rip dd{margin:2px 0 0;font:650 16px/1.2 var(--sans)}
 .sealed-rip .muted{font-size:14px}
 @media (min-width:768px){
-  .glance{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(200px,100%)}
-}
-@media (min-width:1100px){
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(240px,100%)}
+  .glance{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
 }
 .yr{margin:2px 0 14px;max-width:100%}
 .yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
@@ -3337,7 +3352,7 @@ export function renderCard(card, stamp, opts = {}) {
 @media(max-width:480px){.yr-line{font-size:11px;letter-spacing:-.03em}}
 </style>
 <div class="glance">
-<div class="glance-photo">${img}</div>
+<div class="glance-photo" style="--rel:${sealedFrameRel(card)}">${img}</div>
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
@@ -3357,6 +3372,7 @@ ${storeLinksHtml(card, esc)}
 ${priceChart}
 ${rangeRow}</section>
 ${historyJs}
+${depthHtml}
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${(Array.isArray(opts.listingSeries) && opts.listingSeries.length >= 2) || (opts.itemListings && Number.isFinite(Number(opts.itemListings.n)) && Number(opts.itemListings.n) > 0) ? `<section class="item-sec" id="supply"><h2>Listings</h2><p>The listings figure is in the chart under Price.</p></section>` : ""}
@@ -4110,7 +4126,7 @@ const affTcg=${affTcg.toString()};
 const affEbay=${affEbay.toString()};
 const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
-${artType.toString()}
+${artTypeSource()}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
 let catImages={};
@@ -4338,7 +4354,10 @@ document.getElementById("q").addEventListener("focus",function(){
   if(manifest||usedLite) return;
   fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
 });
-document.getElementById("vtag").addEventListener("input",draw);
+var vtagEl=document.getElementById("vtag");
+function onVtag(){ draw(); }
+vtagEl.addEventListener("input", onVtag);
+vtagEl.addEventListener("change", onVtag);
 document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});limit=40;draw();});
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
@@ -6020,7 +6039,7 @@ function cardEl(card, facts){
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
       .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
       .then(function(res){
-        if(!res.ok) return;
+        if(!res.ok || (res.j && res.j.deviceOnly)) return;
         sheet.classList.remove("open");
         trackBtn.textContent="Tracking";
         let done=el.querySelector(".track-done");
