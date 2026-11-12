@@ -2,7 +2,7 @@
 // and a mail key is present. Do not sign up for a paid provider from this code.
 // Reuses the same Resend HTTP shape as reads-email when armed. Never logs keys.
 
-import { validEmail, maskEmail, EMAIL_FROM, EMAIL_KEY, emailSendAllowed } from "./reads-email.mjs";
+import { validEmail, maskEmail, EMAIL_FROM, EMAIL_KEY, emailSendAllowed, emailLink, emailLinkOk, emailMailingAddress, listHeaders } from "./reads-email.mjs";
 import { morningBrief, normalizeGoal, defaultGoal, goalLabel } from "./smart-collection.mjs";
 import { isClean } from "./advice-rules.mjs";
 
@@ -30,7 +30,7 @@ export function normalizeBriefEmailPrefs(raw) {
   };
 }
 
-export function buildMorningBriefEmail({ day, brief, origin = "https://catchemtcg.com" }) {
+export function buildMorningBriefEmail({ day, brief, origin = "https://catchemtcg.com", stopUrl = "", mailingAddress = "" } = {}) {
   const label = brief?.label || goalLabel(brief?.goal) || "Collecting";
   const sections = Array.isArray(brief?.sections) ? brief.sections : [];
   const lines = [];
@@ -69,15 +69,26 @@ export function buildMorningBriefEmail({ day, brief, origin = "https://catchemtc
     "",
     `Open your collection: ${open}`,
     "",
-    "You opted in to this email. Turn it off on My collection.",
-  ].join("\n");
+    stopUrl ? `Unsubscribe: ${stopUrl}` : "You opted in to this email. Turn it off on My collection.",
+    String(mailingAddress || "").trim(),
+  ].filter((line) => line !== "").join("\n");
   const htmlLines = lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("");
+  const addr = String(mailingAddress || "").trim();
+  const foot = stopUrl
+    ? `<p style="opacity:.7;font-size:13px"><a href="${escapeHtml(stopUrl)}" style="color:#d4a017">Unsubscribe</a></p>`
+    : `<p style="opacity:.7;font-size:13px">You opted in to this email. Turn it off on My collection.</p>`;
+  const address = addr
+    ? `<p style="opacity:.7;font-size:13px">${escapeHtml(addr)}</p>`
+    : "<!-- mailingAddress empty; a postal address is required before any real subscriber send -->";
   const html = `<!doctype html><html><body style="font-family:IBM Plex Sans,Helvetica,Arial,sans-serif;background:#12100e;color:#f5f0e8;padding:24px">
+<div style="max-width:390px;margin:0 auto">
 <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600">Morning Brief</h1>
 <p style="opacity:.8">${escapeHtml(label)}</p>
 <ul>${htmlLines || "<li>Add items to fill this brief.</li>"}</ul>
 <p><a href="${escapeHtml(open)}" style="color:#d4a017">Open My collection</a></p>
-<p style="opacity:.7;font-size:13px">You opted in to this email. Turn it off on My collection.</p>
+${foot}
+${address}
+</div>
 </body></html>`;
   return { subject, text, html, lines };
 }
@@ -109,15 +120,17 @@ export async function readBriefEmailPrefs(store, discordId) {
 }
 
 /** Send one brief. No-ops unless morningBriefEmailArmed(env). Never throws the key. */
-export async function sendMorningBriefEmail({ env, to, brief, day, fetchImpl = fetch }) {
+export async function sendMorningBriefEmail({ env, to, brief, day, stopUrl = "", fetchImpl = fetch } = {}) {
   if (!morningBriefEmailArmed(env)) {
     return { ok: false, skipped: true, reason: "flag-off" };
   }
   const email = validEmail(to);
   if (!email) return { ok: false, skipped: true, reason: "bad-email" };
-  const built = buildMorningBriefEmail({ day, brief });
+  const mailingAddress = emailMailingAddress(env);
+  const built = buildMorningBriefEmail({ day, brief, stopUrl, mailingAddress });
   const key = String(env?.[EMAIL_KEY] || "").trim();
   if (!key) return { ok: false, skipped: true, reason: "no-key" };
+  const headers = listHeaders(stopUrl);
   const res = await fetchImpl("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -130,6 +143,7 @@ export async function sendMorningBriefEmail({ env, to, brief, day, fetchImpl = f
       subject: built.subject,
       text: built.text,
       html: built.html,
+      headers,
     }),
   });
   if (!res.ok) return { ok: false, skipped: false, reason: "provider", status: res.status };
@@ -153,3 +167,20 @@ export async function handleBriefEmailStatus(request, env) {
   // Optional: if Authorization cookie present, caller can pass ? via member. Keep this public flag-only.
   return new Response(JSON.stringify({ ok: true, armed, flag: BRIEF_EMAIL_FLAG, goLive: goLiveChecklist() }), { status: 200, headers });
 }
+
+export async function briefStopLink(env, origin, discordId, email) {
+  return emailLink(env, origin, "brief-stop", discordId, email);
+}
+
+export async function handleBriefEmailStop(request, env) {
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get("id") || "").replace(/^d:/, "");
+  const mac = String(url.searchParams.get("t") || "");
+  const rec = await (env?.FEED_KV?.get ? env.FEED_KV.get(`morning-brief-email:${id}`, "json") : null);
+  const email = validEmail(rec?.email);
+  const ok = email && await emailLinkOk(env, "brief-stop", id, email, mac);
+  if (!ok) return new Response("Not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+  await saveBriefEmailPrefs(env.FEED_KV, id, { ...rec, optIn: false, email });
+  return new Response("<!doctype html><html><body><h1>Email stopped</h1><p>You will not get the Catch'em Morning Brief by email. You can turn it on again from My collection.</p></body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+

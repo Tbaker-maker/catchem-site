@@ -12,7 +12,6 @@ import { stageFromChips, stageLine } from "./run-stage.mjs";
 import { patternBarsEmail, patternFromGate } from "./pattern-track.mjs";
 import { flagForItem, flagWord } from "./premium-ratio.mjs";
 import { meterEmailBlock, meterPlainLine } from "./market-meter.mjs";
-import { premiumEmailBlock, premiumPlainLine } from "./premium-mode.mjs";
 
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
@@ -45,6 +44,12 @@ export function okCopy(text) {
   if (s.toLowerCase().includes(["no", "data"].join(" "))) return false;
   return !GUARD.test(s);
 }
+export function emptyFilterLine(premiumRatioActive) {
+  return premiumRatioActive
+    ? "No reads match this premium filter today."
+    : "No reads match this filter today.";
+}
+
 export function day(d) {
   const m = String(d || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? MONTHS[Number(m[2]) - 1] + " " + Number(m[3]) : "";
@@ -347,8 +352,8 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     const report = watchReport(follow, reportPool, history.sinceDay, asOf || ctx.asOf);
     const empty = {
       asOf, length, path, label: filter.label, intro: "", fallback: "",
-      lead: report ? "Your watchlist." : "No reads match this premium filter today.",
-      emptyPremium: true, top: null, ups: [], downs: [], supply: [], tiles: [],
+      lead: report ? "Your watchlist." : emptyFilterLine(true),
+      emptyPremium: true, premiumRatio: want, top: null, ups: [], downs: [], supply: [], tiles: [],
       vintage: null, pattern: null, rotation: null, news: null, setCompare: [],
       report, away: null, quiet: true, building: [],
     };
@@ -503,7 +508,7 @@ function shell(title, preheader, body, footer) {
 <style>:root{color-scheme:light dark;supported-color-schemes:light dark}
 ${darkCss()}</style></head>
 <body class="ce-page" style="margin:0;padding:0;background:${C.page}"><div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-page" bgcolor="${C.page}" style="background:${C.page}"><tr><td align="center" style="padding:16px 14px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:420px">${body}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-page" bgcolor="${C.page}" style="background:${C.page}"><tr><td align="center" style="padding:16px 14px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:390px">${body}
 <tr><td class="ce-soft" style="padding:8px 10px;text-align:center;font:400 11px/1.5 ${FONT};color:${C.soft}">${footer}</td></tr></table></td></tr></table></body></html>`;
 }
 
@@ -551,29 +556,44 @@ function buildingCard(rows) {
 
 const LENGTH_NAME = { glance: "Glance", standard: "Daily read", deep: "Deep dive" };
 
-export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null, premiumMode = "waitlist" } = {}) {
+
+export function caslAddressLine(mailingAddress = "") {
+  return String(mailingAddress || "").trim();
+}
+
+function caslFooterHtml(mailingAddress = "") {
+  const addr = caslAddressLine(mailingAddress);
+  return addr
+    ? `<p class="ce-soft" style="margin:10px 0 0;font:400 12px/1.45 ${FONT};color:${C.soft}">${esc(addr)}</p>`
+    : "<!-- mailingAddress empty; a postal address is required before any real subscriber send -->";
+}
+
+function caslFooterText(mailingAddress = "") {
+  return caslAddressLine(mailingAddress);
+}
+
+export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null, mailingAddress = "" } = {}) {
   const L = doc.length;
   const when = day(doc.asOf);
   if (doc.emptyPremium) {
     const body = [];
     body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
     if (doc.meter) { const block = meterEmailBlock(doc.meter); if (block) body.push(block); }
-    body.push(premiumEmailBlock(premiumMode));
     if (doc.report) body.push(reportCard(doc.report, L));
-    else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">No reads match this premium filter today.</p>`));
+    else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">${emptyFilterLine(doc.premiumRatio === "below" || doc.premiumRatio === "above")}</p>`));
     const footer = [
       "Prices are TCGplayer market on the dates shown. Listings counted are eBay listings on the dates shown. A listing is not a sale.",
       SHOP_NOTE,
       page ? "" : `You follow this read. <a href="${esc(manage)}" style="color:${C.soft}">Change what you follow</a>${unsubscribe ? ` or <a href="${esc(unsubscribe)}" style="color:${C.soft}">unsubscribe</a>` : ""}.`,
       AFFILIATION + " " + TCGPLAYER_ATTRIBUTION,
-    ].filter(Boolean).map((l, i) => (i === 2 ? l : esc(l))).join("<br>");
+      caslFooterHtml(mailingAddress),
+    ].filter(Boolean).map((l, i) => (i === 2 || String(l).startsWith("<") || String(l).startsWith("<!--") ? l : esc(l))).join("<br>");
     return shell(`Your Catch'em reads, ${when}`, doc.lead, body.join("\n"), footer);
   }
   const anchor = (id) => (more ? more + "#" + id : "");
   const body = [];
   body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
   if (doc.meter) { const block = meterEmailBlock(doc.meter); if (block) body.push(block); }
-  body.push(premiumEmailBlock(premiumMode));
   const sub = `${LENGTH_NAME[L]} · ${when} · ${doc.label}`;
   body.push(card(`<p class="ce-ink" style="margin:0 0 6px;font:700 21px/1.3 ${FONT};color:${C.ink}">${esc(doc.lead)}</p><p class="ce-soft" style="margin:0;font:400 13px/1.4 ${FONT};color:${C.soft}">${esc(sub)}</p>${L !== "glance" ? para(doc.intro) : ""}${doc.fallback ? para(doc.fallback, ";font-style:italic") : ""}`));
   if (doc.report) body.push(reportCard(doc.report, L));
@@ -613,20 +633,20 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     SHOP_NOTE,
     page ? "" : `You follow this read. <a href="${esc(manage)}" style="color:${C.soft}">Change what you follow</a>${unsubscribe ? ` or <a href="${esc(unsubscribe)}" style="color:${C.soft}">unsubscribe</a>` : ""}.`,
     AFFILIATION + " " + TCGPLAYER_ATTRIBUTION,
-  ].filter(Boolean).map((l, i) => (i === 2 ? l : esc(l))).join("<br>");
+    caslFooterHtml(mailingAddress),
+  ].filter(Boolean).map((l, i) => (i === 2 || String(l).startsWith("<") || String(l).startsWith("<!--") ? l : esc(l))).join("<br>");
   return shell(`Your Catch'em reads, ${when}`, doc.lead, body.join("\n"), footer);
 }
 
-export function articleText(doc, { unsubscribe = "", more = "", suggest = null, premiumMode = "waitlist" } = {}) {
+export function articleText(doc, { unsubscribe = "", more = "", suggest = null, mailingAddress = "" } = {}) {
   const meterLine = doc.meter ? meterPlainLine(doc.meter) : "";
-  const upsell = premiumPlainLine(premiumMode);
   if (doc.emptyPremium) {
-    const out = [meterLine, upsell, doc.report ? "Your watchlist." : "No reads match this premium filter today."].filter((l) => l !== undefined && l !== "");
+    const out = [meterLine, doc.report ? "Your watchlist." : emptyFilterLine(doc.premiumRatio === "below" || doc.premiumRatio === "above")].filter((l) => l !== undefined && l !== "");
     if (doc.report) out.push(...doc.report.rows.map((r) => [r.name, flagWord(r.premiumFlag)].filter(Boolean).join(". ")));
-    out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads");
+    out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads", caslFooterText(mailingAddress));
     return out.filter((l) => l !== undefined).join("\n");
   }
-  const out = [meterLine, upsell, doc.lead, doc.intro].filter((l) => l !== undefined && l !== "");
+  const out = [meterLine, doc.lead, doc.intro].filter((l) => l !== undefined && l !== "");
   if (doc.fallback) out.push(doc.fallback);
   const w = (r) => `${r.name}: ${money(r.from[1])} on ${day(r.from[0])} to ${money(r.to[1])} on ${day(r.to[0])} (${pct(r.change)})`;
   if (doc.report) out.push("", "Watchlist report card, since " + day(doc.report.since), ...doc.report.rows.map(w));
@@ -637,7 +657,7 @@ export function articleText(doc, { unsubscribe = "", more = "", suggest = null, 
   if (doc.building?.length && doc.length !== "glance") out.push("", "What's building quietly", ...doc.building.map((r) => r.name + ": " + r.line));
   if (more) out.push("", "Read the full version: " + more);
   if (suggest?.href) out.push("", suggest.text + " " + suggest.label + ": " + suggest.href);
-  out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads");
+  out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads", caslFooterText(mailingAddress));
   return out.filter((l) => l !== undefined).join("\n");
 }
 

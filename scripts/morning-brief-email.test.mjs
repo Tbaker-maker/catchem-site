@@ -9,6 +9,7 @@ import {
   goLiveChecklist,
   BRIEF_EMAIL_FLAG,
 } from "../src/morning-brief-email.mjs";
+import { listHeaders } from "../src/reads-email.mjs";
 
 let fail = 0;
 const t = (name, ok) => { console.log((ok ? "ok   " : "FAIL ") + name); if (!ok) fail++; };
@@ -52,6 +53,18 @@ t("no em dash in module", !/[\u2013\u2014]/.test(src));
 for (const line of [built.subject, "You opted in to this email. Turn it off on My collection.", "Sending stays skipped while the flag is off."]) {
   t("advice: " + line.slice(0, 36), flagLine(line).length === 0);
 }
+
+
+const stopped = buildMorningBriefEmail({
+  day: "Oct 28, 2026",
+  brief,
+  stopUrl: "https://catchemtcg.com/collection/brief-email/stop?id=1&t=abcd",
+  mailingAddress: "",
+});
+t("morning brief is 390 wide and carries unsubscribe", stopped.html.includes("max-width:390px") && stopped.html.includes("Unsubscribe") && stopped.text.includes("Unsubscribe: https://catchemtcg.com/collection/brief-email/stop?id=1&t=abcd") && stopped.html.includes("<!-- mailingAddress empty; a postal address is required before any real subscriber send -->") && !stopped.html.includes("$14.99") && !stopped.html.includes("Join the Premium waitlist"));
+t("brief List-Unsubscribe accepts the brief stop URL", listHeaders("https://catchemtcg.com/collection/brief-email/stop?id=1&t=abcd")["List-Unsubscribe"].includes("/collection/brief-email/stop"));
+const addressed = buildMorningBriefEmail({ day: "Oct 28, 2026", brief, mailingAddress: "100 Example St, Town, BC" });
+t("a supplied postal address shows in the brief", addressed.html.includes("100 Example St, Town, BC") && addressed.text.includes("100 Example St, Town, BC"));
 
 if (fail) { console.error(fail + " failed"); process.exit(1); }
 console.log("morning-brief-email tests passed");

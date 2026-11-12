@@ -1,7 +1,7 @@
 // Custom Reads email article on top of the #291 send path: approved white card
 // look, story lines, honesty rules, supply lead, pathways, lengths, brief page.
 import worker from "../src/index.mjs";
-import { analyze, buildArticle, cleanLength, followFromPlan, loadContext, pathwayOf, renderArticle, storyFor } from "../src/reads-article.mjs";
+import { analyze, articleText, buildArticle, caslAddressLine, cleanLength, followFromPlan, loadContext, pathwayOf, renderArticle, storyFor } from "../src/reads-article.mjs";
 import { briefLink, deliverOutboxEmails, emailLink, handleBrief } from "../src/reads-email.mjs";
 import { gatePlan, lengthPicker, planFromFields, renderReadsPage, PRESETS } from "../src/reads.mjs";
 
@@ -135,6 +135,15 @@ const plain = JSON.parse(calls[1].init.body);
 t("a day with nothing to write up falls back to the #291 letter", calls.length === 2 && plain.html.includes("Ledian 144/142") && !plain.html.includes("Three moves"));
 const off = await deliverOutboxEmails({ store, env: { FEED_KV: store }, outbox: { day: "2026-10-20", members: outbox.members }, fetchImpl: resend, articleCtx: ctx });
 t("nothing sends without READS_EMAIL_KEY", off.armed === false && calls.length === 2);
+
+
+t("the article letter is 390 wide and has no plan price or waitlist CTA", html.includes("max-width:390px") && html.includes('width="100%"') && !html.includes("Join the Premium waitlist") && !html.includes("$14.99") && html.includes("<!-- mailingAddress empty; a postal address is required before any real subscriber send -->"));
+const withAddr = renderArticle(art, { mailingAddress: "100 Example St, Town, BC" });
+t("a supplied postal address appears in the article footer", withAddr.includes("100 Example St, Town, BC") && caslAddressLine("") === "");
+const emptyFilter = renderArticle({ ...art, emptyPremium: true, report: null }, {});
+t("an unmatched filter uses plain wording", emptyFilter.includes("No reads match this filter today.") && !emptyFilter.includes("premium filter") && !emptyFilter.includes("Join the Premium waitlist"));
+const emptyText = articleText({ ...art, emptyPremium: true, report: null }, {});
+t("plain text also drops the plan CTA", emptyText.includes("No reads match this filter today.") && !emptyText.includes("$14.99") && !emptyText.includes("Join the Premium waitlist"));
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("reads article ok");
