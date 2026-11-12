@@ -82,3 +82,10 @@ export function artType(item) {
   if (printing.indexOf("holofoil") >= 0 || rarity === "Holo Rare" || rarity === "Rare Holo") return "Holo";
   return "Regular";
 }
+
+// The set page and the search page copy this into a script tag. Copy the
+// helpers too, or the first card that is not an illustration rare throws
+// and the list never redraws.
+export function artTypeSource() {
+  return [hasWord, isLetter, numOverSet, startsCode, artType].map((fn) => fn.toString()).join("\n");
+}

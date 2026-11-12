@@ -1,5 +1,5 @@
 import { openDataHref, ITEM_SECTIONS } from "./open-data.mjs";
-import { artType } from "./art-type.mjs";
+import { artType, artTypeSource } from "./art-type.mjs";
 import { marketOverMsrp, msrpSourceLabel } from "./msrp.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
@@ -1898,7 +1898,7 @@ ${opts.setValueHtml || ""}
 <select id="vtag" aria-label="Variant"><option value="">All variants</option></select>
 <input id="q" aria-label="Filter by name, rarity, or artist" placeholder="Name, rarity, artist">
 <select id="sort" aria-label="Sort"><option value="price">Price</option><option value="name">Name</option><option value="num">Number</option></select>
-</div><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
+</div><p class="muted" id="filter-count" aria-live="polite"></p><p class="muted" id="mine-line"></p><div id="list"></div><button id="more" type="button">Show more</button><div id="sections"></div></main>
 <script type="application/json" id="meta">${JSON.stringify({ slug }).replace(/</g, "\\u003c")}</script>
 <script>
 const slug=JSON.parse(document.getElementById("meta").textContent).slug;
@@ -1915,7 +1915,7 @@ function html(s){
   });
 }
 let rows=[], shown=48, setLogo="", shelfIds={};
-${artType.toString()}
+${artTypeSource()}
 let catImages={};
 ${cataloguePath.toString()}
 ${browserAssetUrl.toString()}
@@ -2040,7 +2040,7 @@ function draw(){
   const vtag=vsel?vsel.value:"";
   var artOn=document.querySelector("#art-chips button[aria-pressed="+String.fromCharCode(34)+"true"+String.fromCharCode(34)+"]");
   var artWant=artOn?String(artOn.getAttribute("data-art")||""):"";
-  if(artWant) list=list.filter(function(r){return r.kind==="sealed"||artType(r)===artWant;});
+  if(artWant) list=list.filter(function(r){return r.kind!=="sealed" && artType(r)===artWant;});
   if(vtag) list=list.filter(r=>(r.tags||[]).indexOf(vtag)>=0);
   if(q) list=list.filter(r=>(r.name+" "+(r.rarity||"")+" "+(r.artist||"")+" "+(r.num||"")+" "+(r.printing||"")+" "+(r.tags||[]).join(" ")).toLowerCase().includes(q));
   list.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="num"?String(a.num).localeCompare(String(b.num)):((b.price||0)-(a.price||0)));
@@ -2054,6 +2054,13 @@ function draw(){
   });
   const view=main.slice(0, shown);
   document.getElementById("list").innerHTML=view.map(rowHtml).join("") || (order.length?"":'<p class="muted">Nothing matches.</p>');
+  var countEl=document.getElementById("filter-count");
+  if(countEl){
+    var n=list.length;
+    var line="Showing "+n+(n===1?" match.":" matches.");
+    if(artWant) line+=" "+artWant+".";
+    countEl.textContent=line;
+  }
   document.getElementById("sections").innerHTML=order.map(function(name){
     const id=String(name).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
     const cards=grouped[name];
@@ -2128,9 +2135,10 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   setLogo=logoSrc||"";
   document.getElementById("lines").innerHTML=(logoSrc?'<img class="set-logo" alt="" width="220" height="72" loading="lazy" decoding="async" src="'+String(logoSrc).replace(/"/g,"")+'" style="height:72px;width:100%;max-width:280px;object-fit:contain;background:#12100e;border-radius:12px">':brandedTile("logo",{kind:"set",name:data.name}))+setTiles(data);
   const hasIdx=function(a){ return Array.isArray(a) && a.filter(function(p){ return p && p.v!=null && Number(p.n)>0; }).length>=2; };
-  const boxSingle='<div class="chart-box"><p class="muted">Singles index</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
-  const boxSealed='<div class="chart-box"><p class="muted">Sealed index</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
-  document.getElementById("charts").innerHTML=(hasIdx(data.singleIndex)?boxSingle:"")+(hasIdx(data.sealedIndex)?boxSealed:"");
+  const chartScope='<p class="muted" id="chart-scope">This chart is the whole set. The chips below filter the card list.</p>';
+  const boxSingle='<div class="chart-box"><p class="muted">Singles index for the whole set</p><div class="chart" id="single-chart" data-caption="Singles index, chain-linked. TCGplayer market, daily" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  const boxSealed='<div class="chart-box"><p class="muted">Sealed index for the whole set</p><div class="chart" id="sealed-chart" data-caption="Sealed index, chain-linked. TCGplayer market, daily'+(data.fillNote?". "+html(data.fillNote).replace(/\.$/,""):"")+'" style="height:180px;min-height:180px"></div><div class="filters" data-ranges><button type="button" data-range="7D">7D</button><button type="button" data-range="30D">30D</button><button type="button" data-range="90D">90D</button><button type="button" data-range="1Y">1Y</button><button type="button" data-range="All" aria-pressed="true">All</button></div><p class="muted chart-note"></p></div>';
+  document.getElementById("charts").innerHTML=((hasIdx(data.singleIndex)||hasIdx(data.sealedIndex))?chartScope:"")+(hasIdx(data.singleIndex)?boxSingle:"")+(hasIdx(data.sealedIndex)?boxSealed:"");
   const sc=document.getElementById("single-chart"), dc=document.getElementById("sealed-chart");
   if(sc){ sc.setAttribute("data-chart", JSON.stringify(data.singleIndex||[])); sc.setAttribute("data-release", data.release||""); }
   if(dc){ dc.setAttribute("data-chart", JSON.stringify(data.sealedIndex||[])); dc.setAttribute("data-release", data.release||""); }
@@ -2151,7 +2159,13 @@ fetch("/data/sets/"+encodeURIComponent(slug)+".json").then(r=>{if(!r.ok) throw 0
   var title=document.getElementById("title");
   if(title && title.textContent==="Set") title.textContent="This set did not load.";
 });
-["kind","q","sort","scope","vtag"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{shown=48;draw()}));
+["kind","sort","scope","vtag"].forEach(function(id){
+  var el=document.getElementById(id);
+  function go(){ shown=48; draw(); }
+  el.addEventListener("input", go);
+  el.addEventListener("change", go);
+});
+document.getElementById("q").addEventListener("input", function(){ shown=48; draw(); });
 document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});shown=48;draw();});
 document.getElementById("more").addEventListener("click",()=>{shown+=48;draw()});
 document.getElementById("mine-toggle").addEventListener("click", function(){
@@ -4117,7 +4131,7 @@ const affTcg=${affTcg.toString()};
 const affEbay=${affEbay.toString()};
 const queryShardIds=${queryShardIds.toString()};
 function storeLinks(r){var m=String(r[0]).match(/^tcgcsv-([0-9]+)$/);var t=m?'<a href="'+html(affTcg("https://www.tcgplayer.com/product/"+m[1], AFF.tcg))+'" rel="sponsored noopener">TCGplayer</a>':"";var q=ebayQuery({name:r[1],set:r[2],num:r[3],kind:r[5]});var e=q?'<a href="'+html(affEbay("https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(q), AFF.epn))+'" rel="sponsored noopener">eBay</a>':"";return (t||e)?'<span class="store-links">'+[t,e].filter(Boolean).join(" · ")+' <small class="paid-note">Paid link</small></span>':"";}
-${artType.toString()}
+${artTypeSource()}
 function html(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){if(c==="&")return "&"+"amp;";if(c==="<")return "&"+"lt;";if(c===">")return "&"+"gt;";if(c==='"')return "&"+"quot;";return "&"+"#39;"})}
 let rows=[];
 let catImages={};
@@ -4345,7 +4359,10 @@ document.getElementById("q").addEventListener("focus",function(){
   if(manifest||usedLite) return;
   fetch("/data/feed/search/manifest.json").then(function(res){ return res.ok?res.json():null; }).then(function(doc){ if(doc&&!manifest) manifest=doc; }).catch(function(){});
 });
-document.getElementById("vtag").addEventListener("input",draw);
+var vtagEl=document.getElementById("vtag");
+function onVtag(){ draw(); }
+vtagEl.addEventListener("input", onVtag);
+vtagEl.addEventListener("change", onVtag);
 document.getElementById("art-chips").addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;document.querySelectorAll("#art-chips button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});limit=40;draw();});
 (function(){var q0=new URLSearchParams(location.search).get("q");var qi=document.getElementById("q");if(q0&&qi){qi.value=q0.slice(0,80);qi.dispatchEvent(new Event("input"));}})();
 (function(){var t=new URLSearchParams(location.search).get("tag");if(t){var s=document.getElementById("vtag");for(var i=0;i<s.options.length;i++){if(s.options[i].value===t){s.value=t;draw();break;}}}})();
