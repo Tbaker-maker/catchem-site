@@ -662,7 +662,7 @@ const AI_JS = `<script id="ai-boot">
       x.target = "_blank";
       x.rel = "noopener";
       x.textContent = "Post to X";
-      x.style.cssText = "display:inline-flex;align-items:center;min-height:44px;padding:0 14px;margin-left:8px;text-decoration:none";
+      x.style.cssText = "display:inline-flex;align-items:center;min-height:44px;padding:0 14px;margin-left:8px;text-decoration:none;background:#1a1815;color:#efe9de;border:1px solid #403a33;border-radius:10px;font:600 14px/1 'IBM Plex Sans',system-ui,sans-serif";
       out.appendChild(p);
       out.appendChild(b);
       out.appendChild(x);
