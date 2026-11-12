@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { renderSetShell } from "../src/ui.mjs";
+import { renderCard, renderSetShell } from "../src/ui.mjs";
 import { publicContentType } from "../src/data.mjs";
-import { changeOver, sealedShelfHtml, SEALED_SHELF_CSS } from "../src/sealed-shelf.mjs";
+import { changeOver, sealedFrameRel, sealedShelfHtml, SEALED_SHELF_CSS } from "../src/sealed-shelf.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -53,7 +53,12 @@ t("no em or en dash in the shelf", !/[\u2013\u2014]/.test(shelf.html));
 const packAt = shelf.html.indexOf("swsh11-pack");
 const boxAt = shelf.html.indexOf("swsh11-booster-box");
 t("the pack sits before the taller box", packAt > -1 && boxAt > packAt);
-t("box is full height and the pack is smaller", shelf.html.includes("swsh11-booster-box.webp") && /--rel:0\.4/.test(shelf.html) && shelf.html.includes("--rel:1"));
+t("packs, bundles, and ETBs share a frame and boxes are larger", sealedFrameRel({ productType: "booster-pack" }) === 0.88 && sealedFrameRel({ productType: "booster-bundle" }) === 0.88 && sealedFrameRel({ productType: "etb" }) === 0.88 && sealedFrameRel({ productType: "sleeved-pack" }) === 0.88 && sealedFrameRel({ productType: "blister" }) === 0.88 && sealedFrameRel({ productType: "tin" }) === 0.88 && sealedFrameRel({ productType: "booster-box" }) === 1 && sealedFrameRel({ productType: "special-collection" }) === 1 && sealedFrameRel({ productType: "upc" }) === 1 && sealedFrameRel({ productType: "case" }) === 1);
+t("the shelf uses that frame and contains the photo", shelf.html.includes("--rel:0.88") && shelf.html.includes("--rel:1") && !/--rel:0\.4/.test(shelf.html) && SEALED_SHELF_CSS.includes("object-fit:contain") && !SEALED_SHELF_CSS.includes("object-fit:cover"));
+const packPage = renderCard({ id: "tcgcsv-512822", name: "Paradox Rift Booster Pack", kind: "sealed", subtype: "booster-pack", price: 9.13, asOf: "2026-11-12", set: "SV04: Paradox Rift" }, "Nov 12", { catalogueSrc: "/data/cutouts/sv4-pack.webp" });
+const boxPage = renderCard({ id: "tcgcsv-512821", name: "Paradox Rift Booster Box", kind: "sealed", subtype: "booster-box", price: 281.73, asOf: "2026-11-12", set: "SV04: Paradox Rift" }, "Nov 12", { catalogueSrc: "/data/cutouts/sv4-booster-box.webp" });
+t("the product hero contains the pack instead of a square crop", packPage.includes('style="--rel:0.88"') && packPage.includes("object-fit:contain") && !packPage.includes("aspect-ratio:1/1"));
+t("a booster box hero uses the large frame", boxPage.includes('style="--rel:1"'));
 t("cards are rounded and share a baseline", SEALED_SHELF_CSS.includes("border-radius:22px") && SEALED_SHELF_CSS.includes("align-items:flex-end") && SEALED_SHELF_CSS.includes("prefers-color-scheme: light"));
 
 const page = renderSetShell("swsh11-lost-origin", "Oct 24");

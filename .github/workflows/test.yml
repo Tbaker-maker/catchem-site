@@ -16,6 +16,7 @@ jobs:
       - run: node scripts/feed-news-live.test.mjs
       - run: node scripts/rebuild.test.mjs
       - run: node scripts/reads.test.mjs
+      - run: node scripts/ppp-kinds.test.mjs
       - run: node scripts/signal-chips.test.mjs
       - run: node scripts/feed-first.test.mjs
       - run: node scripts/reads-pipe.test.mjs
@@ -29,6 +30,7 @@ jobs:
       - run: node scripts/price-hold.test.mjs
       - run: node scripts/condition-chips.test.mjs
       - run: node scripts/art-type.test.mjs
+      - run: node scripts/set-filters.test.mjs
       - run: node scripts/promos-page.test.mjs
       - run: node scripts/promo-links.test.mjs
       - run: node scripts/public-routes.test.mjs
@@ -60,6 +62,7 @@ jobs:
       - run: node scripts/listings-one-window.test.mjs
       - run: node scripts/msrp-key-stats.test.mjs
       - run: node scripts/product-chart.test.mjs
+      - run: node scripts/market-depth.test.mjs
       - run: node scripts/chart-no-gaps.test.mjs
       - run: node scripts/card-page.test.mjs
       - run: node scripts/phone-hero.test.mjs

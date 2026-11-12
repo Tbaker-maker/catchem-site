@@ -5,7 +5,9 @@
 // A view shows only when its series has at least two real points. Price days with no
 // file carry the last real price (the sitewide chart rule); the tooltip snaps to real
 // days only. Listings are bars on real nights only, so a night with no count is empty.
-// There is no sales or demand view: no sold data is published.
+//   sold     eBay sold comps recorded per day (PkmnPrices sales/volume), real days
+//            only. This is the one view that may say "sold": it is actual sold data.
+//            Listings stay "listings counted" everywhere.
 import { fillDaily, historySources } from "./history-chart.mjs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -27,13 +29,26 @@ export function listingPoints(rows) {
 }
 
 // Views this product can honestly show, in tab order.
-export function chartViews(priceReal, listReal) {
+export function chartViews(priceReal, listReal, soldReal = 0) {
   const views = [];
   if (priceReal >= 2) views.push(["price", "Price"]);
   if (listReal >= 2) views.push(["listings", "Listings"]);
   if (priceReal >= 2 && listReal >= 2) views.push(["both", "Price + listings"]);
+  if (soldReal >= 2) views.push(["sold", "Sold (eBay)"]);
   if (priceReal >= 2) views.push(["change", "% change"]);
   return views;
+}
+
+// eBay sold comps per day: [[date, count]] with count >= 1, sorted, one per date.
+export function soldPoints(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const d = Array.isArray(row) ? row[0] : "";
+    const n = Number(Array.isArray(row) ? row[1] : NaN);
+    if (!ISO.test(String(d || "")) || !Number.isInteger(n) || n < 1) continue;
+    map.set(d, n);
+  }
+  return [...map.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
 // Sealed pages open on Price + listings when that view exists; otherwise the first tab.
@@ -53,10 +68,36 @@ export function yDomain(vals, view) {
   return [mn - pad, mx + pad];
 }
 
-export function productChart({ price = [], listings = [], asOf = "", ownLabel, path = "" } = {}) {
+// Visible x-axis for a tab and range pill. All (days = 0) uses the full price
+// history on Price, Price + listings, and % change. Listings bars start where
+// listings data starts; they do not shorten the axis. 1M / 3M / 6M / 1Y count
+// back from the later series in the current view.
+export function chartWindow(view, days, P, L) {
+  var bars = view === "listings" || view === "sold";
+  var useP = !bars, useL = bars || view === "both";
+  function ms(d) { return Date.parse(d + "T00:00:00Z"); }
+  var ends = [];
+  if (useP && P.length) ends.push(ms(P[P.length - 1][0]));
+  if (useL && L.length) ends.push(ms(L[L.length - 1][0]));
+  var end = Math.max.apply(null, ends);
+  var from = days ? end - days * 864e5 : -Infinity;
+  var p = useP ? P.filter(function (x) { return ms(x[0]) >= from; }) : [];
+  var l = useL ? L.filter(function (x) { return ms(x[0]) >= from; }) : [];
+  if (useP && p.filter(function (x) { return !x[3]; }).length < 2) p = P.slice(-2);
+  if (useL && l.length < 2) l = L.slice(-2);
+  var starts = [];
+  if (p.length) starts.push(ms(p[0][0]));
+  if (l.length) starts.push(ms(l[0][0]));
+  var t0 = Math.min.apply(null, starts), t1 = end;
+  if (t1 <= t0) t1 = t0 + 864e5;
+  return { from: from, t0: t0, t1: t1, p: p, l: l, useP: useP, useL: useL };
+}
+
+export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
-  const views = chartViews(priceReal.length, list.length);
+  const soldPts = soldPoints(sold);
+  const views = chartViews(priceReal.length, list.length, soldPts.length);
   if (!views.length) return "";
   const start = defaultView(views);
   const filled = priceReal.length >= 2 ? fillDaily(priceReal) : [];
@@ -71,19 +112,20 @@ export function productChart({ price = [], listings = [], asOf = "", ownLabel, p
   const markPath = /^\/[pc]\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawPath) && !/\/tcgcsv-\d+$/.test(rawPath) ? rawPath : "";
   const srcs = (priceReal.length >= 2 ? historySources(priceReal, ownLabel) : []).map((line) => line.replace(/\d{4}-\d{2}-\d{2}/g, longDay));
   if (list.length >= 2) srcs.push(`eBay listings counted, active listings each night, ${longDay(list[0][0])} to ${longDay(list.at(-1)[0])}`);
+  if (soldPts.length >= 2) srcs.push(`${soldSource || "eBay sold comps"} recorded per day, ${longDay(soldPts[0][0])} to ${longDay(soldPts.at(-1)[0])}; a day with no bar had no comp recorded`);
   const lastDay = String(asOf || "").slice(0, 10) || (dates.at(-1) || "");
   const markSrc = priceReal.length >= 2 ? "TCGplayer market" : "eBay listings counted";
   const sum = priceReal.length >= 2
     ? `Price from ${esc(priceReal[0][0])} to ${esc(priceReal.at(-1)[0])}.${list.length >= 2 ? ` eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).` : ""}`
     : `eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).`;
-  return `<style>${PRODUCT_CHART_CSS}</style><figure class="hc pc" id="chart" data-view="${start}" data-p="${esc(JSON.stringify(filled))}" data-l="${esc(JSON.stringify(list))}">
+  return `<style>${PRODUCT_CHART_CSS}</style><figure class="hc pc" id="chart" data-view="${start}" data-p="${esc(JSON.stringify(filled))}" data-l="${esc(JSON.stringify(list))}"${soldPts.length >= 2 ? ` data-s="${esc(JSON.stringify(soldPts))}"` : ""}>
 <p class="hc-sum">${sum}</p>
 ${tabs}
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<p class="pc-mark" aria-hidden="true" data-day="${esc(lastDay ? longDay(lastDay) : "")}" data-src-price="TCGplayer market"${list.length >= 2 ? ` data-src-listings="eBay listings counted" data-src-both="TCGplayer market, eBay listings counted"` : ""}><b>Catch'em<span>.</span></b>${markPath ? ` <span class="pc-mark-path">${esc(markPath)}</span>` : ""} <span class="pc-mark-t">${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</span></p>
+<p class="pc-mark" aria-hidden="true" data-day="${esc(lastDay ? longDay(lastDay) : "")}" data-src-price="TCGplayer market"${list.length >= 2 ? ` data-src-listings="eBay listings counted" data-src-both="TCGplayer market, eBay listings counted"` : ""}${soldPts.length >= 2 ? ` data-src-sold="eBay sold comps"` : ""}><b>Catch'em<span>.</span></b>${markPath ? ` <span class="pc-mark-path">${esc(markPath)}</span>` : ""} <span class="pc-mark-t">${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</span></p>
 ${list.length >= 2 ? `<p class="pc-key muted"><span class="pc-k"><span class="pc-sw pc-sw-p"></span>Price</span><span class="pc-k"><span class="pc-sw pc-sw-l"></span>eBay listings counted (active listings each night)</span></p>` : ""}
 <p class="pc-src muted">${srcs.map(esc).join(". ")}${srcs.length ? "." : ""}</p>
 <p class="pc-foot"><button type="button" class="pc-cam-btn" aria-pressed="false">Camera mode</button></p>
@@ -141,6 +183,7 @@ html.pc-cam .pc .hc-plot{height:420px}
 // Client script. Kept free of dashed strokes: the price line stays solid.
 export const PRODUCT_CHART_JS = `(function(){
 var yDomain=${yDomain.toString()};
+var chartWindow=${chartWindow.toString()};
 var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function ms(d){return Date.parse(d+"T00:00:00Z");}
 function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+(+p[0]===new Date().getUTCFullYear()?"":", "+p[0]);}
@@ -152,21 +195,14 @@ function pct(v){var r=Math.round(v*10)/10;return (r>0?"+":"")+r.toFixed(1)+"%";}
 function smooth(xy){var d="M"+xy[0][0].toFixed(1)+","+xy[0][1].toFixed(1);for(var i=0;i<xy.length-1;i++){var p0=xy[i-1]||xy[i],p1=xy[i],p2=xy[i+1],p3=xy[i+2]||p2;var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;var lo=Math.min(p1[1],p2[1]),hi=Math.max(p1[1],p2[1]);c1y=Math.max(lo,Math.min(hi,c1y));c2y=Math.max(lo,Math.min(hi,c2y));d+=" C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);}return d;}
 function cam(on){document.documentElement.classList.toggle("pc-cam",on);document.querySelectorAll(".pc-cam-btn").forEach(function(b){b.setAttribute("aria-pressed",on?"true":"false");b.textContent=on?"Exit camera mode":"Camera mode";});if(on){var f=document.getElementById("price")||document.querySelector("figure.pc");if(f&&f.scrollIntoView)f.scrollIntoView({block:"start"});}}
 function mount(fig){if(fig.dataset.ready)return;fig.dataset.ready="1";
-var P=JSON.parse(fig.getAttribute("data-p")||"[]"),L=JSON.parse(fig.getAttribute("data-l")||"[]");
+var P=JSON.parse(fig.getAttribute("data-p")||"[]"),L0=JSON.parse(fig.getAttribute("data-l")||"[]"),S=JSON.parse(fig.getAttribute("data-s")||"[]"),L=L0;
 var svg=fig.querySelector(".hc-svg"),plot=fig.querySelector(".hc-plot"),tip=fig.querySelector(".hc-tip"),gls=fig.querySelector(".hc-gls"),tags=fig.querySelector(".pc-tags"),ax=fig.querySelector(".hc-axis"),ul=fig.querySelector(".pc-ul"),ur=fig.querySelector(".pc-ur"),priceEl=fig.querySelector(".hc-price"),dateEl=fig.querySelector(".hc-date");
 var W=600,H=220,PT=16,PB=6,GOLD="#d9b779",GREEN="#7fc79a",gid="pg"+Math.random().toString(36).slice(2,8);
 var view=fig.getAttribute("data-view")||"price",days=0,st={};
 var Preal=function(arr){return arr.filter(function(p){return !p[3];});};
 function draw(){
-  var useP=view!=="listings",useL=view==="listings"||view==="both";
-  var ends=[];if(useP&&P.length)ends.push(ms(P[P.length-1][0]));if(useL&&L.length)ends.push(ms(L[L.length-1][0]));
-  var end=Math.max.apply(null,ends),from=days?end-days*864e5:-Infinity;
-  // The overlay covers the nights that have both series.
-  if(view==="both"&&L.length)from=Math.max(from,ms(L[0][0]));
-  var p=useP?P.filter(function(x){return ms(x[0])>=from;}):[],l=useL?L.filter(function(x){return ms(x[0])>=from;}):[];
-  if(useP&&Preal(p).length<2)p=P.slice(-2);if(useL&&l.length<2)l=L.slice(-2);
-  var starts=[];if(p.length)starts.push(ms(p[0][0]));if(l.length)starts.push(ms(l[0][0]));
-  var t0=Math.min.apply(null,starts),t1=end;if(t1<=t0)t1=t0+864e5;
+  L=view==="sold"?S:L0;
+  var win=chartWindow(view,days,P,L),p=win.p,l=win.l,t0=win.t0,t1=win.t1,useP=win.useP,useL=win.useL,bars=!useP;
   var nDays=Math.max(1,Math.round((t1-t0)/864e5)),bw=Math.max(1.2,Math.min(14,W/(nDays+1)*0.7)),inset=useL?bw/2+1:0;
   function X(d){return inset+((ms(d)-t0)/(t1-t0))*(W-2*inset);}
   var body="",gl="",tg="";
@@ -183,7 +219,7 @@ function draw(){
   if(useL&&l.length){
     var lmx=Math.max.apply(null,l.map(function(x){return x[1];}))*1.12||1,ltop=view==="both"?H*.66:PT,lbot=H-PB;
     Yl=function(v){return ltop+(1-v/lmx)*(lbot-ltop);};
-    if(view==="listings"){for(var j=1;j<=3;j++){var ly=ltop+(lbot-ltop)*j/4;body+='<line x1="0" x2="'+W+'" y1="'+ly.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="rgba(255,255,255,.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>';gl+='<span class="hc-gl l" style="top:'+(ly/H*100).toFixed(2)+'%">'+cnt(lmx*(1-(ly-ltop)/(lbot-ltop)))+'</span>';}}
+    if(bars){for(var j=1;j<=3;j++){var ly=ltop+(lbot-ltop)*j/4;body+='<line x1="0" x2="'+W+'" y1="'+ly.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="rgba(255,255,255,.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>';gl+='<span class="hc-gl l" style="top:'+(ly/H*100).toFixed(2)+'%">'+cnt(lmx*(1-(ly-ltop)/(lbot-ltop)))+'</span>';}}
     else{gl+='<span class="hc-gl r" style="top:'+(ltop/H*100+6).toFixed(2)+'%">'+cnt(lmx)+'</span>';}
     l.forEach(function(x){var y=Yl(x[1]);body+='<rect class="pc-bar" x="'+(X(x[0])-bw/2).toFixed(2)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(2)+'" height="'+Math.max(0,lbot-y).toFixed(1)+'" rx="1" fill="'+GREEN+'" fill-opacity="'+(view==="both"?".55":".8")+'"/>';});
   }
@@ -200,26 +236,28 @@ function draw(){
         var xp=Math.max(12,Math.min(88,X(h[0][0])/W*100));tg+='<span class="pc-tag'+(i?" lo":"")+'" style="left:'+xp.toFixed(1)+'%;top:'+(y/H*100).toFixed(2)+'%">'+h[1]+" "+money(h[0][1])+" · "+short(h[0][0])+'</span>';});
     }
   }
-  svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+GOLD+'" stop-opacity=".28"/><stop offset="1" stop-color="'+GOLD+'" stop-opacity="0"/></linearGradient></defs>'+body+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+(view==="listings"?GREEN:GOLD)+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
+  svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+GOLD+'" stop-opacity=".28"/><stop offset="1" stop-color="'+GOLD+'" stop-opacity="0"/></linearGradient></defs>'+body+'<line class="hc-x" x1="0" x2="0" y1="'+PT+'" y2="'+(H-PB)+'" stroke="rgba(255,255,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><circle class="hc-dot" r="4" fill="'+(view==="listings"||view==="sold"?GREEN:GOLD)+'" stroke="#141210" stroke-width="2" visibility="hidden"/>';
   gls.innerHTML=gl;tags.innerHTML=tg;
   var mid=new Date((t0+t1)/2).toISOString().slice(0,10),a=new Date(t0).toISOString().slice(0,10),b=new Date(t1).toISOString().slice(0,10);
   ax.innerHTML="<span>"+short(a)+"</span><span>"+short(mid)+"</span><span>"+short(b)+"</span>";
-  ul.textContent=view==="listings"?"Listings counted":view==="change"?"% change from "+(pr.length?short(pr[0][0]):""):"Price (USD)";
+  ul.textContent=view==="sold"?"eBay sold comps per day":view==="listings"?"Listings counted":view==="change"?"% change from "+(pr.length?short(pr[0][0]):""):"Price (USD)";
   ur.textContent=view==="both"?"Listings counted":"";
   // Readout: newest real point and its move from the first real point in range.
-  var lr=view==="listings"?l:pr;if(lr.length){var last=lr[lr.length-1],first=lr[0];
-    if(view==="listings"){var dn=last[1]-first[1];priceEl.textContent=cnt(last[1])+" listings counted";dateEl.innerHTML=short(last[0])+(lr.length>1?' · <span class="'+(dn>0?"pc-up":dn<0?"pc-down":"")+'">'+(dn>0?"+":"")+cnt(dn)+(first[1]>0?" ("+pct(dn/first[1]*100)+")":"")+"</span> since "+short(first[0]):"");}
+  var lr=bars?l:pr;if(lr.length){var last=lr[lr.length-1],first=lr[0];
+    if(view==="sold"){var tot=0;lr.forEach(function(x){tot+=x[1];});priceEl.textContent=cnt(tot)+" eBay sold comps";dateEl.innerHTML=short(first[0])+" to "+short(last[0]);}
+    else if(view==="listings"){var dn=last[1]-first[1];priceEl.textContent=cnt(last[1])+" listings counted";dateEl.innerHTML=short(last[0])+(lr.length>1?' · <span class="'+(dn>0?"pc-up":dn<0?"pc-down":"")+'">'+(dn>0?"+":"")+cnt(dn)+(first[1]>0?" ("+pct(dn/first[1]*100)+")":"")+"</span> since "+short(first[0]):"");}
     else{var ch=(last[1]/first[1]-1)*100;priceEl.textContent=view==="change"?pct(ch):money(last[1]);dateEl.innerHTML=short(last[0])+' · <span class="'+(ch>0?"pc-up":ch<0?"pc-down":"")+'">'+(view==="change"?money(last[1]):pct(ch))+"</span> "+(view==="change"?"on "+short(last[0]):"since "+short(first[0]));}}
   var mk=fig.querySelector(".pc-mark-t"),mw=fig.querySelector(".pc-mark");if(mk){var md=mw.getAttribute("data-day"),ms_=mw.getAttribute("data-src-"+(view==="change"?"price":view))||mw.getAttribute("data-src-price")||"";mk.textContent=ms_+(md?", "+md:"");}
   st={p:p,l:l,X:X,Yp:Yp,Yl:Yl,val:val};
 }
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=[];
-  if(view!=="listings")Preal(st.p).forEach(function(q){pool.push(q[0]);});if(view==="listings"||view==="both")st.l.forEach(function(q){pool.push(q[0]);});
+  if(view!=="listings"&&view!=="sold")Preal(st.p).forEach(function(q){pool.push(q[0]);});if(view==="listings"||view==="sold"||view==="both")st.l.forEach(function(q){pool.push(q[0]);});
   var best=null,bd=1e9;pool.forEach(function(d){var k=Math.abs(st.X(d)-x);if(k<bd){bd=k;best=d;}});return best;}
 function at(arr,d){for(var i=0;i<arr.length;i++)if(arr[i][0]===d)return arr[i];return null;}
 function show(cx){var d=near(cx);if(!d)return;var x=st.X(d),y,html="";
   var pp=at(st.p,d),lp=at(st.l,d);
-  if(view==="listings"){y=st.Yl(lp[1]);html="<b>"+cnt(lp[1])+" listings counted</b><span>"+nice(d)+"</span>";}
+  if(view==="sold"){y=st.Yl(lp[1]);html="<b>"+cnt(lp[1])+" eBay sold comp"+(lp[1]===1?"":"s")+"</b><span>"+nice(d)+"</span>";}
+  else if(view==="listings"){y=st.Yl(lp[1]);html="<b>"+cnt(lp[1])+" listings counted</b><span>"+nice(d)+"</span>";}
   else if(view==="change"){y=st.Yp(st.val(pp));html="<b>"+pct(st.val(pp))+"</b><span>"+money(pp[1])+" · "+nice(d)+"</span>";}
   else{if(pp){y=st.Yp(pp[1]);html="<b>"+money(pp[1])+"</b>"+(pp[3]?"<span>last price on file "+short(pp[3])+"</span>":"");}else{y=st.Yl(lp[1]);html="<b>No price file that day</b>";}
     if(view==="both")html+="<span>"+(lp?cnt(lp[1])+" listings counted":"No listings count that night")+"</span>";html+="<span>"+nice(d)+"</span>";}
@@ -232,7 +270,7 @@ fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",
 fig.querySelectorAll(".pc-tab").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".pc-tab").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});view=b.getAttribute("data-view");fig.setAttribute("data-view",view);hide();draw();});});
 fig.querySelectorAll(".pc-cam-x").forEach(function(b){b.addEventListener("click",function(){cam(false);});});
 fig.querySelectorAll(".pc-cam-btn").forEach(function(b){b.addEventListener("click",function(){cam(!document.documentElement.classList.contains("pc-cam"));});});
-var q=typeof location!=="undefined"?location.search:"";var vm=/[?&]view=(price|listings|both|change)\\b/.exec(q);if(vm){var t=fig.querySelector('.pc-tab[data-view="'+vm[1]+'"]');if(t)t.click();}
+var q=typeof location!=="undefined"?location.search:"";var vm=/[?&]view=(price|listings|both|sold|change)\\b/.exec(q);if(vm){var t=fig.querySelector('.pc-tab[data-view="'+vm[1]+'"]');if(t)t.click();}
 draw();if(/[?&]camera=1\\b/.test(q))cam(true);}
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&document.documentElement.classList.contains("pc-cam"))cam(false);});
 function all(){document.querySelectorAll("figure.pc[data-p]").forEach(mount);}
