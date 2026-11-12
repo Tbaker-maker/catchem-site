@@ -48,6 +48,18 @@ await writePublicRoutes(OUT);
 await buildStripIndex(OUT);
 const videoSrc = join(ROOT, "vendor/video");
 if (existsSync(videoSrc)) cpSync(videoSrc, join(OUT, "video"), { recursive: true });
+// 96x28 set marks. Full logo.png stays on /img/{id}/logo.png. These are the
+// small WebP files the sealed page actually shows.
+const logoSrc = join(ROOT, "vendor/set-logos");
+if (existsSync(logoSrc)) {
+  for (const name of readdirSync(logoSrc)) {
+    if (!/^[a-z0-9]+\.webp$/.test(name)) continue;
+    const id = name.slice(0, -".webp".length);
+    const dir = join(OUT, "img", id);
+    mkdirSync(dir, { recursive: true });
+    cpSync(join(logoSrc, name), join(dir, "logo-sm.webp"));
+  }
+}
 
 // Refuse to hand wrangler a partial site: an assets deploy replaces everything.
 const must = ["index.html", "build.html", "methodology.html", "corrections.html",

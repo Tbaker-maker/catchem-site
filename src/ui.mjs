@@ -3300,8 +3300,9 @@ export function renderCard(card, stamp, opts = {}) {
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
   const hrefKind = card.kind === "sealed" ? "Sealed" : "Single";
-  const setMark = /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(opts.setLogo || ""))
-    ? `<img class="set-mark" alt="" width="96" height="28" loading="lazy" decoding="async" src="${esc(opts.setLogo)}">`
+  const setLogoId = String(opts.setLogo || "").match(/^\/img\/([a-z0-9]+)\/logo\.png$/i);
+  const setMark = setLogoId
+    ? `<img class="set-mark" alt="" width="96" height="28" loading="lazy" decoding="async" src="/img/${setLogoId[1].toLowerCase()}/logo-sm.webp">`
     : "";
   const setBit = setMark + (card.setSlug
     ? `<a class="set-link" href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`

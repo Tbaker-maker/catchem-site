@@ -1486,7 +1486,7 @@ const worker = {
       return handleShareCard(request, url);
     }
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/img/")) {
-      return handleSetLogo(request, url.pathname, fetchImpl);
+      return handleSetLogo(request, url.pathname, fetchImpl, env?.ASSETS);
     }
     if (request.method === "GET" && url.pathname.startsWith("/data/editor/tcg/")) {
       const rest = decodeURIComponent(url.pathname.slice("/data/editor/tcg/".length));
@@ -1768,9 +1768,27 @@ export default worker;
 
 // /img/{setId}/logo.png: Post Office catalogue file in Catchem-data first,
 // then the same id on images.pokemontcg.io (already in IMAGE_HOSTS). Else 404.
-export async function handleSetLogo(request, pathname, fetchImpl = fetch) {
-  const m = pathname.match(/^\/img\/([a-z0-9]+)\/logo\.png$/);
+// /img/{setId}/logo-sm.webp is the 96x28 set mark: a prebuilt file from
+// vendor/set-logos, copied into site assets at build. It is not the full PNG.
+export async function handleSetLogo(request, pathname, fetchImpl = fetch, assets = null) {
   const miss = () => new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
+  const small = String(pathname || "").match(/^\/img\/([a-z0-9]+)\/logo-sm\.webp$/);
+  if (small) {
+    if (assets && typeof assets.fetch === "function") {
+      try {
+        const hit = await assets.fetch(new Request(new URL(pathname, request.url), { method: "GET" }));
+        if (hit && (hit.ok || hit.status === 304)) {
+          const headers = new Headers(hit.headers);
+          headers.set("content-type", "image/webp");
+          headers.set("cache-control", "public, max-age=86400");
+          if (request.method === "HEAD") return new Response(null, { status: hit.status, headers });
+          return new Response(hit.body, { status: hit.status, headers });
+        }
+      } catch { /* no small file */ }
+    }
+    return miss();
+  }
+  const m = String(pathname || "").match(/^\/img\/([a-z0-9]+)\/logo\.png$/);
   if (!m) return miss();
   const headers = { "content-type": "image/png", "cache-control": "public, max-age=86400" };
   try {
