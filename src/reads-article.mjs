@@ -44,6 +44,12 @@ export function okCopy(text) {
   if (s.toLowerCase().includes(["no", "data"].join(" "))) return false;
   return !GUARD.test(s);
 }
+export function emptyFilterLine(premiumRatioActive) {
+  return premiumRatioActive
+    ? "No reads match this premium filter today."
+    : "No reads match this filter today.";
+}
+
 export function day(d) {
   const m = String(d || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? MONTHS[Number(m[2]) - 1] + " " + Number(m[3]) : "";
@@ -346,8 +352,8 @@ export function buildArticle({ follow = {}, ctx = {}, asOf = "", length = "stand
     const report = watchReport(follow, reportPool, history.sinceDay, asOf || ctx.asOf);
     const empty = {
       asOf, length, path, label: filter.label, intro: "", fallback: "",
-      lead: report ? "Your watchlist." : "No reads match this filter today.",
-      emptyPremium: true, top: null, ups: [], downs: [], supply: [], tiles: [],
+      lead: report ? "Your watchlist." : emptyFilterLine(true),
+      emptyPremium: true, premiumRatio: want, top: null, ups: [], downs: [], supply: [], tiles: [],
       vintage: null, pattern: null, rotation: null, news: null, setCompare: [],
       report, away: null, quiet: true, building: [],
     };
@@ -566,7 +572,7 @@ function caslFooterText(mailingAddress = "") {
   return caslAddressLine(mailingAddress);
 }
 
-export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null, premiumMode = "waitlist", mailingAddress = "" } = {}) {
+export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null, mailingAddress = "" } = {}) {
   const L = doc.length;
   const when = day(doc.asOf);
   if (doc.emptyPremium) {
@@ -574,7 +580,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     body.push(`<tr><td style="padding:4px 6px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ce-ink ce-brand" style="font:700 15px/1 ${FONT};color:${C.ink}">Catch'em</td><td align="right" class="ce-soft" style="font:400 13px/1 ${FONT};color:${C.soft}">${esc(when)}</td></tr></table></td></tr>`);
     if (doc.meter) { const block = meterEmailBlock(doc.meter); if (block) body.push(block); }
     if (doc.report) body.push(reportCard(doc.report, L));
-    else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">No reads match this filter today.</p>`));
+    else body.push(card(`<p class="ce-ink" style="margin:0;font:600 16px/1.45 ${FONT};color:${C.ink}">${emptyFilterLine(doc.premiumRatio === "below" || doc.premiumRatio === "above")}</p>`));
     const footer = [
       "Prices are TCGplayer market on the dates shown. Listings counted are eBay listings on the dates shown. A listing is not a sale.",
       SHOP_NOTE,
@@ -632,10 +638,10 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
   return shell(`Your Catch'em reads, ${when}`, doc.lead, body.join("\n"), footer);
 }
 
-export function articleText(doc, { unsubscribe = "", more = "", suggest = null, premiumMode = "waitlist", mailingAddress = "" } = {}) {
+export function articleText(doc, { unsubscribe = "", more = "", suggest = null, mailingAddress = "" } = {}) {
   const meterLine = doc.meter ? meterPlainLine(doc.meter) : "";
   if (doc.emptyPremium) {
-    const out = [meterLine, doc.report ? "Your watchlist." : "No reads match this filter today."].filter((l) => l !== undefined && l !== "");
+    const out = [meterLine, doc.report ? "Your watchlist." : emptyFilterLine(doc.premiumRatio === "below" || doc.premiumRatio === "above")].filter((l) => l !== undefined && l !== "");
     if (doc.report) out.push(...doc.report.rows.map((r) => [r.name, flagWord(r.premiumFlag)].filter(Boolean).join(". ")));
     out.push("", SHOP_NOTE, unsubscribe ? "Unsubscribe: " + unsubscribe : "", "Change your reads: " + SITE + "/reads", caslFooterText(mailingAddress));
     return out.filter((l) => l !== undefined).join("\n");

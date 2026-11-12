@@ -4,9 +4,7 @@
 
 import { isClean } from "./advice-rules.mjs";
 import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
-import { WEEKDAY_NAMES, darkCss, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, premiumPill, renderArticle } from "./reads-article.mjs";
-import { premiumMode } from "./premium-mode.mjs";
-import { openAccess } from "./open-access.mjs";
+import { WEEKDAY_NAMES, darkCss, articleForPlan, articleText, cleanLength, emptyFilterLine, followFromPlan, loadContext, premiumPill, renderArticle } from "./reads-article.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -205,7 +203,14 @@ function caslEmailFooterHtml(mailingAddress = "") {
     : "<!-- mailingAddress empty; a postal address is required before any real subscriber send -->";
 }
 
-export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false, mailingAddress = "" } = {}) {
+function fallbackEmptyIsPremium({ empty, premiumRatio, emptyPremium, stopUrl }) {
+  if (emptyPremium === true || premiumRatio === "below" || premiumRatio === "above") return true;
+  if (emptyPremium === false) return false;
+  // empty: true with no flag is the original premium-ratio fallback letter, which had no stop link.
+  return !!(empty && !stopUrl);
+}
+
+export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false, mailingAddress = "", premiumRatio = "", emptyPremium } = {}) {
   const when = readsDateLabel(day);
   const cards = (reads || []).map((read) => {
     const title = read.href
@@ -223,7 +228,7 @@ export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false, maili
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 class="ce-ink" style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${flag ? `<p style="margin:8px 0 0;">${flag}</p>` : ""}${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
   }).join("");
   const emptyLine = !cards && empty
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:600 16px/1.45 Arial,Helvetica,sans-serif;color:#1c1c1e;">No reads match this filter today.</p></td></tr></table>`
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:600 16px/1.45 Arial,Helvetica,sans-serif;color:#1c1c1e;">${emptyFilterLine(fallbackEmptyIsPremium({ empty, premiumRatio, emptyPremium, stopUrl }))}</p></td></tr></table>`
     : "";
   const stop = stopUrl
     ? `<p class="ce-soft" style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
@@ -243,9 +248,9 @@ ${caslEmailFooterHtml(mailingAddress)}
 </td></tr></table></body></html>`;
 }
 
-export function readsEmailText({ lead, day, reads, stopUrl, empty = false, mailingAddress = "" } = {}) {
+export function readsEmailText({ lead, day, reads, stopUrl, empty = false, mailingAddress = "", premiumRatio = "", emptyPremium } = {}) {
   const parts = [lead || readsSubject(day)];
-  if (empty && !(reads || []).length) parts.push("No reads match this filter today.");
+  if (empty && !(reads || []).length) parts.push(emptyFilterLine(fallbackEmptyIsPremium({ empty, premiumRatio, emptyPremium, stopUrl })));
   for (const read of reads || []) {
     const chips = (read.chips || []).map((chip) => chip.text).join(", ");
     const flag = read.premium === "below" ? "Below its usual premium" : read.premium === "above" ? "Above its usual premium" : "";
@@ -636,10 +641,9 @@ export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin =
   const tip = suggestLength(stats, doc.length, plan?.deep === true);
   const tipHref = tip ? await lengthLink(env, origin, id, tip.to, doc.weekday || "") : "";
   const suggest = tip && tipHref ? { text: `${tip.why} ${LENGTH_LABEL[tip.to]} might suit you${doc.weekday ? ` on ${WEEKDAY_NAMES[doc.weekday]}s` : ""}.`, label: `Try ${LENGTH_LABEL[tip.to]}`, href: tipHref, to: tip.to } : null;
-  const mode = openAccess(env) ? "open" : premiumMode(env);
   const mailingAddress = emailMailingAddress(env);
-  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode, mailingAddress });
-  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode, mailingAddress });
+  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, mailingAddress });
+  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, mailingAddress });
   return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };
 }
 
@@ -699,7 +703,7 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
       if (!reads.length && !(want && prepared.length)) { skipped++; continue; }
       const lead = scrub(member.lead || "") || readsSubject(day);
       const empty = want && prepared.length > 0 && matched.length === 0;
-      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env) }), text: readsEmailText({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env) }) };
+      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env), premiumRatio: want }), text: readsEmailText({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env), premiumRatio: want }) };
     }
     const { html, text } = letter;
     if (!emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }
