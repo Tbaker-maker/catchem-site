@@ -402,9 +402,11 @@ const indexHtml = await readFile(new URL("../index.html", import.meta.url), "utf
 const homeAssets = { fetch: async () => new Response(indexHtml, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }) };
 const homeOff = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets })).text();
 const homeOn = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, FEED_ENABLED: "true" })).text();
-t("the homepage club points at the waitlist", homeOff.includes('href="/premium"') && homeOff.includes("Join the Catch'em Club") && homeOff.includes("Join the Premium waitlist") && homeOff.includes("All site tools stay free.") && !homeOff.includes("$14.99") && !homeOff.includes("First 222") && !homeOff.includes("See Premium") && !homeOff.includes(">Get Premium<") && !homeOff.includes("checkout.stripe.com") && !homeOff.includes("Early beta access") && !homeOff.includes("bigger limits") && !homeOff.includes("Private channels") && !/lifetime|forever/i.test(homeOff) && !/more entries/i.test(homeOff) && !homeOff.includes("Discord Premium is $14.99"));
-const homeLive = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, PREMIUM_MODE: "live" })).text();
-t("live mode keeps the club and hides the price", homeLive.includes('href="/premium"') && homeLive.includes("See Premium") && homeLive.includes("All site tools stay free.") && homeLive.includes("The Premium role and your numbered First 222 role") && !homeLive.includes("$14.99"));
+t("open access homepage has no club and no plan price", !homeOff.includes("Join the Catch'em Club") && !homeOff.includes("Join the Premium waitlist") && !homeOff.includes("See Premium") && !homeOff.includes(">Get Premium<") && !homeOff.includes("$14.99") && !homeOff.includes("Discord Premium") && !homeOff.includes("checkout.stripe.com") && !/lifetime|forever/i.test(homeOff));
+const homeGated = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, OPEN_ACCESS: "false" })).text();
+t("switch off: the homepage club points at the waitlist", homeGated.includes('href="/premium"') && homeGated.includes("Join the Catch'em Club") && homeGated.includes("Join the Premium waitlist") && homeGated.includes("All site tools stay free.") && !homeGated.includes("$14.99") && !homeGated.includes("First 222") && !homeGated.includes("See Premium") && !homeGated.includes(">Get Premium<") && !homeGated.includes("checkout.stripe.com") && !homeGated.includes("Early beta access") && !homeGated.includes("bigger limits") && !homeGated.includes("Private channels") && !/lifetime|forever/i.test(homeGated) && !/more entries/i.test(homeGated) && !homeGated.includes("Discord Premium is $14.99"));
+const homeLive = await (await worker.fetch(new Request("https://catchemtcg.com/"), { ...env, ASSETS: homeAssets, PREMIUM_MODE: "live", OPEN_ACCESS: "false" })).text();
+t("switch off + live mode keeps the club and hides the price", homeLive.includes('href="/premium"') && homeLive.includes("See Premium") && homeLive.includes("All site tools stay free.") && homeLive.includes("The Premium role and your numbered First 222 role") && !homeLive.includes("$14.99"));
 
 t("homepage does not claim a free Premium entry route", !homeOff.includes("free entry route") && !/AMOE|no purchase necessary/i.test(homeOff) && !homeOff.includes("giveaway auto-entry") && homeOff.includes("Watch the Stadium live"));
 t("the homepage What you get row leads with the Feed", homeOff.includes("<h3>Feed</h3>") && homeOff.includes("Daily market reads.") && homeOff.includes("Weekly and monthly wraps, built with the community.") && homeOff.includes('href="/feed">Open the Feed') && !homeOff.includes("<h3>Sets</h3>") && homeOff.includes('href="/sets">Sets</a>') && homeOff.includes("<h3>Post Office</h3>") && homeOff.includes("Closed Beta") && homeOff.includes('href="/post-office"') && !homeOff.includes("/post-office/app") && !homeOff.includes("Post Office is open") && homeOff.includes("<h3>The Community</h3>"));
@@ -432,14 +434,17 @@ const counted = countPublishedReads({ cards: {
 }});
 t("catalogue counts use reads in the file, skip news, and name the latest file day", counted && counted.total === 2 && counted.onDay === 1 && counted.day === "2026-10-03");
 t("a file with no reads adds nothing", countPublishedReads({ cards: {} }) === null && countPublishedReads({ reads: [{ kind: "news", asOf: "2026-10-03" }] }) === null);
-const premium = await worker.fetch(new Request("https://catchemtcg.com/premium"), env);
+const openPremRes = await worker.fetch(new Request("https://catchemtcg.com/premium"), env);
+t("open access redirects /premium to home", openPremRes.status === 302 && new URL(openPremRes.headers.get("location"), "https://catchemtcg.com").pathname === "/");
+const gatedEnv = { ...env, OPEN_ACCESS: "false" };
+const premium = await worker.fetch(new Request("https://catchemtcg.com/premium"), gatedEnv);
 const premiumHtml = await premium.text();
-const liveEnv = { ...env, PREMIUM_MODE: "live" };
+const liveEnv = { ...env, PREMIUM_MODE: "live", OPEN_ACCESS: "false" };
 const premiumLiveRes = await worker.fetch(new Request("https://catchemtcg.com/premium"), liveEnv);
 const premiumLive = await premiumLiveRes.text();
 const lock = "The rate you check out at stays yours while you stay subscribed or on a valid pause. Cancel and the number is retired. If you come back, you pay the public rate then on the site.";
-t("premium defaults to the waitlist", premium.status === 200 && premiumHtml.includes("Join the Premium waitlist") && !premiumHtml.includes("$14.99") && !premiumHtml.includes(">Get Premium</a>") && !premiumHtml.includes("checkout.stripe.com") && !premiumHtml.includes("buy.stripe.com") && !premiumHtml.includes("First 222"));
-t("premium is a worker page", pageKind("/premium") === "premium" && premiumLiveRes.status === 200);
+t("switch off: premium defaults to the waitlist", premium.status === 200 && premiumHtml.includes("Join the Premium waitlist") && !premiumHtml.includes("$14.99") && !premiumHtml.includes(">Get Premium</a>") && !premiumHtml.includes("checkout.stripe.com") && !premiumHtml.includes("buy.stripe.com") && !premiumHtml.includes("First 222"));
+t("switch off: premium is a worker page", pageKind("/premium") === "premium" && premiumLiveRes.status === 200);
 t("premium pause and cancel sit together", premiumLive.includes('class="prem-acts"') && premiumLive.includes(">Manage in Discord with /premium</a>") && premiumLive.includes("Pause or cancel in Discord with /premium.") && premiumLive.includes('href="https://discord.gg/fUSjxDX4Hy"'));
 t("premium keeps the lock sentence", premiumLive.includes(lock));
 t("premium skips lifetime, forever, and investing words", !/lifetime|forever/i.test(premiumLive) && !BANNED.test(clean(premiumLive)) && !/pay to win|more entries/i.test(premiumLive));

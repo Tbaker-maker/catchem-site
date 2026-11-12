@@ -1,7 +1,8 @@
 // Sealed Rating panel for sealed product pages. Factual position data for this
 // product against sealed products of the same type. Not advice.
-// Everyone sees the verdict and the facts. Premium also sees the factor bars.
+// Everyone sees the verdict, the facts, and the factor bars while OPEN_ACCESS is on.
 import { esc } from "./ui.mjs";
+import { entitled } from "./open-access.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 import { RATING_CSS } from "./card-rating.mjs";
 
@@ -25,7 +26,7 @@ export function sealedFacts(row) {
   return out;
 }
 
-export function sealedRatingPanel(row, doc, { premium = false } = {}) {
+export function sealedRatingPanel(row, doc, { premium = false, openAccess, env } = {}) {
   if (!row) return "";
   const asOf = doc?.asOf || row.price?.date;
   const head = `<h2>Sealed Rating</h2><p class="grp">${esc(row.typeLabel || "")}</p>`;
@@ -40,7 +41,7 @@ export function sealedRatingPanel(row, doc, { premium = false } = {}) {
   const facts = factList ? `<details class="sr-all"><summary>All facts</summary><ul>${factList}</ul></details>` : "";
   let bars = "";
   const have = ORDER.filter((k) => row.factors?.[k]);
-  if (premium && have.length) {
+  if (entitled({ premium, openAccess, env }) && have.length) {
     bars = `<ul style="margin-bottom:12px">${have.map((k) => { const pct = Math.round(Math.max(0, Math.min(1, Number(row.factors[k].v))) * 100); return `<li><div class="row"><b>${esc(LABEL[k])}</b><span>${pct}</span></div><div class="bar" role="img" aria-label="${esc(LABEL[k])} ${pct} of 100"><i style="width:${pct}%"></i></div></li>`; }).join("")}</ul>`;
   } else if (have.length) {
     const list = have.map((k) => LABEL[k].toLowerCase());

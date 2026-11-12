@@ -1,7 +1,8 @@
 // Discord sign-in for the AI seat. No session is minted without SESSION_SECRET.
 // If Discord is not configured, the page is one line and has no button.
 
-import { avatarUrl, ideasSignInLine, readUser, signSession, usageOf } from "./quota.mjs";
+import { avatarUrl, ideasSignInLine, readUser, signSession, usageOf, LIMITS } from "./quota.mjs";
+import { openAccess } from "./open-access.mjs";
 import { postOfficeOn } from "./post-office-flag.mjs";
 
 export const DISCORD_INVITE = "https://discord.gg/fUSjxDX4Hy";
@@ -72,14 +73,14 @@ function json(obj, status = 200) {
 
 export function signInDocument(env) {
   const ready = discordReady(env);
-  const line = ideasSignInLine(ready);
+  const line = ideasSignInLine(ready, env);
   const back = officeHome(env);
   const backLabel = postOfficeOn(env) ? "Back to Post Office" : "Back to Catch'em";
   const about = postOfficeOn(env)
     ? "Sign in to Catch'em with Discord to use Post Office Ideas."
     : "Sign in to Catch'em with Discord.";
   const link = ready
-    ? `<p><a href="/auth/discord?next=${back}">Sign in with Discord</a> to use Ideas. Ideas are 3 a day.</p>`
+    ? `<p><a href="/auth/discord?next=${back}">Sign in with Discord</a> to use Ideas. Ideas are ${openAccess(env) ? LIMITS.ideas.premium : LIMITS.ideas.free} a day.</p>`
     : `<p>${line}</p>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="description" content="${about}"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Sign in · Catch'em</title></head><body style="margin:24px;font:16px/1.5 sans-serif;background:#12100e;color:#efe9de">${link}<p><a href="${back}">${backLabel}</a></p><footer><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops.</p></footer></body></html>`;
 }
@@ -95,8 +96,8 @@ export async function sessionView(request, env) {
     premium: user.premium === true,
     name: user.name || "",
     avatar: avatarUrl(user),
-    ideas: usageOf(user, "ideas"),
-    post: usageOf(user, "post-text"),
+    ideas: usageOf(user, "ideas", env),
+    post: usageOf(user, "post-text", env),
   };
 }
 

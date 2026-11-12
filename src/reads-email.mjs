@@ -6,6 +6,7 @@ import { isClean } from "./advice-rules.mjs";
 import { SHOP_NOTE, ebaySearchUrl, setAffiliateConfig, tcgStoreUrl } from "./pokemon.mjs";
 import { WEEKDAY_NAMES, darkCss, articleForPlan, articleText, cleanLength, followFromPlan, loadContext, premiumPill, renderArticle } from "./reads-article.mjs";
 import { premiumMode } from "./premium-mode.mjs";
+import { openAccess } from "./open-access.mjs";
 
 export const EMAIL_FROM = "Catch'em <reads@catchemtcg.com>";
 export const EMAIL_KEY = "READS_EMAIL_KEY";
@@ -586,7 +587,7 @@ export async function handleEmailLink(request, env) {
   rec.updatedAt = new Date().toISOString();
   await store.put(key, JSON.stringify(rec));
   await setPlanEmail(store, id, true);
-  return htmlResponse(notePage("Email confirmed", "Reads will go out on your schedule. Free is weekly. Premium is daily. At most one letter a day."));
+  return htmlResponse(notePage("Email confirmed", "Reads will go out on your schedule. At most one letter a day."));
 }
 
 function addonCards(member) {
@@ -619,7 +620,7 @@ export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin =
   const tip = suggestLength(stats, doc.length, plan?.deep === true);
   const tipHref = tip ? await lengthLink(env, origin, id, tip.to, doc.weekday || "") : "";
   const suggest = tip && tipHref ? { text: `${tip.why} ${LENGTH_LABEL[tip.to]} might suit you${doc.weekday ? ` on ${WEEKDAY_NAMES[doc.weekday]}s` : ""}.`, label: `Try ${LENGTH_LABEL[tip.to]}`, href: tipHref, to: tip.to } : null;
-  const mode = premiumMode(env);
+  const mode = openAccess(env) ? "open" : premiumMode(env);
   const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
   const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
   return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };

@@ -1641,6 +1641,10 @@ let postOfficeOpen = false;
 export function setPostOfficeOpen(open) {
   postOfficeOpen = open === true;
 }
+let accessOpen = true;
+export function setOpenAccess(open) {
+  accessOpen = open !== false;
+}
 export function trackRecordOpenNow() {
   return trackOpen;
 }
@@ -1708,7 +1712,7 @@ ${shareTags}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
 <style>${CSS}${FEATURE_CSS}${SIGNAL_CSS}${RETURN_CSS}${makePostCss()}</style><script>${TILE_JS}</script><script>var CATCHEM_TCG_IMAGES=${tcgOn ? "true" : "false"};function __name(t,v){try{Object.defineProperty(t,"name",{value:v,configurable:true})}catch(e){}return t}</script><style>${HISTORY_CSS}</style><script>${QUICK_JS}</script></head><body><a class="skip-link" href="#main">Skip to content</a>\n<div id="qback" hidden></div><div id="qsheet" role="dialog" aria-modal="true" aria-label="Price chart" hidden><div class="q-grab" aria-hidden="true"></div><div class="q-head"><button type="button" id="q-close">Close</button></div><div id="q-body"></div></div>
 <header class="site-bar"><a class="logo" href="/">Catch'em<span>.</span></a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button><nav id="site-nav">
-${feedLink}${item("/collection", "Collection")}${item("/heatmap", "Heatmap")}${item("/rip", "Rip value")}${item("/reads", "Reads")}${item("/releases", "Releases")}${officePrimary}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/sets", "Sets")}${item("/search", "Search")}${item("/watch", "Watch")}${item("/promos", "Promos")}${item("/indexes", "Indexes")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeMore}${item("/premium", "Premium")}</div></details>
+${feedLink}${item("/collection", "Collection")}${item("/heatmap", "Heatmap")}${item("/rip", "Rip value")}${item("/reads", "Reads")}${item("/releases", "Releases")}${officePrimary}<details class="nav-more"><summary>More</summary><div class="nav-more-list">${item("/sets", "Sets")}${item("/search", "Search")}${item("/watch", "Watch")}${item("/promos", "Promos")}${item("/indexes", "Indexes")}${item("/alerts", "Alerts")}${item("/me", "Account")}${item("/weekly", "Weekly")}${item("/scanner", "Scanner")}${item("/artists", "Artists")}${item("/compare", "Compare")}${officeMore}${accessOpen ? "" : item("/premium", "Premium")}</div></details>
 </nav></header>
 ${banner}
 ${fresh}

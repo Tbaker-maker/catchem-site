@@ -1,5 +1,7 @@
 // One switch for Premium. Only the exact word "live" opens checkout.
 // Anything else, including unset, is the waitlist.
+// OPEN_ACCESS (default on) strips plan CTAs; checkout paths stay in this file.
+import { openAccess, paintOpenAccessHtml } from "./open-access.mjs";
 
 export function premiumMode(env) {
   const raw = String(env?.PREMIUM_MODE ?? "").trim().toLowerCase();
@@ -50,6 +52,7 @@ export function pointPremiumTab(html) {
 }
 
 export function paintPublicHtml(html, pathname, env) {
+  if (openAccess(env)) return paintOpenAccessHtml(html);
   if (!isWaitlist(env)) return String(html || "");
   const path = String(pathname || "");
   const home = path === "/" || path === "";
@@ -58,6 +61,7 @@ export function paintPublicHtml(html, pathname, env) {
 }
 
 export function premiumPlainLine(mode = "waitlist") {
+  if (mode === "open") return "";
   if (mode === "live") {
     return "Premium reads in Discord, watchlist pings, and members-only channels. $14.99 USD a month. All site tools stay free. https://catchemtcg.com/premium";
   }
@@ -65,6 +69,7 @@ export function premiumPlainLine(mode = "waitlist") {
 }
 
 export function premiumEmailBlock(mode = "waitlist") {
+  if (mode === "open") return "";
   const live = mode === "live";
   const label = live ? "See Premium" : "Join the Premium waitlist";
   const price = live ? "$14.99 USD a month." : "";

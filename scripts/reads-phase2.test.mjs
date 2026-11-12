@@ -154,7 +154,8 @@ t("weekday of the send day", weekdayOf("2026-10-18") === "sun" && weekdayOf("202
 t("a Sunday Deep dive applies on Sunday for Premium", lengthFor({ length: "glance", lengthByDay: { sun: "deep" }, deep: true }, "2026-10-18").length === "deep" && lengthFor({ length: "glance", lengthByDay: { sun: "deep" }, deep: true }, "2026-10-19").length === "glance");
 t("free Deep dive days read as Standard", lengthFor({ lengthByDay: { sun: "deep" }, deep: false }, "2026-10-18").length === "standard");
 t("the form saves weekday lengths", (() => { const p = gatePlan(planFromFields(new URLSearchParams("length=glance&len_sun=deep&len_mon=glance&len_tue=")), { premium: true }).plan; return p.length === "glance" && p.lengthByDay.sun === "deep" && p.lengthByDay.mon === "glance" && !("tue" in p.lengthByDay); })());
-t("free plans lose Deep dive days with a note", (() => { const g = gatePlan({ lengthByDay: { sun: "deep" } }, { premium: false }); return g.plan.lengthByDay.sun === "standard" && g.notes.some((n) => n.includes("Deep dive days")); })());
+t("open access keeps Deep dive days", gatePlan({ lengthByDay: { sun: "deep" } }, { premium: false }).plan.lengthByDay.sun === "deep");
+t("switch off: free plans lose Deep dive days with a note", (() => { const g = gatePlan({ lengthByDay: { sun: "deep" } }, { premium: false, openAccess: false }); return g.plan.lengthByDay.sun === "standard" && g.notes.some((n) => n.includes("Deep dive days")); })());
 const picker = lengthByDayPicker({ lengthByDay: { sun: "deep" } }, true);
 t("the picker has a row per weekday with point and click chips", (picker.match(/<fieldset class="rd-day">/g) || []).length === 7 && (picker.match(/type="radio" name="len_/g) || []).length === 28 && picker.includes('name="len_sun" value="deep" data-label="Deep dive" checked') && picker.includes("Glance weekdays"));
 t("free members see Deep dive days locked", /name="len_sun" value="deep"[^>]*disabled/.test(lengthByDayPicker({}, false)));

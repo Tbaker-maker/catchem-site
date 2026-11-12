@@ -1,7 +1,8 @@
 // Card Rating panel for card pages. A factual comparison of this card's
 // price and facts on file against similar cards. Not advice.
-// Free viewers see the verdict and the peer line. Premium sees the factor bars.
+// Everyone sees the verdict, the peer line, and the factor bars while OPEN_ACCESS is on.
 import { esc } from "./ui.mjs";
+import { entitled } from "./open-access.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 import { indexHref, indexKeyOf } from "./indexes.mjs";
 
@@ -32,7 +33,7 @@ export function comparedWith(row, pool, pic = () => "") {
   return `<div class="cw-wrap"><h3>Compared with ${list.length} ${esc(row.peers?.matched ? `${row.groupLabel} with similar pull rate and popularity` : row.groupLabel)}</h3><ul class="cw">${first}</ul>${more}</div>`;
 }
 
-export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}) {
+export function ratingPanel(row, doc, { premium = false, pool = null, pic, openAccess, env } = {}) {
   if (!row) return "";
   const asOf = doc?.asOf || row.price?.date;
   const head = `<h2>Rating</h2><p class="grp">${esc(row.groupOne || row.groupLabel || "")}${row.firstEd ? " · 1st Edition printing" : ""}</p>`;
@@ -44,7 +45,7 @@ export function ratingPanel(row, doc, { premium = false, pool = null, pic } = {}
   const why = row.reason === "no published pull rate for this set" ? `No published pull rate for this set and rarity, so there is no fair group to compare against.` : `Fewer than 5 ${esc(row.groupLabel)} share its pull rate and popularity.`;
   const peer = !row.verdict ? `${cash(row.price.price)} on ${shortDate(row.price.date)}, TCGplayer market. ${why} The cards below are listed without a verdict.` : row.peers ? `Price vs similar cards: ${cash(row.price.price)} vs a typical ${cash(row.peers.median)} for ${esc(row.groupLabel)} (${row.peers.n} cards). TCGplayer market, ${shortDate(row.price.date)}.` : "";
   let body = "";
-  if (premium) {
+  if (entitled({ premium, openAccess, env })) {
     const items = ORDER.filter((k) => row.factors?.[k]).map((k) => {
       const f = row.factors[k];
       const pct = Math.round(Math.max(0, Math.min(1, Number(f.v))) * 100);

@@ -7,6 +7,7 @@ import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, TILE_JS, chipForSample, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
 import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay } from "./reads-article.mjs";
+import { entitled } from "./open-access.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
 
@@ -104,7 +105,7 @@ export const PRESETS = [
 export const LENGTH_CHOICES = [
   { id: "glance", label: "Glance", note: "Headline and three moves. About 20 seconds." },
   { id: "standard", label: "Standard", note: "The full read. About a minute." },
-  { id: "deep", label: "Deep dive", note: "Charts, run stage and set by set. Premium." },
+  { id: "deep", label: "Deep dive", note: "Charts, run stage and set by set." },
 ];
 
 function cleanList(value, cap = 25) {
@@ -137,7 +138,8 @@ export function followCount(plan) {
     + (plan.watch?.length || 0);
 }
 
-export function gatePlan(plan, { premium = false } = {}) {
+export function gatePlan(plan, opts = {}) {
+  const premium = entitled(opts);
   const next = blankPlan();
   const notes = [];
   next.sets = cleanList(plan?.sets);
@@ -306,7 +308,7 @@ export function whereItGoes(shown, state = {}) {
 <label class="rd-chip"><input type="checkbox" name="email_on" value="1"${shown.channels?.email === true ? " checked" : ""}> <span>Email</span></label>
 <label class="rd-mail">Email address<input type="email" name="email" inputmode="email" autocomplete="email" maxlength="120" value="${esc(state.emailValue || "")}"></label>
 <p class="rd-note">Email stays off until you open the confirm link. Every letter has a one click stop link.</p>
-${lengthPicker(shown, state.premium === true)}`;
+${lengthPicker(shown, entitled(state))}`;
 }
 
 export function preSend(text) {
@@ -483,7 +485,7 @@ export function renderReadsPage(state = {}) {
     return `<main id="main" tabindex="-1" class="rd-wrap"><h1>Your reads</h1><p>Reads are off.</p><p>Discord is the account link. <a href="https://discord.gg/fUSjxDX4Hy">Open Discord</a>.</p></main>`;
   }
   const signedIn = state.signedIn === true;
-  const premium = state.premium === true;
+  const premium = entitled(state);
   const base = state.plan && typeof state.plan === "object" ? state.plan : blankPlan();
   const draft = { ...base, watch: [...(base.watch || [])] };
   const cardId = productId(state.card);
@@ -581,7 +583,7 @@ export function renderReadsPage(state = {}) {
 })();
 </script>
 </section>
-<p class="rd-note">${premium ? "Premium can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."} <a href="/premium">Premium</a></p>
+<p class="rd-note">${premium ? "You can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."}${premium ? "" : ` <a href="/premium">Premium</a>`}</p>
 ${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
 <form class="rd-card" id="rd-form" method="post" action="/api/reads">
 <h2>Quick start</h2>
@@ -757,7 +759,7 @@ export async function handleReads(request, env, fetchImpl = fetch) {
     try { fields = await request.json(); } catch { return json({ ok: false, error: "Bad read." }, 400); }
   }
   const raw = planFromFields(fields);
-  const { plan, notes } = gatePlan(raw, { premium: user.premium === true });
+  const { plan, notes } = gatePlan(raw, { premium: user.premium === true, env });
   plan.savedAt = new Date().toISOString();
   let emailState = "";
   const armed = emailSendAllowed(env);

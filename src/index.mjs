@@ -52,13 +52,14 @@ import { renderLegal, LEGAL_PATHS } from "./legal.mjs";
 import { addError, topErrors } from "./client-log.mjs";
 import {
   clockLabel, feedReads, readYearChart, priceBannerLine, readStaleAgainstCard, renderAll, renderArtist, renderArtists, renderCard, renderDive, renderFeed, renderMethod, renderMine, renderMovers,
-  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, renderWatch, setPriceBanner, quickView, cardPriceSeries,
+  renderPokemon, renderPost, renderPostClosed, renderPremium, renderPremiumResult, renderRetired, renderSearch, renderSetShell, renderSets, renderSetValue, renderSupply, renderToday, todayStrip, heroToday, renderTrackRecord, renderTrackRecordHidden, trackRecordIsOpen, setTrackRecordOpen, setPostOfficeOpen, setOpenAccess, renderCompare, renderStatus, renderRotation, renderReleases, renderSetValuePage, renderPractice, renderNotFound, renderWatch, setPriceBanner, quickView, cardPriceSeries,
 } from "./ui.mjs";
 import { postOfficeOn, paintHomePostOffice } from "./post-office-flag.mjs";
 import { paintHomeBriefStrip } from "./home-brief-strip.mjs";
 import { flagForItem } from "./premium-ratio.mjs";
 import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
+import { openAccess } from "./open-access.mjs";
 import { exploreOn, exploreResponse, paintExplore } from "./explore-page.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
@@ -675,8 +676,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   setTrackRecordOpen(trackOpen);
   const rawTrack = trackOpen && typeof trackDoc?.windows?.d90?.line === "string" ? trackDoc.windows.d90.line.replace(/\s+/g, " ").trim() : "";
   const trackLine = rawTrack && !/[\u2014\u2013]/.test(rawTrack) && !/\bsolds?\b/i.test(rawTrack) ? rawTrack.slice(0, 180) : "";
-  const pageOpts = { ...opts, asOf, trackLine, postOffice: opts.postOffice === true || postOfficeOn(opts) };
+  const accessOn = opts.openAccess === false ? false : (opts.openAccess === true ? true : openAccess(opts.env || opts));
+  const pageOpts = { ...opts, asOf, trackLine, postOffice: opts.postOffice === true || postOfficeOn(opts), openAccess: accessOn };
   setPostOfficeOpen(pageOpts.postOffice);
+  setOpenAccess(accessOn);
   if (kind === "data") {
     const rel = path.slice("/data/".length);
     if (!rel || rel.includes("..")) return new Response("Bad path", { status: 400 });
@@ -1057,7 +1060,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         const panels = [];
         for (const r of rows) {
           const pool = r.peers?.pool ? await loadJson(`feed/rating/peers/${r.peers.pool}.json`, fetchImpl).catch(() => null) : null;
-          panels.push(ratingPanel(r, { ...meta, asOf: ratingShard.asOf }, { premium: opts.premium === true, pool, pic: (x) => pic(x, pool) }));
+          panels.push(ratingPanel(r, { ...meta, asOf: ratingShard.asOf }, { premium: opts.premium === true, openAccess: pageOpts.openAccess, pool, pic: (x) => pic(x, pool) }));
         }
         ratingHtml = panels.join("");
         if (rows.some((r) => r.check)) priceCheck = true;
@@ -1067,7 +1070,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (card && card.kind === "sealed" && cardId) {
       const row = sealedRatingShard?.rows?.[cardId];
       if (row) {
-        rotationHtml = sealedRatingPanel(row, { ...sealedRatingMeta, asOf: sealedRatingShard.asOf }, { premium: opts.premium === true }) + rotationHtml;
+        rotationHtml = sealedRatingPanel(row, { ...sealedRatingMeta, asOf: sealedRatingShard.asOf }, { premium: opts.premium === true, openAccess: pageOpts.openAccess }) + rotationHtml;
       }
     }
     let rip = null;
@@ -1201,6 +1204,9 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderPost(stamp, await liveStamp(fetchImpl), pageOpts));
   }
   if (kind === "premium") {
+    if (pageOpts.openAccess) {
+      return Response.redirect(new URL("/", "https://catchemtcg.com"), 302);
+    }
     if (premiumMode({ PREMIUM_MODE: opts.premiumMode }) !== "live") {
       return html(renderWaitlistPage({ feed: pageOpts.feed === true }));
     }
@@ -1245,7 +1251,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const doc = await loadJson("feed/ir-cycle.json", fetchImpl).catch(() => null);
     const images = await catalogueMap(fetchImpl);
     const pic = (r) => { const hit = officialSrc({ id: r.id, kind: "single" }, images); return picTag(hit.src, "thumb", r.name, { id: r.id, alts: hit.alts || [] }); };
-    const body = watchlistBody(doc, { premium: opts.premium === true, set: opts.set || "", page: opts.page || "", pic });
+    const body = watchlistBody(doc, { premium: opts.premium === true, openAccess: pageOpts.openAccess, set: opts.set || "", page: opts.page || "", pic });
     return html(pageChrome("", body, "Illustration Rares to watch", stamp, "", pageOpts.feed === true));
   }
   if (kind === "supply") {
@@ -1606,6 +1612,7 @@ const worker = {
           plan: stored,
           signedIn: !!viewer?.sub,
           premium: viewer?.premium === true,
+          openAccess: openAccess(env),
           saved: url.searchParams.get("saved") === "1",
           email: url.searchParams.get("email") || "",
           emailValue: mail.email || "",
@@ -1634,7 +1641,7 @@ const worker = {
           const prewarmParam = url.searchParams.get("prewarm") || "";
           const prewarm = prewarmParam === "1" || prewarmParam === "html";
           const prewarmHtml = prewarmParam === "html";
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, prewarmHtml, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env), officeSearch: url.search || "" });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, prewarmHtml, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env), officeSearch: url.search || "", openAccess: openAccess(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.

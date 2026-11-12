@@ -1,7 +1,8 @@
 // Votes, follows, and price alerts. Account rows need FEED_KV.
-// Discord DMs are sent by the bot from the synced watch list. Premium only.
+// Discord DMs are sent by the bot from the synced watch list.
 import { readUser } from "./quota.mjs";
 import { WATCH_CAP } from "./watch-cap.mjs";
+import { FOLLOW_CAP, entitled } from "./open-access.mjs";
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -54,9 +55,9 @@ export async function handleFollow(request, env) {
   const listKey = `follows:${user.sub}`;
   const list = await store.get(listKey, "json") || [];
   if (list.includes(id)) return json({ ok: true, following: true, saved: list.length });
-  const cap = user.premium === true ? 25 : 3;
+  const cap = entitled({ user, env }) ? FOLLOW_CAP : 3;
   if (list.length >= cap) {
-    return json({ ok: false, error: user.premium ? "25 follows saved." : "You can follow 3 reads." }, 429);
+    return json({ ok: false, error: cap >= FOLLOW_CAP ? "25 follows saved." : "You can follow 3 reads." }, 429);
   }
   list.push(id);
   await store.put(`follow:${user.sub}:${id}`, JSON.stringify({ id, sku, at: new Date().toISOString() }));

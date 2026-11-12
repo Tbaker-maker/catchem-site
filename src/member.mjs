@@ -436,7 +436,7 @@ ${CLIENT}
 
 export function renderAlerts(stamp) {
   const body = `<h1>Alert settings</h1>
-<p>Set the number to cross, and whether the note should fire above or below it. Premium gets the Discord DM. Everyone else can still save 25.</p>
+<p>Set the number to cross, and whether the note should fire above or below it. A Discord DM can go out when the number is crossed. You can save up to 25.</p>
 <form id="prefs" class="rowcard">
 <label class="switch"><input id="pause" type="checkbox"> Pause all alerts</label>
 <div class="grid2">
@@ -457,7 +457,7 @@ ${ALERT_JS}
 
 export function renderAccount(stamp) {
   const body = `<h1>Account</h1>
-<p>Catch'em stores your Discord id, the name and avatar Discord sends, and whether the server role says Premium. The watchlist, collection, and alert settings stay on the account when you are signed in, and on this device when you are not.</p>
+<p>Catch'em stores your Discord id, the name and avatar Discord sends, and whether a paid Discord role is on the account. The watchlist, collection, and alert settings stay on the account when you are signed in, and on this device when you are not.</p>
 <p><a class="tap" href="/api/me/export">Export my data</a></p>
 <p><button type="button" id="ask-delete" class="quiet">Delete my account</button></p>
 <form id="delete-form" hidden>
