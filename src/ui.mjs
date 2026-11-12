@@ -1412,8 +1412,10 @@ a{color:var(--gold)}
 .win{font:600 16px/1.2 var(--sans)}
 .win.up{color:var(--green)}
 .win.down{color:var(--red)}
-.sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}@media(max-width:600px){.sum-strip{display:grid;grid-template-columns:1fr 1fr}.sum-strip .sum-chip{text-align:center;justify-content:center}}
-.sum-chip{display:inline-flex;align-items:center;min-height:44px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
+.sum-strip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.sum-chip{display:inline-flex;flex-wrap:wrap;align-items:center;min-height:44px;padding:6px 12px;border-radius:16px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans);white-space:normal;max-width:100%;box-sizing:border-box}
+@media(max-width:600px){.sum-strip{flex-direction:column;align-items:stretch}.sum-strip .sum-chip{width:100%;justify-content:flex-start;text-align:left;border-radius:16px}}
+.set-link,.print-run a,.dive-links a,.open-data,.legal-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center}
 .sum-chip.up{color:var(--green)}.sum-arrow{font-size:12px;margin-left:4px}.sum-arrow.up{color:var(--green)}.sum-arrow.down{color:var(--red)}.itap{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;min-width:44px;min-height:44px;margin:-10px -6px -10px 0;border-radius:999px;cursor:pointer;outline:none;color:var(--dim,#a8a091)}.itap-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;opacity:.75}.itap:focus-visible .itap-i{outline:2px solid var(--gold,#d9b779);outline-offset:2px}.itap-pop{display:none;position:absolute;z-index:30;left:0;top:100%;width:max-content;max-width:260px;padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;box-shadow:0 10px 24px rgba(0,0,0,.45);font:500 13px/1.4 var(--sans);font-style:normal;color:var(--txt,#efe9de);white-space:normal;text-align:left}.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}@media(max-width:700px){.itap-pop{position:fixed;left:16px;right:16px;top:auto;bottom:96px;width:auto;max-width:none}}
 .sum-chip.down{color:var(--red)}
 .means{background:#211e1a;border-radius:14px;padding:12px 14px}
@@ -2737,7 +2739,7 @@ const SINGLE_CSS = `
 .cp-facts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .cp-facts li{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04)}
 .cp-facts span{color:var(--dim);font:500 13px/1.2 var(--sans)}
-.cp-facts b{font-weight:600;text-align:right}
+.cp-facts b{font-weight:600;text-align:right}.cp-facts a,.card-page .print-run a{min-height:44px;display:inline-flex;align-items:center}
 .cp-mon{display:block;margin-top:12px;padding:14px 14px;border-radius:16px;background:rgba(217,183,121,.08);color:var(--txt);text-decoration:none;font:600 15px/1.35 var(--sans)}
 .cp-panels{display:grid;gap:16px;margin:18px 0}
 .card-page .crt,.card-page .ircy{border-radius:22px;max-width:100%;min-width:0}
@@ -3049,14 +3051,14 @@ ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${artType(card) ? `<p class="artchip-row"><span class="artchip">${esc(artType(card))}</span></p>` : ""}
 ${opts.comesFrom ? `<p class="comes-from">Comes from <a href="/p/${esc(opts.comesFrom.id)}">${esc(opts.comesFrom.name)}</a></p>` : ""}
 ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " + String(card.setSlug || "")) ? `<p><a href="/promos">All promos</a></p>` : ""}
-${readLink(card)}
-${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
-${storeLinksHtml(card, esc)}
 ${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span></p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${priceKnow(card, endDay, opts)}</p>`}`}
-${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : (view.selected ? Number(view.selected.amount) : Number(card.price)), track: opts.trackLine || "" })}
 ${view.html}
 ${held ? "" : chips}
 ${strip}
+${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : (view.selected ? Number(view.selected.amount) : Number(card.price)), track: opts.trackLine || "" })}
+${readLink(card)}
+${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
+${storeLinksHtml(card, esc)}
 ${printingsHtml(card, held)}
 ${conditionLine(opts.conditionNote)}
 ${ebayBlock(opts.priceRead)}
@@ -3270,7 +3272,7 @@ export function renderCard(card, stamp, opts = {}) {
     ? `<img class="set-mark" alt="" width="96" height="28" loading="lazy" decoding="async" src="${esc(opts.setLogo)}">`
     : "";
   const setBit = setMark + (card.setSlug
-    ? `<a href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
+    ? `<a class="set-link" href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || ""));
   const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"').replace(/<img\b([^>]*?)\ssrc="(\/data\/editor\/tcg\/[a-z0-9]+\/[A-Za-z0-9._-]+_hires\.png)"/, (m, pre, hi) => {
     const pid = /^tcgcsv-(\d+)$/.exec(String(card.id || card.sku || ""));
@@ -3336,13 +3338,13 @@ ${premiumFlagLine(card)}
 ${card.exclusive === "Costco" ? `<p class="muted">Costco exclusive${card.region ? ` · ${esc(card.region)}` : ""}</p>` : ""}
 ${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
+${priceHtml}
+${sealedStrip}
+${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
 ${readLink(card)}
 ${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<section class="cp-sec" id="promos-inside"><h2>Promos inside</h2><ul class="cp-facts">${opts.promosInside.map((row) => `<li><a href="/c/${esc(row.id)}">${esc(row.name)}${row.num ? ` #${esc(row.num)}` : ""}</a></li>`).join("")}</ul></section>` : ""}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${priceHtml}
-${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
-${sealedStrip}
 <!--jump-->
 <section id="price">${changeHtml}
 ${priceChart}
@@ -3366,7 +3368,7 @@ ${checked ? `<p class="muted">${esc(checked)}</p>` : ""}
 ${breakBits.length ? `<div class="means">${breakBits.join("")}</div>` : ""}
 ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.artist).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))}">${esc(card.artist)}</a>` : "not matched"} · Number ${esc(card.num || "not in the file")} · Rarity ${esc(card.rarity || "not in the file")}</p>`}
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
-${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
+${opts.diveHref ? `<p class="dive-links"><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
 <details><summary>See the math</summary>
 ${sealed ? "" : "<p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>\n"}<p><button type="button" id="paid">Report a price I paid</button></p>
 <form id="paid-form" hidden>
@@ -5884,7 +5886,7 @@ function cardEl(card, facts){
   const h2=pageMode==="read"?"<h2>"+title+"</h2>":(pid?'<h2><a href="'+readHref+'" data-quick="'+html(pid)+'">'+title+"</a></h2>":'<h2><a href="'+readHref+'">'+title+"</a></h2>");
   const open='<p><a class="open-data" href="'+html(openDataHref(card))+'">Open the data</a></p>';
   const diveId=diveIdFor(card);
-  const diveLink=diveId?'<p><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
+  const diveLink=diveId?'<p class="dive-links"><a class="open-data" href="/dive/'+encodeURIComponent(diveId)+'">Deeper look</a> · <a href="/dive/'+encodeURIComponent(diveId)+'">See the chart</a></p>':"";
   const cut=isFact(card)?(face?"":factCutLine(card)):"";
   const vchips=(card.tags||[]).length?'<div class="vchips sm" aria-label="Variant">'+card.tags.map(function(t){return '<a class="vchip" href="/search?tag='+encodeURIComponent(t)+'">'+html(t)+'</a>';}).join("")+'</div>':"";
   const glance=glanceChips(card);
