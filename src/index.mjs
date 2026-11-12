@@ -1820,10 +1820,19 @@ export async function withoutPostOfficeInSitemap(res, open) {
   return new Response(text, { status: res.status, headers: res.headers });
 }
 
+// Public index pages that should appear in sitemap-00. Product and card pages
+// already ship in later shards. /promos is omitted while that route 404s.
+export const CORE_SITEMAP_PATHS = ["/", "/releases", "/weekly", "/scanner", "/heatmap", "/indexes"];
+
 export async function withReleasesInSitemap(res) {
   if (!res || !res.ok) return res;
   let text = await res.text();
-  const loc = "<url><loc>https://catchemtcg.com/releases</loc></url>";
-  if (!text.includes("https://catchemtcg.com/releases<")) text = text.replace("</urlset>", loc + "\n</urlset>");
+  const add = [];
+  for (const path of CORE_SITEMAP_PATHS) {
+    const href = "https://catchemtcg.com" + (path === "/" ? "/" : path);
+    const needle = "<loc>" + href + "</loc>";
+    if (!text.includes(needle)) add.push("<url>" + needle + "</url>");
+  }
+  if (add.length && text.includes("</urlset>")) text = text.replace("</urlset>", add.join("\n") + "\n</urlset>");
   return new Response(text, { status: 200, headers: res.headers });
 }
