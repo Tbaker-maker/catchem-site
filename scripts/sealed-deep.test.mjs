@@ -40,7 +40,7 @@ t("a single does not take the sealed rip block", !single.includes("<h2>Rip value
 const sealedText = html.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ");
 t("a sealed page has no condition field or condition line", !/name="condition"/.test(html) && !/\bcondition\b/i.test(sealedText.replace(/<[^>]+>/g, " ")) && !/\b(NM|Near Mint)\b/.test(sealedText.replace(/<[^>]+>/g, " ")) && html.includes('id="paid-form"'));
 const singleText = single.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ");
-t("a single keeps its condition field", /name="condition"/.test(singleText) || !singleText.includes('id="paid-form"'));
+t("a single keeps its form and its condition field", singleText.includes('id="paid-form"') && /name="condition"/.test(singleText));
 const main = (html.slice(html.indexOf("<main"), html.lastIndexOf("</main>"))).replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 t("sealed deep copy stays clean", !/[\u2014\u2013]/.test(html) && !BANNED.test(main) && !/No data/i.test(main));
 
