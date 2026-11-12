@@ -3,12 +3,22 @@
 // Card, sealed, set and feed pages were rendered on every hit with no-store, so a cold
 // isolate parsed several large JSON files (search-lite, reads, ir-cycle) per request and
 // ran past the CPU/memory limit. Anonymous GETs of render pages are now kept in the
-// Cloudflare cache for EDGE_TTL seconds, so most hits never run the render at all.
-// Signed-in visitors (ce_session cookie) always get a fresh render.
-// The browser still sees no-store; only the edge copy is reused.
+// Cloudflare cache. The browser still sees no-store; only the edge copy is reused.
+//
+// A Worker deploy does not purge caches.default. The key includes the build stamp (bv)
+// so the new deploy misses immediately. The stored copy stays fresh for EDGE_TTL
+// seconds, then is served stale for EDGE_SWR seconds while a refresh runs.
 
-export const EDGE_TTL = 86400; // 24h soft TTL; publish bumps counts.asOf → new cache key (never stale prices)
+import { BUILD_SHA } from "./build-stamp.mjs";
+
+export const EDGE_TTL = 86400; // 24h fresh. A deploy misses via bv in the key.
+export const EDGE_SWR = 3600;
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
+
+export function edgeBuildId(explicit) {
+  const raw = explicit != null && explicit !== "" ? explicit : BUILD_SHA;
+  return String(raw || "dev").slice(0, 12) || "dev";
+}
 
 function edgeCache() {
   try { return typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { return null; }
@@ -50,18 +60,19 @@ export function cacheKeyUrl(href) {
 }
 // Panel generation: bump when mid-day fact/copy changes must drop same-day edge HTML.
 export const PANEL_CACHE_GEN = "5";
-function cacheKey(request, dataVersion = "") {
+export function edgeCacheKey(request, dataVersion = "", buildId = "") {
   const url = new URL(cacheKeyUrl(request.url));
   const day = String(dataVersion || "").slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(day)) url.searchParams.set("dv", day);
   url.searchParams.set("pv", PANEL_CACHE_GEN);
+  url.searchParams.set("bv", edgeBuildId(buildId));
   url.searchParams.sort();
   return new Request(url.toString(), { method: "GET" });
 }
 
 // Graceful HTML for catchable render failures. Status 200 so visitors never see a
 // hard error page from us. Cloudflare 1102 (CPU kill) cannot be caught in-process;
-// longer EDGE_TTL + paced prewarm keep those off the critical path.
+// paced prewarm and the build stamp in the cache key keep those off the critical path.
 export function errorPage() {
   const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Catch'em · One moment</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d12;color:#e9ecf2;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -85,14 +96,37 @@ async function safeRender(render, request, env, ctx) {
 function asEdgeHit(hit, soft = false, dataVersion = "") {
   const h = new Headers(hit.headers);
   h.set("cache-control", "no-store");
+  // The stored copy is public so caches.default will keep it. Do not let that
+  // header reach Cloudflare or the CDN holds yesterday's HTML past a deploy.
+  h.set("cdn-cache-control", "no-store");
   h.set("x-edge-cache", soft ? "stale" : "hit");
   if (soft) h.set("x-catchem-soft", "stale");
   if (dataVersion) h.set("x-data-version", dataVersion);
   return new Response(hit.body, { status: 200, headers: h });
 }
 
+function ageSeconds(hit) {
+  const at = Number(hit.headers.get("x-cached-at") || "");
+  if (!Number.isFinite(at) || at <= 0) return 0;
+  return Math.max(0, (Date.now() - at) / 1000);
+}
+
+async function storeHtml(cache, key, res, dataVersion) {
+  const type = res.headers.get("content-type") || "";
+  if (res.status !== 200 || !type.includes("text/html") || res.headers.has("set-cookie")) return false;
+  const stored = res.clone();
+  const h = new Headers(stored.headers);
+  h.set("cache-control", `public, max-age=${EDGE_TTL + EDGE_SWR}`);
+  h.set("x-cached-at", String(Date.now()));
+  if (dataVersion) h.set("x-data-version", dataVersion);
+  h.delete("cdn-cache-control");
+  await cache.put(key, new Response(stored.body, { status: 200, headers: h }));
+  return true;
+}
+
 export async function edgeFetch(render0, request, env, ctx, opts = {}) {
   const dataVersion = String(opts.dataVersion || "").slice(0, 10);
+  const buildId = opts.buildId;
   const render = (r, e, c) => safeRender(render0, r, e, c);
   const cache = edgeCache();
   if (!cache || !cacheableRequest(request)) {
@@ -104,10 +138,25 @@ export async function edgeFetch(render0, request, env, ctx, opts = {}) {
     }
     return res;
   }
-  const key = cacheKey(request, dataVersion);
+  const key = edgeCacheKey(request, dataVersion, buildId);
   let hit = null;
   try { hit = await cache.match(key); } catch { hit = null; }
-  if (hit) return asEdgeHit(hit, false, dataVersion);
+  if (hit) {
+    const age = ageSeconds(hit);
+    if (age <= EDGE_TTL) return asEdgeHit(hit, false, dataVersion);
+    if (age <= EDGE_TTL + EDGE_SWR) {
+      const stale = asEdgeHit(hit, true, dataVersion);
+      const job = (async () => {
+        try {
+          const fresh = await render(request, env, ctx);
+          await storeHtml(cache, key, fresh, dataVersion);
+        } catch { /* keep the stale copy */ }
+      })();
+      if (ctx?.waitUntil) ctx.waitUntil(job);
+      else await job;
+      return stale;
+    }
+  }
 
   let res;
   try {
@@ -130,12 +179,7 @@ export async function edgeFetch(render0, request, env, ctx, opts = {}) {
   }
   if (res.status === 200 && type.includes("text/html") && !res.headers.has("set-cookie")) {
     try {
-      const stored = res.clone();
-      const h = new Headers(stored.headers);
-      h.set("cache-control", `public, max-age=${EDGE_TTL}`);
-      if (dataVersion) h.set("x-data-version", dataVersion);
-      h.delete("cdn-cache-control");
-      const put = cache.put(key, new Response(stored.body, { status: 200, headers: h })).catch(() => {});
+      const put = storeHtml(cache, key, res, dataVersion).catch(() => {});
       if (ctx?.waitUntil) ctx.waitUntil(put); else await put;
     } catch { /* never block the page on the cache */ }
   }

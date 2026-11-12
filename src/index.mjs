@@ -86,12 +86,11 @@ async function withPremium(card, fetchImpl) {
 }
 
 
-const PRODUCT_HTML_TTL = 86400; // soft TTL; counts.asOf in the key drops yesterday on publish
-// v5: include the site build so HTML changes drop the previous build's cached pages.
-// Key still includes public-data asOf so nightly publish drops yesterday.
+const PRODUCT_HTML_TTL = 86400; // 24h. The key includes the build stamp so a deploy misses.
+// v5: build stamp in the key. A Worker deploy must not keep yesterday's HTML for a day.
 const productHtmlKey = (id) => {
   const v = currentDataVersion() || "na";
-  const build = String(BUILD_SHA || "dev").slice(0, 7) || "dev";
+  const build = String(BUILD_SHA || "dev").slice(0, 12) || "dev";
   return `product-html:v5:${build}:${v}:${id}`;
 };
 
@@ -1364,7 +1363,7 @@ const worker = {
       const res = await worker.render(request, env, ctx);
       if (!exploreOn(env)) return res;
       return paintExplore(res, request);
-    }, request, env, ctx, { dataVersion });
+    }, request, env, ctx, { dataVersion, buildId: BUILD_SHA });
   },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
