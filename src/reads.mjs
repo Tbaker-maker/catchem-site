@@ -470,6 +470,7 @@ function radio(name, value, label, on, locked) {
 // What Save says. It only promises a DM when the nightly can read the follow.
 export function saveLine(state = {}) {
   if (state.note === "closed") return "Saving is not open yet, so nothing was stored.";
+  if (state.note === "device") return "Saved on this device.";
   if (!state.saved) return "";
   let emailBit = "";
   if (state.email === "pending") emailBit = " Check your inbox and open the confirm link. No read email goes out before that.";
@@ -522,14 +523,13 @@ export function renderReadsPage(state = {}) {
   const published = !String(sample).startsWith("Sample read.");
   const sampleHead = published ? "One published read" : "Sample read";
   const sampleNote = published
-    ? "TCGplayer market. The date is in the line. Saving still needs Discord."
+    ? "TCGplayer market. The date is in the line."
     : "The night file has not loaded a published read yet.";
   const keep = (shown.watch || []).map((row) => {
     const value = `${row.kind}:${row.id}:${row.name || ""}`;
     const label = row.name || row.id || "Saved product";
     return choice("keep", value, label, true);
   }).join("");
-  const sign = signedIn ? "" : `<p><a class="rd-sign" href="/auth/discord?next=/reads">Sign in with Discord</a> to save this read.</p>`;
   const beacon = signedIn
     ? `<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>`
     : "";
@@ -578,14 +578,14 @@ export function renderReadsPage(state = {}) {
     window.__cePublishedRead = line;
     out.textContent = line;
     if (head) head.textContent = "One published read";
-    if (note) note.textContent = "TCGplayer market. The date is in the line. Saving still needs Discord.";
+    if (note) note.textContent = "TCGplayer market. The date is in the line.";
   }).catch(function(){});
 })();
 </script>
 </section>
-<p class="rd-note">${premium ? "You can use a daily read and up to 25 follows." : "Free is one weekly read. Daily and more follows are in Premium."}${premium ? "" : ` <a href="/premium">Premium</a>`}</p>
+<p class="rd-note">This read is free.</p>
 ${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
-<form class="rd-card" id="rd-form" method="post" action="/api/reads">
+<form class="rd-card" id="rd-form" method="post" action="/api/reads" data-signed-in="${signedIn ? "1" : "0"}">
 <h2>Quick start</h2>
 <div class="rd-chips">${PRESETS.map((row) => `<button type="button" class="rd-preset" data-preset="${row.id}" title="${esc(row.note)}">${esc(row.label)}</button>`).join("")}</div>
 <p class="rd-note" id="rd-preset-note">Tap one to fill the picks below. Nothing saves until you tap Save.</p>
@@ -625,8 +625,8 @@ ${choice("games", "1", "Video games", shown.addons?.games === true)}
 ${choice("all", "1", "All in one", shown.addons?.all === true)}
 </div>
 <p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>
-${sign}
 <button type="submit">Save</button>
+<p class="rd-note" id="rd-save-note"></p>
 </form>
 <script>
 (function(){
@@ -665,7 +665,7 @@ ${sign}
     var note = document.getElementById("rd-sample-note");
     var real = out.textContent.indexOf("Sample read.") !== 0;
     if (head) head.textContent = real ? "One published read" : "Sample read";
-    if (note) note.textContent = real ? "TCGplayer market. The date is in the line. Saving still needs Discord." : "The night file has not loaded a published read yet.";
+    if (note) note.textContent = real ? "TCGplayer market. The date is in the line." : "The night file has not loaded a published read yet.";
     var catalog = [];
     try { catalog = JSON.parse(document.getElementById("rd-chip-catalog").textContent || "[]"); } catch (e) { catalog = []; }
     var sample = out.textContent || "";
@@ -712,6 +712,79 @@ ${sign}
       paint();
     });
   }
+  function vals(name){
+    var nodes = form.querySelectorAll('input[name="'+name+'"]');
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) out.push(nodes[i].value);
+    return out;
+  }
+  function one(name){
+    var nodes = form.querySelectorAll('input[name="'+name+'"]');
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) return nodes[i].value;
+    return "";
+  }
+  function collected(){
+    var watch = [];
+    var keeps = form.querySelectorAll('input[name="keep"]');
+    for (var n = 0; n < keeps.length; n++) {
+      if (!keeps[n].checked) continue;
+      var parts = String(keeps[n].value || "").split(":");
+      watch.push({ kind: parts[0] === "sealed" ? "sealed" : "card", id: parts[1] || "", name: parts.slice(2).join(":") });
+    }
+    return {
+      sets: vals("set"),
+      pokemon: vals("pokemon"),
+      rarities: vals("rarity"),
+      eras: vals("era"),
+      artists: vals("artist"),
+      generations: vals("generation"),
+      product: one("product") || "singles",
+      sealed: one("product") === "sealed",
+      singles: one("product") !== "sealed",
+      watch: watch,
+      frequency: one("frequency") || "weekly",
+      premiumRatio: one("premiumRatio"),
+      addons: { news: vals("news").indexOf("1") >= 0, games: vals("games").indexOf("1") >= 0, all: vals("all").indexOf("1") >= 0 },
+      length: one("length") || "standard",
+      focus: vals("focus").indexOf("vintage") >= 0 ? "vintage" : ""
+    };
+  }
+  function applyPlan(plan){
+    if (!plan || typeof plan !== "object") return;
+    setAll("set", plan.sets || []);
+    setAll("pokemon", plan.pokemon || []);
+    setAll("rarity", plan.rarities || []);
+    setAll("era", plan.eras || []);
+    setAll("artist", plan.artists || []);
+    setAll("generation", plan.generations || []);
+    setAll("focus", plan.focus === "vintage" ? ["vintage"] : []);
+    pickOne("product", plan.product === "sealed" ? "sealed" : "singles");
+    pickOne("frequency", plan.frequency || "weekly");
+    pickOne("premiumRatio", plan.premiumRatio === "below" || plan.premiumRatio === "above" ? plan.premiumRatio : "all");
+    setAll("news", plan.addons && plan.addons.news ? ["1"] : []);
+    setAll("games", plan.addons && plan.addons.games ? ["1"] : []);
+    setAll("all", plan.addons && plan.addons.all ? ["1"] : []);
+    if (plan.length) pickOne("length", plan.length);
+  }
+  function saveNote(msg){
+    var el = document.getElementById("rd-save-note");
+    if (el) el.textContent = msg;
+  }
+  if (form.getAttribute("data-signed-in") !== "1") {
+    try {
+      var stored = JSON.parse(localStorage.getItem("catchem-reads") || "null");
+      if (stored && typeof stored === "object") { applyPlan(stored); paint(); }
+    } catch (err) {}
+    form.addEventListener("submit", function(ev){
+      ev.preventDefault();
+      try {
+        localStorage.setItem("catchem-reads", JSON.stringify(collected()));
+        saveNote("Saved on this device.");
+      } catch (err) {
+        saveNote("This browser did not store the save.");
+      }
+    });
+  }
 })();
 </script>
 ${beacon}
@@ -737,8 +810,14 @@ export async function handleReads(request, env, fetchImpl = fetch) {
   const form = (request.headers.get("content-type") || "").includes("application/x-www-form-urlencoded");
   const back = new URL("/reads", request.url);
   if (!user?.sub) {
-    if (form) return Response.redirect(new URL("/auth/discord?next=/reads", request.url), 303);
-    return json({ ok: false, error: "Sign in with Discord to save a read." }, 401);
+    if (request.method === "GET") return json({ ok: true, deviceOnly: true, plan: blankPlan() });
+    if (request.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
+    if (form) {
+      back.searchParams.set("saved", "1");
+      back.searchParams.set("note", "device");
+      return Response.redirect(back, 303);
+    }
+    return json({ ok: true, deviceOnly: true });
   }
   const store = env?.FEED_KV;
   if (request.method === "GET") {
