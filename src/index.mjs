@@ -26,6 +26,7 @@ import { sealedDocument, SEALED_PATH } from "./office-sealed.mjs";
 import { officialSrc, imageForId, editorImageFallbacks, sealedCutoutSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { marketDepthFor } from "./market-depth.mjs";
 import { homeFinderSource } from "./home-finder.mjs";
 const withChartKit = (page) => {
   let html = String(page);
@@ -924,6 +925,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const setSlugOk = !!(card && card.setSlug && /^[a-z0-9-]+$/.test(String(card.setSlug || "")));
     // One item-reads fetch feeds both the top-3 chips and the all-reads list.
     // Skip the 500KB+ rip-roi catalogue on the critical path (optional below).
+    // PkmnPrices market depth (eBay sold comps, pop, EUR): one small bucket file, in parallel.
+    const depthP = card ? marketDepthFor(card, fetchImpl) : Promise.resolve(null);
     const [
       packed,
       facts,
@@ -1170,7 +1173,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       ]);
       msrp = msrpOf({ keys: [sealedId, card.id, cardId], pid: card.tcgPlayerId || cardId, redirects, pageId: cardId }, msrpDoc);
     }
-    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
+    const marketDepth = await depthP;
+    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, marketDepth, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
     if (card) await Promise.resolve(writeProductHtml(opts, cardId, pageBody));
     return html(pageBody, card ? 200 : 404);
   }

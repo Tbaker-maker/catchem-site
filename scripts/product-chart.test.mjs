@@ -1,5 +1,5 @@
-// Product page chart: switchable views from published series only. No sales, sold,
-// demand, or MSRP view (none is published). Listings are bars on real nights only.
+// Product page chart: switchable views from published series only. These checks run
+// without sold data: the Sold view (eBay sold comps) is covered in market-depth.test.mjs.
 import vm from "node:vm";
 import { productChart, chartViews, defaultView, listingPoints, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
