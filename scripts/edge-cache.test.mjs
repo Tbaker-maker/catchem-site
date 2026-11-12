@@ -34,7 +34,7 @@ assert.equal(r.headers.get("x-catchem-soft"), "1");
 assert.match(await r.text(), /Retry/);
 assert.doesNotMatch(await errorPage().text(), /\u2014/);
 
-assert.equal(EDGE_TTL, 300);
+assert.equal(EDGE_TTL, 86400);
 assert.equal(EDGE_SWR, 3600);
 assert.equal(edgeBuildId("abcdef1234567890"), "abcdef123456");
 assert.equal(edgeBuildId(""), "dev");

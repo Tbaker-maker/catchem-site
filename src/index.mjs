@@ -86,7 +86,7 @@ async function withPremium(card, fetchImpl) {
 }
 
 
-const PRODUCT_HTML_TTL = 300; // 5 min fresh. The key includes the build stamp so a deploy misses.
+const PRODUCT_HTML_TTL = 86400; // 24h. The key includes the build stamp so a deploy misses.
 // v5: build stamp in the key. A Worker deploy must not keep yesterday's HTML for a day.
 const productHtmlKey = (id) => {
   const v = currentDataVersion() || "na";

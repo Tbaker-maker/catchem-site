@@ -11,7 +11,7 @@
 
 import { BUILD_SHA } from "./build-stamp.mjs";
 
-export const EDGE_TTL = 300;
+export const EDGE_TTL = 86400; // 24h fresh. A deploy misses via bv in the key.
 export const EDGE_SWR = 3600;
 const CACHEABLE = /^\/(c|p|sets|feed|artists|pokemon|indexes|board|releases|rotation|weekly|receipts|methodology|accuracy|dive)(\/|$)/;
 
@@ -72,7 +72,7 @@ export function edgeCacheKey(request, dataVersion = "", buildId = "") {
 
 // Graceful HTML for catchable render failures. Status 200 so visitors never see a
 // hard error page from us. Cloudflare 1102 (CPU kill) cannot be caught in-process;
-// paced prewarm and the short fresh window keep those off the critical path.
+// paced prewarm and the build stamp in the cache key keep those off the critical path.
 export function errorPage() {
   const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Catch'em · One moment</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d12;color:#e9ecf2;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}

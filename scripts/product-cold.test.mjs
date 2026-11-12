@@ -4,7 +4,7 @@ import { EDGE_TTL, cacheKeyUrl, PANEL_CACHE_GEN } from "../src/edge-cache.mjs";
 import { setRawKv, listBucketIds, extractRow, extractAllRows, setDataVersion, currentDataVersion, publicDataVersion } from "../src/data.mjs";
 import { runPrewarmBatchTests } from "./prewarm-product-pages.test.mjs";
 
-assert.equal(EDGE_TTL, 300);
+assert.equal(EDGE_TTL, 86400);
 assert.equal(cacheKeyUrl("https://catchemtcg.com/p/tcgcsv-1?prewarm=1"), "https://catchemtcg.com/p/tcgcsv-1");
 assert.equal(typeof setRawKv, "function");
 setRawKv(null);
@@ -24,7 +24,7 @@ assert.match(index, /x-prewarm/);
 assert.match(index, /prewarmHtml/);
 assert.match(index, /prewarm=html/);
 assert.match(index, /html-skip/);
-assert.match(index, /PRODUCT_HTML_TTL = 300/);
+assert.match(index, /PRODUCT_HTML_TTL = 86400/);
 assert.match(index, /product-html:v5:\$\{build\}:\$\{v\}:\$\{id\}/);
 assert.match(index, /BUILD_SHA/);
 assert.match(index, /publicDataVersion/);
