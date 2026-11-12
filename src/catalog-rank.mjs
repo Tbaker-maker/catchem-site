@@ -3,9 +3,13 @@ export function createRank() {
 // Collector search. Browser-safe. No prices are invented here.
 
 const ALIASES = [
-  [/moonbreon|moonbrean|moonbreom/g, "umbreon vmax alternate 215"],
+  [/moonbreon|moonbrean|moonbreom|moon brionne|moonbrionne|moon brion/g, "umbreon vmax alternate 215"],
   [/van gogh pikachu|vangogh pikachu|van gogh|grey felt hat/g, "pikachu grey felt hat"],
   [/poke center|pokemon center|pc etb/g, "pokemon center elite trainer box"],
+  [/prismatics/g, "prismatic evolutions"],
+  [/crowns edith/g, "crown zenith"],
+  [/\bsv151\b/g, "151"],
+  [/\betv\b|\be t v\b/g, "elite trainer box"],
   [/\betb\b/g, "elite trainer box"],
   [/\bbb\b/g, "booster box"],
   [/\bsir\b/g, "special illustration"],
