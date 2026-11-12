@@ -61,6 +61,7 @@ jobs:
       - run: node scripts/listings-one-window.test.mjs
       - run: node scripts/msrp-key-stats.test.mjs
       - run: node scripts/product-chart.test.mjs
+      - run: node scripts/market-depth.test.mjs
       - run: node scripts/chart-no-gaps.test.mjs
       - run: node scripts/card-page.test.mjs
       - run: node scripts/phone-hero.test.mjs

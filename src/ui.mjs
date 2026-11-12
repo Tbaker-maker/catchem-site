@@ -6,6 +6,7 @@ import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { productChart } from "./product-chart.mjs";
+import { marketDepthHtml, soldSeries } from "./market-depth.mjs";
 import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
@@ -3026,7 +3027,8 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   // One switchable chart: price, listings counted, both, % change (only views with data).
-  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, asOf: endDay, path: chartPath(card, opts) });
+  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, sold: held ? [] : soldSeries(opts.marketDepth), soldSource: opts.marketDepth?.source, asOf: endDay, path: chartPath(card, opts) });
+  const depthHtml = held ? "" : marketDepthHtml(opts.marketDepth, { kind: "single" });
   const chartOn = !!(priceChart || rangeRow);
   const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
   const boardSrc = Array.isArray(opts.boardReads) ? opts.boardReads : (opts.productReads || []);
@@ -3083,6 +3085,7 @@ ${ebayBlock(opts.priceRead)}
 </div>
 </header>
 ${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div><script>${HISTORY_JS}</script>` : ""}
+${depthHtml}
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
@@ -3267,7 +3270,8 @@ export function renderCard(card, stamp, opts = {}) {
   // wins on overlap, so fill only covers days after its last point.
   const priceSeries = cardPriceSeries(card, hist, sealed);
   // One switchable chart for the sealed page: price, eBay listings counted, both, % change.
-  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull", path: chartPath(card, opts) }) || historyChart(priceSeries, { asOf: endDay });
+  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], sold: held ? [] : soldSeries(opts.marketDepth), soldSource: opts.marketDepth?.source, asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull", path: chartPath(card, opts) }) || historyChart(priceSeries, { asOf: endDay });
+  const depthHtml = held ? "" : marketDepthHtml(opts.marketDepth, { kind: sealed ? "sealed" : "single" });
   // Quick-view sheets on this page still mount the shared history chart.
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
@@ -3359,6 +3363,7 @@ ${storeLinksHtml(card, esc)}
 ${priceChart}
 ${rangeRow}</section>
 ${historyJs}
+${depthHtml}
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${(Array.isArray(opts.listingSeries) && opts.listingSeries.length >= 2) || (opts.itemListings && Number.isFinite(Number(opts.itemListings.n)) && Number(opts.itemListings.n) > 0) ? `<section class="item-sec" id="supply"><h2>Listings</h2><p>The listings figure is in the chart under Price.</p></section>` : ""}
