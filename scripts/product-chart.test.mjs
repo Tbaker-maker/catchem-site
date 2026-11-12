@@ -1,7 +1,7 @@
 // Product page chart: switchable views from published series only. No sales, sold,
 // demand, or MSRP view (none is published). Listings are bars on real nights only.
 import vm from "node:vm";
-import { productChart, chartViews, listingPoints, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
+import { productChart, chartViews, listingPoints, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
 let fail = 0;
@@ -35,13 +35,24 @@ const words = visible(html);
 t("no sales, sold, demand, supply, or MSRP words", !/\b(sales?|sold|demand|supply|msrp)\b/i.test(words));
 t("no em or en dashes", !/[\u2014\u2013]/.test(html));
 t("no advice phrases", !hasAdvice(words));
-t("camera mode button and watermark with source and date", html.includes('class="pc-cam-btn"') && /class="pc-mark"[^>]*><b>Catch'em<span>\.<\/span><\/b> TCGplayer market, /.test(html));
+t("camera mode button and watermark with source and date", html.includes('class="pc-cam-btn"') && /class="pc-mark"[^>]*><b>Catch'em<span>\.<\/span><\/b> <span class="pc-mark-t">TCGplayer market, /.test(html));
 t("camera mode hides nav, banner, dock, footer, and buy buttons", ["site-bar", "stale-banner", "dock", "site-foot", "shop-block", "shop-btns", "item-jump"].every((c) => PRODUCT_CHART_CSS.includes(`html.pc-cam .${c}`)) && PRODUCT_CHART_CSS.includes("html.pc-cam .pc-mark{display:block}"));
 t("tabs fit a 390px screen (2 by 2 grid under 420px)", /@media\(max-width:420px\)\{\.pc \.pc-tabs\{display:grid;grid-template-columns:1fr 1fr\}/.test(PRODUCT_CHART_CSS) && /\.pc-tab\{[^}]*min-height:44px/.test(PRODUCT_CHART_CSS));
 let parsed = true; try { new vm.Script(PRODUCT_CHART_JS); } catch { parsed = false; }
 t("client script parses", parsed);
 t("price line stays solid", !/stroke-dasharray/.test(PRODUCT_CHART_JS));
 t("tooltip snaps to real price days and names carried days", /return !p\[3\]/.test(PRODUCT_CHART_JS) && PRODUCT_CHART_JS.includes("last price on file"));
+
+// A small move must not fill the plot: price and combined views span at least MIN_SPAN of the price.
+for (const view of ["price", "both"]) {
+  const [lo, hi] = yDomain([194.33, 195.83, 194.76], view);
+  t(`${view}: a 0.8% move gets at least a 10% y range`, hi - lo >= 195 * MIN_SPAN && lo < 194.33 && hi > 195.83);
+}
+{ const [lo, hi] = yDomain([100, 200], "price"); t("a wide move keeps its own range", lo < 100 && hi > 200 && hi - lo < 140); }
+{ const [lo, hi] = yDomain([-2, 3], "change"); t("% change keeps zero and is not widened", lo < -2 && lo > -3 && hi > 3 && hi < 4); }
+t("client chart uses the same y range function", PRODUCT_CHART_JS.includes("var yDomain=function yDomain(") && /yDomain\(p\.map\(val\),view\)/.test(PRODUCT_CHART_JS));
+t("camera mode hides the source paragraph, legend, and button row, and shows a corner close", ["pc-src", "pc-key", "pc-foot"].every((c) => PRODUCT_CHART_CSS.includes(`html.pc-cam .${c}`)) && PRODUCT_CHART_CSS.includes("html.pc-cam .pc-cam-x{display:block}") && html.includes('class="pc-cam-x" aria-label="Exit camera mode"') && /key==="Escape"/.test(PRODUCT_CHART_JS));
+t("watermark is one line with the date and names the view's source", /\.pc-mark\{[^}]*white-space:nowrap/.test(PRODUCT_CHART_CSS) && html.includes('data-src-both="TCGplayer market, eBay listings counted"') && PRODUCT_CHART_JS.includes('"data-src-"+') && /data-day="[A-Z][a-z]{2} \d+, \d{4}"/.test(html));
 
 // Pages: sealed gets all views, a card without counts gets price and % change.
 const sealed = renderCard({ id: "tcgcsv-9", name: "Test Elite Trainer Box", kind: "sealed", set: "Test", price: 60, asOf: "2026-10-12", hist: [["2026-10-01", 55], ["2026-10-12", 60]] }, "stamp", {

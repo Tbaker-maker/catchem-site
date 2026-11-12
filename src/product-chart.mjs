@@ -36,6 +36,17 @@ export function chartViews(priceReal, listReal) {
   return views;
 }
 
+// Y range for the price, combined, and % change views. Price views span at least
+// MIN_SPAN of the middle price (about +-5%), so a 1% move does not fill the plot.
+export const MIN_SPAN = 0.1;
+export function yDomain(vals, view) {
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (view === "change") { mn = Math.min(mn, 0); mx = Math.max(mx, 0); }
+  else { var mid = (mn + mx) / 2, need = Math.abs(mid) * 0.1; if (mx - mn < need) { mn = mid - need / 2; mx = mid + need / 2; } }
+  var pad = (mx - mn) * 0.14 || Math.abs(mx) * 0.05 || 1;
+  return [mn - pad, mx + pad];
+}
+
 export function productChart({ price = [], listings = [], asOf = "", ownLabel } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
@@ -63,10 +74,11 @@ ${tabs}
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<p class="pc-mark" aria-hidden="true"><b>Catch'em<span>.</span></b> ${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</p>
+<p class="pc-mark" aria-hidden="true" data-day="${esc(lastDay ? longDay(lastDay) : "")}" data-src-price="TCGplayer market"${list.length >= 2 ? ` data-src-listings="eBay listings counted" data-src-both="TCGplayer market, eBay listings counted"` : ""}><b>Catch'em<span>.</span></b> <span class="pc-mark-t">${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</span></p>
 ${list.length >= 2 ? `<p class="pc-key muted"><span class="pc-k"><span class="pc-sw pc-sw-p"></span>Price</span><span class="pc-k"><span class="pc-sw pc-sw-l"></span>eBay listings counted (active listings each night)</span></p>` : ""}
 <p class="pc-src muted">${srcs.map(esc).join(". ")}${srcs.length ? "." : ""}</p>
 <p class="pc-foot"><button type="button" class="pc-cam-btn" aria-pressed="false">Camera mode</button></p>
+<button type="button" class="pc-cam-x" aria-label="Exit camera mode">&times;</button>
 </figure><script>${PRODUCT_CHART_JS}</script>`;
 }
 
@@ -82,14 +94,17 @@ export const PRODUCT_CHART_CSS = `.pc .pc-tabs{display:flex;gap:4px;padding:3px;
 .pc-foot{margin:8px 0 0;display:flex;justify-content:flex-end}
 .pc-cam-btn{appearance:none;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;font:600 13px/1 var(--sans);min-height:44px;padding:0 14px;border-radius:999px;cursor:pointer}
 .pc-cam-btn[aria-pressed="true"]{background:#d9b779;color:#141210;border-color:#d9b779}
-.pc-mark{display:none;margin:6px 0 0;text-align:right;font:500 12px/1.2 var(--sans);opacity:.8}.pc-mark b{font:600 14px/1 var(--serif)}.pc-mark span{color:#d9b779}
+.pc{position:relative}
+.pc-mark{display:none;margin:6px 0 0;text-align:right;font:500 12px/1.2 var(--sans);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-mark b{font:600 14px/1 var(--serif)}.pc-mark b span{color:#d9b779}
+.pc-cam-x{display:none;position:absolute;top:4px;right:4px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:inherit;font:400 18px/28px var(--sans);opacity:.45;cursor:pointer;z-index:3}.pc-cam-x:hover,.pc-cam-x:focus-visible{opacity:1;outline:2px solid #d9b779}
 .pc-up{color:#7fc79a}.pc-down{color:#e88b7f}
 html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback{display:none!important}
-html.pc-cam .pc-mark{display:block}html.pc-cam .pc{box-shadow:none}html.pc-cam .pc .hc-plot{height:260px}
+html.pc-cam .pc-mark{display:block}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block}html.pc-cam .pc{box-shadow:none;padding-top:38px}html.pc-cam .pc .hc-plot{height:260px}
 @media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
 
 // Client script. Kept free of dashed strokes: the price line stays solid.
 export const PRODUCT_CHART_JS = `(function(){
+var yDomain=${yDomain.toString()};
 var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function ms(d){return Date.parse(d+"T00:00:00Z");}
 function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+(+p[0]===new Date().getUTCFullYear()?"":", "+p[0]);}
@@ -123,9 +138,7 @@ function draw(){
   function val(x){return view==="change"?(x[1]/base-1)*100:x[1];}
   var Yp=null,Yl=null;
   if(useP&&p.length){
-    var vs=p.map(val),mn=Math.min.apply(null,vs),mx=Math.max.apply(null,vs);
-    if(view==="change"){mn=Math.min(mn,0);mx=Math.max(mx,0);}
-    var pad=(mx-mn)*.14||Math.abs(mx)*.05||1;mn-=pad;mx+=pad;
+    var dom=yDomain(p.map(val),view),mn=dom[0],mx=dom[1];
     var top=view==="both"?PT:PT,bot=view==="both"?H*.62:H-PB;
     Yp=function(v){return top+(1-(v-mn)/(mx-mn))*(bot-top);};
     for(var k=1;k<=3;k++){var gy=top+(bot-top)*k/4,gv=mn+(1-(gy-top)/(bot-top))*(mx-mn);body+='<line x1="0" x2="'+W+'" y1="'+gy.toFixed(1)+'" y2="'+gy.toFixed(1)+'" stroke="rgba(255,255,255,.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>';gl+='<span class="hc-gl l" style="top:'+(gy/H*100).toFixed(2)+'%">'+(view==="change"?pct(gv):grid$(gv,mx-mn))+'</span>';}
@@ -161,6 +174,7 @@ function draw(){
   var lr=view==="listings"?l:pr;if(lr.length){var last=lr[lr.length-1],first=lr[0];
     if(view==="listings"){var dn=last[1]-first[1];priceEl.textContent=cnt(last[1])+" listings counted";dateEl.innerHTML=short(last[0])+(lr.length>1?' · <span class="'+(dn>0?"pc-up":dn<0?"pc-down":"")+'">'+(dn>0?"+":"")+cnt(dn)+(first[1]>0?" ("+pct(dn/first[1]*100)+")":"")+"</span> since "+short(first[0]):"");}
     else{var ch=(last[1]/first[1]-1)*100;priceEl.textContent=view==="change"?pct(ch):money(last[1]);dateEl.innerHTML=short(last[0])+' · <span class="'+(ch>0?"pc-up":ch<0?"pc-down":"")+'">'+(view==="change"?money(last[1]):pct(ch))+"</span> "+(view==="change"?"on "+short(last[0]):"since "+short(first[0]));}}
+  var mk=fig.querySelector(".pc-mark-t"),mw=fig.querySelector(".pc-mark");if(mk){var md=mw.getAttribute("data-day"),ms_=mw.getAttribute("data-src-"+(view==="change"?"price":view))||mw.getAttribute("data-src-price")||"";mk.textContent=ms_+(md?", "+md:"");}
   st={p:p,l:l,X:X,Yp:Yp,Yl:Yl,val:val};
 }
 function near(cx){var r=plot.getBoundingClientRect(),x=(cx-r.left)/r.width*W,pool=[];
@@ -180,6 +194,7 @@ function hide(){tip.hidden=true;var ln=svg.querySelector(".hc-x"),dot=svg.queryS
 plot.addEventListener("pointermove",function(e){show(e.clientX);});plot.addEventListener("pointerdown",function(e){show(e.clientX);});plot.addEventListener("pointerleave",hide);
 fig.querySelectorAll(".hc-pill").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".hc-pill").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});days=+b.getAttribute("data-days");hide();draw();});});
 fig.querySelectorAll(".pc-tab").forEach(function(b){b.addEventListener("click",function(){fig.querySelectorAll(".pc-tab").forEach(function(o){o.setAttribute("aria-pressed",o===b?"true":"false");});view=b.getAttribute("data-view");fig.setAttribute("data-view",view);hide();draw();});});
+fig.querySelectorAll(".pc-cam-x").forEach(function(b){b.addEventListener("click",function(){cam(false);});});
 fig.querySelectorAll(".pc-cam-btn").forEach(function(b){b.addEventListener("click",function(){cam(!document.documentElement.classList.contains("pc-cam"));});});
 var q=typeof location!=="undefined"?location.search:"";var vm=/[?&]view=(price|listings|both|change)\\b/.exec(q);if(vm){var t=fig.querySelector('.pc-tab[data-view="'+vm[1]+'"]');if(t)t.click();}
 draw();if(/[?&]camera=1\\b/.test(q))cam(true);}
