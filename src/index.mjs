@@ -43,6 +43,7 @@ import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
 import { ripBody } from "./rip.mjs";
 import { renderScanner, renderWeekly } from "./weekly.mjs";
+import { renderPromos } from "./promos.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
 import { pageChrome, freshLabel, newestStamp } from "./ui.mjs";
@@ -1223,8 +1224,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "weekly" || kind === "scanner") {
     const doc = await loadCatalogue("derived/weekly.json", fetchImpl).catch(() => null);
-    if (kind === "scanner") return html(renderScanner(doc, stamp, pageOpts));
     const images = await catalogueMap(fetchImpl);
+    if (kind === "scanner") return html(renderScanner(doc, stamp, pageOpts, images));
     return html(renderWeekly(doc, stamp, pageOpts, images));
   }
   if (kind === "rip") {
