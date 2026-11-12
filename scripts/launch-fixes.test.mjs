@@ -34,9 +34,13 @@ const ui = fs.readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 t("set list does not print No market price", !ui.includes('const money=n=>!(n>0)?"No market price"'));
 const card = `<html><head><title>Charizard · Catch'em</title></head><body><img alt="Charizard" loading="eager" src="/data/editor/tcg/base1/4_hires.png"><span>$968.91</span><span>Oct 13, 2026</span></body></html>`;
 const meta = addShareMeta(card, "/c/tcgcsv-42382", "card");
-const frameAmp = "&" + "amp;";
-const frameImage = "https://catchemtcg.com/og/frame.svg?n=Charizard" + frameAmp + "p=968.91" + frameAmp + "d=2026-10-13" + frameAmp + "img=%2Fdata%2Feditor%2Ftcg%2Fbase1%2F4_hires.png" + frameAmp + "src=tcg";
-t("card share meta uses the branded card and price", meta.includes('og:image" content="' + frameImage + '"') && meta.includes("og:title\" content=\"Charizard · Catch'em\"") && meta.includes("$968.91 TCGplayer market on Oct 13, 2026") && meta.includes('og:image:width" content="1200"') && meta.includes('og:image:height" content="675"'));
+const rasterImage = "https://catchemtcg.com/data/editor/tcg/base1/4_hires.png";
+t("card share meta uses a raster picture and the dated price", meta.includes('og:image" content="' + rasterImage + '"') && meta.includes('twitter:image" content="' + rasterImage + '"') && !/(og|twitter):image" content="[^"]*\.svg/.test(meta) && meta.includes("og:title\" content=\"Charizard · Catch'em\"") && meta.includes("$968.91 TCGplayer market on Oct 13, 2026"));
+// Live Nov 11: the description said Oct 29 (from a listings chip) while the page and the frame said Oct 30.
+const lost = `<html><head><title>Lost Origin Elite Trainer Box · Catch'em</title></head><body><div data-rv-price="194.33" data-rv-date="2026-10-30"></div><img loading="eager" src="/data/sealed-cutouts/x.svg"><p class="sum-strip"><span class="sum-chip">$194.33 · Oct 30</span><span class="sum-chip">137 listings counted, Oct 30 <span aria-label="Up 0.7% since Oct 29, 2026">▲ 0.7%</span></span></p></body></html>`;
+const lostMeta = addShareMeta(lost, "/p/tcgcsv-277335", "product");
+t("share description uses the page's own price date", lostMeta.includes("$194.33 TCGplayer market on Oct 30, 2026") && !lostMeta.includes("Oct 29, 2026. Price"));
+t("an SVG hero falls back to og.png at its real size", lostMeta.includes('og:image" content="https://catchemtcg.com/og.png"') && lostMeta.includes('twitter:image" content="https://catchemtcg.com/og.png"') && lostMeta.includes('og:image:height" content="630"'));
 const set = addShareMeta(`<html><head><title>ME06: Delta Reign · Catch'em</title></head><body></body></html>`, "/sets/me06-delta-reign", "set");
 t("set share meta has its own title and description", set.includes('og:title" content="ME06: Delta Reign · Catch\'em"') && set.includes("in ME06: Delta Reign"));
 const signin = fs.readFileSync(new URL("../src/auth.mjs", import.meta.url), "utf8");

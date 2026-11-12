@@ -2,7 +2,6 @@
 // Every page gets a description, canonical URL, and Open Graph / Twitter tags.
 // The share image is Catch'em's own og.png, or for a card or product page the
 // picture the site itself serves on that page (a same-origin path), never a store URL.
-import { frameUrl, prettyDateToIso } from "./return-share.mjs";
 
 const ORIGIN = "https://catchemtcg.com";
 const OG_IMAGE = `${ORIGIN}/og.png`;
@@ -55,46 +54,22 @@ export function headerPriceHtml(html) {
 export function pageDescription(html, kind, name) {
   const base = describePage(kind, name);
   if (kind !== "card" && kind !== "product") return base;
+  // The page's own dated price (the same one the share frame and the price
+  // chip use). A loose match once took "$194.33 · Oct 30" plus "Oct 29, 2026"
+  // from a listings chip 200 characters later.
+  const s = String(html || "");
+  const rvDate = (s.match(/data-rv-date="(\d{4}-\d{2}-\d{2})"/) || [])[1] || "";
+  const rvPrice = Number((s.match(/data-rv-price="([0-9]+(?:\.[0-9]{1,2})?)"/) || [])[1] || NaN);
+  if (rvDate && rvPrice > 0) {
+    const [y, mo, d] = rvDate.split("-").map(Number);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const money = `$${rvPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${name}: ${money} TCGplayer market on ${months[mo - 1]} ${d}, ${y}. Price chart and 12-month range on Catch'em.`;
+  }
   const src = headerPriceHtml(html);
   const m = src.match(/(\$[0-9][0-9,]*\.[0-9]{2})[\s\S]{0,200}?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
   if (!m) return base;
   return `${name}: ${m[1]} TCGplayer market on ${m[2]}. Price chart and 12-month range on Catch'em.`;
-}
-
-function brandedShare(html, kind, name, pic) {
-  const s = String(html || "");
-  const rvDate = (s.match(/data-rv-date="(\d{4}-\d{2}-\d{2})"/) || [])[1] || "";
-  const rvPrice = (s.match(/data-rv-price="([0-9]+(?:\.[0-9]{1,2})?)"/) || [])[1] || "";
-  const rvFact = unesc((s.match(/data-rv-fact="([^"]*)"/) || [])[1] || "");
-  const rvImg = unesc((s.match(/data-rv-img="([^"]+)"/) || [])[1] || "");
-  const priceM = headerPriceHtml(s).match(/\$([0-9][0-9,]*(?:\.[0-9]{2})?)/);
-  const dateM = headerPriceHtml(s).match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
-  let points = [];
-  const ptsAttr = unesc((s.match(/data-rv-pts="([^"]*)"/) || [])[1] || "");
-  if (ptsAttr) {
-    points = ptsAttr.split(",").filter(Boolean);
-  } else {
-    const chart = s.match(/data-chart="([^"]+)"/);
-    if (chart) {
-      try {
-        const raw = chart[1].replace(/\u0026quot;/g, '"').replace(/\u0026#39;/g, "'").replace(/\u0026amp;/g, "\u0026");
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) points = parsed.slice(-24);
-      } catch {
-        points = [];
-      }
-    }
-  }
-  return frameUrl({
-    name,
-    price: rvPrice || (priceM ? priceM[1].replace(/,/g, "") : ""),
-    date: rvDate || (dateM ? prettyDateToIso(dateM[1]) : ""),
-    img: rvImg || pic,
-    fact: rvFact,
-    sealed: kind === "product",
-    source: "TCGplayer market",
-    points,
-  });
 }
 
 export function addShareMeta(html, pathname, kind) {
@@ -108,11 +83,14 @@ export function addShareMeta(html, pathname, kind) {
   const path = canonicalPath(pathname);
   const desc = path === "/reads" ? "Pick the Pokémon cards, sets and sealed products you follow and get a dated read on them by email or Discord DM." : pageDescription(s, kind, name);
   const pic = pageImage(s, kind);
-  const branded = kind === "card" || kind === "product" ? brandedShare(s, kind, name, pic) : "";
-  const image = branded || pic || OG_IMAGE;
-  const tall = kind === "card" || kind === "product";
-  const size = tall
-    ? `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="675">`
+  // X, Facebook, Discord and iMessage do not render an SVG share image, so
+  // og:image and twitter:image are always raster: the page's own hero picture
+  // (JPEG or PNG from this origin) or og.png. The branded SVG frame
+  // (/og/frame.svg) stays for in-site use until it has a PNG renderer.
+  const raster = pic && !/\.svg(?:$|[?#])/i.test(pic) ? pic : "";
+  const image = raster || OG_IMAGE;
+  const size = raster
+    ? ""
     : `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
   const alt = pic ? name : "Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.";
   const tags = `<meta name="description" content="${escAttr(desc)}">
