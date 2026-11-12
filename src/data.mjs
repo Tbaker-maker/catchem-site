@@ -1,4 +1,4 @@
-import { buildPokemonPages } from "./pokemon.mjs";
+import { buildPokemonPages, catalogCard } from "./pokemon.mjs";
 
 // One place for Catchem-data raw URLs. public-data is tried first.
 // A 404 or a network error falls back to main. After the first miss, the
@@ -257,7 +257,14 @@ export async function loadPokemonBundle(fetchImpl = fetch) {
     readCatalogue("card-attrs.json", fetchImpl),
     readCatalogue("card-catalogue.json", fetchImpl),
   ]);
-  pokemonBundle = buildPokemonPages(attrs?.cards || {}, catalogue?.cards || {});
+  const cards = catalogue?.cards || {};
+  const pages = buildPokemonPages(attrs?.cards || {}, cards);
+  const byCard = {};
+  for (const [id, card] of Object.entries(cards)) {
+    const view = catalogCard(id, card);
+    if (view.name) byCard[id] = view;
+  }
+  pokemonBundle = { ...pages, byCard };
   return pokemonBundle;
 }
 

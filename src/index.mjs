@@ -847,45 +847,63 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
   }
   if (kind === "card" || kind === "product") {
     const raw = path.startsWith("/p/") ? path.slice("/p/".length) : path.slice("/c/".length);
-    const cardId = decodeURIComponent(raw);
+    let cardId = decodeURIComponent(raw);
+    // Pretty card slugs (/c/me55-1) use the same nightly row as /c/tcgcsv-N
+    // when that catalogue row already stores a product id. The request path
+    // stays canonical. No product id, or a product id with no nightly row,
+    // stays on the skinny catalogue page. Never a guessed id.
+    let prettySlug = "";
+    let catalogueHit = null;
+    const renderCatalogueCard = async (hit) => {
+      const images = await catalogueMap(fetchImpl);
+      const row = {
+        id: hit.id,
+        name: hit.name,
+        set: hit.set,
+        num: hit.number,
+        artist: hit.artist,
+        price: hit.price,
+        asOf: hit.priceDate,
+        source: hit.source,
+        release: hit.release || "",
+        printing: hit.finish || "",
+        kind: "single",
+        tcgPlayerId: hit.tcgPlayerId || hit.pid || "",
+        sku: hit.sku || "",
+      };
+      const pic = officialSrc({ id: hit.id, kind: "single", tcgPlayerId: row.tcgPlayerId, sku: row.sku }, images);
+      const [reads, conditionNote, premiumRow, signalCard, productReads, pokemon] = await Promise.all([
+        cardReadSplit(hit.id, fetchImpl),
+        conditionNoteFor(fetchImpl),
+        withPremium(row, fetchImpl),
+        signalCardFor(hit.id, fetchImpl),
+        readsFor(hit.id, fetchImpl),
+        pokemonStripFor(row, fetchImpl),
+      ]);
+      return renderCard(premiumRow, stamp, { ...pageOpts, signalCard, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads, ...reads, conditionNote, pokemon });
+    };
     if (!cardId.startsWith("tcgcsv-")) {
       const map = await loadJson("redirects.json", fetchImpl).catch(() => null);
       const dest = map?.products?.[cardId];
       if (dest) return go(dest);
       try {
         const bundle = await loadPokemonBundle(fetchImpl);
-        const hit = bundle.byId[cardId];
-        if (hit) {
-          const images = await catalogueMap(fetchImpl);
-          const row = {
-            id: hit.id,
-            name: hit.name,
-            set: hit.set,
-            num: hit.number,
-            artist: hit.artist,
-            price: hit.price,
-            asOf: hit.priceDate,
-            source: hit.source,
-            release: hit.release || "",
-            printing: hit.finish || "",
-            kind: "single",
-            tcgPlayerId: hit.tcgPlayerId || hit.pid || "",
-            sku: hit.sku || "",
-          };
-          const pic = officialSrc({ id: hit.id, kind: "single", tcgPlayerId: row.tcgPlayerId, sku: row.sku }, images);
-          const [reads, conditionNote, premiumRow, signalCard, productReads, pokemon] = await Promise.all([
-            cardReadSplit(hit.id, fetchImpl),
-            conditionNoteFor(fetchImpl),
-            withPremium(row, fetchImpl),
-            signalCardFor(hit.id, fetchImpl),
-            readsFor(hit.id, fetchImpl),
-            pokemonStripFor(row, fetchImpl),
-          ]);
-          return html(renderCard(premiumRow, stamp, { ...pageOpts, signalCard, catalogueSrc: pic.src, catalogueCrop: pic.crop, catalogueAlts: pic.alts, productReads, ...reads, conditionNote, pokemon }));
-        }
+        catalogueHit = kind === "card"
+          ? (bundle.byCard?.[cardId] || bundle.byId?.[cardId] || null)
+          : (bundle.byId?.[cardId] || null);
       } catch { /* the catalogue file did not load */ }
-      return html(renderNotFound(stamp, pageOpts), 404);
+      const pid = Number(catalogueHit?.tcgPlayerId || catalogueHit?.pid);
+      if (kind === "card" && catalogueHit && Number.isInteger(pid) && pid > 0) {
+        prettySlug = cardId;
+        cardId = "tcgcsv-" + pid;
+      } else if (catalogueHit) {
+        try {
+          return html(await renderCatalogueCard(catalogueHit));
+        } catch { /* skinny render failed */ }
+      }
+      if (!prettySlug) return html(renderNotFound(stamp, pageOpts), 404);
     }
+    const pageKey = prettySlug || cardId;
     // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
     // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
     if (opts.prewarm) {
@@ -900,7 +918,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       }
       // Full-catalog re-runs: skip a second render when KV already has HTML.
       if (opts.anon) {
-        const warm = await readProductHtml(opts.kv, cardId);
+        const warm = await readProductHtml(opts.kv, pageKey);
         if (warm) {
           return new Response("prewarm-html-skip", {
             status: 200,
@@ -912,11 +930,19 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const bucket = String((Number((cardId.match(/(\d+)/) || [])[1]) || 0) % 100).padStart(2, "0");
     void bucket;
     if (opts.anon) {
-      const cachedHtml = await readProductHtml(opts.kv, cardId);
+      const cachedHtml = await readProductHtml(opts.kv, pageKey);
       if (cachedHtml) return html(cachedHtml);
     }
     const found = await bucketRow(cardId, fetchImpl).catch(() => null);
+    if (!found && prettySlug && catalogueHit) {
+      return html(await renderCatalogueCard(catalogueHit));
+    }
     const card = found ? { ...found } : null;
+    if (card && prettySlug) {
+      card.slug = prettySlug;
+      const existing = String(card.cardId || "");
+      if (!/^[a-z0-9]+-\d+[a-z]?$/i.test(existing) || /^tcgcsv-/i.test(existing)) card.cardId = prettySlug;
+    }
     // Wave 1: every fetch that does not need sealedId, in parallel. Cold /p/
     // was ~20s sequential and tripped Worker resource limits (503).
     const sealedLikely = !!(card && card.kind === "sealed");
@@ -1171,7 +1197,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       msrp = msrpOf({ keys: [sealedId, card.id, cardId], pid: card.tcgPlayerId || cardId, redirects, pageId: cardId }, msrpDoc);
     }
     const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
-    if (card) await Promise.resolve(writeProductHtml(opts, cardId, pageBody));
+    if (card) await Promise.resolve(writeProductHtml(opts, pageKey, pageBody));
     return html(pageBody, card ? 200 : 404);
   }
   if (kind === "movers") {
