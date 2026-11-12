@@ -1417,7 +1417,7 @@ a{color:var(--gold)}
 .sum-chip{display:inline-flex;align-items:center;min-height:44px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);font:600 13px/1.2 var(--sans)}
 .sum-chip{flex-wrap:wrap;white-space:normal;max-width:100%;box-sizing:border-box;border-radius:16px}
 @media(max-width:600px){.sum-strip{flex-direction:column;align-items:stretch}.sum-strip .sum-chip{width:100%;justify-content:flex-start;text-align:left;border-radius:16px}}
-.set-link,.print-run a,.dive-links a,.open-data,.legal-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center}
+.set-link,.print-run a,.dive-links a,.open-data,.legal-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center;box-sizing:border-box;padding:10px 12px}
 .sum-chip.up{color:var(--green)}.sum-arrow{font-size:12px;margin-left:4px}.sum-arrow.up{color:var(--green)}.sum-arrow.down{color:var(--red)}.itap{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;min-width:44px;min-height:44px;margin:-10px -6px -10px 0;border-radius:999px;cursor:pointer;outline:none;color:var(--dim,#a8a091)}.itap-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font:italic 600 12px/1 Georgia,serif;opacity:.75}.itap:focus-visible .itap-i{outline:2px solid var(--gold,#d9b779);outline-offset:2px}.itap-pop{display:none;position:absolute;z-index:30;left:0;top:100%;width:max-content;max-width:260px;padding:10px 12px;border-radius:14px;background:#1a1815;border:1px solid #3a352d;box-shadow:0 10px 24px rgba(0,0,0,.45);font:500 13px/1.4 var(--sans);font-style:normal;color:var(--txt,#efe9de);white-space:normal;text-align:left}.itap:focus .itap-pop,.itap:hover .itap-pop{display:block}@media(max-width:700px){.itap-pop{position:fixed;left:16px;right:16px;top:auto;bottom:96px;width:auto;max-width:none}}
 .sum-chip.down{color:var(--red)}
 .means{background:#211e1a;border-radius:14px;padding:12px 14px}
@@ -1429,12 +1429,13 @@ a{color:var(--gold)}
 .status-list li{padding:8px 0;border-bottom:1px solid var(--line)}
 .site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em;min-height:44px;display:inline-flex;align-items:center}
 .site-bar .logo span{color:var(--gold)}
-a.tap,.site-foot a{min-height:44px;display:inline-flex;align-items:center}
+a.tap,.site-foot a{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;padding:8px 12px}
 .menu-btn{display:none;min-height:44px}
 .site-bar nav{display:flex;flex-wrap:wrap;gap:8px 14px}
 .site-bar nav a{color:var(--dim);text-decoration:none;font:500 14px/1 var(--sans);min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px}
 .site-bar nav a[aria-current="page"],.site-bar nav a:hover{color:var(--gold)}
 @media (max-width:1023px){
+  body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
   .menu-btn{display:inline-flex;align-items:center;justify-content:center}
   .site-bar nav{display:none;position:absolute;top:100%;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
@@ -1548,6 +1549,7 @@ button.primary{background:var(--gold);color:#1a1407;border-color:transparent}
 .site-foot{max-width:1040px;margin:0 auto;padding:8px 16px 24px;color:var(--dim);font-size:14px}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{scroll-behavior:auto!important;transition:none!important}}
 @media (max-width:1023px){
+  body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
   .menu-btn{display:inline-flex;align-items:center;justify-content:center}
   .site-bar nav{display:none;position:absolute;top:56px;left:0;right:0;background:#1a1815;border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column}
   .site-bar nav.open{display:flex}
@@ -2714,13 +2716,13 @@ export function pokemonStripHtml(strip) {
 }
 
 const SINGLE_CSS = `
-.card-page{padding-bottom:48px;overflow-x:clip;max-width:100%}
+.card-page{padding-bottom:calc(120px + env(safe-area-inset-bottom));overflow-x:clip;max-width:100%}
 .cp-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;margin:0 0 8px;min-width:0;max-width:100%}
 .cp-photo{width:min(240px,72%)}
 .cp-photo img,.cp-photo .tile{width:100%;height:auto;border-radius:22px;background:#1a1815}
 .cp-id{min-width:0;max-width:100%}
 .cp-set{margin:0 0 4px;color:var(--dim);font:500 14px/1.3 var(--sans)}
-.cp-set a{color:inherit;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+.cp-set a{color:inherit;text-decoration:none;min-height:44px;min-width:44px;padding:10px 12px;box-sizing:border-box;display:inline-flex;align-items:center}
 .card-page h1{margin:0;font:600 34px/1.05 var(--serif);letter-spacing:-.03em;overflow-wrap:anywhere}
 .cp-price{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:8px;margin:12px 0 2px;max-width:100%;min-width:0;white-space:normal}
 .cp-now{font:600 34px/1.1 var(--serif);color:var(--gold);letter-spacing:-.03em;min-width:0;overflow-wrap:anywhere}
@@ -3307,7 +3309,7 @@ export function renderCard(card, stamp, opts = {}) {
 .glance-photo img{border-radius:12px;max-height:100%}
 .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
 @media (max-width:767px){
-  .product-glance{padding-bottom:16px}
+  .product-glance{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
   .glance-photo{width:min(156px,42vw);padding:8px}
   .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(140px,100%)}
 }
@@ -3346,8 +3348,8 @@ ${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${priceHtml}
 ${sealedStrip}
-${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
 ${readLink(card)}
+${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
 ${sealed && Array.isArray(opts.promosInside) && opts.promosInside.length ? `<section class="cp-sec" id="promos-inside"><h2>Promos inside</h2><ul class="cp-facts">${opts.promosInside.map((row) => `<li><a href="/c/${esc(row.id)}">${esc(row.name)}${row.num ? ` #${esc(row.num)}` : ""}</a></li>`).join("")}</ul></section>` : ""}
 ${(card.tags || []).length ? `<div class="vchips" aria-label="Variant">${card.tags.map((t) => `<a class="vchip" href="/search?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
