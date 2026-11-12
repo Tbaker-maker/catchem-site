@@ -22,13 +22,14 @@ assert.equal(await res.text(), "low");
 assert.ok(calls[calls.length - 1].endsWith("/cel25c/17_A.png"), calls.join("\n"));
 console.log("editor image ok");
 
-// me2pt5 and later: images.pokemontcg.io misses, the same id's TCGplayer photo is served.
+// When images.pokemontcg.io misses, the same id's TCGplayer photo is served (me2pt5 to me6, mep, mcd17, leftover svp).
 {
   const { EDITOR_TCG_PIDS } = await import("../src/editor-tcg-pids.mjs");
   const pid = EDITOR_TCG_PIDS["me55/1"];
   assert.ok(pid > 0, "me55/1 has a TCGplayer id");
-  for (const k of ["me2pt5/1", "me3/1", "me4/1", "me5/1", "me55c/4", "me6/1"]) assert.ok(EDITOR_TCG_PIDS[k] > 0, k);
+  for (const k of ["me2pt5/1", "me3/1", "me4/1", "me5/1", "me55c/4", "me6/1", "mep/1", "mep/9-pc", "mcd17/1", "svp/102"]) assert.ok(EDITOR_TCG_PIDS[k] > 0, k);
   assert.equal(EDITOR_TCG_PIDS["base1/4"], undefined, "sets with pokemontcg.io files keep that source only");
+  assert.equal(EDITOR_TCG_PIDS["svp/1"], undefined, "svp ids that pokemontcg.io hosts stay off the fallback map");
   const seen = [];
   const tcgFetch = async (url) => {
     seen.push(String(url));
