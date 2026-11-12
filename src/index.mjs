@@ -1019,7 +1019,12 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     }
     let listingsHtml = "";
     if (card && card.kind === "sealed" && sealedId) {
-      listingsHtml = listingsBlock(listingsEntry(counted, sealedId));
+      const entry = listingsEntry(counted, sealedId);
+      listingsHtml = listingsBlock(entry);
+      const lc = entry?.listingsCounted;
+      if (lc && Number.isFinite(Number(lc.n)) && Number(lc.n) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(lc.date || ""))) {
+        pageOpts.itemListings = pageOpts.itemListings || { n: Number(lc.n), day: String(lc.date).slice(0, 10) };
+      }
     }
     let notMovedHtml = "";
     if (card && nm && nm.on !== false) {
@@ -1101,7 +1106,17 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       const block = itemReadBlock(itemRead, { skipRip: !!rip, skipRotation: !!rotationFact, skipWindows: true, kind: card.kind });
       if (block) itemReadHtml = block;
       const l = itemRead?.listings;
-      if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) pageOpts.itemListings = { n: l.n, day: l.date, pct: Number.isFinite(l.pct) ? l.pct : null, prevDay: l.prevDate || "", days: l.prevDate ? Math.round((Date.parse(l.date) - Date.parse(l.prevDate)) / 86400000) : 0 };
+      if (l && Number.isInteger(l.n) && /^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ""))) {
+        const days = l.prevDate ? Math.round((Date.parse(l.date) - Date.parse(l.prevDate)) / 86400000) : 0;
+        const row = { n: l.n, day: l.date };
+        if (days >= 7 && Number.isFinite(l.pct) && l.prevDate) {
+          row.pct = l.pct;
+          row.prevDay = l.prevDate;
+          row.days = days;
+          if (Number.isFinite(Number(l.from))) row.from = Number(l.from);
+        }
+        pageOpts.itemListings = row;
+      }
     }
     const setLogo = card && card.setSlug && /^\/img\/[a-z0-9]+\/logo\.png$/i.test(String(images[card.setSlug] || "")) ? images[card.setSlug] : "";
     let comesFrom = null;
