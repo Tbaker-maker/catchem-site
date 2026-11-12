@@ -3,6 +3,7 @@
 import worker from "./index.mjs";
 import { dataExplorerResponse } from "./data-explorer.mjs";
 import { sealedPulseResponse } from "./brand-visuals.mjs";
+import { handleProductShare } from "./product-share.mjs";
 
 export default {
   async fetch(request, env, ctx) {
@@ -32,6 +33,9 @@ export default {
           headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
         });
       }
+    }
+    if ((request.method === "GET" || request.method === "HEAD") && /^\/og\/product\/[^/]+\.png$/.test(path)) {
+      return handleProductShare(request, url, { env, ctx });
     }
     return worker.fetch(request, env, ctx);
   },
