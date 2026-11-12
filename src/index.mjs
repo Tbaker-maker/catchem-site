@@ -328,7 +328,7 @@ function withCatalogue(list, images, cutDoc) {
 // build-feed). The old per-request bucket scan fetched ~70 buckets on a cold
 // isolate and tripped Cloudflare error 1102, so it is gone. Without the list,
 // only the build-time stale flag applies.
-const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase"]);
+const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase", "sold-gap", "sold-pace", "sold-trend", "sell-through", "msrp-sold", "pop-growth", "gem-rate", "low-pop", "graded-spread", "eu-gap", "jp-en", "range52"]);
 async function omitStalePriceReads(reads, fetchImpl, opts = {}) {
   // The build-time stale flag is about prices. Dated facts (Pokemon, listings
   // counted, news, releases, rotation, deep reads) stay true on their own date.
