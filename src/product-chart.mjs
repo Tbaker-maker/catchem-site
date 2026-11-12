@@ -88,7 +88,7 @@ ${list.length >= 2 ? `<p class="pc-key muted"><span class="pc-k"><span class="pc
 <p class="pc-src muted">${srcs.map(esc).join(". ")}${srcs.length ? "." : ""}</p>
 <p class="pc-foot"><button type="button" class="pc-cam-btn" aria-pressed="false">Camera mode</button></p>
 <button type="button" class="pc-cam-x" aria-label="Exit camera mode">&times;</button>
-</figure><script>${PRODUCT_CHART_JS}</script>`;
+</figure><script>(function(){var run=function(){${PRODUCT_CHART_JS}};var el=document.getElementById("chart");if(!el||!("IntersectionObserver" in window)){run();return;}var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting;})){io.disconnect();run();}},{rootMargin:"240px"});io.observe(el);})();</script>`;
 }
 
 export const PRODUCT_CHART_CSS = `.pc .pc-tabs{display:flex;gap:4px;padding:3px;margin:0 0 10px;border-radius:14px;background:rgba(255,255,255,.06)}
