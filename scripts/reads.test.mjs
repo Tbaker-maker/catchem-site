@@ -9,12 +9,17 @@ const t = (name, cond) => {
 
 const typed = typePlan("Eeveelutions IRs from Scarlet and Violet, weekly");
 t("a plain line becomes a weekly plan", typed && typed.frequency === "weekly" && typed.eras.includes("Scarlet and Violet") && typed.watch[0].name === "Eeveelutions IRs");
-const freeDaily = gatePlan(typePlan("Charizard daily"), { premium: false });
-t("a free seat stays weekly", freeDaily.plan.frequency === "weekly" && freeDaily.notes.length > 0);
-const paid = gatePlan({ ...typePlan("Charizard daily"), channels: { discord: true, email: false }, addons: { all: true } }, { premium: true });
+const openDaily = gatePlan(typePlan("Charizard daily"), { premium: false });
+t("open access keeps a daily read", openDaily.plan.frequency === "daily" && openDaily.plan.deep === true);
+const freeDaily = gatePlan(typePlan("Charizard daily"), { premium: false, openAccess: false });
+t("switch off: a free seat stays weekly", freeDaily.plan.frequency === "weekly" && freeDaily.notes.length > 0);
+const paid = gatePlan({ ...typePlan("Charizard daily"), channels: { discord: true, email: false }, addons: { all: true } }, { premium: true, openAccess: false });
 t("premium can keep a daily read and all add-ons", paid.plan.frequency === "daily" && paid.plan.addons.news && paid.plan.addons.games && paid.plan.channels.discord === true && paid.plan.channels.email === false);
-const crowded = gatePlan({ sets: ["A", "B"], pokemon: ["Pika"], sealed: true, singles: true, watch: [{ name: "One" }, { name: "Two" }], frequency: "weekly", channels: { discord: true }, addons: {} }, { premium: false });
-t("a free seat keeps one follow", crowded.plan && (crowded.plan.sets.length + crowded.plan.pokemon.length + crowded.plan.watch.length + (crowded.plan.sealed ? 1 : 0) + (crowded.plan.singles ? 1 : 0)) === 1);
+const crowdedOpen = gatePlan({ sets: ["A", "B"], pokemon: ["Pika"], sealed: true, singles: true, watch: [{ name: "One" }, { name: "Two" }], frequency: "weekly", channels: { discord: true }, addons: {} }, { premium: false });
+const followN = (p) => p.sets.length + p.pokemon.length + p.watch.length + (p.sealed ? 1 : 0) + (p.singles ? 1 : 0);
+t("open access keeps every follow up to 25", crowdedOpen.plan && followN(crowdedOpen.plan) === 7);
+const crowded = gatePlan({ sets: ["A", "B"], pokemon: ["Pika"], sealed: true, singles: true, watch: [{ name: "One" }, { name: "Two" }], frequency: "weekly", channels: { discord: true }, addons: {} }, { premium: false, openAccess: false });
+t("switch off: a free seat keeps one follow", crowded.plan && followN(crowded.plan) === 1);
 const fields = new URLSearchParams("discord=0&discord=1&email_on=0&news=0&news=1&frequency=weekly&rarity=Illustration+Rare");
 const parsed = gatePlan(planFromFields(fields), { premium: true });
 t("discord stays on and email stays off", parsed.plan.channels.discord === true && parsed.plan.channels.email === false && parsed.plan.addons.news === true && parsed.plan.rarities[0] === "Illustration Rare");

@@ -320,8 +320,8 @@ export async function handleIdeas(request, env, fetchImpl = fetch) {
   if (!officeAllowed(user, env)) {
     return json({ ok: false, signedIn: !!user, line: INVITE_LINE, ready: discordReady(env) }, 403);
   }
-  const userGate = peek(user, "ideas");
-  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
+  const userGate = peek(user, "ideas", env);
+  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env), env), ready: discordReady(env) }, userGate.status);
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const facts = await factsFor(body.ids || [], fetchImpl);
@@ -341,7 +341,7 @@ export async function handleIdeas(request, env, fetchImpl = fetch) {
   }
   if (!ideas) ideas = factIdeas(facts.cards, facts.pins);
   commit(user, "ideas");
-  return json({ ok: true, ideas, asOf: facts.asOf, quota: usageOf(user, "ideas"), model: fromModel ? "catalog-model" : "fact-pack" });
+  return json({ ok: true, ideas, asOf: facts.asOf, quota: usageOf(user, "ideas", env), model: fromModel ? "catalog-model" : "fact-pack" });
 }
 
 export async function handlePostText(request, env, fetchImpl = fetch) {
@@ -349,8 +349,8 @@ export async function handlePostText(request, env, fetchImpl = fetch) {
   if (!officeAllowed(user, env)) {
     return json({ ok: false, signedIn: !!user, line: INVITE_LINE, ready: discordReady(env) }, 403);
   }
-  const userGate = peek(user, "post-text");
-  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env)), ready: discordReady(env) }, userGate.status);
+  const userGate = peek(user, "post-text", env);
+  if (!userGate.ok) return json({ ...userGate, line: ideasSignInLine(discordReady(env), env), ready: discordReady(env) }, userGate.status);
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
   const facts = await factsFor((body.ids || []).slice(0, 4), fetchImpl);
@@ -370,7 +370,7 @@ export async function handlePostText(request, env, fetchImpl = fetch) {
   }
   if (!variations) variations = factPost(facts.cards, tone);
   commit(user, "post-text");
-  return json({ ok: true, variations, asOf: facts.asOf, tone, quota: usageOf(user, "post-text"), model });
+  return json({ ok: true, variations, asOf: facts.asOf, tone, quota: usageOf(user, "post-text", env), model });
 }
 
 function json(obj, status = 200) {
@@ -388,10 +388,10 @@ export async function handleVideoQuota(request, env) {
   }
   let body = {};
   try { body = await request.json(); } catch { body = {}; }
-  const gate = peek(user, "video");
+  const gate = peek(user, "video", env);
   if (!gate.ok) return json({ ...gate, weekUsed: gate.weekUsed || 0, dayUsed: gate.dayUsed || 0, premium: false }, gate.status);
   if (body.action === "complete") commit(user, "video");
-  const after = peek(user, "video");
+  const after = peek(user, "video", env);
   return json({
     ok: true,
     signedIn: true,

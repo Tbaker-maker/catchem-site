@@ -21,7 +21,7 @@ t("the X caption check still refuses payout coaching", html.includes("how to (ge
 
 const copy = [ideasSignInLine(true), ideasSignInLine(false), signInCard("ideas").body, signInCard("post").body, signInCard("video").body,
   limitCard("ideas", 3).body, limitCard("post-text", 3).body, limitCard("video", 1).body].join(" ");
-t("Ideas and limit copy has no seat tier", !/premium|free seat|free is/i.test(copy) && copy.includes("3 a day"));
+t("Ideas and limit copy has no seat tier", !/premium|free seat|free is/i.test(copy) && copy.includes("50 a day"));
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("post-office branding ok");

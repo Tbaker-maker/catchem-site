@@ -88,7 +88,8 @@ t("no dashes, sold, sales, NM, Near Mint or advice in any length", !/[\u2013\u20
 // Lengths and gates
 t("Deep dive is Premium only", cleanLength("deep", false) === "standard" && cleanLength("deep", true) === "deep" && cleanLength("glance", false) === "glance");
 t("the plan carries the length and Deep dive needs plan.deep", followFromPlan({ length: "deep", deep: false }).length === "standard" && followFromPlan({ length: "deep", deep: true }).length === "deep" && followFromPlan({ length: "glance" }).length === "glance");
-t("free plans cannot keep Deep dive and get a note", (() => { const g = gatePlan({ length: "deep" }, { premium: false }); return g.plan.length === "standard" && g.notes.some((n) => n.includes("Deep dive is in Premium")); })() && gatePlan({ length: "deep" }, { premium: true }).plan.length === "deep");
+t("open access keeps Deep dive", gatePlan({ length: "deep" }, { premium: false }).plan.length === "deep");
+t("switch off: free plans cannot keep Deep dive and get a note", (() => { const g = gatePlan({ length: "deep" }, { premium: false, openAccess: false }); return g.plan.length === "standard" && g.notes.some((n) => n.includes("Deep dive is in Premium")); })() && gatePlan({ length: "deep" }, { premium: true, openAccess: false }).plan.length === "deep");
 t("the form carries length and vintage focus", (() => { const f = new URLSearchParams("length=glance&focus=vintage"); const p = planFromFields(f); return p.length === "glance" && p.focus === "vintage"; })());
 t("the length picker locks Deep dive for free", /value="deep"[^>]*disabled/.test(lengthPicker({}, false)) && !/value="deep"[^>]*disabled/.test(lengthPicker({}, true)));
 const offPage = renderReadsPage({ signedIn: true });

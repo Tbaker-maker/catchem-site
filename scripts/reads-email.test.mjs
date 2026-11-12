@@ -136,7 +136,7 @@ const save = await handleReads(new Request("https://catchemtcg.com/api/reads", {
 }), env, fetchImpl);
 const saved = await save.json();
 const plan = JSON.parse(store.m.get(`reads:d:${ID}`));
-t("a free seat stays weekly and the address is not on the plan", save.status === 200 && saved.plan.frequency === "weekly" && saved.plan.channels.email === true && saved.plan.email === "" && !JSON.stringify(saved).includes(TO));
+t("open access keeps a daily save and the address is not on the plan", save.status === 200 && saved.plan.frequency === "daily" && saved.plan.channels.email === true && saved.plan.email === "" && !JSON.stringify(saved).includes(TO));
 t("the address is only in the email record", JSON.parse(store.m.get(`reads-email:${ID}`)).email === TO && JSON.parse(store.m.get(`reads-email:${ID}`)).status === "pending");
 const confirmCall = calls.find((row) => JSON.parse(row.init.body).subject.startsWith("Confirm"));
 t("opt in sends a confirm letter before any read", !!confirmCall && JSON.parse(confirmCall.init.body).html.includes("Confirm this email") && !JSON.parse(confirmCall.init.body).html.includes(TO));
@@ -146,8 +146,10 @@ const exported = await handleReadsPipe(new Request("https://catchemtcg.com/api/r
 const exportBody = await exported.json();
 t("the public follow export drops the address", exported.status === 200 && !JSON.stringify(exportBody).includes(TO) && !JSON.stringify(exportBody).includes("email"));
 
-const free = gatePlan({ channels: { email: true }, email: TO, frequency: "daily", sets: ["me-30th-celebration"] }, { premium: false });
-t("free email is still a weekly read", free.plan.frequency === "weekly" && free.plan.channels.email === true && free.plan.email === "");
+const openPlan = gatePlan({ channels: { email: true }, email: TO, frequency: "daily", sets: ["me-30th-celebration"] }, { premium: false });
+t("open access keeps a daily email read", openPlan.plan.frequency === "daily" && openPlan.plan.channels.email === true && openPlan.plan.deep === true);
+const free = gatePlan({ channels: { email: true }, email: TO, frequency: "daily", sets: ["me-30th-celebration"] }, { premium: false, openAccess: false });
+t("switch off: free email is still a weekly read", free.plan.frequency === "weekly" && free.plan.channels.email === true && free.plan.email === "");
 
 const allow = new Set(["support@catchemtcg.com", "reads@catchemtcg.com", "you@email.com", TO]);
 const roots = ["src", "scripts", "newsletter"];

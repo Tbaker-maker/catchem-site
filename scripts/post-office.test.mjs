@@ -191,7 +191,7 @@ for (let i = 0; i < 4; i++) {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({ ids: ["tcgcsv-246723"] }),
-  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
+  }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST, OPEN_ACCESS: "false" });
   if (i < 3) {
     const body = await res.json();
     t("idea " + (i + 1) + " is from the catalog", res.status === 200 && body.ideas && body.ideas[0].includes("Umbreon") && body.ideas.join(" ").includes("TCGplayer market: $2,214.79 (2026-09-27)") && body.ideas.every((line) => line.includes("Pokémon")));
@@ -203,6 +203,13 @@ for (let i = 0; i < 4; i++) {
   }
 }
 t("stopped at the free cap", ideaHits === 429);
+{
+  const { peek } = await import("../src/quota.mjs");
+  const openGate = peek({ sub: "user-open", premium: false }, "ideas", {});
+  t("open access uses the 50-idea cap", openGate.ok === true && openGate.cap === 50);
+  const closedGate = peek({ sub: "user-closed", premium: false }, "ideas", { OPEN_ACCESS: "false" });
+  t("switch off: free cap stays 3", closedGate.ok === true && closedGate.cap === 3);
+}
 
 const text = await worker.fetch(new Request("https://catchemtcg.com/api/post-text", {
   method: "POST",
@@ -230,7 +237,7 @@ const sessionOffBody = await sessionOff.json();
 t("session tells a signed-out visitor how to sign in", sessionOff.status === 200 && sessionOffBody.signedIn === false && sessionOffBody.ready === false && /not turned on yet/.test(sessionOffBody.line));
 const sessionOn = await worker.fetch(new Request("https://catchemtcg.com/api/session", { headers: { cookie } }), { SESSION_SECRET: secret, PUBLIC_FETCH: fetchImpl, POST_OFFICE_ALLOWLIST: LIST });
 const sessionOnBody = await sessionOn.json();
-t("signed in session shows the free idea cap", sessionOn.status === 200 && sessionOnBody.signedIn === true && sessionOnBody.premium === false && sessionOnBody.ideas.cap === 3 && sessionOnBody.ideas.left === 0);
+t("signed in session shows the open idea cap", sessionOn.status === 200 && sessionOnBody.signedIn === true && sessionOnBody.premium === false && sessionOnBody.ideas.cap === 50 && sessionOnBody.ideas.left === 47);
 const discordEnv = { SESSION_SECRET: secret, DISCORD_CLIENT_ID: "id", DISCORD_CLIENT_SECRET: "sec", PUBLIC_FETCH: fetchImpl, ASSETS: env.ASSETS, POST_OFFICE_ALLOWLIST: LIST };
 const readyPage = await worker.fetch(new Request("https://catchemtcg.com/signin"), discordEnv);
 const readyHtml = await readyPage.text();

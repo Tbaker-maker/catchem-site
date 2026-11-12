@@ -1,8 +1,10 @@
 // Sign-in caps. A browser cookie that is not a signed session does not count.
+import { openAccess, entitled } from "./open-access.mjs";
 
-export function ideasSignInLine(ready) {
-  if (ready) return "Sign in with Discord to use Ideas. Ideas are 3 a day.";
-  return "Ideas need Discord sign-in. Ideas are 3 a day. Discord sign-in is not turned on yet.";
+export function ideasSignInLine(ready, env) {
+  const cap = openAccess(env) ? LIMITS.ideas.premium : LIMITS.ideas.free;
+  if (ready) return `Sign in with Discord to use Ideas. Ideas are ${cap} a day.`;
+  return `Ideas need Discord sign-in. Ideas are ${cap} a day. Discord sign-in is not turned on yet.`;
 }
 
 export const LIMITS = {
@@ -106,22 +108,27 @@ function bucket(sub, feature) {
   return { recent, dayUsed, weekUsed: recent.length };
 }
 
-export function signInCard(feature) {
+export function signInCard(feature, env) {
+  const open = openAccess(env);
   if (feature === "video") {
+    const day = open ? LIMITS.video.premiumDay : LIMITS.video.freeDay;
+    const week = open ? LIMITS.video.premiumWeek : LIMITS.video.freeWeek;
     return {
       title: "Sign in to export",
-      body: "Export is tied to your Discord sign-in. A browser cookie is not a pass. Export is 1 a day and 2 a week.",
+      body: `Export is tied to your Discord sign-in. A browser cookie is not a pass. Export is ${day} a day and ${week} a week.`,
     };
   }
   if (feature === "ideas") {
+    const cap = open ? LIMITS.ideas.premium : LIMITS.ideas.free;
     return {
       title: "Sign in for Ideas",
-      body: "Ideas are 3 a day. A browser cookie is not a pass.",
+      body: `Ideas are ${cap} a day. A browser cookie is not a pass.`,
     };
   }
+  const cap = open ? LIMITS["post-text"].premium : LIMITS["post-text"].free;
   return {
     title: "Sign in for post text",
-    body: "Post text is 3 a day. A browser cookie is not a pass.",
+    body: `Post text is ${cap} a day. A browser cookie is not a pass.`,
   };
 }
 
@@ -135,32 +142,33 @@ export function limitCard(feature, cap) {
   return { title: "Post text limit", body: `Post text is capped at ${cap} a day. The count resets at midnight Pacific.` };
 }
 
-export function usageOf(user, feature) {
+export function usageOf(user, feature, env) {
   if (!user) return null;
   const spec = LIMITS[feature];
   if (!spec || feature === "video") return null;
   const { dayUsed } = bucket(user.sub, feature);
-  const cap = user.premium ? spec.premium : spec.free;
+  const cap = entitled({ user, env }) ? spec.premium : spec.free;
   return { used: dayUsed, cap, left: Math.max(0, cap - dayUsed) };
 }
 
-export function peek(user, feature) {
-  if (!user) return { ok: false, status: 401, signedIn: false, card: signInCard(feature) };
+export function peek(user, feature, env) {
+  if (!user) return { ok: false, status: 401, signedIn: false, card: signInCard(feature, env) };
   const spec = LIMITS[feature];
   const { dayUsed, weekUsed } = bucket(user.sub, feature);
+  const paid = entitled({ user, env });
   if (feature === "video") {
-    const dayCap = user.premium ? spec.premiumDay : spec.freeDay;
-    const weekCap = user.premium ? spec.premiumWeek : spec.freeWeek;
+    const dayCap = paid ? spec.premiumDay : spec.freeDay;
+    const weekCap = paid ? spec.premiumWeek : spec.freeWeek;
     if (dayUsed >= dayCap || weekUsed >= weekCap) {
-      return { ok: false, status: 429, signedIn: true, premium: user.premium, dayUsed, weekUsed, dayCap, weekCap, card: limitCard(feature, dayCap) };
+      return { ok: false, status: 429, signedIn: true, premium: paid, dayUsed, weekUsed, dayCap, weekCap, card: limitCard(feature, dayCap) };
     }
-    return { ok: true, status: 200, signedIn: true, premium: user.premium, dayUsed, weekUsed, dayCap, weekCap };
+    return { ok: true, status: 200, signedIn: true, premium: paid, dayUsed, weekUsed, dayCap, weekCap };
   }
-  const cap = user.premium ? spec.premium : spec.free;
+  const cap = paid ? spec.premium : spec.free;
   if (dayUsed >= cap) {
-    return { ok: false, status: 429, signedIn: true, premium: user.premium, used: dayUsed, cap, card: limitCard(feature, cap) };
+    return { ok: false, status: 429, signedIn: true, premium: paid, used: dayUsed, cap, card: limitCard(feature, cap) };
   }
-  return { ok: true, status: 200, signedIn: true, premium: user.premium, used: dayUsed, cap };
+  return { ok: true, status: 200, signedIn: true, premium: paid, used: dayUsed, cap };
 }
 
 export function commit(user, feature) {
