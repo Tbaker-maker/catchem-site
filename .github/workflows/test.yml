@@ -50,6 +50,7 @@ jobs:
       - run: node scripts/post-office-closed.test.mjs
       - run: node scripts/editor-image.test.mjs
       - run: node scripts/sealed-pid.test.mjs
+      - run: node scripts/listings-one-window.test.mjs
       - run: node scripts/sealed-cutouts.test.mjs
       - run: node scripts/sealed-deep.test.mjs
       - run: node scripts/launch-fixes.test.mjs

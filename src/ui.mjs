@@ -2421,19 +2421,41 @@ function rotationChipLabel(html) {
   return status ? `Mark ${mark[1]} · ${status[1]}` : `Mark ${mark[1]}`;
 }
 
+// One listings change for the whole page: the summary chip and the
+// "eBay listings 7D" line read the same window. A week back when that night
+// was counted, else the nearest earlier count up to 14 days back, with its
+// real day count. Never the last-night step: the chip once said +0.7% (1 day)
+// beside "7D +7% (128 -> 137)" on the same page.
+export function listingChange(series, endDay) {
+  const pts = (series || [])
+    .filter((point) => point && /^\d{4}-\d{2}-\d{2}/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
+    .map((point) => ({ day: String(point.date).slice(0, 10), n: Number(point.listingCount) }))
+    .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  const end = pts.find((point) => point.day === endDay);
+  if (!end) return null;
+  const endMs = Date.parse(`${endDay}T00:00:00Z`);
+  const ago = (point) => Math.round((endMs - Date.parse(`${point.day}T00:00:00Z`)) / 86400000);
+  const start = pts.filter((point) => ago(point) >= 7 && ago(point) <= 14).sort((a, b) => ago(a) - ago(b))[0];
+  if (!start || !(start.n > 0)) return null;
+  const pct = Math.round(((end.n - start.n) / start.n) * 1000) / 10;
+  return { n: end.n, day: end.day, from: start.n, fromDay: start.day, days: ago(start), pct };
+}
+
 function countedListings(fact, series, endDay) {
   const n = Number(fact?.listings);
   const day = String(fact?.listingsAsOf || "").slice(0, 10);
-  if (Number.isFinite(n) && n >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(day)) return { n, day };
+  if (Number.isFinite(n) && n >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const ch = listingChange(series, day);
+    return ch && ch.n === n ? { n, day, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n, day };
+  }
   const pts = (series || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0);
   const endMs = Date.parse(`${endDay}T00:00:00Z`);
   const near = Number.isFinite(endMs) ? pts.filter((point) => { const ms = Date.parse(`${String(point.date).slice(0, 10)}T00:00:00Z`); return ms <= endMs && endMs - ms <= 3 * 86400000; }).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)) : [];
   const row = pts.find((point) => String(point.date).slice(0, 10) === endDay) || near[0] || null;
   if (!row) return null;
   const rowDay = String(row.date).slice(0, 10);
-  const prev = pts.filter((point) => String(point.date).slice(0, 10) < rowDay).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1))[0];
-  const pct = prev && Number(prev.listingCount) > 0 ? Math.round(((Number(row.listingCount) - Number(prev.listingCount)) / Number(prev.listingCount)) * 1000) / 10 : null;
-  return { n: Number(row.listingCount), day: rowDay, pct, prevDay: prev ? String(prev.date).slice(0, 10) : "" };
+  const ch = listingChange(series, rowDay);
+  return ch ? { n: ch.n, day: rowDay, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n: Number(row.listingCount), day: rowDay, pct: null, prevDay: "" };
 }
 
 // One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
@@ -2456,8 +2478,11 @@ function summaryStrip({ nm = false, prefix = "", price = "", year = null, listin
   }
   if (listings && Number.isFinite(listings.n) && listings.n > 0 && listings.day) {
     const when = priceDay(listings.day);
-    const pct = Number(listings.pct);
-    const arrow = Number.isFinite(pct) && pct === 0 ? `<span class="sum-arrow" aria-label="Flat since ${esc(priceDay(listings.prevDay || "") || "the last count")}">\u2192 0%</span>` : Number.isFinite(pct) ? `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(Math.round(pct * 10) / 10)}% since ${esc(priceDay(listings.prevDay || "") || "the last count")}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(Math.round(pct * 10) / 10)}%</span>` : "";
+    // Only a change with a named window shows, and it is the same window as the "eBay listings 7D" line.
+    const pct = listings.pct == null ? NaN : Number(listings.pct);
+    const days = Number(listings.days);
+    const win = Number.isFinite(pct) && days > 0 && listings.prevDay ? { tag: `${days}D`, said: `over ${days} days, since ${esc(priceDay(listings.prevDay))}` } : null;
+    const arrow = !win ? "" : pct === 0 ? `<span class="sum-arrow" aria-label="Flat ${win.said}">\u2192 0% ${win.tag}</span>` : `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(pct)}% ${win.said}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(pct)}% ${win.tag}</span>`;
     bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${when ? `, ${esc(when.replace(/, \d{4}$/, ""))}` : ""}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`)}</span>`);
   }
   if (rotation) bits.push(`<span class="sum-chip">${esc(rotation)}</span>`);
