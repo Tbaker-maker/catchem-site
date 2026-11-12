@@ -1,5 +1,5 @@
 import { pageKind, renderPath } from "../src/index.mjs";
-import { bumpClick, emailLetter, emailSendAllowed, gatePlan, planFromFields, planToFollow, preSend, renderReadsPage, sampleRead, typePlan, upsertFollow } from "../src/reads.mjs";
+import { bumpClick, emailLetter, emailSendAllowed, gatePlan, handleReads, planFromFields, planToFollow, preSend, renderReadsPage, sampleRead, typePlan, upsertFollow } from "../src/reads.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -26,7 +26,8 @@ t("discord stays on and email stays off", parsed.plan.channels.discord === true 
 const page = renderReadsPage({ signedIn: false, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 const armedPage = renderReadsPage({ signedIn: false, emailArmed: true, line: "Eeveelutions IRs from Scarlet and Violet, weekly" });
 t("email is coming soon until the key is set", page.includes("Email delivery is coming soon.") && !page.includes('name="email"') && !page.includes('name="email_on"') && !page.includes('type="radio" name="length"'));
-t("the picker offers Email next to Discord DM", armedPage.includes("Discord DM") && armedPage.includes(">Email<") && armedPage.includes('name="email"') && armedPage.includes('name="email_on"') && !armedPage.includes('name="email_on" value="1" checked') && !armedPage.includes("coming soon") && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("/auth/discord?next=/reads") && page.includes("Scarlet and Violet") && page.includes("Sample read.") && page.indexOf('id="rd-preview"') < page.indexOf('id="rd-form"') && page.indexOf('id="rd-sample"') < page.indexOf("/auth/discord") && page.includes('<h2 id="rd-sample-h">Sample read</h2>'));
+t("the picker offers Email next to Discord DM", armedPage.includes("Discord DM") && armedPage.includes(">Email<") && armedPage.includes('name="email"') && armedPage.includes('name="email_on"') && !armedPage.includes('name="email_on" value="1" checked') && !armedPage.includes("coming soon") && page.includes(">Save<") && !page.includes("Keep this plan") && page.includes("Scarlet and Violet") && page.includes("Sample read.") && page.indexOf('id="rd-preview"') < page.indexOf('id="rd-form"') && page.includes('<h2 id="rd-sample-h">Sample read</h2>'));
+t("unsigned reads have no Discord save wall or cap line", page.includes("This read is free.") && page.includes("TCGplayer market. The date is in the line.") && !page.includes("Saving still needs Discord") && !page.includes("Sign in with Discord to save this read") && !page.includes("Sign in with Discord to save a read") && !page.includes("You can use a daily read and up to 25 follows") && !page.includes("Free is one weekly read") && !page.includes('href="/premium"') && page.includes("catchem-reads") && page.includes("Saved on this device."));
 t("one save button", (page.match(/<button type="submit"/g) || []).length === 1);
 t("a blank picker starts on the recommended set", renderReadsPage({ signedIn: false }).includes("ME: 30th Celebration") && renderReadsPage({ signedIn: false }).includes("me-30th-celebration"));
 t("a saved plan is one Discord follow", (() => {
@@ -79,6 +80,26 @@ t("a sample keeps chips when the line names that card", own.includes("18% 7D") &
 const html = await renderPath("/reads", async () => { throw new Error("no data"); }, { feed: false, reads: { signedIn: false, premium: false } });
 const body = await html.text();
 t("the reads page renders without catalog data", html.status === 200 && body.includes("Your reads") && body.includes("Add-ons") && !body.includes("No data"));
+
+
+const unsignedGet = await handleReads(new Request("https://catchemtcg.com/api/reads"), {});
+const unsignedGetBody = await unsignedGet.json();
+t("unsigned reads GET is device only", unsignedGet.status === 200 && unsignedGetBody.ok === true && unsignedGetBody.deviceOnly === true);
+const unsignedPost = await handleReads(new Request("https://catchemtcg.com/api/reads", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ frequency: "weekly", sets: ["me-30th-celebration"] }),
+}), {});
+const unsignedPostBody = await unsignedPost.json();
+t("unsigned reads POST does not write or demand Discord", unsignedPost.status === 200 && unsignedPostBody.ok === true && unsignedPostBody.deviceOnly === true && unsignedPostBody.plan == null);
+const unsignedForm = await handleReads(new Request("https://catchemtcg.com/api/reads", {
+  method: "POST",
+  headers: { "content-type": "application/x-www-form-urlencoded" },
+  body: "frequency=weekly&set=me-30th-celebration",
+  redirect: "manual",
+}), {});
+const loc = unsignedForm.headers.get("location") || "";
+t("unsigned form save stays on /reads", unsignedForm.status === 303 && loc.includes("/reads") && loc.includes("saved=1") && loc.includes("note=device") && !loc.includes("/auth/discord"));
 
 if (fail) process.exit(1);
 console.log("reads ok");
