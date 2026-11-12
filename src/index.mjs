@@ -21,6 +21,7 @@ import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { handleOverlay, OVERLAY_PATH } from "./office-overlay.mjs";
+import { sealedDocument, SEALED_PATH } from "./office-sealed.mjs";
 import { officialSrc, imageForId, editorImageFallbacks, sealedCutoutSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
@@ -1419,6 +1420,14 @@ const worker = {
         return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
       } catch {
         return new Response("[]", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+      }
+    }
+    if (request.method === "GET" && url.pathname === SEALED_PATH) {
+      try {
+        const body = await sealedDocument(fetchImpl);
+        return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120" } });
+      } catch {
+        return new Response("{\"rows\":[]}", { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
       }
     }
     if (request.method === "GET" && url.pathname === PAPER_PATH) {
