@@ -6,6 +6,7 @@ import { handleFrame } from "./return-share.mjs";
 import { feedShareButton, handleReturnVisit } from "./return-visit.mjs";
 import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
+import { msrpOf } from "./msrp.mjs";
 import { applySetSpark } from "./set-spark.mjs";
 import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
@@ -1160,7 +1161,15 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       itemReadHtml = "";
       priceRead = null;
     }
-    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
+    let msrp = null;
+    if (sealedPage) {
+      const [msrpDoc, redirects] = await Promise.all([
+        loadCatalogue("msrp-sourced.json", fetchImpl).catch(() => null),
+        loadJson("redirects.json", fetchImpl).catch(() => null),
+      ]);
+      msrp = msrpOf({ keys: [sealedId, card.id, cardId], pid: card.tcgPlayerId || cardId, redirects, pageId: cardId }, msrpDoc);
+    }
+    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
     if (card) await Promise.resolve(writeProductHtml(opts, cardId, pageBody));
     return html(pageBody, card ? 200 : 404);
   }
