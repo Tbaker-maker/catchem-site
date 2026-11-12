@@ -3052,6 +3052,7 @@ ${ebayBlock(opts.priceRead)}
 </div>
 </header>
 ${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div>` : ""}
+<script>${HISTORY_JS}</script>
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
@@ -3238,6 +3239,8 @@ export function renderCard(card, stamp, opts = {}) {
   const priceSeries = cardPriceSeries(card, hist, sealed);
   // One switchable chart for the sealed page: price, eBay listings counted, both, % change.
   const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull" }) || historyChart(priceSeries, { asOf: endDay });
+  // Quick-view sheets on this page still mount the shared history chart.
+  const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
   const sealedStrip = sealed ? summaryStrip({
@@ -3245,11 +3248,6 @@ export function renderCard(card, stamp, opts = {}) {
     listings: countedListings(fact, opts.listingSeries, endDay) || opts.itemListings || null,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
-  const listReal = (opts.listingSeries || [])
-    .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
-    .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  void listReal;
   const listChart = "";
   const breakBits = [];
   const listings = Number(fact?.listings);
@@ -3339,6 +3337,7 @@ ${sealedStrip}
 <section id="price">${changeHtml}
 ${priceChart}
 ${rangeRow}</section>
+${historyJs}
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
 ${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}

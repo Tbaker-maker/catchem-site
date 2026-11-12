@@ -139,7 +139,7 @@ function draw(){
   var Yp=null,Yl=null;
   if(useP&&p.length){
     var dom=yDomain(p.map(val),view),mn=dom[0],mx=dom[1];
-    var top=view==="both"?PT:PT,bot=view==="both"?H*.62:H-PB;
+    var top=PT,bot=view==="both"?H*.62:H-PB;
     Yp=function(v){return top+(1-(v-mn)/(mx-mn))*(bot-top);};
     for(var k=1;k<=3;k++){var gy=top+(bot-top)*k/4,gv=mn+(1-(gy-top)/(bot-top))*(mx-mn);body+='<line x1="0" x2="'+W+'" y1="'+gy.toFixed(1)+'" y2="'+gy.toFixed(1)+'" stroke="rgba(255,255,255,.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>';gl+='<span class="hc-gl l" style="top:'+(gy/H*100).toFixed(2)+'%">'+(view==="change"?pct(gv):grid$(gv,mx-mn))+'</span>';}
     if(view==="change"){var zy=Yp(0).toFixed(1);body+='<line x1="0" x2="'+W+'" y1="'+zy+'" y2="'+zy+'" stroke="rgba(255,255,255,.28)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
