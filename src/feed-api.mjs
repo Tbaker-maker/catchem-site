@@ -174,7 +174,11 @@ export async function handleAlert(request, env) {
   const store = env?.FEED_KV;
   if (!store) return json({ ok: false, error: "Alerts are not open yet." }, 503);
   const user = await readUser(request, env);
-  if (!user?.sub) return json({ ok: false, error: "Sign in with Discord to save an alert." }, 401);
+  if (!user?.sub) {
+    if (request.method === "GET") return json({ ok: true, rows: [], deviceOnly: true });
+    if (request.method !== "POST" && request.method !== "DELETE") return json({ ok: false, error: "Use POST." }, 405);
+    return json({ ok: true, deviceOnly: true, rows: [] });
+  }
   const listKey = `alerts:${user.sub}`;
   const loadRows = async () => {
     const list = await store.get(listKey, "json") || [];
