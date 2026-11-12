@@ -1,0 +1,888 @@
+{
+  "ranAt": "2026-10-26T06:53:05.997Z",
+  "base": "https://catchemtcg.com",
+  "viewport": "390x844",
+  "wanderSeconds": 180,
+  "screens": [
+    {
+      "id": "home-v2",
+      "name": "Home v2",
+      "requested": "/",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/",
+      "title": "Catch'em: know what every Pokémon card is doing",
+      "h1": "Know what every card and pack is doing.",
+      "fold": [
+        "Skip to content",
+        "Catch'em.",
+        "Menu",
+        "BUILT WITH THE COMMUNITY",
+        "Know what every card and pack is doing.",
+        "From Base Set to the latest drops.",
+        "Search",
+        "Open the Feed",
+        "OPEN Updated Oct 23, 3:12 AM PT",
+        "Updated Oct 23, 3:12 AM PT",
+        "Daily reads on every card and sealed product",
+        "Price charts and listings counted, each with its date",
+        "Free to use, no account needed",
+        "LATEST READ, OCT 23 One year on: Heat Rotom (Rising Rivals) RT3, $25.05 (Oct 23, 2025) to $95.07 (Oct 23) on TCGplayer market. Up 280%. Open the data",
+        "LATEST READ, OCT 23",
+        "One year on: Heat Rotom (Rising Rivals) RT3, $25.05 (Oct 23, 2025) to $95.07 (Oct 23) on TCGplayer market. Up 280%.",
+        "Open the data",
+        "FEAR AND GREED"
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [
+          {
+            "tag": "a",
+            "text": "Skip to content",
+            "w": 171,
+            "h": 43
+          },
+          {
+            "tag": "a",
+            "text": "Catch'em.",
+            "w": 115,
+            "h": 28
+          }
+        ],
+        "unnamed": [],
+        "images": [],
+        "colorOnly": []
+      },
+      "pass": true,
+      "notes": [
+        "2 controls in the first screen are under 44px."
+      ],
+      "shot": "qa/shots/home-v2-390.png"
+    },
+    {
+      "id": "pulse",
+      "name": "Pulse",
+      "requested": "/pulse",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/feed?r=span-year-ago-tcgcsv-505916",
+      "title": "The Feed · Catch'em",
+      "h1": "The Feed",
+      "fold": [
+        "Catch'em .",
+        "Menu",
+        "Prices last updated Oct 23.",
+        "Updated Oct 23, 3:12 AM PT",
+        "The Feed",
+        "My tracked reads",
+        "All",
+        "Prices",
+        "News",
+        "More",
+        "Fast mode",
+        "Crown Zenith Special Collection [Unown V & Lugia V]",
+        "SWSH: Crown Zenith",
+        "Up 247.2%",
+        "$290.50",
+        "‹",
+        "›"
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [],
+        "unnamed": [],
+        "images": [],
+        "colorOnly": []
+      },
+      "pass": true,
+      "notes": [
+        "The flag says Pulse. The screen title is The Feed. /pulse redirects to /feed."
+      ],
+      "shot": "qa/shots/pulse-390.png"
+    },
+    {
+      "id": "tab-bar",
+      "name": "Tab bar",
+      "requested": "/",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/",
+      "title": "Catch'em: know what every Pokémon card is doing",
+      "h1": "Know what every card and pack is doing.",
+      "fold": [
+        "Skip to content",
+        "Catch'em.",
+        "Menu",
+        "BUILT WITH THE COMMUNITY",
+        "Know what every card and pack is doing.",
+        "From Base Set to the latest drops.",
+        "Search",
+        "Open the Feed",
+        "OPEN Updated Oct 23, 3:12 AM PT",
+        "Updated Oct 23, 3:12 AM PT",
+        "Daily reads on every card and sealed product",
+        "Price charts and listings counted, each with its date",
+        "Free to use, no account needed",
+        "LATEST READ, OCT 23 One year on: Heat Rotom (Rising Rivals) RT3, $25.05 (Oct 23, 2025) to $95.07 (Oct 23) on TCGplayer market. Up 280%. Open the data",
+        "LATEST READ, OCT 23",
+        "One year on: Heat Rotom (Rising Rivals) RT3, $25.05 (Oct 23, 2025) to $95.07 (Oct 23) on TCGplayer market. Up 280%.",
+        "Open the data",
+        "FEAR AND GREED"
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [
+          {
+            "tag": "a",
+            "text": "Skip to content",
+            "w": 143,
+            "h": 43
+          },
+          {
+            "tag": "a",
+            "text": "Catch'em.",
+            "w": 124,
+            "h": 28
+          }
+        ],
+        "unnamed": [],
+        "images": [],
+        "colorOnly": []
+      },
+      "pass": false,
+      "notes": [
+        "Indexes is on the tab bar. A beginner cannot tell what it opens.",
+        "2 controls in the first screen are under 44px."
+      ],
+      "shot": "qa/shots/tab-bar-390.png"
+    },
+    {
+      "id": "product-v2",
+      "name": "Product v2",
+      "requested": "/c/tcgcsv-517045",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/c/tcgcsv-517045",
+      "title": "Charizard ex - 199/165 · Catch'em",
+      "h1": "Charizard ex - 199/165",
+      "fold": [
+        "Catch'em .",
+        "Menu",
+        "Prices last updated Oct 23.",
+        "Updated Oct 23, 3:12 AM PT",
+        "SV: Scarlet & Violet 151 · #199/165",
+        "SV: Scarlet & Violet 151",
+        "Charizard ex - 199/165",
+        "Special Illustration Rare",
+        "Add this to your read",
+        "Holofoil",
+        "Buy on TCGplayer",
+        "Buy on eBay"
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [
+          {
+            "tag": "a",
+            "text": "Special Illustration Rare",
+            "w": 181,
+            "h": 28
+          },
+          {
+            "tag": "a",
+            "text": "Holofoil",
+            "w": 77,
+            "h": 28
+          }
+        ],
+        "unnamed": [],
+        "images": [
+          "/img/sv3pt5/logo.png"
+        ],
+        "colorOnly": []
+      },
+      "pass": false,
+      "notes": [
+        "Store buttons sit above the price line. The first screen looks like a shop.",
+        "2 controls in the first screen are under 44px.",
+        "Images in the first screen with no alt text."
+      ],
+      "shot": "qa/shots/product-v2-390.png"
+    },
+    {
+      "id": "product-sealed",
+      "name": "Product v2 sealed example",
+      "requested": "/p/tcgcsv-503313",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/p/tcgcsv-503313",
+      "title": "151 Elite Trainer Box · Catch'em",
+      "h1": "151 Elite Trainer Box",
+      "fold": [
+        "Catch'em .",
+        "Menu",
+        "Prices last updated Oct 23.",
+        "Updated Oct 23, 3:12 AM PT",
+        "SV: Scarlet & Violet 151 · Sealed",
+        "SV: Scarlet & Violet 151",
+        "151 Elite Trainer Box",
+        "DATA 28 days on file DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026 i",
+        "DATA 28 days on file DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "DATA 28 days on file",
+        "DATA",
+        "28 days on file",
+        "DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "More bars, more data. 24 prices on file, 24 in the last 30 days.",
+        "TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "i",
+        "PRICE 7D Flat from $496.87, Oct 16 PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026 i",
+        "PRICE 7D Flat from $496.87, Oct 16 PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026",
+        "PRICE 7D Flat from $496.87, Oct 16",
+        "PRICE 7D",
+        "Flat",
+        "from $496.87, Oct 16",
+        "PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026",
+        "Green is up, red is down, grey is flat. The window is 7 days."
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [
+          {
+            "tag": "a",
+            "text": "SV: Scarlet & Violet 151",
+            "w": 174,
+            "h": 20
+          }
+        ],
+        "unnamed": [],
+        "images": [
+          "/img/sv3pt5/logo.png"
+        ],
+        "colorOnly": []
+      },
+      "pass": false,
+      "notes": [
+        "The first screen leads with DATA and PRICE 7D, not a plain price sentence.",
+        "1 controls in the first screen are under 44px.",
+        "Images in the first screen with no alt text."
+      ],
+      "shot": "qa/shots/product-sealed-390.png"
+    },
+    {
+      "id": "receipt-sheet",
+      "name": "Receipt sheet",
+      "requested": "/p/tcgcsv-503313",
+      "status": 200,
+      "finalUrl": "https://catchemtcg.com/p/tcgcsv-503313",
+      "title": "151 Elite Trainer Box · Catch'em",
+      "h1": "151 Elite Trainer Box",
+      "fold": [
+        "Catch'em .",
+        "Menu",
+        "Prices last updated Oct 23.",
+        "Updated Oct 23, 3:12 AM PT",
+        "SV: Scarlet & Violet 151 · Sealed",
+        "SV: Scarlet & Violet 151",
+        "151 Elite Trainer Box",
+        "DATA 28 days on file DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026 i",
+        "DATA 28 days on file DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "DATA 28 days on file",
+        "DATA",
+        "28 days on file",
+        "DATA More bars, more data. 24 prices on file, 24 in the last 30 days. TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "More bars, more data. 24 prices on file, 24 in the last 30 days.",
+        "TCGplayer market, Sep 25, 2026 to Oct 23, 2026",
+        "i",
+        "PRICE 7D Flat from $496.87, Oct 16 PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026 i",
+        "PRICE 7D Flat from $496.87, Oct 16 PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026",
+        "PRICE 7D Flat from $496.87, Oct 16",
+        "PRICE 7D",
+        "Flat",
+        "from $496.87, Oct 16",
+        "PRICE 7D Green is up, red is down, grey is flat. The window is 7 days. TCGplayer market, Oct 23, 2026",
+        "Green is up, red is down, grey is flat. The window is 7 days."
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [
+          {
+            "tag": "a",
+            "text": "SV: Scarlet & Violet 151",
+            "w": 174,
+            "h": 20
+          }
+        ],
+        "unnamed": [],
+        "images": [
+          "/img/sv3pt5/logo.png"
+        ],
+        "colorOnly": []
+      },
+      "pass": false,
+      "notes": [
+        "Price, date, and listings counted are not all in the first screen. There is no receipt sheet.",
+        "The heading The numbers is not in the first screen.",
+        "1 controls in the first screen are under 44px.",
+        "Images in the first screen with no alt text."
+      ],
+      "shot": "qa/shots/receipt-sheet-390.png"
+    },
+    {
+      "id": "explorer",
+      "name": "Explorer",
+      "requested": "/explore",
+      "status": 404,
+      "finalUrl": "https://catchemtcg.com/explore",
+      "title": "Page not found · Catch'em",
+      "h1": "This page is not here",
+      "fold": [
+        "Catch'em .",
+        "Menu",
+        "Prices last updated Oct 23.",
+        "404",
+        "This page is not here",
+        "The link may be old or mistyped. Try a search, or head back home.",
+        "Search",
+        "Home All sets Releases",
+        "Home",
+        "All sets",
+        "Releases",
+        "Not affiliated with Nintendo, The Pokémon Company, or Creatures."
+      ],
+      "dock": [
+        {
+          "text": "Feed",
+          "w": 72,
+          "h": 48,
+          "href": "/feed"
+        },
+        {
+          "text": "Sets",
+          "w": 72,
+          "h": 48,
+          "href": "/sets"
+        },
+        {
+          "text": "Search",
+          "w": 72,
+          "h": 48,
+          "href": "/search"
+        },
+        {
+          "text": "Indexes",
+          "w": 72,
+          "h": 48,
+          "href": "/indexes"
+        },
+        {
+          "text": "Premium",
+          "w": 72,
+          "h": 48,
+          "href": "/premium"
+        }
+      ],
+      "overflow": false,
+      "a11y": {
+        "contrast": [],
+        "taps": [],
+        "unnamed": [],
+        "images": [],
+        "colorOnly": []
+      },
+      "pass": false,
+      "notes": [
+        "HTTP 404. The flagged screen is not a page a visitor can use.",
+        "No Explorer route. /explore is a 404. Tabs named Sets, Cards, Sealed, Reads, Calendar are not on this screen."
+      ],
+      "shot": "qa/shots/explorer-390.png"
+    }
+  ],
+  "tasks": [
+    {
+      "site": "Catch'em",
+      "task": "card-price",
+      "ok": false,
+      "taps": 2,
+      "seconds": 3.5,
+      "note": "Page says Price being checked. Dollars elsewhere: $3.88, $1,501.23",
+      "url": "https://catchemtcg.com/c/tcgcsv-517045"
+    },
+    {
+      "site": "Catch'em",
+      "task": "price-date",
+      "ok": false,
+      "taps": 2,
+      "seconds": 3.5,
+      "note": "No dated market price in the first screen. Catch'em . | . | Menu | Prices last updated Oct 23. | Updated Oct 23, 3:12 AM PT | SV: Scarlet & Violet 151 · #199/165 | SV: Scarlet & Violet 151 | Charizard ex",
+      "url": "https://catchemtcg.com/c/tcgcsv-517045"
+    },
+    {
+      "site": "Catch'em",
+      "task": "listings",
+      "ok": false,
+      "taps": 2,
+      "seconds": 3.5,
+      "note": "This card page does not say listings counted.",
+      "url": "https://catchemtcg.com/c/tcgcsv-517045"
+    },
+    {
+      "site": "Catch'em",
+      "task": "market-read",
+      "ok": true,
+      "taps": 1,
+      "seconds": 1.9,
+      "note": "Feed card shows a price and a date.",
+      "url": "https://catchemtcg.com/feed?r=span-year-ago-tcgcsv-505916"
+    },
+    {
+      "site": "Catch'em",
+      "task": "sealed-price",
+      "ok": true,
+      "taps": 3,
+      "seconds": 3.4,
+      "note": "First screen shows $496.87, on 151 Elite Trainer Box.",
+      "url": "https://catchemtcg.com/p/tcgcsv-503313"
+    },
+    {
+      "site": "TCGplayer",
+      "task": "card-price",
+      "ok": false,
+      "taps": 0,
+      "seconds": 1.3,
+      "note": "Search box not found.",
+      "url": "https://www.tcgplayer.com/"
+    },
+    {
+      "site": "TCGplayer",
+      "task": "price-date",
+      "ok": false,
+      "taps": 0,
+      "seconds": 1.2,
+      "note": "Search box not found.",
+      "url": "https://www.tcgplayer.com/"
+    },
+    {
+      "site": "TCGplayer",
+      "task": "listings",
+      "ok": false,
+      "taps": 0,
+      "seconds": 9.3,
+      "note": "locator.click: Timeout 8000ms exceeded.\nCall log:\n  - waiting for locator('text=Find something awesome').first()\n    - locator resolved to <div data-v-e17bb906=\"\" class=\"place-hold",
+      "url": "https://www.tcgplayer.com/"
+    },
+    {
+      "site": "TCGplayer",
+      "task": "market-read",
+      "ok": false,
+      "taps": 0,
+      "seconds": 0.9,
+      "note": "No dated price list on the first screen.",
+      "url": "https://www.tcgplayer.com/"
+    },
+    {
+      "site": "TCGplayer",
+      "task": "sealed-price",
+      "ok": false,
+      "taps": 0,
+      "seconds": 9.2,
+      "note": "locator.click: Timeout 8000ms exceeded.\nCall log:\n  - waiting for locator('text=Find something awesome').first()\n    - locator resolved to <div data-v-e17bb906=\"\" class=\"place-hold",
+      "url": "https://www.tcgplayer.com/"
+    },
+    {
+      "site": "PriceCharting",
+      "task": "card-price",
+      "ok": true,
+      "taps": 2,
+      "seconds": 2.7,
+      "note": "A Charizard price is visible.",
+      "url": "https://www.pricecharting.com/game/pokemon-scarlet-&-violet-151/charizard-ex-199?q=pokemon+charizard+ex+199"
+    },
+    {
+      "site": "PriceCharting",
+      "task": "price-date",
+      "ok": true,
+      "taps": 2,
+      "seconds": 2.5,
+      "note": "A date is on the page with the price.",
+      "url": "https://www.pricecharting.com/game/pokemon-scarlet-&-violet-151/charizard-ex-199?q=pokemon+charizard+ex+199"
+    },
+    {
+      "site": "PriceCharting",
+      "task": "listings",
+      "ok": false,
+      "taps": 2,
+      "seconds": 2.6,
+      "note": "No listing count on the page.",
+      "url": "https://www.pricecharting.com/game/pokemon-scarlet-&-violet-151/charizard-ex-199?q=pokemon+charizard+ex+199"
+    },
+    {
+      "site": "PriceCharting",
+      "task": "market-read",
+      "ok": true,
+      "taps": 0,
+      "seconds": 0.9,
+      "note": "The first screen already lists prices and a date.",
+      "url": "https://www.pricecharting.com/"
+    },
+    {
+      "site": "PriceCharting",
+      "task": "sealed-price",
+      "ok": true,
+      "taps": 2,
+      "seconds": 2.6,
+      "note": "Sealed price visible.",
+      "url": "https://www.pricecharting.com/search-products?type=prices&q=pokemon+151+elite+trainer+box&go=Go"
+    },
+    {
+      "site": "PokeData",
+      "task": "card-price",
+      "ok": false,
+      "taps": 0,
+      "seconds": 9.8,
+      "note": "locator.click: Timeout 8000ms exceeded.\nCall log:\n  - waiting for locator('input[aria-label=\\'search cards\\'], input[placeholder*=\\'Find a card\\' i]').first()\n    - locator resolve",
+      "url": "https://www.pokedata.io/"
+    },
+    {
+      "site": "PokeData",
+      "task": "price-date",
+      "ok": true,
+      "taps": 2,
+      "seconds": 3.2,
+      "note": "A date is on the page with the price.",
+      "url": "https://www.pokedata.io/cards?q=Charizard+ex+199"
+    },
+    {
+      "site": "PokeData",
+      "task": "listings",
+      "ok": false,
+      "taps": 2,
+      "seconds": 3.1,
+      "note": "No listing count on the page.",
+      "url": "https://www.pokedata.io/cards?q=Charizard+ex+199"
+    },
+    {
+      "site": "PokeData",
+      "task": "market-read",
+      "ok": true,
+      "taps": 0,
+      "seconds": 1.4,
+      "note": "The first screen already lists prices and a date.",
+      "url": "https://www.pokedata.io/"
+    },
+    {
+      "site": "PokeData",
+      "task": "sealed-price",
+      "ok": false,
+      "taps": 3,
+      "seconds": 4.3,
+      "note": "Sealed price not visible.",
+      "url": "https://www.pokedata.io/card/Premium+Trainer+Box/Ultra+Ball+002"
+    }
+  ],
+  "wanders": [
+    {
+      "persona": "beginner",
+      "seconds": 180,
+      "opened": 3,
+      "items": [
+        "/p/tcgcsv-685924",
+        "/sets/miscellaneous-cards-and-products",
+        "/c/tcgcsv-252517"
+      ],
+      "deadEnds": [
+        {
+          "atSec": 0,
+          "url": "https://catchemtcg.com/explore",
+          "why": "Explorer is a 404. Heading: This page is not here."
+        },
+        {
+          "atSec": 9,
+          "url": "https://catchemtcg.com/feed?r=span-year-ago-tcgcsv-505916",
+          "why": "Tap did nothing visible: Crown Zenith Special Collection [Unown V & Lugia V]"
+        }
+      ],
+      "confusion": [
+        "Momentum on /p/tcgcsv-685924",
+        "7D on /p/tcgcsv-685924",
+        "Buy on on /p/tcgcsv-685924",
+        "Momentum on /c/tcgcsv-252517",
+        "7D on /c/tcgcsv-252517",
+        "Buy on on /c/tcgcsv-252517",
+        "Fast mode on /feed",
+        "Fast mode on /feed?r=span-year-ago-tcgcsv-505916",
+        "7D on /feed?r=span-year-ago-tcgcsv-505916"
+      ]
+    },
+    {
+      "persona": "regular",
+      "seconds": 180,
+      "opened": 2,
+      "items": [
+        "/p/tcgcsv-610741",
+        "/sets/swsh07-evolving-skies"
+      ],
+      "deadEnds": [
+        {
+          "atSec": 0,
+          "url": "https://catchemtcg.com/explore",
+          "why": "Explorer is a 404. Heading: This page is not here."
+        },
+        {
+          "atSec": 8,
+          "url": "https://catchemtcg.com/feed?r=span-year-ago-tcgcsv-505916",
+          "why": "Tap did nothing visible: Crown Zenith Special Collection [Unown V & Lugia V]"
+        }
+      ],
+      "confusion": [
+        "Momentum on /p/tcgcsv-610741",
+        "7D on /p/tcgcsv-610741",
+        "Buy on on /p/tcgcsv-610741",
+        "Fear and Greed on /sets/swsh07-evolving-skies",
+        "Fast mode on /feed?r=span-year-ago-tcgcsv-505916",
+        "7D on /feed?r=span-year-ago-tcgcsv-505916"
+      ]
+    },
+    {
+      "persona": "returning",
+      "seconds": 180,
+      "opened": 3,
+      "items": [
+        "/p/tcgcsv-685924",
+        "/sets/miscellaneous-cards-and-products",
+        "/c/tcgcsv-252517"
+      ],
+      "deadEnds": [
+        {
+          "atSec": 0,
+          "url": "https://catchemtcg.com/explore",
+          "why": "Explorer is a 404. Heading: This page is not here."
+        },
+        {
+          "atSec": 9,
+          "url": "https://catchemtcg.com/feed?r=span-year-ago-tcgcsv-505916",
+          "why": "Tap did nothing visible: Crown Zenith Special Collection [Unown V & Lugia V]"
+        }
+      ],
+      "confusion": [
+        "Momentum on /p/tcgcsv-685924",
+        "7D on /p/tcgcsv-685924",
+        "Buy on on /p/tcgcsv-685924",
+        "Momentum on /c/tcgcsv-252517",
+        "7D on /c/tcgcsv-252517",
+        "Buy on on /c/tcgcsv-252517",
+        "Fast mode on /feed",
+        "Fast mode on /feed?r=span-year-ago-tcgcsv-505916",
+        "7D on /feed?r=span-year-ago-tcgcsv-505916"
+      ]
+    }
+  ],
+  "summary": {
+    "screensPass": [
+      "home-v2",
+      "pulse"
+    ],
+    "screensFail": [
+      "tab-bar",
+      "product-v2",
+      "product-sealed",
+      "receipt-sheet",
+      "explorer"
+    ],
+    "wanderOpenedAvg": 2.7,
+    "wanderDeadEnds": 6,
+    "ship": false
+  }
+}
