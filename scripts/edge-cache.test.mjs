@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL, cacheKeyUrl } from "../src/edge-cache.mjs";
+import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL, EDGE_SWR, cacheKeyUrl, edgeCacheKey, edgeBuildId } from "../src/edge-cache.mjs";
 
 const store = new Map();
 globalThis.caches = { default: {
@@ -22,6 +22,7 @@ assert.equal(await r.text(), "<p>hi</p>");
 r = await edgeFetch(render, req("/sets"), {}, {});
 assert.equal(r.headers.get("x-edge-cache"), "hit");
 assert.equal(r.headers.get("cache-control"), "no-store");
+assert.equal(r.headers.get("cdn-cache-control"), "no-store");
 assert.equal(renders, 1);
 await edgeFetch(render, req("/sets", "ce_session=abc"), {}, {});
 assert.equal(renders, 2);
@@ -34,6 +35,9 @@ assert.match(await r.text(), /Retry/);
 assert.doesNotMatch(await errorPage().text(), /\u2014/);
 
 assert.equal(EDGE_TTL, 86400);
+assert.equal(EDGE_SWR, 3600);
+assert.equal(edgeBuildId("abcdef1234567890"), "abcdef123456");
+assert.equal(edgeBuildId(""), "dev");
 assert.equal(errorPage().status, 200);
 
 const five = async () => new Response("<p>down</p>", { status: 503, headers: { "content-type": "text/html" } });
@@ -80,5 +84,50 @@ assert.equal(r.headers.get("x-edge-cache"), "hit");
 r = await edgeFetch(render, req("/feed"), {}, {}, { dataVersion: "2026-10-28" });
 assert.equal(renders, 1);
 assert.equal(r.headers.get("x-edge-cache"), "hit");
+
+// A deploy changes the build stamp. Same data day must miss on the three paths
+// that stayed stale for hours after the ungate deploy.
+store.clear(); renders = 0;
+const stampA = async () => new Response("<p>stamp-a</p>", { headers: { "content-type": "text/html" } });
+const stampB = async () => { renders++; return new Response("<p>stamp-b</p>", { headers: { "content-type": "text/html" } }); };
+const day = "2026-11-12";
+for (const path of ["/p/tcgcsv-242436", "/indexes", "/feed"]) {
+  await edgeFetch(stampA, req(path), {}, {}, { dataVersion: day, buildId: "aaaa11111111" });
+}
+renders = 0;
+for (const path of ["/p/tcgcsv-242436", "/indexes", "/feed"]) {
+  r = await edgeFetch(stampB, req(path), {}, {}, { dataVersion: day, buildId: "bbbb22222222" });
+  assert.equal(r.headers.get("x-edge-cache"), null);
+  assert.equal(await r.text(), "<p>stamp-b</p>");
+}
+assert.equal(renders, 3);
+r = await edgeFetch(stampB, req("/p/tcgcsv-242436"), {}, {}, { dataVersion: day, buildId: "bbbb22222222" });
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+assert.equal(renders, 3);
+r = await edgeFetch(stampB, req("/indexes"), {}, {}, { dataVersion: day, buildId: "aaaa11111111" });
+assert.equal(await r.text(), "<p>stamp-a</p>");
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+const key = edgeCacheKey(req("/feed"), day, "bbbb22222222");
+assert.equal(new URL(key.url).searchParams.get("bv"), "bbbb22222222");
+assert.equal(new URL(key.url).searchParams.get("dv"), day);
+
+// Past the fresh window, the same stamp is served stale and refreshed in the background.
+const staleKey = edgeCacheKey(req("/feed?f=news"), day, "bbbb22222222");
+const stored = store.get(staleKey.url);
+assert.ok(stored);
+assert.match(stored.headers.get("cache-control"), new RegExp(`max-age=${EDGE_TTL + EDGE_SWR}`));
+const aged = new Headers(stored.headers);
+aged.set("x-cached-at", String(Date.now() - (EDGE_TTL + 5) * 1000));
+store.set(staleKey.url, new Response("<p>old</p>", { status: 200, headers: aged }));
+renders = 0;
+let bg = null;
+r = await edgeFetch(stampB, req("/feed?f=prices"), {}, { waitUntil(p) { bg = p; } }, { dataVersion: day, buildId: "bbbb22222222" });
+assert.equal(r.headers.get("x-edge-cache"), "stale");
+assert.equal(await r.text(), "<p>old</p>");
+assert.ok(bg);
+await bg;
+r = await edgeFetch(stampB, req("/feed"), {}, {}, { dataVersion: day, buildId: "bbbb22222222" });
+assert.equal(r.headers.get("x-edge-cache"), "hit");
+assert.equal(await r.text(), "<p>stamp-b</p>");
 
 console.log("edge-cache ok");
