@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL, cacheKeyUrl } from "../src/edge-cache.mjs";
+import { edgeFetch, cacheableRequest, errorPage, EDGE_TTL, PUBLIC_CACHE, cacheKeyUrl } from "../src/edge-cache.mjs";
 
 const store = new Map();
 globalThis.caches = { default: {
@@ -10,6 +10,8 @@ let renders = 0;
 const render = async () => { renders++; return new Response("<p>hi</p>", { headers: { "content-type": "text/html", "cache-control": "no-store" } }); };
 const req = (path, cookie) => new Request("https://catchemtcg.com" + path, { headers: cookie ? { cookie } : {} });
 
+assert.equal(cacheableRequest(req("/")), true);
+assert.equal(cacheableRequest(req("/search")), true);
 assert.equal(cacheableRequest(req("/c/abc")), true);
 assert.equal(cacheableRequest(req("/post-office")), false);
 assert.equal(cacheableRequest(req("/c/abc", "ce_session=x")), false);
@@ -21,7 +23,7 @@ let r = await edgeFetch(render, req("/sets"), {}, {});
 assert.equal(await r.text(), "<p>hi</p>");
 r = await edgeFetch(render, req("/sets"), {}, {});
 assert.equal(r.headers.get("x-edge-cache"), "hit");
-assert.equal(r.headers.get("cache-control"), "no-store");
+assert.equal(r.headers.get("cache-control"), PUBLIC_CACHE);
 assert.equal(renders, 1);
 await edgeFetch(render, req("/sets", "ce_session=abc"), {}, {});
 assert.equal(renders, 2);

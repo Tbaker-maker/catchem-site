@@ -92,12 +92,10 @@ async function readProductHtml(kv, id) {
   try { return await kv.get(productHtmlKey(id)); } catch { return null; }
 }
 
-function writeProductHtml(opts, id, body) {
-  if (!opts?.anon || !opts?.kv || !id || !body) return;
-  const put = opts.kv.put(productHtmlKey(id), body, { expirationTtl: PRODUCT_HTML_TTL }).catch(() => {});
-  // Ops ?prewarm=html must finish the KV put before the next paced request.
-  if (opts.prewarmHtml) return put;
-  if (typeof opts.waitUntil === "function") opts.waitUntil(put);
+function writeProductHtml() {
+  // Product HTML is cached at the edge and on the CDN.
+  // A KV put per page used the daily write cap.
+  // readProductHtml still returns a stored copy when one exists.
 }
 
 const html = (body, status = 200) => new Response(ensureAffiliation(body), {
@@ -876,12 +874,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       } catch { /* the catalogue file did not load */ }
       return html(renderNotFound(stamp, pageOpts), 404);
     }
-    // Ops-only: ?prewarm=1 seeds prodrow KV and returns immediately (no product render).
+    // Ops-only: ?prewarm=1 checks the one bucket key and returns immediately.
     // Full cold render + warmBucket was timing out / 503ing during calm prewarm.
     if (opts.prewarm) {
       try { await warmBucket(bucketOf(cardId), fetchImpl); } catch { /* retry later */ }
-      // prewarm=1: seed only. prewarm=html: seed then fall through so product-html KV fills
-      // without writing the edge Cache API (prewarm bypasses cacheableRequest).
+      // prewarm=1: bucket check only. prewarm=html: render so the edge and CDN
+      // cache fill. A stored product-html value, if one is still in KV, is
+      // reused and the render is skipped.
       if (!opts.prewarmHtml) {
         return new Response("prewarm", {
           status: 200,
