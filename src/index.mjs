@@ -862,8 +862,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             release: hit.release || "",
             printing: hit.finish || "",
             kind: "single",
+            tcgPlayerId: hit.tcgPlayerId || hit.pid || "",
+            sku: hit.sku || "",
           };
-          const pic = officialSrc({ id: hit.id, kind: "single" }, images);
+          const pic = officialSrc({ id: hit.id, kind: "single", tcgPlayerId: row.tcgPlayerId, sku: row.sku }, images);
           const [reads, conditionNote, premiumRow, signalCard, productReads, pokemon] = await Promise.all([
             cardReadSplit(hit.id, fetchImpl),
             conditionNoteFor(fetchImpl),

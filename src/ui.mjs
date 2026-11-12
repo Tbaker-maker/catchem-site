@@ -12,7 +12,7 @@ import { DISCORD_INVITE, INVITE_LINE } from "./auth.mjs";
 import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
-import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
+import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, phoneCardHeroImg, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
 import { SEALED_SHELF_CSS, shelfClientSource } from "./sealed-shelf.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
@@ -3281,12 +3281,7 @@ export function renderCard(card, stamp, opts = {}) {
   const setBit = setMark + (card.setSlug
     ? `<a class="set-link" href="/sets/${esc(card.setSlug)}">${esc(card.set || "")}</a>`
     : esc(card.set || ""));
-  const img = imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"').replace(/<img\b([^>]*?)\ssrc="(\/data\/editor\/tcg\/[a-z0-9]+\/[A-Za-z0-9._-]+_hires\.png)"/, (m, pre, hi) => {
-    const pid = /^tcgcsv-(\d+)$/.exec(String(card.id || card.sku || ""));
-    if (!pid || card.kind === "sealed") return m;
-    const small = `/api/card-hero?pid=${pid[1]}&amp;fb=${hi}`;
-    return `<img${pre} src="${small}" srcset="${small} 431w, ${hi} 733w" sizes="(max-width: 600px) 240px, 280px"`;
-  });
+  const img = phoneCardHeroImg(imageTag(opts.catalogueSrc || "", card.kind === "sealed" ? "sealed" : "card", card.name, { ...card, catalogueCrop: false, crop: false, logo: opts.setLogo || "", alts: opts.catalogueAlts || [] }).replace('loading="lazy"', 'loading="eager" fetchpriority="high"'), card);
   const also = (card.also || []).map((row) => `<a href="${card.kind === "sealed" ? "/p/" : "/c/"}${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
   if (!sealed) {
     return chrome("", renderSingleCard({ card, opts, price, endDay, hist, priceSeries: held ? [] : priceSeries, rangeRow: held ? "" : rangeRow, img, setBit, held }), card.name, stamp, "", feedNav(opts));

@@ -77,4 +77,5 @@ t("sealed camera watermark uses the product slug", sealedSlug.includes('class="p
 
 const card = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 5, asOf: "2026-10-12", hist: [["2026-10-01", 4], ["2026-10-12", 5]] }, "stamp", {});
 t("card page has price and % change only, opening on Price", card.includes('<figure class="hc pc"') && /<figure class="hc pc" id="chart" data-view="price"/.test(card) && card.includes('data-view="change"') && !card.includes('data-view="listings"'));
+t("chart script waits until the figure is near the viewport", html.includes("IntersectionObserver") && html.includes('rootMargin:"240px"') && html.includes("getElementById(\"chart\")") && html.includes(PRODUCT_CHART_JS));
 if (fail) process.exit(1); else console.log("product chart ok");

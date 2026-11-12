@@ -78,6 +78,29 @@ export function ptcgFile(id) {
   return m[1] + "/" + m[2] + "_hires.png";
 }
 
+// Product card heroes: phones must not download the 734px _hires.png on first load.
+// A srcset that also lists that file at 733w still gets picked on a 3x phone
+// (240px CSS * 3 = 720). /api/card-hero is a ~600px JPEG; the official mid-res
+// .png is the fallback when we have no TCGplayer id. Desktop (768px+) can still
+// use the hires scan.
+export function phoneCardHeroImg(tag, card) {
+  const src = String(tag || "");
+  const m = src.match(/^(<img\b)([^>]*?)\ssrc="(\/data\/editor\/tcg\/[a-z0-9]+\/[A-Za-z0-9._-]+_hires\.png)"([^>]*)>([\s\S]*)$/);
+  if (!m) return src;
+  if (card && card.kind === "sealed") return src;
+  const pre = m[2], hi = m[3], post = m[4], rest = m[5];
+  let pid = tcgPid(card);
+  if (!(pid > 0)) {
+    const blob = `${src} ${JSON.stringify(card && typeof card === "object" ? card : {})}`;
+    const hit = blob.match(/\/api\/card-(?:hero|img)\?pid=(\d+)/);
+    if (hit) pid = Number(hit[1]);
+  }
+  const small = pid > 0
+    ? "/api/card-hero?pid=" + pid + "&amp;fb=" + escapeAttr(hi)
+    : hi.replace(/_hires\.png$/, ".png");
+  return "<picture><source media=\"(min-width: 768px)\" srcset=\"" + hi + "\"><img" + pre + " src=\"" + small + "\"" + post + ">" + rest + "</picture>";
+}
+
 export function productTypeLabel(row) {
   const kind = String(row && row.kind || "").toLowerCase();
   const blob = (String(row && row.subtype || "") + " " + String(row && row.name || "")).toLowerCase();

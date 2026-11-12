@@ -58,6 +58,7 @@ jobs:
       - run: node scripts/product-chart.test.mjs
       - run: node scripts/chart-no-gaps.test.mjs
       - run: node scripts/card-page.test.mjs
+      - run: node scripts/phone-hero.test.mjs
       - run: node scripts/mobile-hero.test.mjs
       - run: node scripts/sealed-cutouts.test.mjs
       - run: node scripts/sealed-deep.test.mjs
