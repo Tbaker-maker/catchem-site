@@ -214,6 +214,25 @@ export function prefillBootJs() {
     var btn = document.querySelector('#ai-tones [data-tone="' + tone + '"]');
     if (btn) btn.click();
   }
+  function started(names, caption, tone){
+    note((names.length ? "Draft started for " + names.join(" and ") + ". " : "Draft started. ")
+      + (caption ? caption + " " : "")
+      + "Make the picture, then copy the text or post to X.");
+    applyTone(tone);
+    var dock = document.getElementById("compose-dock");
+    if (dock && dock.scrollIntoView) dock.scrollIntoView({ block: "start" });
+    return true;
+  }
+  function goSealed(want, caption, tone){
+    if (!window.__ceSealed || typeof window.__ceSealed.prefill !== "function") return false;
+    var result = window.__ceSealed.prefill(want);
+    if (!result) return false;
+    if (!result.ids || !result.ids.length) {
+      note("That sealed product is not in the Post Office catalog yet.", "error");
+      return true;
+    }
+    return started(result.names || [], caption, tone);
+  }
   function go(){
     var q = params();
     var want = cleanIds(q.get("ids") || q.get("id") || "");
@@ -224,6 +243,7 @@ export function prefillBootJs() {
       note("Pick a card, then Make the picture. Write the post for copy or Post to X.");
       return true;
     }
+    if (kind === "sealed") return goSealed(want, caption, tone);
     if (!window.__ce || typeof window.__ce.inject !== "function") return false;
     var pins = [];
     want.forEach(function(id){
@@ -231,9 +251,8 @@ export function prefillBootJs() {
       if (hit && pins.indexOf(hit) < 0) pins.push(hit);
     });
     if (!pins.length) {
-      note(kind === "sealed"
-        ? "That sealed product is not in the Post Office catalog yet."
-        : "That product is not in the Post Office catalog.", "error");
+      if (window.__ceSealed && typeof window.__ceSealed.prefill === "function") return goSealed(want, caption, tone);
+      note("That product is not in the Post Office catalog.", "error");
       return true;
     }
     window.__ce.inject({ pins: pins, parent: caption || undefined, emptyTray: false });
@@ -241,13 +260,7 @@ export function prefillBootJs() {
       var c = window.__ce.card(id);
       return c && c.name ? c.name : id;
     }).filter(Boolean);
-    note((names.length ? "Draft started for " + names.join(" and ") + ". " : "Draft started. ")
-      + (caption ? caption + " " : "")
-      + "Make the picture, then copy the text or post to X.");
-    applyTone(tone);
-    var dock = document.getElementById("compose-dock");
-    if (dock && dock.scrollIntoView) dock.scrollIntoView({ block: "start" });
-    return true;
+    return started(names, caption, tone);
   }
   function wait(n){
     if (go()) return;

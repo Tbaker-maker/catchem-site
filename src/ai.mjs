@@ -6,6 +6,7 @@ import { commit, ideasSignInLine, peek, readUser, usageOf } from "./quota.mjs";
 import { discordReady, INVITE_LINE, officeAllowed } from "./auth.mjs";
 import { fetchRepo } from "./data.mjs";
 import { banGuard } from "./advice-rules.mjs";
+import { extrasById, loadSealedSidecar, sealedType } from "./office-sealed.mjs";
 
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json), plus post-text
 // house rules: no sold claims (listings only), no rounded-to-zero prices, one spelling of catalog.
@@ -36,6 +37,9 @@ NON-NEGOTIABLE RULES:
 - If a price is supplied, write it as "TCGplayer market: [price] ([date])", using the supplied price and date. Never use a price without its supplied date. If either is missing, omit the price.
 - Never tell people what to do with their money: no "buy now," "you should buy" or "sell," "load up," "guaranteed," "can't lose," or "to the moon." Do not use crypto, NFT, or Web3 language. Shopping words like Buy, Shop, and Sell your cards are fine.
 - Do not promise or guarantee a future price, pull, grade, value, or outcome.
+- If a fact has "kind":"sealed", it is a sealed product. Never give it a condition or grade (no NM, Near Mint, LP, or "condition"). Call eBay counts "listings counted", never sold.
+- If a fact has "msrp", you may write that exact string (for example "MSRP $39.99"). Never invent an MSRP.
+- If a fact has "rip", you may write that exact string (for example "Average pull value $21.20 (2026-10-19)"). Never invent a pull value.
 - Do not use generic hype without a concrete detail.
 - Do not browse or rely on outside knowledge.
 - Return exactly 3 clearly different variations. Keep every variation factual and within the requested platform format.
@@ -108,7 +112,33 @@ async function asOf(fetchImpl) {
   return asOfCache;
 }
 
-export function rowFact(row, date) {
+// Sealed has one state, so no condition word may ride on it (NM, Near Mint, LP...).
+export const SEALED_CONDITION = /\b(nm|lp|mp|hp|dmg|near[ -]?mint|lightly played|moderately played|heavily played|damaged|mint condition|condition)\b/i;
+
+function attachSealedExtra(fact, extra) {
+  if (!fact || !extra) return fact;
+  if (Number(extra.msrp) > 0) {
+    fact.msrp = "MSRP $" + Number(extra.msrp).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (Number(extra.rip) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(extra.ripDate || ""))) {
+    fact.rip = "Average pull value $" + Number(extra.rip).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " (" + extra.ripDate + ")";
+  }
+  return fact;
+}
+
+export function rowFact(row, date, extra) {
+  if (row[5] === "sealed") {
+    return attachSealedExtra({
+      id: row[0],
+      name: row[1],
+      edition: row[2] || "",
+      printing: "",
+      artist: "",
+      kind: "sealed",
+      productType: sealedType(row[1]),
+      price: priceLine(row[6], date),
+    }, extra);
+  }
   const labels = editionLabel(row);
   const price = row[5] === "pocket" ? "No market price" : priceLine(row[6], date);
   return {
@@ -160,8 +190,14 @@ export async function factsFor(ids, fetchImpl) {
   const out = [];
   if ([...want].some((id) => id.startsWith("tcgcsv-"))) {
     const lite = await loadLite(fetchImpl);
+    const sealedWanted = lite.some((row) => want.has(row[0]) && row[5] === "sealed");
+    let extras = {};
+    if (sealedWanted) {
+      const side = await loadSealedSidecar(fetchImpl);
+      extras = extrasById(lite, side.cutDoc, side.msrpDoc, side.ripDoc).extras;
+    }
     for (const row of lite) {
-      if (want.has(row[0])) out.push(rowFact(row, date));
+      if (want.has(row[0])) out.push(rowFact(row, date, extras[row[0]]));
     }
   }
   if ([...want].some((id) => id.startsWith("tcgp-"))) {
@@ -179,6 +215,13 @@ export async function factsFor(ids, fetchImpl) {
 }
 
 function lineOf(card) {
+  if (card && card.kind === "sealed") {
+    const bits = [card.name, card.edition].filter(Boolean);
+    if (card.price && card.price !== "No market price") bits.push(card.price);
+    if (card.msrp) bits.push(card.msrp);
+    if (card.rip) bits.push(card.rip);
+    return bits.join(". ") + ".";
+  }
   const bits = [card.name, card.printing, card.edition].filter(Boolean);
   if (card.artist) bits.push("art by " + card.artist);
   if (card.price && card.price !== "No market price") bits.push(card.price);
@@ -202,10 +245,54 @@ export function factIdeas(cards, pins) {
   }
   if (!parts.length) return [];
   const all = parts.join(" ");
+  if (rows.length && rows.every((card) => card.kind === "sealed")) {
+    return [
+      `Sealed Pokémon TCG product: ${all}`,
+      `From the live catalog, still sealed: ${all}`,
+      `Picked for the picture: ${all}`,
+    ];
+  }
   return [
     `Notable Pokémon print: ${all}`,
     `Same Pokémon catalog row: ${all}`,
     `Pinned Pokémon cards: ${all}`,
+  ];
+}
+
+function sealedDetail(card) {
+  const set = String(card.edition || "");
+  const short = set.split(":").pop().trim().toLowerCase();
+  const named = short && String(card.name || "").toLowerCase().includes(short);
+  return [card.name, named ? "" : set].filter(Boolean).join(", ");
+}
+
+function sealedLines(card, tone) {
+  const base = sealedDetail(card);
+  if (tone === "hype") {
+    return [
+      `${base}. Still sealed and still a looker on the Pokémon shelf.`,
+      `The whole Pokémon shelf leans in for this one. ${base}.`,
+      `${base}. Worth a second look on the Pokémon shelf.`,
+    ];
+  }
+  if (tone === "chill") {
+    return [
+      `${base}. A sealed Pokémon piece to slow down and look at.`,
+      `Quietly one of those Pokémon shelf pieces. ${base}.`,
+      `${base}. Easy to sit with, Pokémon and all.`,
+    ];
+  }
+  if (tone === "funny") {
+    return [
+      `${base}. The Pokémon shelf has entered its dramatic era.`,
+      `${base}. Every other sealed Pokémon product just asked for the same spotlight.`,
+      `${base}. Pokémon, shrink-wrapped and a little theatrical about it.`,
+    ];
+  }
+  return [
+    `${base}. Sealed Pokémon TCG product, straight from the catalog.`,
+    `Product details, Pokémon TCG: ${base}.`,
+    `${base}. A sealed Pokémon reference, and nothing extra.`,
   ];
 }
 
@@ -264,9 +351,11 @@ export function factPost(cards, tone = "informative") {
   const list = cards || [];
   const card = list[0];
   if (!card) return [];
-  const price = card.price && card.price !== "No market price" ? card.price : "";
+  const price = card.kind === "sealed"
+    ? [card.price && card.price !== "No market price" ? card.price : "", card.msrp, card.rip].filter(Boolean).join(". ")
+    : (card.price && card.price !== "No market price" ? card.price : "");
   const mood = ["hype", "chill", "funny", "informative"].includes(tone) ? tone : "informative";
-  const lines = toneLines(card, mood);
+  const lines = card.kind === "sealed" ? sealedLines(card, mood) : toneLines(card, mood);
   if (list[1]) {
     const extra = lineOf(list[1]).replace(/\.$/, "");
     lines[2] = `${lines[2].replace(/\.$/, "")} Also ${extra}.`;
@@ -282,11 +371,19 @@ const DOLLARS = /\$\s?[\d,]+(?:\.\d+)?/g;
 export function acceptable(text, cards) {
   const body = String(text || "");
   if (!body.trim() || BANNED.test(body)) return false;
+  if ((cards || []).some((c) => c && c.kind === "sealed") && SEALED_CONDITION.test(body)) return false;
   const allowed = (cards || []).map((c) => c && c.price).filter((p) => p && p.startsWith("TCGplayer market:"));
   const mentions = body.match(PRICE_MENTION) || [];
   if (!mentions.every((hit) => allowed.includes(hit.trim()))) return false;
   const norm = (d) => d.replace(/\s/g, "").replace(/,+$/, "");
-  const amounts = new Set(allowed.map((p) => norm((p.match(DOLLARS) || [""])[0])));
+  const amounts = new Set();
+  for (const card of cards || []) {
+    if (!card) continue;
+    for (const field of [card.price, card.msrp, card.rip]) {
+      if (!field) continue;
+      for (const d of field.match(DOLLARS) || []) amounts.add(norm(d));
+    }
+  }
   return (body.match(DOLLARS) || []).every((d) => amounts.has(norm(d)));
 }
 

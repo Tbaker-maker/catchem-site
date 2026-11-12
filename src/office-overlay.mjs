@@ -4,9 +4,9 @@
 // is the card's own dated series (cardPriceSeries) on the product chart's y domain (#418).
 import { factsFor } from "./ai.mjs";
 import { officeAllowed } from "./auth.mjs";
-import { bucketRow, longHistOf } from "./data.mjs";
+import { bucketRow, loadDive, loadDiveIndex, longHistOf } from "./data.mjs";
+import { listingPoints, yDomain } from "./product-chart.mjs";
 import { postOfficeOn } from "./post-office-flag.mjs";
-import { yDomain } from "./product-chart.mjs";
 import { readUser } from "./quota.mjs";
 import { cardPriceSeries } from "./ui.mjs";
 
@@ -37,6 +37,25 @@ export function miniSeries(series, asOf, days = OVERLAY_DAYS) {
   return { from, to: last, points: win, domain: yDomain(win.map((p) => p[1]), "price"), high: hi, low: lo };
 }
 
+// Sealed only: the latest eBay listings count on or before the price date, from the
+// product's dive series (the product chart's Listings view). Listings, never sales.
+export function latestListings(series, asOf) {
+  const end = DAY.test(String(asOf || "")) ? String(asOf) : "";
+  const pts = listingPoints(series).filter((p) => !end || p[0] <= end);
+  const last = pts.at(-1);
+  return last ? { n: last[1], day: last[0] } : null;
+}
+
+async function sealedListings(id, asOf, fetchImpl) {
+  try {
+    const index = await loadDiveIndex(fetchImpl);
+    const dive = (index && index.byTcgcsv && index.byTcgcsv[id]) || "";
+    if (!dive) return null;
+    const doc = await loadDive(dive, fetchImpl);
+    return latestListings(Array.isArray(doc?.series) ? doc.series : [], asOf);
+  } catch { return null; }
+}
+
 export async function overlayFor(ids, fetchImpl) {
   const facts = await factsFor(ids, fetchImpl);
   const out = [];
@@ -47,6 +66,8 @@ export async function overlayFor(ids, fetchImpl) {
       continue;
     }
     let chart = null;
+    let listings = null;
+    if (card.kind === "sealed") listings = await sealedListings(card.id, facts.asOf, fetchImpl);
     if (String(card.id).startsWith("tcgcsv-")) {
       try {
         const row = await bucketRow(card.id, fetchImpl);
@@ -59,7 +80,7 @@ export async function overlayFor(ids, fetchImpl) {
         }
       } catch { chart = null; }
     }
-    out.push({ id: pin.id, name: card.name, price: card.price, chart });
+    out.push({ id: pin.id, name: card.name, price: card.price, chart, kind: card.kind, listings });
   }
   return { asOf: facts.asOf, cards: out };
 }

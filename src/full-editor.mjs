@@ -3,6 +3,7 @@ import { rewriteOfficeFilters } from "./post-office-filters.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { browserAssetUrl, fetchRepo } from "./data.mjs";
 import { prefillBootTag } from "./office-path.mjs";
+import { SEALED_JS } from "./office-sealed.mjs";
 
 // The Post Office editor (Catchem-data research/assets/play.html).
 // Card scans are proxied same-origin so the picture canvas can read them.
@@ -299,6 +300,7 @@ const SHARE_JS = `<script id="share-boot">
   var data = {};
   function $(id){ return document.getElementById(id); }
   function pinIds(){
+    if (window.__ceSealed && window.__ceSealed.on()) return window.__ceSealed.ids();
     var list = window.pins || [];
     var out = [];
     for (var i = 0; i < list.length && out.length < 4; i++) {
@@ -357,6 +359,9 @@ const SHARE_JS = `<script id="share-boot">
     g.fillStyle = "#c4baab";
     g.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
     g.fillText("TCGplayer market, " + (m ? nice(m[2]) : ""), x + pad, y + 86);
+    if (card.listings && card.listings.n >= 0 && card.listings.day) {
+      g.fillText(Number(card.listings.n).toLocaleString("en-US") + " eBay listings counted, " + nice(card.listings.day), x + pad, y + 108);
+    }
     var ch = card.chart;
     var cx = x + w * 0.48, cw = w * 0.52 - pad, cy = y + 18, chh = h - 58;
     if (!ch || !ch.points || ch.points.length < 2) {
@@ -406,7 +411,7 @@ const SHARE_JS = `<script id="share-boot">
     var rows = (sel || []).map(function(c){ return data[c && c.id]; }).filter(function(c){ return c && c.price; });
     var note = $("ov-note");
     if (!rows.length) {
-      if (note) note.textContent = (sel || []).some(function(c){ return data[c && c.id] === undefined; }) ? "Loading prices…" : "No TCGplayer market price on file for these cards.";
+      if (note) note.textContent = (sel || []).some(function(c){ return data[c && c.id] === undefined; }) ? "Loading prices…" : "No TCGplayer market price on file for these picks.";
       return canvas;
     }
     if (note) note.textContent = "Price and chart: TCGplayer market, same date as the post text.";
@@ -472,7 +477,7 @@ const SHARE_JS = `<script id="share-boot">
     $("ov-on").onchange = function(){
       if (!overlayOn()) { note.textContent = ""; rebuild(); return; }
       var ids = pinIds();
-      if (!ids.length) { note.textContent = "Pin a card first."; return; }
+      if (!ids.length) { note.textContent = "Pin a card or a sealed product first."; return; }
       note.textContent = "Loading prices…";
       fetchOverlay(ids, rebuild);
     };
@@ -545,6 +550,7 @@ const AI_JS = `<script id="ai-boot">
     load(panel);
   }
   function ids(){
+    if (window.__ceSealed && window.__ceSealed.on()) return window.__ceSealed.ids();
     var tray = (window.tray && window.tray.length) ? window.tray : (window.pins || []);
     var out = [];
     for (var i = 0; i < tray.length && out.length < 4; i++) {
@@ -676,7 +682,7 @@ const AI_JS = `<script id="ai-boot">
     var picked = ids();
     var out = document.getElementById("ai-out");
     if (!picked.length) {
-      if (out) out.textContent = "Pick a card from the live catalog first.";
+      if (out) out.textContent = "Pick a card or a sealed product from the live catalog first.";
       return;
     }
     if (out) out.textContent = "Working…";
@@ -1080,7 +1086,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
     '<button type="button" class="lab-only" data-view="desk">Desk lab</button>',
   );
   if (!out.includes('id="office-dock"')) {
-    const dockCss = '<style id="office-dock">#compose-dock{position:sticky;bottom:0;z-index:5;background:#12100e;padding:8px 0 12px}#compose-dock.dock-top{position:static;padding:4px 0 8px;border-bottom:1px solid #2f2b26;margin-bottom:12px}#compose-dock.dock-top.dock-empty #sizes,#compose-dock.dock-top.dock-empty #share-row,#compose-dock.dock-top.dock-empty #ov-opt,#compose-dock.dock-top.dock-empty #ov-note,#compose-dock.dock-top.dock-empty #ai-panel,#compose-dock.dock-top.dock-empty #next-step{display:none}#seat-row[hidden],#edit-seat[hidden],#phone-make[hidden]{display:none!important}@media(min-width:900px){#compose-dock{position:static;padding:0}}</style>';
+    const dockCss = '<style id="office-dock">#compose-dock{position:sticky;bottom:0;z-index:5;background:#12100e;padding:8px 0 12px}#compose-dock.dock-top{position:static;padding:4px 0 8px;border-bottom:1px solid #2f2b26;margin-bottom:12px}#compose-dock.dock-top.dock-empty #sizes,#compose-dock.dock-top.dock-empty #share-row,#compose-dock.dock-top.dock-empty #ov-opt,#compose-dock.dock-top.dock-empty #ov-note,#compose-dock.dock-top.dock-empty #ai-panel,#compose-dock.dock-top.dock-empty #next-step{display:none!important}#seat-row[hidden],#edit-seat[hidden],#phone-make[hidden]{display:none!important}@media(min-width:900px){#compose-dock{position:static;padding:0}}</style>';
     out = out.includes("</head>") ? out.replace("</head>", dockCss + "</head>") : dockCss + out;
   }
   out = rewritePlayAssets(out);
@@ -1095,6 +1101,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   if (!out.includes('id="sizes-boot"')) out += SIZE_JS;
   if (!out.includes('id="ai-boot"')) out += AI_JS;
   if (!out.includes('id="share-boot"')) out += SHARE_JS;
+  if (!out.includes('id="sealed-boot"')) out += SEALED_JS;
   if (!out.includes('id="path-boot"')) out += prefillBootTag();
   if (mark && !out.includes('id="post-build"')) {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
