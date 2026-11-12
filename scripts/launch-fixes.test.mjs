@@ -59,7 +59,9 @@ for (const [path, key] of Object.entries(LEGAL_PATHS)) {
   t(`${path} is exempt from the banned-word check`, LEGAL_EXEMPT.has(path));
 }
 const terms = renderLegal("terms");
-t("terms keeps the approved giveaway line", terms.includes("No purchase is necessary. A free entry route and its details will be posted in the official rules before any draw.") && !/POP|web form/.test(visible(terms)));
+t("terms does not advertise a plan price or Stadium entry", terms.includes("Catch'em does not currently charge for any plan.") && terms.includes("All cards, products and pages are free to use.") && terms.includes("If paid features return, these terms will be updated before any charge.") && terms.includes("Stadium draws are currently off.") && !terms.includes("$14.99") && !terms.includes("No purchase is necessary") && !terms.includes("automatic entry") && !/POP|web form/.test(visible(terms)));
+const privacy = renderLegal("privacy");
+t("privacy drops Premium subscription use and keeps Stripe collection", privacy.includes("Stripe billing information. Stripe processes payments.") && privacy.includes("We do not store full card numbers.") && !privacy.includes("To process Premium subscriptions.") && privacy.includes("Last updated: 11 November 2026"));
 const pages = [nf, renderRotation(""), renderLegal("privacy")];
 t("footer links Terms, Privacy, Disclaimer on every chrome page", pages.every((p) => p.includes('<a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a>')));
 const home = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
