@@ -29,6 +29,7 @@ jobs:
       - run: node scripts/price-hold.test.mjs
       - run: node scripts/condition-chips.test.mjs
       - run: node scripts/art-type.test.mjs
+      - run: node scripts/set-filters.test.mjs
       - run: node scripts/promos-page.test.mjs
       - run: node scripts/promo-links.test.mjs
       - run: node scripts/public-routes.test.mjs
