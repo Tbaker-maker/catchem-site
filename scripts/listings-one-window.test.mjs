@@ -25,6 +25,7 @@ const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
 const strip = (main.match(/<p class="sum-strip">[\s\S]*?<\/p>/) || [""])[0];
 t("summary chip shows the 7D change with its window", strip.includes("137 listings counted") && strip.includes("7% 7D") && strip.includes("over 7 days, since Oct 23") && strip.includes("from 128 on Oct 23"));
 t("the page shows that window once: no 7D line and no Listings counted block", !main.includes("eBay listings 7D") && !main.includes("id=\"lc-h\"") && !main.includes("from 136 on Oct 29") && (main.split("137 listings counted").length - 1) === 1);
+t("Listings jump lands on a section with no second count", main.includes('id="supply"') && main.includes('href="#supply"') && !(main.split('id="supply"')[1] || "").includes("137 listings"));
 t("A listing is not a sale sits on the listings figure, not under Buy", /<p class="list-note muted">A listing is not a sale\.<\/p>/.test(main) && !/<div class="shop-block">[\s\S]*?A listing is not a sale\./.test(main) && main.indexOf("list-note") > main.indexOf("sum-strip") && main.indexOf("list-note") < main.indexOf('<div class="shop-block">'));
 t("Key stats Low is the TCGplayer lowest listing with its date", main.includes("<dt>TCGplayer lowest listing</dt>") && main.includes("<dd>$89.00, Oct 30</dd>"));
 t("no one-night 0.7% anywhere on the page", !/0\.7%/.test(html));

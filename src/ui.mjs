@@ -3270,10 +3270,7 @@ export function renderCard(card, stamp, opts = {}) {
     listings: countedListings(fact, opts.listingSeries, endDay) || opts.itemListings || null,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
-  const listChart = "";
   const breakBits = [];
-  const listings = Number(fact?.listings);
-  if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
   const flagged = flagHtml(fact?.flagged);
   if (flagged) breakBits.push(`<p>${flagged}</p>`);
   const checked = checkedLabel(asOf);
@@ -3362,7 +3359,7 @@ ${rangeRow}</section>
 ${historyJs}
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
-${listChart ? `<section id="supply">${listChart}</section>` : ""}
+${(Array.isArray(opts.listingSeries) && opts.listingSeries.length >= 2) || (opts.itemListings && Number.isFinite(Number(opts.itemListings.n)) && Number(opts.itemListings.n) > 0) ? `<section class="item-sec" id="supply"><h2>Listings</h2><p>The listings figure is in the chart under Price.</p></section>` : ""}
 ${sealed ? sealedAskBox(opts.ebayAsk) : ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
