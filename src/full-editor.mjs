@@ -295,7 +295,6 @@ const SHARE_JS = `<script id="share-boot">
   var OVERLAY_PATH = ${JSON.stringify("/post-office/api/overlay")};
   var GOLD = "#d9b779";
   var data = {};
-  var wanted = "";
   function $(id){ return document.getElementById(id); }
   function pinIds(){
     var list = window.pins || [];
@@ -316,7 +315,6 @@ const SHARE_JS = `<script id="share-boot">
     var key = ids.join(",");
     if (!key) { done(); return; }
     if (ids.every(function(id){ return data[id] !== undefined; })) { done(); return; }
-    wanted = key;
     fetch(OVERLAY_PATH + "?ids=" + encodeURIComponent(key), { credentials: "same-origin" })
       .then(function(r){ return r.json(); })
       .then(function(j){
@@ -424,9 +422,6 @@ const SHARE_JS = `<script id="share-boot">
       g.beginPath(); g.moveTo(18, y + 0.5); g.lineTo(out.width - 18, y + 0.5); g.stroke();
       drawRow(g, card, 0, y, out.width, rowH);
     });
-    g.fillStyle = "#c4baab";
-    g.font = "600 13px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-    g.textAlign = "right"; g.textBaseline = "bottom";
     return out;
   };
   function fname(){
