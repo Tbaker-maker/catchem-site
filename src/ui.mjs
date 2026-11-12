@@ -25,6 +25,7 @@ import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from 
 import { GUIDE_PARAS, PRINT_RUN_LINE, ROTATION_SOURCES, isRotatedSet, rotatedSetKeys, setRotation } from "./rotation.mjs";
 import { SIGNAL_CSS, SIGNAL_CLIENT, TILE_JS, feedToolsHtml, signalRowHtml } from "./signal-chips.mjs";
 import { RETURN_CSS, RETURN_BOOT, returnActions, watchDocument, howWeKnow } from "./return-visit.mjs";
+import { freshnessBadgeHtml, freshnessText } from "./freshness.mjs";
 
 const DISCORD = DISCORD_INVITE;
 
@@ -1420,7 +1421,10 @@ a{color:var(--gold)}
 .means p{margin:0 0 8px}
 .means p:last-child{margin:0}
 .site-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:0 16px;height:56px;min-height:56px;max-height:56px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:5}
-.stale-banner{margin:0;padding:10px 16px;background:#3a2a12;color:#f3e6c8;font:600 14px/1.4 var(--sans)}
+.stale-banner{display:inline-flex;align-items:center;margin:8px 16px;padding:6px 14px;border-radius:999px;background:rgba(217,183,121,.16);color:#f3e6c8;font:500 13px/1.3 var(--sans)}
+.fresh-badge{display:inline-flex;align-items:center;min-height:28px;margin:0 0 0 8px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.08);color:#efe9de;font:500 13px/1.2 var(--sans);vertical-align:middle}
+.fresh-badge.fresh-wait{background:rgba(217,183,121,.16);color:#f3e6c8}
+@media (max-width:420px){.fresh-badge{margin:6px 0 0}}
 .status-list{list-style:none;padding:0;margin:0}
 .status-list li{padding:8px 0;border-bottom:1px solid var(--line)}
 .site-bar .logo{font:600 26px/1 var(--serif);color:var(--txt);text-decoration:none;letter-spacing:-.03em;min-height:44px;display:inline-flex;align-items:center}
@@ -1649,13 +1653,7 @@ export function priceBannerLine(updatedAt, nowMs = Date.now()) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) t = Date.parse(`${raw}T04:00:00Z`);
   if (!Number.isFinite(t)) return "";
   if (nowMs - t <= 36 * 3600 * 1000) return "";
-  const day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(t));
-  return `Prices last updated ${day}.`;
+  return "Prices updating";
 }
 
 const DOCK_ICON = {
@@ -2970,8 +2968,9 @@ function conditionView(card, ladder, held) {
   if (!blocks.length) return { html: "", selected: null };
   const tapDay = selected ? priceDay(selected.date) : "";
   const short = tapDay ? tapDay.replace(/, \d{4}$/, "") : "";
+  const late = freshnessText(selected && selected.date) === "Prices updating";
   const tap = short ? infoTap(`TCGplayer market, ${short}`) : "";
-  const src = short ? `<p class="cp-src">TCGplayer market, ${esc(short)}${tap}</p>` : "";
+  const src = short ? `<p class="cp-src">TCGplayer market${late ? "" : `, ${esc(short)}`}${tap}</p>` : "";
   return { html: `${blocks.join("")}${src}<script>${COND_JS}</script>`, selected };
 }
 
@@ -2979,6 +2978,9 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const view = conditionView(card, opts.conditionLadder, held);
   const showPrice = view.selected ? money(view.selected.amount) : price;
   const when = view.selected ? priceDay(view.selected.date) : priceDay(endDay);
+  const badgeDay = (view.selected && view.selected.date) || endDay;
+  const badge = freshnessBadgeHtml(badgeDay);
+  const showDate = freshnessText(badgeDay) !== "Prices updating";
   const tags = printingTags(card);
   const chips = changeTable(priceSeries.length ? priceSeries : hist, endDay);
   const strip = summaryStrip({
@@ -3041,7 +3043,7 @@ ${/promo/i.test(String(card.rarity || "") + " " + String(card.set || "") + " " +
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
 ${storeLinksHtml(card, esc)}
-${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span></p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${when ? `<span class="cp-date">${esc(when)}</span>` : ""}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${priceKnow(card, endDay, opts)}</p>`}`}
+${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.selected ? esc(view.selected.key) : ""}</span><span class="cp-now">Price being checked</span>${badge}</p>` : `<p class="cp-price">${view.selected ? `<span class="cp-cond-label">${esc(view.selected.key)}</span> ` : ""}<span class="cp-now">${showPrice}</span>${showDate && when ? `<span class="cp-date">${esc(when)}</span>` : ""}${badge}</p>${view.selected ? "" : `<p class="cp-src">${esc(sourceLine(card))}${priceKnow(card, endDay, opts)}</p>`}`}
 ${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : (view.selected ? Number(view.selected.amount) : Number(card.price)), track: opts.trackLine || "" })}
 ${view.html}
 ${held ? "" : chips}
@@ -3242,8 +3244,9 @@ export function renderCard(card, stamp, opts = {}) {
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
+  const priceStale = freshnessText(endDay) === "Prices updating";
   const sealedStrip = sealed ? summaryStrip({
-    price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
+    price: price && !priceStale && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
     listings: countedListings(fact, opts.listingSeries, endDay) || opts.itemListings || null,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
@@ -3275,11 +3278,12 @@ export function renderCard(card, stamp, opts = {}) {
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
   const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
+  const priceBadge = freshnessBadgeHtml(endDay);
   const priceHtml = price
-    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${priceKnow(card, endDay, opts)}</p>`
+    ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${priceKnow(card, endDay, opts)}${priceBadge}</p>`
     : (askFallback
-      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${priceKnow(card, endDay, opts, "eBay asks")}</p>`
-      : `<p class="px">Price being checked</p>`);
+      ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${priceKnow(card, endDay, opts, "eBay asks")}${priceBadge}</p>`
+      : `<p class="px">Price being checked${priceBadge}</p>`);
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}

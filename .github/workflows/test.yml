@@ -72,6 +72,7 @@ jobs:
       - run: node scripts/long-read.test.mjs
       - run: node scripts/track-record-hidden.test.mjs
       - run: node scripts/trust.test.mjs
+      - run: node scripts/freshness-badge.test.mjs
       - run: node scripts/clean-text.test.mjs
       - run: node scripts/check-ppt-safety.mjs
       - run: node scripts/feed-new.test.mjs
