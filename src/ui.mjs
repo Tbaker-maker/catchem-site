@@ -774,7 +774,9 @@ function receiptBacked(row) {
 
 // Reads board v3 rows (Catchem-data scripts/lib/board-mix.mjs): non-price reads
 // that carry their own source line and date. Behind reads.library in that repo.
-const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep", "rip", "release-cycle", "season", "pattern-forming", "pattern-ending", "year-ago", "year-range"]);
+const BOARD_V3_KINDS = new Set(["climb", "setheat", "release", "newsline", "listings", "rotation", "pokemon", "breadth", "sealedchase", "set", "deep", "rip", "release-cycle", "season", "pattern-forming", "pattern-ending", "year-ago", "year-range",
+  // PkmnPrices pathways (Catchem-data scripts/lib/ppp-reads): dated facts with their source.
+  "sold-gap", "sold-pace", "sold-trend", "sell-through", "msrp-sold", "pop-growth", "gem-rate", "low-pop", "graded-spread", "eu-gap", "jp-en", "range52"]);
 export function isBoardV3Row(row) {
   if (!row || typeof row !== "object" || (row.board !== "v3" && !(row.board === "hist" && (row.readKind || row.kind) === "set"))) return false;
   if (!BOARD_V3_KINDS.has(String(row.readKind || row.kind || ""))) return false;
@@ -2850,7 +2852,7 @@ function readLink(card) {
 
 // Item page sections shared by singles and sealed: where it ranks, every read
 // about it, related items, and a jump row. A section is left out when its numbers are missing.
-const KIND_LABEL = { deep: "Deep read", listings: "Listings counted", breadth: "Listings counted", rotation: "Rotation", release: "Release", "release-cycle": "Release cycle", season: "Season", rip: "Rip value", high: "New high", low: "New low", year: "Year", "year-range": "Year range", "year-ago": "A year ago", backto: "Back to", "rarity-band": "Rarity band", "artist-band": "Artist band", set: "Set", streak: "Streak", "pattern-forming": "Pattern", "pattern-ending": "Pattern", "past-cases": "Past cases", mixed: "Mixed", plain: "Price move", mktmove: "Price move" };
+const KIND_LABEL = { deep: "Deep read", listings: "Listings counted", breadth: "Listings counted", rotation: "Rotation", release: "Release", "release-cycle": "Release cycle", season: "Season", rip: "Rip value", high: "New high", low: "New low", year: "Year", "year-range": "Year range", "year-ago": "A year ago", backto: "Back to", "rarity-band": "Rarity band", "artist-band": "Artist band", set: "Set", streak: "Streak", "pattern-forming": "Pattern", "pattern-ending": "Pattern", "past-cases": "Past cases", mixed: "Mixed", plain: "Price move", mktmove: "Price move", "sold-gap": "eBay sold", "sold-pace": "eBay sales pace", "sold-trend": "eBay sold", "sell-through": "Sold per listing", "msrp-sold": "Sold vs MSRP", "pop-growth": "Graded pop", "gem-rate": "Gem rate", "low-pop": "Graded pop", "graded-spread": "PSA 10 vs raw", "eu-gap": "Cardmarket", "jp-en": "Japanese vs English", "range52": "52-week range" };
 const ITEM_CSS = `.item-jump{display:flex;gap:8px;overflow-x:auto;margin:14px 0 4px;padding:2px 0 6px;scrollbar-width:none}.item-jump::-webkit-scrollbar{display:none}
 .item-jump a{flex:0 0 auto;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid #2f2b26;color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}
 .item-sec{margin:16px 0;padding:16px;border-radius:20px;background:#15130f;border:1px solid #2f2b26}.item-sec>h2{margin:0 0 10px;font-size:18px}
