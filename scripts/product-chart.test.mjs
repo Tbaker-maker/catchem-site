@@ -58,9 +58,9 @@ t("watermark is one line with the date and names the view's source", /\.pc-mark\
 
 t("watermark includes the product slug when given a path", productChart({ price, listings: [{ date: day(390), listingCount: 40 }, { date: day(395), listingCount: 31 }], asOf: day(395), path: "/p/swsh11-etb" }).includes('class="pc-mark-path">/p/swsh11-etb</span>'));
 t("a tcgcsv id is not used as a watermark slug", !productChart({ price, listings: [], asOf: day(395), path: "/p/tcgcsv-277335" }).includes('class="pc-mark-path">/p/tcgcsv-277335'));
-t("camera mode hides Watch, Share, Add this to your read, and the product photo", ["rv-actions", "add-read", "glance-photo", "cp-photo"].every((c) => PRODUCT_CHART_CSS.includes(`html.pc-cam .${c}`)));
+t("camera mode hides Watch and Add this to your read, and keeps the product photo", ["rv-actions", "add-read"].every((c) => PRODUCT_CHART_CSS.includes(`html.pc-cam .${c}`)) && /html\.pc-cam \.glance-photo,html\.pc-cam \.cp-photo\{display:flex!important\}/.test(PRODUCT_CHART_CSS) && !/glance-photo,html\.pc-cam \.cp-photo\{display:none/.test(PRODUCT_CHART_CSS));
 t("camera mode opens on the price block so the 7D strip, chart, and 12-month bar share the first frame", PRODUCT_CHART_JS.includes('getElementById("price")') && PRODUCT_CHART_JS.includes('scrollIntoView({block:"start"})'));
-t("camera type is large enough to read on a phone-sized player", /html\.pc-cam \.pc-mark\{[^}]*font:500 16px/.test(PRODUCT_CHART_CSS) && PRODUCT_CHART_CSS.includes("html.pc-cam .chg dd{font-size:18px}") && PRODUCT_CHART_CSS.includes("html.pc-cam .yr-line{font-size:15px"));
+t("camera type is large enough to read on a 1080p frame", /html\.pc-cam \.pc-mark\{[^}]*font:500 22px/.test(PRODUCT_CHART_CSS) && PRODUCT_CHART_CSS.includes("html.pc-cam h1{font:600 64px") && PRODUCT_CHART_CSS.includes("html.pc-cam .px span{font:600 72px") && PRODUCT_CHART_CSS.includes("html.pc-cam .sum-chip{font:600 28px") && PRODUCT_CHART_CSS.includes("min-height:1500px") && PRODUCT_CHART_CSS.includes("min-width:1600px"));
 
 // Pages: sealed gets all views, a card without counts gets price and % change.
 const sealed = renderCard({ id: "tcgcsv-9", name: "Test Elite Trainer Box", kind: "sealed", set: "Test", price: 60, asOf: "2026-10-12", hist: [["2026-10-01", 55], ["2026-10-12", 60]] }, "stamp", {

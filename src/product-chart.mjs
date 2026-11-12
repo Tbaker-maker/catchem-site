@@ -107,9 +107,35 @@ export const PRODUCT_CHART_CSS = `.pc .pc-tabs{display:flex;gap:4px;padding:3px;
 .pc-mark{display:none;margin:6px 0 0;text-align:right;font:500 12px/1.2 var(--sans);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-mark b{font:600 14px/1 var(--serif)}.pc-mark b span{color:#d9b779}
 .pc-cam-x{display:none;position:absolute;top:4px;right:4px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:inherit;font:400 18px/28px var(--sans);opacity:.45;cursor:pointer;z-index:3}.pc-cam-x:hover,.pc-cam-x:focus-visible{opacity:1;outline:2px solid #d9b779}
 .pc-up{color:#7fc79a}.pc-down{color:#e88b7f}
-html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback,html.pc-cam .rv-actions,html.pc-cam .add-read,html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:none!important}
-html.pc-cam .pc-mark{display:block;font:500 16px/1.35 var(--sans);opacity:.92;white-space:normal}html.pc-cam .pc-mark b{font:600 22px/1.1 var(--serif)}html.pc-cam .pc-mark-path{margin:0 6px 0 2px}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block;width:44px;height:44px;font:400 22px/44px var(--sans);top:8px;right:8px}html.pc-cam .pc{box-shadow:none;padding-top:38px}html.pc-cam .pc .hc-plot{height:260px}
-html.pc-cam #price{scroll-margin-top:8px}html.pc-cam .chg dd{font-size:18px}html.pc-cam .yr-line{font-size:15px;letter-spacing:0;white-space:normal}
+html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback,html.pc-cam .rv-actions,html.pc-cam .add-read,html.pc-cam .item-sec,html.pc-cam .cp-sec,html.pc-cam .menu-btn,html.pc-cam .store-links,html.pc-cam .vchips,html.pc-cam .sealed-ask,html.pc-cam .sealed-rip{display:none!important}
+html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:flex!important}
+html.pc-cam,html.pc-cam body{background:#100e0c}
+html.pc-cam .wrap{max-width:none;padding:28px 36px}
+html.pc-cam .glance{display:grid!important;grid-template-columns:minmax(280px,38vw) 1fr;gap:28px;align-items:center}
+html.pc-cam .glance-photo{width:100%!important;max-width:none!important;aspect-ratio:1/1;padding:24px!important}
+html.pc-cam .glance-photo img,html.pc-cam .cp-photo img{width:100%!important;max-width:none!important;height:auto!important;object-fit:contain}
+html.pc-cam h1{font:600 64px/1.02 var(--serif)!important;margin:8px 0 12px}
+html.pc-cam .px{font-size:28px!important}
+html.pc-cam .px span{font:600 72px/1 var(--serif)!important}
+html.pc-cam .sum-strip{display:flex!important;gap:16px;margin:12px 0 8px}
+html.pc-cam .sum-chip{font:600 28px/1.25 var(--sans)!important;padding:14px 18px!important}
+html.pc-cam .pc-mark{display:block;font:500 22px/1.35 var(--sans);opacity:.92;white-space:normal}html.pc-cam .pc-mark b{font:600 28px/1.1 var(--serif)}html.pc-cam .pc-mark-path{margin:0 6px 0 2px}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block;width:44px;height:44px;font:400 22px/44px var(--sans);top:8px;right:8px}html.pc-cam .pc{box-shadow:none;padding-top:12px}html.pc-cam .pc .hc-plot{height:min(46vh,780px)}
+html.pc-cam .pc-tab{font-size:22px;min-height:56px}html.pc-cam .hc-pill{font:600 20px/1 var(--sans);min-height:52px;padding:0 16px}
+html.pc-cam .hc-price{font-size:32px}
+html.pc-cam #price{scroll-margin-top:8px}html.pc-cam .chg dd{font-size:28px}html.pc-cam .yr-line{font-size:22px;letter-spacing:0;white-space:normal}
+@media (orientation:portrait) and (min-height:1500px){
+html.pc-cam .glance{grid-template-columns:1fr;gap:18px}
+html.pc-cam .glance-photo{width:min(720px,86vw)!important;margin:0 auto}
+html.pc-cam h1{font-size:72px!important}
+html.pc-cam .px span{font-size:84px!important}
+html.pc-cam .pc .hc-plot{height:640px}
+}
+@media (orientation:landscape) and (min-width:1600px){
+html.pc-cam .wrap{padding:20px 48px}
+html.pc-cam h1{font-size:56px!important}
+html.pc-cam .px span{font-size:64px!important}
+html.pc-cam .pc .hc-plot{height:420px}
+}
 @media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
 
 // Client script. Kept free of dashed strokes: the price line stays solid.

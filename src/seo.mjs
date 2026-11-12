@@ -1,11 +1,13 @@
 // Share and search tags for worker-rendered pages that do not set their own.
 // Every page gets a description, canonical URL, and Open Graph / Twitter tags.
-// The share image is Catch'em's own og.png, or for a card or product page the
-// picture the site itself serves on that page (a same-origin path), never a store URL.
+// Card and product pages use a 1200x630 PNG (/og/product.png) because X does
+// not render an SVG. Other pages keep og.png.
 // Product and card pages also get a unique title (name, type, set when it is not
 // already in the name, and the dated market price) and Product JSON-LD. Offers
 // are included only when a real market price is on the page. No ratings, review
 // counts, or sold counts are invented.
+
+import { productShareUrl, sparkPoints } from "./product-share.mjs";
 
 const ORIGIN = "https://catchemtcg.com";
 const OG_IMAGE = `${ORIGIN}/og.png`;
@@ -151,17 +153,28 @@ export function addShareMeta(html, pathname, kind) {
   const market = (kind === "card" || kind === "product") ? extractMarketPrice(s) : null;
   const pageTitle = (kind === "card" || kind === "product") ? productPageTitle(kind, name, market, setName) : fullTitle;
   const desc = path === "/reads" ? "Pick the Pokémon cards, sets and sealed products you follow and get a dated read on them by email or Discord DM." : pageDescription(s, kind, name);
-  const pic = pageImage(s, kind);
-  // X, Facebook, Discord and iMessage do not render an SVG share image, so
-  // og:image and twitter:image are always raster: the page's own hero picture
-  // (JPEG or PNG from this origin) or og.png. The branded SVG frame
-  // (/og/frame.svg) stays for in-site use until it has a PNG renderer.
-  const raster = pic && !/\.svg(?:$|[?#])/i.test(pic) ? pic : "";
-  const image = raster || OG_IMAGE;
-  const size = raster
-    ? ""
-    : `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`;
-  const alt = pic ? name : "Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.";
+  const hero = pageImage(s, kind);
+  let share = "";
+  if (kind === "card" || kind === "product") {
+    const heroPath = hero.startsWith(ORIGIN) ? hero.slice(ORIGIN.length) : "";
+    share = productShareUrl({
+      name,
+      price: market?.money || "",
+      date: market?.date || "",
+      source: market ? "TCGplayer market" : "",
+      points: sparkPoints(s),
+      image: heroPath,
+    });
+  }
+  // X, Facebook, Discord and iMessage do not render an SVG share image.
+  // Card and product pages use the composed PNG. Other pages use a raster
+  // hero or og.png.
+  const raster = hero && !/\.svg(?:$|[?#])/i.test(hero) ? hero : "";
+  const image = share || raster || OG_IMAGE;
+  const size = (share || !raster)
+    ? `\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">`
+    : "";
+  const alt = (kind === "card" || kind === "product") ? name : (hero ? name : "Catch'em. Prices, reads and set pages for every Pokémon card and pack, from Base Set to the latest drops.");
   const ogType = (kind === "card" || kind === "product") ? "product" : "website";
   const tags = `<meta name="description" content="${escAttr(desc)}">
 <link rel="canonical" href="${escAttr(url)}">
@@ -176,7 +189,7 @@ export function addShareMeta(html, pathname, kind) {
 <meta name="twitter:title" content="${escAttr(pageTitle)}">
 <meta name="twitter:description" content="${escAttr(desc)}">
 <meta name="twitter:image" content="${escAttr(image)}">
-<meta name="twitter:image:alt" content="${escAttr(alt)}">${structuredData(s, path, kind, name, image, { market, setName, desc })}`;
+<meta name="twitter:image:alt" content="${escAttr(alt)}">${structuredData(s, path, kind, name, raster || image, { market, setName, desc })}`;
   return s.replace(m[0], `<title>${escAttr(pageTitle)}</title>\n${tags}`);
 }
 
