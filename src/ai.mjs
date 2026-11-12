@@ -122,14 +122,17 @@ export function rowFact(row, date) {
   };
 }
 
+// Editor ids (base1-4, me2-125) map to catalog ids through column 22 of the patched
+// paper rows. An empty map is not kept, so one failed load does not stick for the isolate.
 async function ensurePaperMap(fetchImpl) {
-  if (paperIdMap) return paperIdMap;
-  paperIdMap = new Map();
+  if (paperIdMap && paperIdMap.size) return paperIdMap;
+  const map = new Map();
   try {
     const { patchedPaper } = await import("./full-editor.mjs");
     const rows = JSON.parse(await patchedPaper(fetchImpl));
-    for (const row of rows) if (row && row[0] && row[22]) paperIdMap.set(String(row[0]), String(row[22]));
-  } catch { /* catalog id map stays empty */ }
+    for (const row of rows) if (row && row[0] && row[22]) map.set(String(row[0]), String(row[22]));
+  } catch { /* catalog id map stays empty this call */ }
+  paperIdMap = map;
   return paperIdMap;
 }
 
@@ -271,12 +274,20 @@ export function factPost(cards, tone = "informative") {
   return lines.map((line) => fitLine(line, price));
 }
 
+// Model text may only print a price that is in the facts, written the supplied way
+// ("TCGplayer market: $1,501.23 (2026-10-30)"). Any other dollar figure is refused.
+const PRICE_MENTION = /TCGplayer market:\s*\$[\d,]+(?:\.\d+)?(?:\s*\([^)]*\))?/g;
+const DOLLARS = /\$\s?[\d,]+(?:\.\d+)?/g;
+
 export function acceptable(text, cards) {
   const body = String(text || "");
   if (!body.trim() || BANNED.test(body)) return false;
-  const allowed = new Set((cards || []).map((c) => c.price).filter((p) => p && p.startsWith("TCGplayer market:")));
-  const found = body.match(/TCGplayer market:[^.]*/g) || [];
-  return found.every((hit) => [...allowed].some((ok) => hit.includes(ok.replace("TCGplayer market: ", "")) || hit.trim() === ok));
+  const allowed = (cards || []).map((c) => c && c.price).filter((p) => p && p.startsWith("TCGplayer market:"));
+  const mentions = body.match(PRICE_MENTION) || [];
+  if (!mentions.every((hit) => allowed.includes(hit.trim()))) return false;
+  const norm = (d) => d.replace(/\s/g, "").replace(/,+$/, "");
+  const amounts = new Set(allowed.map((p) => norm((p.match(DOLLARS) || [""])[0])));
+  return (body.match(DOLLARS) || []).every((d) => amounts.has(norm(d)));
 }
 
 async function modelText(env, system, user, model) {

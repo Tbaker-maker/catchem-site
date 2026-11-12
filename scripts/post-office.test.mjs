@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker, { renderPath } from "../src/index.mjs";
 import { artistNotable, clientHelpers, comparePair, downloadName, parseQuery, preferPrinting, priceLine } from "../src/post-copy.mjs";
-import { patchEditorHtml, patchPaperRows, paperHasPrices, PAPER_PATH, EDITOR_URL } from "../src/full-editor.mjs";
+import { patchEditorHtml, patchPaperRows, PAPER_PATH, EDITOR_URL } from "../src/full-editor.mjs";
 import { resetQuota, signSession } from "../src/quota.mjs";
 import { factIdeas, factPost, factsFor, resetCatalogCache, STYLE_PROMPT } from "../src/ai.mjs";
 
@@ -111,7 +111,6 @@ t("play assets leave the page origin", playHtml.includes("https://raw.githubuser
 t("lab tabs stay lab only", playHtml.includes('class="lab-only" data-view="replies"') && playHtml.includes('class="lab-only" data-view="review"') && playHtml.includes("Desk lab") && playHtml.includes('data-view="visuals"') && playHtml.includes('data-view="post"'));
 t("sizes read the preview inside the dock", playHtml.includes('getElementById("preview")') && playHtml.includes('getElementById("compose-dock")') && playHtml.includes("Save the picture, then Post.") && playHtml.includes('id="office-dock"'));
 t("editor copy drops hold and em dashes", !playHtml.includes("Hold for the") && !playHtml.includes("Press and keep for the") === false && !playHtml.includes("\u2014"));
-t("a priced paper file is already baked", paperHasPrices([["id", "n", "s", "y", "a", "r", 12]]) === false && paperHasPrices(Array.from({ length: 20 }, () => ["id", "n", "s", "y", "a", "r", 4])) === true);
 t("play wears the site skin", playHtml.includes('id="site-skin"') && playHtml.includes("--accent:#d9b779") && playHtml.includes("body>header{display:none}") && playHtml.includes("Pin two cards. We make a picture.") && playHtml.includes('data-med="paper"') && playHtml.includes(">Pocket<") && playHtml.includes(">Games<") && !playHtml.includes("Visual content") && !playHtml.includes("Visual Quantity"));
 t("first screen is forty priced pictures", playHtml.includes("function screenRows") && playHtml.includes("var SCREEN = 40;") && playHtml.includes("screenAsk = SCREEN") && playHtml.includes("storedPrice(c) > 0 && pictureInFile(c)") && playHtml.includes("storedPrice(b) - storedPrice(a)") && playHtml.includes("first.slice(0, SCREEN)") && playHtml.includes("/cards/c30/ir-moltres.png") && playHtml.includes("/cards/c30/ir-articuno.png") && playHtml.includes("/cards/c30/ir-zapdos.png") && !playHtml.includes("function screenCap") && !playHtml.includes("return 12") && !playHtml.includes("return 24") && !playHtml.includes("var shown = rows;"));
 t("a card with no src says the picture is missing", playHtml.includes("The picture is missing.") && playHtml.includes('return !!(c && String(c.src || "").trim());') && playHtml.includes("storedPrice(c) > 0 && pictureInFile(c)") && !playHtml.includes("if (pictureInFile(c)) lead.push") && playHtml.includes("data-more"));

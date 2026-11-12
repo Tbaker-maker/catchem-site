@@ -179,19 +179,6 @@ export function patchPaperRows(rows, lite) {
   return { rows: out, matched, total: out.length };
 }
 
-export function paperHasPrices(rows) {
-  const list = Array.isArray(rows) ? rows : [];
-  let seen = 0;
-  let priced = 0;
-  for (const row of list) {
-    if (!Array.isArray(row)) continue;
-    seen += 1;
-    if (Number(row[6]) > 0) priced += 1;
-    if (seen >= 200) break;
-  }
-  return seen >= 20 && priced / seen >= 0.5;
-}
-
 export function cleanOfficeCopy(html) {
   let out = String(html || "");
   out = out.replaceAll("Hold for the", "Press and keep for the");
@@ -797,6 +784,10 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = out.split(' + " for about " + ').join(' + ". TCGplayer market $" + ');
   out = out.split('? fname() : "catchem") + ".jpg"').join('? fname() : "catchem.png")');
   out = out.split('? fname() : "catchem") + (b.type.indexOf("jpeg") >= 0 ? ".jpg" : ".png")').join('? fname() : "catchem.png")');
+  const trayFact = '<p class="note" id="tray-fact"></p>';
+  if (out.includes(trayFact) && !out.includes('id="price-date"')) {
+    out = out.replace(trayFact, trayFact + '<p class="note" id="price-date">Prices: TCGplayer market (' + date + ").</p>");
+  }
   out = out.split("if (r[21]) o.mech = r[21];").join("if (r[21]) o.mech = r[21];\n  if (r[22]) o.cid = r[22];");
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
@@ -853,24 +844,25 @@ export async function editorDocument(asOf, fetchImpl = fetch, mark = "") {
   return patchEditorHtml(raw, asOf, mark);
 }
 
-export async function patchedPaper(fetchImpl = fetch) {
+// Paper rows always take today's price and catalog id from search-lite (column 6 and
+// column 22). The baked file in Catchem-data carries old prices and only 22 columns, so
+// it is never served as is: a row with no live match ships with price 0, not a stale one.
+const PAPER_TTL_MS = 30 * 60 * 1000;
+
+export async function patchedPaper(fetchImpl = fetch, now = Date.now()) {
   const key = "patched-paper";
-  if (htmlCache.has(key)) return htmlCache.get(key);
+  const hit = htmlCache.get(key);
+  if (hit && now - hit.at < PAPER_TTL_MS) return hit.body;
   const res = await fetchRepo("research/assets/" + "paper-" + "rows.json", fetchImpl, { cache: "no-store" });
   if (!res.ok) throw new Error("paper " + res.status);
-  const paperRes = await res.text();
-  const rows = JSON.parse(paperRes);
-  if (paperHasPrices(rows)) {
-    htmlCache.set(key, paperRes);
-    htmlCache.set("patched-paper-stats", { rows, matched: 0, total: rows.length, baked: true });
-    return paperRes;
-  }
+  const rows = JSON.parse(await res.text());
   const { loadJson } = await import("./data.mjs");
   const lite = await loadJson("search-lite.json", fetchImpl);
+  if (!Array.isArray(lite) || !lite.length) throw new Error("search-lite");
   const patched = patchPaperRows(rows, lite);
   const body = JSON.stringify(patched.rows);
-  htmlCache.set(key, body);
-  htmlCache.set("patched-paper-stats", patched);
+  htmlCache.set(key, { body, at: now });
+  htmlCache.set("patched-paper-stats", { matched: patched.matched, total: patched.total });
   return body;
 }
 
