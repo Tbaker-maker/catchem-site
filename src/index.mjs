@@ -10,7 +10,7 @@ import { msrpOf } from "./msrp.mjs";
 import { applySetSpark } from "./set-spark.mjs";
 import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
-import { liveStamp } from "./build-stamp.mjs";
+import { liveStamp, BUILD_SHA } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
@@ -85,12 +85,12 @@ async function withPremium(card, fetchImpl) {
 }
 
 
-const PRODUCT_HTML_TTL = 86400; // soft TTL; counts.asOf in the key drops yesterday on publish
-// v4: bump after mid-day unique-breakdown facts republish (v3 HTML kept old Our read lines).
-// Key still includes public-data asOf so nightly publish drops yesterday.
+const PRODUCT_HTML_TTL = 300; // 5 min fresh. The key includes the build stamp so a deploy misses.
+// v5: build stamp in the key. A Worker deploy must not keep yesterday's HTML for a day.
 const productHtmlKey = (id) => {
   const v = currentDataVersion() || "na";
-  return `product-html:v4:${v}:${id}`;
+  const build = String(BUILD_SHA || "dev").slice(0, 12) || "dev";
+  return `product-html:v5:${build}:${v}:${id}`;
 };
 
 async function readProductHtml(kv, id) {
@@ -1359,7 +1359,7 @@ const worker = {
       const res = await worker.render(request, env, ctx);
       if (!exploreOn(env)) return res;
       return paintExplore(res, request);
-    }, request, env, ctx, { dataVersion });
+    }, request, env, ctx, { dataVersion, buildId: BUILD_SHA });
   },
   async render(request, env, ctx) {
     setStripAssets(env?.ASSETS);
