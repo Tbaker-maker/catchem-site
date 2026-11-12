@@ -38,22 +38,22 @@ const page = renderWaitlistPage();
 const main = page.slice(page.indexOf("<main"), page.indexOf("</main>"));
 t("one email field and an optional discord field", (main.match(/type="email"/g) || []).length === 1 && main.includes('name="discord"') && main.includes("optional"));
 t("one join button", (main.match(/Join the Premium waitlist/g) || []).length === 1 && main.includes('class="pwl-join"') && /min-height:48px/.test(main));
-t("price line and real perks only", main.includes("$14.99/month when we open") && main.includes("Premium reads in Discord") && main.includes("up to 25") && main.includes("listings counted") && main.includes("All site tools stay free") && !main.includes("First 222") && !/Stadium|raffle|Coming soon/i.test(main));
+t("no plan price and real perks only", !main.includes("$14.99") && !/\/month|\/mo\b/.test(main) && main.includes("Premium reads in Discord") && main.includes("up to 25") && main.includes("listings counted") && main.includes("All site tools stay free") && !main.includes("First 222") && !/Stadium|raffle|Coming soon/i.test(main));
 t("waitlist page has no checkout leak", checkoutLeak(page) === "");
 t("waitlist copy has no dash and no advice", !/[\u2013\u2014]/.test(main) && !guard.test(main.replace(/<style>[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ")));
 t("gate fails closed on a stripe link and on Get Premium", checkoutLeak('<a href="https://checkout.stripe.com/c/pay">Pay</a>') === "checkout.stripe.com" && checkoutLeak("<a>Get Premium</a>") === "Get Premium" && checkoutLeak("<button>Join the Premium waitlist</button>") === "");
 
 const home = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const painted = paintPublicHtml(home, "/", {});
-t("home rewrite drops First 222 and keeps the price", painted.includes("Join the Premium waitlist") && painted.includes("$14.99/month when we open") && !painted.includes("First 222") && checkoutLeak(painted) === "" && painted.includes('href="/premium" rel="noopener">Discord Premium') && painted.includes(">Join Discord<"));
+t("home rewrite drops First 222 and the price", painted.includes("Join the Premium waitlist") && !painted.includes("$14.99") && !painted.includes("First 222") && checkoutLeak(painted) === "" && painted.includes('href="/premium" rel="noopener">Discord Premium') && painted.includes(">Join Discord<"));
 t("live home is unchanged", paintPublicHtml(home, "/", { PREMIUM_MODE: "live" }).includes("See Premium") && paintPublicHtml(home, "/", { PREMIUM_MODE: "live" }).includes("First 222"));
 
 const block = premiumEmailBlock("waitlist");
 const liveBlock = premiumEmailBlock("live");
-t("email upsell is waitlist by default and live has no stripe url", block.includes("Join the Premium waitlist") && block.includes("$14.99/month when we open") && checkoutLeak(block) === "" && !liveBlock.includes("checkout.stripe.com") && liveBlock.includes("See Premium") && !/[\u2013\u2014]/.test(block + premiumPlainLine("waitlist")));
+t("email upsell is waitlist by default and live has no stripe url", block.includes("Join the Premium waitlist") && !block.includes("$14.99") && !premiumPlainLine("waitlist").includes("$14.99") && checkoutLeak(block) === "" && !liveBlock.includes("checkout.stripe.com") && liveBlock.includes("See Premium") && !/[\u2013\u2014]/.test(block + premiumPlainLine("waitlist")));
 
 const letter = confirmLetter({ confirmUrl: "https://catchemtcg.com/premium/confirm?t=abc", leaveUrl: "https://catchemtcg.com/premium/leave?t=abc" });
-t("confirm mail is white with dark hooks and the price", letter.includes("background:#f2f2f7") && letter.includes("prefers-color-scheme: dark") && letter.includes("[data-ogsc]") && letter.includes("#d9b779") && letter.includes("$14.99/month when we open") && letter.includes("Unsubscribe") && !letter.includes(addr) && checkoutLeak(letter) === "");
+t("confirm mail is white with dark hooks and no price", letter.includes("background:#f2f2f7") && letter.includes("prefers-color-scheme: dark") && letter.includes("[data-ogsc]") && letter.includes("#d9b779") && !letter.includes("$14.99") && letter.includes("Unsubscribe") && !letter.includes(addr) && checkoutLeak(letter) === "");
 
 const kv = memoryKv();
 const logs = [];

@@ -179,6 +179,34 @@ export function patchPaperRows(rows, lite) {
   return { rows: out, matched, total: out.length };
 }
 
+// Branding on the picture is free to keep or remove for everyone. No plan, price, or
+// paywall copy ships in the editor (Tyler, Nov 11 2026). Runs after cleanOfficeCopy.
+const BRANDING_COPY = [
+  [">Premium · monetize</button>", ">Remove branding</button>"],
+  ['data-seat="free">Free · fun</button>', 'data-seat="free">Keep branding</button>'],
+  ["Free edit. Catch'Em stays on the picture. Premium ($9/mo) if you monetize.", "Catch'Em is on the picture. Remove branding any time, free."],
+  ["Free is fun and wears Catch'Em. Premium takes Catch'Em off if you monetize. ", "Catch'Em branding is on by default and free to remove. "],
+  ["<b>Free · fun</b>", "<b>Keep branding</b>"],
+  [" The desk is yours. Monetize needs Premium.", " The desk is yours."],
+  ["<b>Premium · $9/mo</b>", "<b>Remove branding</b>"],
+  ["Monetize the file. Your mark or a clean file. Catch'Em comes off the edit. We bill when beta closes . unlock on this phone now.", "Your mark or a clean file. Catch'Em comes off the edit. Free for everyone."],
+  ["Free is for fun. Premium is the paywall on the edit . not the scans.", "Branding is free to keep or remove."],
+  ['("Premium. Mark: "', '("Branding off. Mark: "'],
+  ["Free is for fun. The fact writes the picture, CatchEmTCG.com sits in the margin. Premium ($9/mo) takes Catch'Em off if you monetize the file.", "The fact writes the picture, CatchEmTCG.com sits in the margin. Remove branding takes it off, free."],
+  ['"Premium edit. Catch\'Em is off. Blank mark = clean file."', '"Branding off. Catch\'Em is off. Blank mark = clean file."'],
+  ["Fact sits under the card. Premium file. Long-press.", "Fact sits under the card. Branding off. Long-press."],
+  ["Fact sits under the card. Catch'Em stays .  fun is free. Premium takes the mark off to monetize. Long-press.", "Fact sits under the card. Catch'Em is on it. Remove branding takes it off, free. Long-press."],
+  ["how to (get paid|monetize|farm impressions)", "how to (get paid|monet[a-z]+|farm impressions)"],
+  ["Refuse. Monetization-coaching posts are ineligible.", "Refuse. Payout-coaching posts are ineligible."],
+];
+export const PLAN_COPY = /premium|\$9\b|\/mo\b|monetiz|paywall|\bper month\b|a month\b/i;
+
+export function freeBranding(html) {
+  let out = String(html || "");
+  for (const [from, to] of BRANDING_COPY) out = out.split(from).join(to);
+  return out;
+}
+
 export function cleanOfficeCopy(html) {
   let out = String(html || "");
   out = out.replaceAll("Hold for the", "Press and keep for the");
@@ -310,7 +338,7 @@ const AI_JS = `<script id="ai-boot">
     var bits = [];
     if (view && view.ideas) bits.push("Ideas left today: " + view.ideas.left);
     if (view && view.post) bits.push("Post text left today: " + view.post.left);
-    return bits.join(". ") + (view && view.premium ? ". Premium." : ". Free.");
+    return bits.join(". ") + ".";
   }
   function controls(panel, view){
     seat = view;
@@ -414,7 +442,7 @@ const AI_JS = `<script id="ai-boot">
     }).then(function(pack){
       var data = pack.data;
       if (pack.status === 401 || pack.status === 403) {
-        showLine(panel, data.line || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.", pack.status === 401 && data.ready ? signInHref : "");
+        showLine(panel, data.line || "Ideas need Discord sign-in. Ideas are 3 a day. Discord sign-in is not turned on yet.", pack.status === 401 && data.ready ? signInHref : "");
         return;
       }
       if (data.card && !data.ideas && !data.variations) {
@@ -441,7 +469,7 @@ const AI_JS = `<script id="ai-boot">
   function load(panel){
     fetch("/api/session").then(function(r){ return r.json(); }).then(function(view){
       if (!view || !view.signedIn || view.open === false) {
-        var line = (view && view.line) || "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.";
+        var line = (view && view.line) || "Ideas need Discord sign-in. Ideas are 3 a day. Discord sign-in is not turned on yet.";
         showLine(panel, line, view && view.open !== false && view.ready ? signInHref : "");
       } else {
         controls(panel, view);
@@ -821,7 +849,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
     out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;
   }
-  return ensureAffiliation(cleanOfficeCopy(out));
+  return freeBranding(ensureAffiliation(cleanOfficeCopy(out)));
 }
 
 export function editorCacheKey() {

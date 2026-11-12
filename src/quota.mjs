@@ -1,8 +1,8 @@
 // Sign-in caps. A browser cookie that is not a signed session does not count.
 
 export function ideasSignInLine(ready) {
-  if (ready) return "Sign in with Discord to use Ideas. A free seat is 3 a day.";
-  return "Ideas need a signed-in seat. Free is 3 a day. Discord sign-in is not turned on yet.";
+  if (ready) return "Sign in with Discord to use Ideas. Ideas are 3 a day.";
+  return "Ideas need Discord sign-in. Ideas are 3 a day. Discord sign-in is not turned on yet.";
 }
 
 export const LIMITS = {
@@ -110,30 +110,29 @@ export function signInCard(feature) {
   if (feature === "video") {
     return {
       title: "Sign in to export",
-      body: "Export is tied to the signed-in seat. A browser cookie is not a pass. Free is 1 a day and 2 a week.",
+      body: "Export is tied to your Discord sign-in. A browser cookie is not a pass. Export is 1 a day and 2 a week.",
     };
   }
   if (feature === "ideas") {
     return {
       title: "Sign in for Ideas",
-      body: "A free seat is 3 Ideas a day. A browser cookie is not a pass.",
+      body: "Ideas are 3 a day. A browser cookie is not a pass.",
     };
   }
   return {
     title: "Sign in for post text",
-    body: "Post text is 3 a day on a free seat. A browser cookie is not a pass.",
+    body: "Post text is 3 a day. A browser cookie is not a pass.",
   };
 }
 
-export function limitCard(feature, cap, premium) {
-  const seat = premium ? "Premium" : "Free";
+export function limitCard(feature, cap) {
   if (feature === "video") {
-    return { title: "Export limit", body: `${seat} export limit is reached. It resets on the Pacific day, and the week cap still applies.` };
+    return { title: "Export limit", body: `The export limit is reached. It resets on the Pacific day, and the week cap still applies.` };
   }
   if (feature === "ideas") {
-    return { title: "Ideas limit", body: `${seat} Ideas are capped at ${cap} a day. The count resets at midnight Pacific.` };
+    return { title: "Ideas limit", body: `Ideas are capped at ${cap} a day. The count resets at midnight Pacific.` };
   }
-  return { title: "Post text limit", body: `${seat} post text is capped at ${cap} a day. The count resets at midnight Pacific.` };
+  return { title: "Post text limit", body: `Post text is capped at ${cap} a day. The count resets at midnight Pacific.` };
 }
 
 export function usageOf(user, feature) {
@@ -153,13 +152,13 @@ export function peek(user, feature) {
     const dayCap = user.premium ? spec.premiumDay : spec.freeDay;
     const weekCap = user.premium ? spec.premiumWeek : spec.freeWeek;
     if (dayUsed >= dayCap || weekUsed >= weekCap) {
-      return { ok: false, status: 429, signedIn: true, premium: user.premium, dayUsed, weekUsed, dayCap, weekCap, card: limitCard(feature, dayCap, user.premium) };
+      return { ok: false, status: 429, signedIn: true, premium: user.premium, dayUsed, weekUsed, dayCap, weekCap, card: limitCard(feature, dayCap) };
     }
     return { ok: true, status: 200, signedIn: true, premium: user.premium, dayUsed, weekUsed, dayCap, weekCap };
   }
   const cap = user.premium ? spec.premium : spec.free;
   if (dayUsed >= cap) {
-    return { ok: false, status: 429, signedIn: true, premium: user.premium, used: dayUsed, cap, card: limitCard(feature, cap, user.premium) };
+    return { ok: false, status: 429, signedIn: true, premium: user.premium, used: dayUsed, cap, card: limitCard(feature, cap) };
   }
   return { ok: true, status: 200, signedIn: true, premium: user.premium, used: dayUsed, cap };
 }

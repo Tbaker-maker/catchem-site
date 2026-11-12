@@ -22,12 +22,11 @@ export function checkoutLeak(html) {
   return "";
 }
 
-const PRICE = "$14.99/month when we open";
+// No plan price on any public page or mail while Premium is a waitlist (Tyler, Nov 11 2026).
 
 export function rewriteHomeClub(html) {
   const block = `<section class="club" aria-label="Catch'em Club">
   <h2>Join the Catch'em Club</h2>
-  <p class="club-line">${PRICE}.</p>
   <ul class="perks">
     <li><span>Premium reads in Discord</span></li>
     <li><span>Watchlist pings, up to 25</span></li>
@@ -62,14 +61,14 @@ export function premiumPlainLine(mode = "waitlist") {
   if (mode === "live") {
     return "Premium reads in Discord, watchlist pings, and members-only channels. $14.99 USD a month. All site tools stay free. https://catchemtcg.com/premium";
   }
-  return `Premium reads in Discord, watchlist pings, and members-only channels. ${PRICE}. All site tools stay free. https://catchemtcg.com/premium`;
+  return `Premium reads in Discord, watchlist pings, and members-only channels. All site tools stay free. https://catchemtcg.com/premium`;
 }
 
 export function premiumEmailBlock(mode = "waitlist") {
   const live = mode === "live";
   const label = live ? "See Premium" : "Join the Premium waitlist";
-  const price = live ? "$14.99 USD a month." : `${PRICE}.`;
-  const copy = `Premium reads in Discord, watchlist pings, and members-only channels. ${price} All site tools stay free.`;
+  const price = live ? "$14.99 USD a month." : "";
+  const copy = `Premium reads in Discord, watchlist pings, and members-only channels. ${price ? price + " " : ""}All site tools stay free.`;
   return `<tr><td style="padding:8px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ce-card" bgcolor="#ffffff" style="background:#ffffff;border-radius:16px"><tr><td style="padding:16px 16px 18px">
 <p class="ce-ink" style="margin:0 0 12px;font:600 16px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#1c1c1e">${copy}</p>
 <a href="https://catchemtcg.com/premium" class="ce-btn-dark" style="display:inline-block;min-height:44px;line-height:44px;padding:0 18px;border-radius:999px;background:#1c1c1e;color:#ffffff;font:600 15px/44px -apple-system,BlinkMacSystemFont,sans-serif;text-decoration:none">${label}</a>

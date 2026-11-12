@@ -8,7 +8,7 @@ import { EMAIL_FROM, EMAIL_KEY, emailSendAllowed, validEmail } from "./reads-ema
 import { darkCss } from "./reads-article.mjs";
 import { isWaitlist, premiumMode } from "./premium-mode.mjs";
 
-const PRICE = "$14.99/month when we open";
+// No plan price on the waitlist page or its mail (Tyler, Nov 11 2026).
 const ORIGIN = "https://catchemtcg.com";
 
 function esc(value) {
@@ -123,7 +123,6 @@ ${shellCss()}
 <p class="pwl-kicker">Premium</p>
 <h1>Premium waitlist</h1>
 <p class="pwl-lede">One list for people who want Premium when it opens.</p>
-<p class="pwl-price">${PRICE}.</p>
 ${note}
 </section>
 <div class="pwl-grid">
@@ -154,7 +153,6 @@ ${shellCss()}
 <section class="pwl-hero">
 <p class="pwl-kicker">Premium</p>
 <h1>You're #${n} on the list.</h1>
-<p class="pwl-price">${PRICE}.</p>
 <p>We will email one checkout link when Premium opens. No date is set.</p>
 ${leave}
 </section>
@@ -212,14 +210,14 @@ export function confirmLetter({ confirmUrl, leaveUrl }) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:420px"><tr><td class="ce-card" bgcolor="#ffffff" style="background:#ffffff;border-radius:16px;padding:22px">
 <p class="ce-ink ce-brand" style="margin:0 0 8px;font:700 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#1c1c1e">Catch'em</p>
 <p class="ce-ink" style="margin:0 0 8px;font:600 20px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#1c1c1e">${esc(lead)}</p>
-<p class="ce-dim" style="margin:0 0 16px;font:400 15px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:#636366">${PRICE}. No date is set.</p>
+<p class="ce-dim" style="margin:0 0 16px;font:400 15px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:#636366">No date is set.</p>
 <a href="${esc(confirmUrl)}" class="ce-btn-dark" style="display:inline-block;min-height:44px;line-height:44px;padding:0 18px;border-radius:999px;background:#1c1c1e;color:#ffffff;font:600 15px/44px -apple-system,BlinkMacSystemFont,sans-serif;text-decoration:none">Confirm your place</a>
 <p class="ce-soft" style="margin:16px 0 0;font:400 13px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:#8e8e93">Leave the list any time: <a href="${esc(leaveUrl)}" style="color:#8e8e93">Unsubscribe</a></p>
 </td></tr></table></td></tr></table></body></html>`;
 }
 
 export function confirmText({ confirmUrl, leaveUrl }) {
-  return `Confirm your place on the Premium waitlist.\n${PRICE}. No date is set.\n\n${confirmUrl}\n\nUnsubscribe: ${leaveUrl}`;
+  return `Confirm your place on the Premium waitlist.\nNo date is set.\n\n${confirmUrl}\n\nUnsubscribe: ${leaveUrl}`;
 }
 
 async function sendMail({ env, to, subject, html, text, leaveUrl, fetchImpl }) {
