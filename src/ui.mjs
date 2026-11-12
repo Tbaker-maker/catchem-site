@@ -3335,13 +3335,11 @@ ${sealed ? "" : `<p>Artist ${card.artist ? `<a href="/artists/${esc(String(card.
 ${(card.versions || []).length ? `<p class="muted">Prize pack versions, kept with this card and left out of search.</p><ul>${card.versions.map((v) => `<li>${esc(v.name)} ${money(v.price) || ""}</li>`).join("")}</ul>` : ""}
 ${opts.diveHref ? `<p><a class="open-data" href="${esc(opts.diveHref)}">Deeper look</a> · <a href="${esc(opts.diveHref)}">See the chart</a></p>` : ""}
 <details><summary>See the math</summary>
-<p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>
-<p><button type="button" id="paid">Report a price I paid</button></p>
+${sealed ? "" : "<p>Condition prices are not in this feed. The market price is one number for the printing we publish.</p>\n"}<p><button type="button" id="paid">Report a price I paid</button></p>
 <form id="paid-form" hidden>
 <label>Price <input name="price" inputmode="decimal" required></label>
 <label>Date <input name="date" type="date" required></label>
-<label>Condition <input name="condition" required></label>
-<label>Where <input name="where" required></label>
+${sealed ? "" : "<label>Condition <input name=\"condition\" required></label>\n"}<label>Where <input name="where" required></label>
 <button type="submit">Send</button>
 <p class="muted" id="paid-status"></p>
 <p class="muted">A report stays private. A community median shows only after 5 reports of the same product. We do not attach your name. Proof photos are not accepted on this page.</p>
