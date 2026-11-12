@@ -65,7 +65,7 @@ t("releases nav link", rel.text.includes('href="/releases"'));
 t("releases empty line", (await page("/releases", { today: "2027-01-01" })).text.includes(COPY.releases.empty));
 t("upcoming filter", upcomingReleases(files["releases.json"], "2026-11-07").length === 1);
 const prod = await page("/p/tcgcsv-644300");
-t("listings line with previous night", prod.text.includes("eBay listings counted: 37 on Oct 12, from 35 on Oct 11."));
+t("listings line with previous night", prod.text.includes("37 listings counted") && prod.text.includes("Oct 12") && !prod.text.includes("from 35 on Oct 11") && prod.text.includes("A listing is not a sale."));
 t("listings line without previous", listingsCountedLine(files["listings-counted.json"].products[1]) === "eBay listings counted: 8 on Oct 12.");
 t("product rotation badge", prod.text.includes('class="rm">I<') && prod.text.includes("Standard"));
 const sm = await page("/sitemap-00.xml");
@@ -76,8 +76,8 @@ for (const [name, p] of [["base", base], ["shadow", shadow], ["pe", pe], ["relea
   t(`${name}: no em dash`, !/\u2014/.test(body));
   t(`${name}: no banned words`, !BANNED.test(body) || (console.log("    hit:", body.match(BANNED)?.[0]), false));
 }
-const prodBody = visible(prod.text.split('<h2 id="lc-h"')[1]?.split("</section>")[0] || "");
-t("listings block: no supply or dash", prodBody && !/supply|\u2014/i.test(prodBody));
+const prodList = visible((prod.text.match(/<p class="sum-strip">[\s\S]*?<\/p>/) || [""])[0] + (prod.text.match(/<p class="list-note[^"]*">[\s\S]*?<\/p>/) || [""])[0]);
+t("listings block: no supply or dash", prodList.includes("37 listings counted") && !/supply|\u2014/i.test(prodList));
 t("noDash", noDash("A \u2014 B") === "A: B");
 t("set value hides when no doc", setValueBlock(null) === "");
 

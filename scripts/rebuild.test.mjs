@@ -340,7 +340,7 @@ t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["
   const main = page.slice(page.indexOf("<h1>Track record"), page.indexOf("</main>"));
   t("track record lists the later price and hides the method", main.includes("Past moves don") && main.includes("Example") && main.includes("Pidgey") && main.indexOf("2026-10-10") < main.indexOf("2026-10-09") && main.includes("More history added nightly") && !main.includes("scored so far") && !main.includes("14 days") && !page.includes("tcgcsv-"));
   const facts = renderFacts({ market: 12.5, low: 9, date: "2026-10-09", source: "TCGplayer market", listings: 40 });
-  t("facts panel is market, low, date, and source", facts.includes("<dt>Market</dt>") && facts.includes("<dt>Low</dt>") && facts.includes("<dt>Date</dt>") && facts.includes("<dt>Source</dt>") && !facts.includes("listings"));
+  t("facts panel is market, TCGplayer lowest listing with its date, date, and source", facts.includes("<dt>Market</dt>") && facts.includes("<dt>TCGplayer lowest listing</dt>") && facts.includes("$9.00, Oct 9") && facts.includes("<dt>Date</dt>") && facts.includes("<dt>Source</dt>") && !facts.includes("listings"));
   const compared = compareRows({ market: 10, date: "2026-10-09", source: "TCGplayer market" }, { market: 12, low: 8, source: "TCGplayer market" });
   t("compare leaves a missing row off", compared.map((row) => row.label).join() === "Market,Source" && !/winner|score|better|higher|lower/i.test(JSON.stringify(compared)));
   t("compare page has the form", renderCompare(null, null, "stamp").includes("Compare two products") && renderCompare(null, null, "stamp").includes("A missing number is left off."));
