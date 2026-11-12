@@ -56,7 +56,7 @@ export async function handleFollow(request, env) {
   if (list.includes(id)) return json({ ok: true, following: true, saved: list.length });
   const cap = user.premium === true ? 25 : 3;
   if (list.length >= cap) {
-    return json({ ok: false, error: user.premium ? "25 follows saved." : "A free seat can follow 3 reads." }, 429);
+    return json({ ok: false, error: user.premium ? "25 follows saved." : "You can follow 3 reads." }, 429);
   }
   list.push(id);
   await store.put(`follow:${user.sub}:${id}`, JSON.stringify({ id, sku, at: new Date().toISOString() }));
