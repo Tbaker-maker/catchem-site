@@ -1,4 +1,5 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
+import { rewriteOfficeFilters } from "./post-office-filters.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { browserAssetUrl, fetchRepo } from "./data.mjs";
 import { prefillBootTag } from "./office-path.mjs";
@@ -1085,6 +1086,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   out = rewritePlayAssets(out);
   out = rewriteFirstScreen(out);
   out = rewriteLoadedLines(out);
+  out = rewriteOfficeFilters(out);
   out = siteSkin(out);
   if (out.includes("Pin two cards. We make a picture.") && !out.includes('id="dl"')) {
     const hook = '<div id="dl" hidden></div>';
