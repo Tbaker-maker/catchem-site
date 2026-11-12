@@ -1,6 +1,7 @@
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { browserAssetUrl, fetchRepo } from "./data.mjs";
+import { prefillBootTag } from "./office-path.mjs";
 
 // The Post Office editor (Catchem-data research/assets/play.html).
 // Card scans are proxied same-origin so the picture canvas can read them.
@@ -263,7 +264,7 @@ const SIZE_JS = `<script id="sizes-boot">
       g.fillRect(0, 0, w, h);
       var iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
       if (!iw || !ih) return;
-      var scale = Math.min(w / iw, h / ih);
+      var scale = Math.max(w / iw, h / ih);
       var dw = Math.round(iw * scale), dh = Math.round(ih * scale);
       g.drawImage(im, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh);
       out.toBlob(function(blob){
@@ -1092,6 +1093,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   if (!out.includes('id="sizes-boot"')) out += SIZE_JS;
   if (!out.includes('id="ai-boot"')) out += AI_JS;
   if (!out.includes('id="share-boot"')) out += SHARE_JS;
+  if (!out.includes('id="path-boot"')) out += prefillBootTag();
   if (mark && !out.includes('id="post-build"')) {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
     out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;

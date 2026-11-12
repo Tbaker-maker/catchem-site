@@ -51,6 +51,7 @@ jobs:
       - run: node scripts/post-office-live-catalog.test.mjs
       - run: node scripts/post-office-branding.test.mjs
       - run: node scripts/post-office-share.test.mjs
+      - run: node scripts/office-path.test.mjs
       - run: node scripts/editor-image.test.mjs
       - run: node scripts/sealed-pid.test.mjs
       - run: node scripts/listings-one-window.test.mjs
