@@ -5,7 +5,7 @@ export const POST_OFFICE_LINE = "We're rebuilding this. Email and social tools a
 export const CLOSED_BETA_COPY = "Email and social tools, rebuilt. Closed beta.";
 
 const CLOSED_NAV = '<a class="po-beta-link" href="/post-office" data-po="closed">Post Office <span class="po-beta">Closed Beta</span></a>';
-const OPEN_NAV = '<a href="/post-office">Post Office</a>';
+const OPEN_NAV = '<a href="/post-office">Make a post</a>';
 
 const CLOSED_TILE = `    <article class="tile post" id="po-beta-tile">
       <div class="ttl">
@@ -20,7 +20,7 @@ const OPEN_TILE = `    <article class="tile post">
       <span class="tag open">Open</span>
       <h3>Post Office</h3>
       <p>Every card and every artist. Pick one and the post is ready for X or Facebook.</p>
-      <a class="more" href="/post-office">Post Office <span aria-hidden="true">→</span></a>
+      <a class="more" href="/post-office">Make a post <span aria-hidden="true">→</span></a>
     </article>`;
 
 export function postOfficeOn(env) {

@@ -1,5 +1,6 @@
 // Weekly changes and the scanner explainer. Every figure is a field on weekly.json.
 import { esc, pageChrome } from "./ui.mjs";
+import { makePostLink } from "./office-path.mjs";
 import { patternCopy } from "./pattern-track.mjs";
 import { imageTag, officialSrc } from "./catalogue-image.mjs";
 
@@ -66,7 +67,17 @@ function moverItem(row, images) {
   const pct = Number(row.pct);
   const move = Number.isFinite(pct) ? `${pct > 0 ? "+" : ""}${pct}%` : "";
   const meta = [num, set].filter(Boolean).join(" · ");
-  return `<a class="wk-row" href="${esc(href)}">${face(row, images)}<span><b>${esc(name)}</b>${meta ? `<small>${esc(meta)}</small>` : ""}<small>${esc(p0)} on ${esc(from)} to ${esc(p1)} on ${esc(to)}${move ? `. ${esc(move)}` : ""}</small></span></a>`;
+  const post = makePostLink({
+    ids: id,
+    kind: "single",
+    name,
+    move: move || undefined,
+    from: String(row.from || "").slice(0, 10),
+    to: String(row.to || "").slice(0, 10),
+    p0: row.p0,
+    p1: row.p1,
+  });
+  return `<div class="wk-row"><a class="wk-row-main" href="${esc(href)}">${face(row, images)}<span><b>${esc(name)}</b>${meta ? `<small>${esc(meta)}</small>` : ""}<small>${esc(p0)} on ${esc(from)} to ${esc(p1)} on ${esc(to)}${move ? `. ${esc(move)}` : ""}</small></span></a>${post}</div>`;
 }
 
 function listingItem(row) {
@@ -81,7 +92,18 @@ function listingItem(row) {
   const change = pct == null ? "" : `, ${pct > 0 ? "+" : ""}${pct}%`;
   const text = `${name}: ${n} listings counted on ${day}, from ${prev} on ${prevDay}${change}.`;
   const inner = `<span><b>${esc(text)}</b></span>`;
-  return href ? `<a class="wk-row" href="${esc(href)}">${inner}</a>` : `<div class="wk-row">${inner}</div>`;
+  const post = href ? makePostLink({
+    ids: String(row.id),
+    kind: row.kind === "sealed" ? "sealed" : "single",
+    name,
+    listings: true,
+    p0: n,
+    p1: prev,
+    from: String(row.date || "").slice(0, 10),
+    to: String(row.prevDate || "").slice(0, 10),
+    move: pct == null ? undefined : `${pct > 0 ? "+" : ""}${pct}%`,
+  }) : "";
+  return href ? `<div class="wk-row"><a class="wk-row-main" href="${esc(href)}">${inner}</a>${post}</div>` : `<div class="wk-row">${inner}</div>`;
 }
 
 const CSS = `<style>
@@ -90,7 +112,8 @@ const CSS = `<style>
 .wk-nav{display:flex;gap:8px;overflow-x:auto}
 .wk-nav a{flex:none;min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.06);color:inherit;text-decoration:none;font:600 14px/1 var(--sans)}
 .wk-list{display:grid;gap:8px}
-.wk-row{display:flex;gap:10px;align-items:center;min-height:44px;padding:8px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}
+.wk-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:44px;padding:8px;border-radius:16px;background:#1a1815;border:1px solid #2f2b26;color:inherit;text-decoration:none}
+.wk-row-main{display:flex;gap:10px;align-items:center;flex:1;min-width:12rem;min-height:44px;color:inherit;text-decoration:none}
 .wk-row img,.wk-row .tile{width:44px;height:62px;object-fit:contain;border-radius:8px;background:#12100e;flex:none}
 .wk-row b{display:block;font:600 16px/1.3 var(--sans)}
 .wk-row small{display:block;color:var(--dim);font:500 14px/1.35 var(--sans)}

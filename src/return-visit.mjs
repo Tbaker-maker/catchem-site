@@ -1,3 +1,4 @@
+import { makePostLink } from "./office-path.mjs";
 // Device-only return visit, watchlist, and trust lines.
 // No account, no send, no invented price or date.
 // A missing movers file yields an empty payload and the features stay quiet.
@@ -334,12 +335,13 @@ export function returnActions(card, opts = {}) {
   const pid = id.slice("tcgcsv-".length);
   const img = "/api/card-img?pid=" + pid;
   const showPrice = price > 0 && know ? String(price) : "";
-  return `<p class="rv-actions"><button type="button" class="rv-watch" data-rv-id="${attr(id)}" data-rv-name="${attr(name)}" data-rv-href="${attr(href)}" data-rv-kind="${kind}">Watch</button><button type="button" class="rv-share" data-rv-share="product" data-rv-name="${attr(name)}" data-rv-price="${attr(showPrice)}" data-rv-date="${attr(end)}" data-rv-fact="${attr(know ? fact : "")}" data-rv-source="${attr(sourceCode)}" data-rv-img="${attr(img)}" data-rv-pts="${attr(pts)}" data-rv-kind="${kind}">Share</button></p>`;
+  const post = makePostLink({ ids: id, kind, name });
+  return `<p class="rv-actions"><button type="button" class="rv-watch" data-rv-id="${attr(id)}" data-rv-name="${attr(name)}" data-rv-href="${attr(href)}" data-rv-kind="${kind}">Watch</button><button type="button" class="rv-share" data-rv-share="product" data-rv-id="${attr(id)}" data-rv-name="${attr(name)}" data-rv-price="${attr(showPrice)}" data-rv-date="${attr(end)}" data-rv-fact="${attr(know ? fact : "")}" data-rv-source="${attr(sourceCode)}" data-rv-img="${attr(img)}" data-rv-pts="${attr(pts)}" data-rv-kind="${kind}">Share</button>${post}</p>`;
 }
 
 export function feedShareButton(asOf) {
   const day = isoDay(asOf);
-  return `<p class="rv-share-row"><button type="button" id="rv-share" data-rv-share="feed" data-rv-name="The Feed" data-rv-date="${attr(day)}" data-rv-source="tcg">Share</button></p>`;
+  return `<p class="rv-share-row"><button type="button" id="rv-share" data-rv-share="feed" data-rv-name="The Feed" data-rv-date="${attr(day)}" data-rv-source="tcg">Share</button> ${makePostLink({})}</p>`;
 }
 
 export function watchDocument() {
@@ -354,7 +356,7 @@ export function watchDocument() {
 </main>`;
 }
 
-export const RETURN_CSS = `.rv-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 4px}.rv-actions button,.rv-share-row button,.rv-card button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #3a342c;background:#1c1916;color:#efe9de;font:600 15px/1 var(--sans,system-ui,sans-serif);cursor:pointer}.rv-actions button[aria-pressed=true],.rv-card button[aria-pressed=true]{background:#d9b779;color:#1a1407;border-color:#d9b779}.rv-share-row{margin:0 16px 12px}.rv-cards{display:grid;gap:12px;margin:12px 0 20px}.rv-card{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;padding:14px 16px;border-radius:22px;background:#1a1815;border:1px solid #2f2b26}.rv-card img{width:72px;height:72px;object-fit:contain;border-radius:16px;background:#221e1a}.rv-card a{color:inherit;text-decoration:none;font:600 17px/1.35 var(--serif,Georgia,serif)}.rv-card p{margin:4px 0 0;color:#c4baab;font:500 14px/1.45 var(--sans,system-ui,sans-serif)}.rv-empty,.rv-invite{color:#c4baab;margin:6px 0}.watch-page h1{margin:8px 0 12px;font:500 clamp(32px,5vw,44px)/1.1 var(--serif,Georgia,serif)}.rv-skel{height:72px;border-radius:22px;background:#1a1815}@media(max-width:700px){.rv-card{grid-template-columns:72px 1fr}.rv-card button{grid-column:1 / -1;justify-self:start}}`;
+export const RETURN_CSS = `.rv-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 4px}.rv-share-note{flex:1 0 100%;margin:0}.rv-actions button,.rv-share-row button,.rv-card button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #3a342c;background:#1c1916;color:#efe9de;font:600 15px/1 var(--sans,system-ui,sans-serif);cursor:pointer}.rv-actions button[aria-pressed=true],.rv-card button[aria-pressed=true]{background:#d9b779;color:#1a1407;border-color:#d9b779}.rv-share-row{margin:0 16px 12px}.rv-cards{display:grid;gap:12px;margin:12px 0 20px}.rv-card{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;padding:14px 16px;border-radius:22px;background:#1a1815;border:1px solid #2f2b26}.rv-card img{width:72px;height:72px;object-fit:contain;border-radius:16px;background:#221e1a}.rv-card a{color:inherit;text-decoration:none;font:600 17px/1.35 var(--serif,Georgia,serif)}.rv-card p{margin:4px 0 0;color:#c4baab;font:500 14px/1.45 var(--sans,system-ui,sans-serif)}.rv-empty,.rv-invite{color:#c4baab;margin:6px 0}.watch-page h1{margin:8px 0 12px;font:500 clamp(32px,5vw,44px)/1.1 var(--serif,Georgia,serif)}.rv-skel{height:72px;border-radius:22px;background:#1a1815}@media(max-width:700px){.rv-card{grid-template-columns:72px 1fr}.rv-card button{grid-column:1 / -1;justify-self:start}}`;
 
 export const RETURN_BOOT = `(function(){
   var IDP=["tcg","csv","-"].join("");
@@ -453,11 +455,23 @@ export const RETURN_BOOT = `(function(){
     g.lineCap="round";
     g.stroke();
   }
-  function finishCard(canvas){
+  function finishCard(canvas, btn){
     var link=document.createElement("a");
     link.href=canvas.toDataURL("image/png");
     link.download="catchem-share.png";
     link.click();
+    var id=btn && btn.getAttribute("data-rv-id") || "";
+    var kind=btn && btn.getAttribute("data-rv-kind") || "single";
+    if(!idOk(id)) return;
+    var row=btn.closest(".rv-actions, .rv-share-row") || btn.parentNode;
+    if(!row) return;
+    var note=row.querySelector(".rv-share-note");
+    if(!note){
+      note=document.createElement("p");
+      note.className="rv-share-note muted";
+      row.appendChild(note);
+    }
+    note.innerHTML='Card saved on this device. <a class="make-post" href="/post-office?ids='+encodeURIComponent(id)+'&kind='+encodeURIComponent(kind)+'">Make a post</a>';
   }
   function drawShare(btn){
     var name=btn.getAttribute("data-rv-name")||"Catch'em";
@@ -505,7 +519,7 @@ export const RETURN_BOOT = `(function(){
         g.font="500 20px system-ui, sans-serif";
         g.fillText(source+", "+date, 420, 620);
       }
-      finishCard(canvas);
+      finishCard(canvas, btn);
     }
     if(!imgSrc){ words(); return; }
     var img=new Image();
