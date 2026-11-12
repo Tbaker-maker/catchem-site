@@ -446,7 +446,7 @@ export function renderAlerts(stamp) {
 <button type="submit">Save settings</button>
 <p id="pref-note" class="muted"></p>
 </form>
-<p><a class="tap quiet" href="/auth/discord?next=/alerts">Sign in with Discord</a></p>
+<p>Alert notes save on this device. Discord is optional, and it is not a paid plan.</p>
 <div id="skel" class="skel" aria-hidden="true"></div>
 <div id="rows"></div>
 <script>
@@ -1378,7 +1378,11 @@ signedIn().then(function(view){
 
 const ALERT_JS = `
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ if(c==="&") return "&"+"amp;"; if(c==="<") return "&"+"lt;"; if(c===">") return "&"+"gt;"; if(c==='"') return "&"+"quot;"; return "&"+"#39;"; }); }
-function paint(rows){
+function localAlerts(){ try { var cur=JSON.parse(localStorage.getItem("catchem-watch")||"[]"); return Array.isArray(cur)?cur:[]; } catch(err){ return []; } }
+function saveLocalAlerts(rows){ try { localStorage.setItem("catchem-watch", JSON.stringify(rows)); } catch(err) {} }
+function localPrefs(){ try { var cur=JSON.parse(localStorage.getItem("catchem-alert-prefs")||"{}"); return cur && typeof cur==="object"?cur:{}; } catch(err){ return {}; } }
+function saveLocalPrefs(p){ try { localStorage.setItem("catchem-alert-prefs", JSON.stringify(p||{})); } catch(err) {} }
+function paint(rows, signedIn){
   document.getElementById("skel").hidden=true;
   var box=document.getElementById("rows");
   box.innerHTML="";
@@ -1392,29 +1396,45 @@ function paint(rows){
       ev.preventDefault();
       var note=card.querySelector("p");
       var body={ id:row.id, sku:row.sku, name:row.name, kind:row.kind, market:row.market, price:card.price.value, priceDir:card.dir.value, direction:card.dir.value==="below"?"down":"up", listingsAt:card.listings.value, listingsDir:card.dir.value };
+      var next=localAlerts().filter(function(item){ return (item.sku||item.id)!==(body.sku||body.id) && item.id!==body.id; });
+      next.unshift(body);
+      saveLocalAlerts(next.slice(0,25));
+      if(!signedIn){ note.textContent="Saved on this device."; return; }
       fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
         .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
-        .then(function(res){ note.textContent=res.ok?"Saved.":(res.j.error||"Not saved."); })
-        .catch(function(){ note.textContent="Not saved."; });
+        .then(function(res){
+          if(res.ok && !(res.j && res.j.deviceOnly)) note.textContent="Saved.";
+          else note.textContent="Saved on this device.";
+        })
+        .catch(function(){ note.textContent="Saved on this device."; });
     };
     box.appendChild(card);
   });
 }
+function applyPrefs(prefs){
+  if(!prefs) return;
+  document.getElementById("pause").checked=!!prefs.pauseAll;
+  if(prefs.quietStart) document.getElementById("q0").value=prefs.quietStart;
+  if(prefs.quietEnd) document.getElementById("q1").value=prefs.quietEnd;
+}
 fetch("/api/me").then(function(r){ return r.ok?r.json():null; }).then(function(me){
-  if(me && me.prefs){
-    document.getElementById("pause").checked=!!me.prefs.pauseAll;
-    if(me.prefs.quietStart) document.getElementById("q0").value=me.prefs.quietStart;
-    if(me.prefs.quietEnd) document.getElementById("q1").value=me.prefs.quietEnd;
-  }
-  if(me && me.alerts){ paint(me.alerts); return; }
-  return fetch("/api/alerts").then(function(r){ return r.ok?r.json():{rows:[]}; }).then(function(j){ paint((j&&j.rows)||[]); });
-}).catch(function(){ document.getElementById("skel").hidden=true; });
+  if(me && me.prefs) applyPrefs(me.prefs);
+  if(me && me.alerts){ paint(me.alerts, true); return; }
+  applyPrefs(localPrefs());
+  paint(localAlerts(), false);
+}).catch(function(){
+  applyPrefs(localPrefs());
+  paint(localAlerts(), false);
+});
 document.getElementById("prefs").onsubmit=function(ev){
   ev.preventDefault();
   var body={ action:"prefs", pauseAll:document.getElementById("pause").checked, quietStart:document.getElementById("q0").value, quietEnd:document.getElementById("q1").value };
+  saveLocalPrefs(body);
   fetch("/api/me",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
-    .then(function(res){ document.getElementById("pref-note").textContent=res.ok?"Settings saved.":(res.j.error||"Sign in to save settings on the account."); })
-    .catch(function(){ document.getElementById("pref-note").textContent="Not saved."; });
+    .then(function(res){
+      document.getElementById("pref-note").textContent=(res.ok && !(res.j && res.j.error))?"Settings saved.":"Settings saved on this device.";
+    })
+    .catch(function(){ document.getElementById("pref-note").textContent="Settings saved on this device."; });
 };
 `;

@@ -6020,7 +6020,7 @@ function cardEl(card, facts){
     fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
       .then(function(res){return res.json().then(function(j){return {ok:res.ok,j:j}})})
       .then(function(res){
-        if(!res.ok) return;
+        if(!res.ok || (res.j && res.j.deviceOnly)) return;
         sheet.classList.remove("open");
         trackBtn.textContent="Tracking";
         let done=el.querySelector(".track-done");
