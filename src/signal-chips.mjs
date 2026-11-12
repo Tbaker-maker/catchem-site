@@ -233,8 +233,10 @@ export function signalMarkup(card, escape, opts) {
     }
     const listed = t && t.listings;
     if (listed && Number(listed.days) > 0 && Array.isArray(listed.spark) && listed.spark.length >= 2) {
-      const word = /^(Draining|Stacking|Steady)$/.test(String(listed.word)) ? String(listed.word) : "Steady";
       const dir = listed.dir === "up" ? "up" : listed.dir === "down" ? "down" : "flat";
+      // "Steady" beside a 7% move read as two answers. The word shows only when it
+      // agrees with the number: a pace word, or Steady on a flat count.
+      const word = /^(Draining|Stacking)$/.test(String(listed.word)) ? String(listed.word) : (dir === "flat" ? "Steady" : "");
       const arrow = dir === "up" ? "▲ " : dir === "down" ? "▼ " : "";
       const days = Math.round(Number(listed.days));
       const band = Array.isArray(listed.band) && listed.band.length === 2;
@@ -247,8 +249,8 @@ export function signalMarkup(card, escape, opts) {
       const when = day((ltg && ltg.date) || (lst && lst.date) || listed.to, true);
       const backSrc = (ltg || lst) ? "Source: eBay listings counted, " + when : src;
       out.push(tile(
-        "Listings counted: " + word + ", " + said + " over " + days + " days. " + (ltg ? tagWords(ltg) + " " : "") + (lst ? stageWords(lst, true) + " " : "") + (band ? "The shaded band is this product's usual range. " : "") + backSrc + ".",
-        '<span class="tl-k">Listings counted</span><span class="tl-v"><span class="tl-w">' + e(word) + '</span><span class="tl-n">' + e(arrow + Number(listed.pct) + "%") + '</span><span class="tl-d">' + days + "D</span></span>" + spark(listed.spark, band ? listed.band : null, "#d9b779") + (pills ? '<span class="tl-tags">' + pills + "</span>" : ""),
+        "Listings counted: " + (word ? word + ", " : "") + said + " over " + days + " days. " + (ltg ? tagWords(ltg) + " " : "") + (lst ? stageWords(lst, true) + " " : "") + (band ? "The shaded band is this product's usual range. " : "") + backSrc + ".",
+        '<span class="tl-k">Listings counted</span><span class="tl-v">' + (word ? '<span class="tl-w">' + e(word) + '</span>' : '') + '<span class="tl-n">' + e(arrow + Number(listed.pct) + "%") + '</span><span class="tl-d">' + days + "D</span></span>" + spark(listed.spark, band ? listed.band : null, "#d9b779") + (pills ? '<span class="tl-tags">' + pills + "</span>" : ""),
         '<span class="tl-k">Listings counted</span>' + (extra || '<span class="tl-p">eBay listings counted each night.' + (band ? " The shaded band is this product's usual range." : "") + "</span>") + '<span class="tl-s">' + e(backSrc) + "</span>",
         true));
     }
