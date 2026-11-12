@@ -17,12 +17,16 @@ const listingSeries = [
 
 const ch = listingChange(listingSeries, "2026-10-30");
 t("the change is a week back, not the last night", ch && ch.days === 7 && ch.from === 128 && ch.n === 137 && ch.pct === 7 && ch.fromDay === "2026-10-23");
-t("the 7D line reads the same numbers", listingTrend(listingSeries, "2026-10-30").includes("7D +7% (128 → 137)"));
+t("the 7D window math is unchanged", listingTrend(listingSeries, "2026-10-30").includes("7D +7% (128 → 137)"));
 
-const card = { id: "tcgcsv-390", name: "Test Booster Box", kind: "sealed", set: "Test", price: 100, asOf: "2026-10-30", source: "TCGplayer market", hist: [["2026-10-01", 90], ["2026-10-30", 100]] };
-const html = renderCard(card, "stamp", { listingSeries });
-const strip = (html.match(/<p class="sum-strip">[\s\S]*?<\/p>/) || [""])[0];
-t("summary chip shows the 7D change with its window", strip.includes("137 listings counted") && strip.includes("7% 7D") && strip.includes("over 7 days, since Oct 23"));
+const card = { id: "tcgcsv-390", name: "Test Booster Box", kind: "sealed", set: "Test", price: 100, asOf: "2026-10-30", source: "TCGplayer market", low: 89, hist: [["2026-10-01", 90], ["2026-10-30", 100]] };
+const html = renderCard(card, "stamp", { listingSeries, listingsHtml: "<section class=\"lc\" aria-labelledby=\"lc-h\"><h2 id=\"lc-h\">Listings counted</h2><p>eBay listings counted: 137 on Oct 30, from 136 on Oct 29.</p></section>" });
+const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
+const strip = (main.match(/<p class="sum-strip">[\s\S]*?<\/p>/) || [""])[0];
+t("summary chip shows the 7D change with its window", strip.includes("137 listings counted") && strip.includes("7% 7D") && strip.includes("over 7 days, since Oct 23") && strip.includes("from 128 on Oct 23"));
+t("the page shows that window once: no 7D line and no Listings counted block", !main.includes("eBay listings 7D") && !main.includes("id=\"lc-h\"") && !main.includes("from 136 on Oct 29") && (main.split("137 listings counted").length - 1) === 1);
+t("A listing is not a sale sits on the listings figure, not under Buy", /<p class="list-note muted">A listing is not a sale\.<\/p>/.test(main) && !/<div class="shop-block">[\s\S]*?A listing is not a sale\./.test(main) && main.indexOf("list-note") > main.indexOf("sum-strip") && main.indexOf("list-note") < main.indexOf('<div class="shop-block">'));
+t("Key stats Low is the TCGplayer lowest listing with its date", main.includes("<dt>TCGplayer lowest listing</dt>") && main.includes("<dd>$89.00, Oct 30</dd>"));
 t("no one-night 0.7% anywhere on the page", !/0\.7%/.test(html));
 
 // A gap: no count exactly 7 days back. The nearest earlier count is used and its real day count named.

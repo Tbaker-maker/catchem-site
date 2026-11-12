@@ -2453,7 +2453,7 @@ function countedListings(fact, series, endDay) {
   const day = String(fact?.listingsAsOf || "").slice(0, 10);
   if (Number.isFinite(n) && n >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
     const ch = listingChange(series, day);
-    return ch && ch.n === n ? { n, day, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n, day };
+    return ch && ch.n === n ? { n, day, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n, day };
   }
   const pts = (series || []).filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0);
   const endMs = Date.parse(`${endDay}T00:00:00Z`);
@@ -2462,7 +2462,7 @@ function countedListings(fact, series, endDay) {
   if (!row) return null;
   const rowDay = String(row.date).slice(0, 10);
   const ch = listingChange(series, rowDay);
-  return ch ? { n: ch.n, day: rowDay, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n: Number(row.listingCount), day: rowDay, pct: null, prevDay: "" };
+  return ch ? { n: ch.n, day: rowDay, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n: Number(row.listingCount), day: rowDay, pct: null, prevDay: "" };
 }
 
 // One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
@@ -2483,17 +2483,24 @@ function summaryStrip({ nm = false, prefix = "", price = "", year = null, listin
     const cls = year > 0 ? " up" : year < 0 ? " down" : "";
     bits.push(`<span class="sum-chip${cls}">1Y ${year > 0 ? "+" : ""}${year}%</span>`);
   }
+  let listed = false;
   if (listings && Number.isFinite(listings.n) && listings.n > 0 && listings.day) {
     const when = priceDay(listings.day);
-    // Only a change with a named window shows, and it is the same window as the "eBay listings 7D" line.
+    const short = when ? when.replace(/, \d{4}$/, "") : "";
+    // One named window: count, date, and from/to when a start night exists.
     const pct = listings.pct == null ? NaN : Number(listings.pct);
     const days = Number(listings.days);
-    const win = Number.isFinite(pct) && days > 0 && listings.prevDay ? { tag: `${days}D`, said: `over ${days} days, since ${esc(priceDay(listings.prevDay))}` } : null;
+    const fromWhen = listings.prevDay ? priceDay(listings.prevDay) : "";
+    const fromShort = fromWhen ? fromWhen.replace(/, \d{4}$/, "") : "";
+    const fromBit = Number.isFinite(Number(listings.from)) && Number(listings.from) >= 0 && fromShort ? `, from ${Number(listings.from).toLocaleString("en-US")} on ${esc(fromShort)}` : "";
+    const win = Number.isFinite(pct) && days > 0 && listings.prevDay ? { tag: `${days}D`, said: `over ${days} days, since ${esc(fromWhen || priceDay(listings.prevDay))}` } : null;
     const arrow = !win ? "" : pct === 0 ? `<span class="sum-arrow" aria-label="Flat ${win.said}">\u2192 0% ${win.tag}</span>` : `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(pct)}% ${win.said}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(pct)}% ${win.tag}</span>`;
-    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${when ? `, ${esc(when.replace(/, \d{4}$/, ""))}` : ""}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${when ? `, ${when.replace(/, \d{4}$/, "")}` : ""}`)}</span>`);
+    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${short ? `, ${esc(short)}` : ""}${fromBit}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${short ? `, ${short}` : ""}`)}</span>`);
+    listed = true;
   }
   if (rotation) bits.push(`<span class="sum-chip">${esc(rotation)}</span>`);
-  return bits.length ? `<p class="sum-strip">${bits.join("")}</p>` : "";
+  const note = listed ? `<p class="list-note muted">A listing is not a sale.</p>` : "";
+  return bits.length ? `<p class="sum-strip">${bits.join("")}</p>${note}` : "";
 }
 
 export function listingTrend(series, endDate) {
@@ -3232,7 +3239,6 @@ export function renderCard(card, stamp, opts = {}) {
   const endDay = String(asOf || "").slice(0, 10);
   const chips = "";
   const sealed = card.kind === "sealed";
-  const listingsLine = sealed ? listingTrend(opts.listingSeries || [], endDay) : "";
   const reads = (opts.productReads || []).filter((read) => read && (read.headline || read.path)).slice(0, 3);
   const readHtml = reads.length
     ? `<ul class="glance-reads">${reads.map((read) => {
@@ -3356,7 +3362,7 @@ ${rangeRow}</section>
 ${historyJs}
 ${opts.itemReadHtml || ""}
 ${opts.rotationHtml || ""}
-${listingsLine || opts.listingsHtml || listChart ? `<section id="supply">${listingsLine ? `<p>${esc(listingsLine)}</p>` : ""}${opts.listingsHtml || ""}${listChart}</section>` : ""}
+${listChart ? `<section id="supply">${listChart}</section>` : ""}
 ${sealed ? sealedAskBox(opts.ebayAsk) : ebayAskLine(opts.ebayAsk)}
 ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
@@ -3643,7 +3649,11 @@ const KV_CSS = `<style>.kv{margin:8px 0 16px;padding:4px 16px;border-radius:18px
 export function factsLines(row) {
   const lines = [];
   if (Number(row?.market) > 0) lines.push({ label: "Market", value: money(row.market) });
-  if (Number(row?.low) > 0) lines.push({ label: "Low", value: money(row.low) });
+  if (Number(row?.low) > 0) {
+    const when = priceDay(String(row.lowDate || row.date || "").slice(0, 10));
+    const short = when ? when.replace(/, \d{4}$/, "") : "";
+    lines.push({ label: "TCGplayer lowest listing", value: short ? `${money(row.low)}, ${short}` : money(row.low) });
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(row?.date || ""))) lines.push({ label: "Date", value: String(row.date).slice(0, 10) });
   if (typeof row?.source === "string" && row.source.trim()) lines.push({ label: "Source", value: row.source.trim() });
   return lines;
