@@ -96,6 +96,9 @@ async function safeRender(render, request, env, ctx) {
 function asEdgeHit(hit, soft = false, dataVersion = "") {
   const h = new Headers(hit.headers);
   h.set("cache-control", "no-store");
+  // The stored copy is public so caches.default will keep it. Do not let that
+  // header reach Cloudflare or the CDN holds yesterday's HTML past a deploy.
+  h.set("cdn-cache-control", "no-store");
   h.set("x-edge-cache", soft ? "stale" : "hit");
   if (soft) h.set("x-catchem-soft", "stale");
   if (dataVersion) h.set("x-data-version", dataVersion);

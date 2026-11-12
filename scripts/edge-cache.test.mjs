@@ -22,6 +22,7 @@ assert.equal(await r.text(), "<p>hi</p>");
 r = await edgeFetch(render, req("/sets"), {}, {});
 assert.equal(r.headers.get("x-edge-cache"), "hit");
 assert.equal(r.headers.get("cache-control"), "no-store");
+assert.equal(r.headers.get("cdn-cache-control"), "no-store");
 assert.equal(renders, 1);
 await edgeFetch(render, req("/sets", "ce_session=abc"), {}, {});
 assert.equal(renders, 2);
