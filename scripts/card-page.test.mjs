@@ -60,8 +60,8 @@ t("price row wraps inside the page", (() => {
   return priceCss.includes("flex-wrap:wrap") && priceCss.includes("white-space:normal") && !priceCss.includes("nowrap") && pageCss.includes("overflow-x:clip");
 })());
 t("normal printing stays off and the special one shows", full.includes(">Reverse Holo<") && !full.includes(">Normal<") && full.includes('class="vchips"'));
-t("chart and since range ignore the sealed fill", full.includes("class=\"hc\"") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
-t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-unit="count"') && full.includes('data-snap="real"') && full.includes("has-counts"));
+t("chart and since range ignore the sealed fill", full.includes("class=\"hc pc\"") && full.includes("Since Sep 3") && full.includes("$8.00") && !full.includes("$3.00"));
+t("listings chart is counted, not a sealed dive", full.includes("eBay listings counted") && full.includes('data-view="listings"') && full.includes('data-view="both"') && /data-l="\[\[&quot;\d{4}-\d{2}-\d{2}&quot;,\d+\]/.test(full));
 t("a trainer name does not become a pokemon strip", speciesPageToken("Gengar Spirit Link") === "" && speciesPageToken("Charizard") === "Charizard" && speciesPageToken("Solosis - 118/086") === "Solosis" && speciesPageToken("Charizard ex") === "Charizard");
 const nightly = nightlySpeciesStrip({
   name: "Pikachu",
@@ -114,7 +114,7 @@ t("rating and release cycle sit after card facts", shownMain.includes("Key stats
 t("no listings, no reads, and no empty copy", !quiet.includes("eBay listings counted") && !quiet.includes("Where it sits") && !quiet.includes("Reads about this card") && !quiet.includes(">Rating<") && !quiet.includes("Release cycle") && !quiet.includes("No reads on file") && !/No data/i.test(quiet) && !quiet.includes("7d") && !quiet.includes(">Normal<") && quiet.includes("$15.00"));
 
 const noList = renderCard(card, "stamp", { sitReads: [], boardReads: [] });
-t("a price chart without counts hides the listings chart", noList.includes("class=\"hc\"") && !noList.includes("eBay listings counted"));
+t("a price chart without counts hides the listings chart", noList.includes("class=\"hc pc\"") && !noList.includes("eBay listings counted") && !noList.includes('data-view="listings"'));
 
 const sealed = renderCard({
   id: "tcgcsv-2",
@@ -130,7 +130,7 @@ const sealed = renderCard({
     { date: day(0), listingCount: 30 },
   ],
 });
-t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-unit="count"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"') && sealed.includes("30 listings counted") && !sealed.includes("NM "));
+t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-view="listings"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"') && sealed.includes("30 listings counted") && !sealed.includes("NM "));
 
 const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "stamp", {
   fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },

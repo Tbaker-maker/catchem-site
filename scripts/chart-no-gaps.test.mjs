@@ -45,20 +45,22 @@ const page = renderCard({
   ],
 });
 if (/A missing night is a gap|No data|Missing days show as gaps/i.test(page)) { console.error("FAIL listings chart still has gap or no-data copy"); fail++; }
-const fig = page.match(/<figure class="hc" data-unit="count" data-snap="real" data-pts="([^"]*)"[\s\S]*?<\/figure>/);
+// The sealed page charts listings counted inside the switchable product chart.
+// Bars sit on real nights only: a night with no count stays empty, nothing is carried.
+const fig = page.match(/<figure class="hc pc"[^>]*data-p="([^"]*)" data-l="([^"]*)"[\s\S]*?<\/figure>/);
 if (!fig) { console.error("FAIL sealed page has no listings-counted chart"); fail++; }
 else {
   const about = fig[0];
   if (!about.includes("eBay listings counted") || about.includes("hc-about") || about.includes("About this chart")) { console.error("FAIL listings chart label missing or About box still shown"); fail++; }
   if (/\u2014/.test(about)) { console.error("FAIL em dash in listings chart"); fail++; }
-  if (/\bsupply\b/i.test(about)) { console.error("FAIL listings chart says supply"); fail++; }
-  const counted = JSON.parse(fig[1].replace(/&quot;/g, '"'));
-  if (maxGap(counted.map((p) => p[0])) > 1) { console.error("FAIL listings chart left a gap"); fail++; }
-  const held = counted.find((p) => p[0] === "2026-10-02");
+  if (/\bsupply\b|\bsales?\b|\bsold\b/i.test(about.replace(/<script[\s\S]*?<\/script>/g, ""))) { console.error("FAIL listings chart says supply, sales, or sold"); fail++; }
+  const counted = JSON.parse(fig[2].replace(/&quot;/g, '"'));
+  const days = counted.map((p) => p[0]);
+  if (days.join() !== "2026-10-01,2026-10-03,2026-10-05,2026-10-12") { console.error("FAIL listings bars must be the real nights only", days); fail++; }
   const zero = counted.find((p) => p[0] === "2026-10-05");
-  if (!held || held[1] !== 40 || held[3] !== "2026-10-01") { console.error("FAIL carried night should hold the last real count", held); fail++; }
-  if (!zero || zero[1] !== 0 || zero[3]) { console.error("FAIL a count of 0 is a real night", zero); fail++; }
-  const hoverable = counted.filter((p) => !p[3]).map((p) => p[0]);
-  if (hoverable.includes("2026-10-02") || !hoverable.includes("2026-10-05") || !hoverable.includes("2026-10-01")) { console.error("FAIL carried nights must not be real points", hoverable); fail++; }
+  if (!zero || zero[1] !== 0) { console.error("FAIL a count of 0 is a real night", zero); fail++; }
+  const priced = JSON.parse(fig[1].replace(/&quot;/g, '"'));
+  if (maxGap(priced.map((p) => p[0])) > 1) { console.error("FAIL product price line left a gap"); fail++; }
+  if (!priced.filter((p) => p[3]).every((p) => p[3] === "2026-10-01")) { console.error("FAIL carried price days must name the last real day"); fail++; }
 }
 if (fail) process.exit(1); else console.log("chart no-gaps ok");

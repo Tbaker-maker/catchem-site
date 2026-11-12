@@ -4,6 +4,7 @@ import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { productChart } from "./product-chart.mjs";
 import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
@@ -2989,15 +2990,13 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const num = String(card.num || "").trim();
   const numBit = num ? ` · ${num.startsWith("#") ? num : `#${num}`}` : "";
   const priceReal = (priceSeries || []).filter((point) => point && Number(point[1]) > 0 && !point[3]);
-  const priceChart = priceReal.length >= 2 ? historyChart(priceSeries, { asOf: endDay }) : "";
   const listReal = (opts.listingSeries || [])
     .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const listChart = listReal.length >= 2
-    ? `<section class="cp-sec cp-counts" id="supply"><h2>eBay listings counted</h2>${historyChart(listReal, { asOf: endDay, color: "#7fc79a", unit: "count", snap: "real" })}</section>`
-    : "";
-  const chartOn = !!(priceChart || rangeRow || listChart);
+  // One switchable chart: price, listings counted, both, % change (only views with data).
+  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, asOf: endDay });
+  const chartOn = !!(priceChart || rangeRow);
   const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
   const boardSrc = Array.isArray(opts.boardReads) ? opts.boardReads : (opts.productReads || []);
   const board = readItems(boardSrc, card.id).filter((item) => !SIT_KINDS.has(item.kind)).slice(0, 5);
@@ -3052,7 +3051,7 @@ ${conditionLine(opts.conditionNote)}
 ${ebayBlock(opts.priceRead)}
 </div>
 </header>
-${chartOn ? `<style>${HISTORY_CSS}</style><div class="cp-charts${listChart ? " has-counts" : ""}">${priceChart || rangeRow ? `<div class="cp-price-col" id="price">${priceChart}${rangeRow}</div>` : ""}${listChart}</div><script>${HISTORY_JS}</script>` : ""}
+${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div>` : ""}
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
@@ -3237,7 +3236,8 @@ export function renderCard(card, stamp, opts = {}) {
   // chart or the since range. For singles the tcgcsv daily archive (longHist)
   // wins on overlap, so fill only covers days after its last point.
   const priceSeries = cardPriceSeries(card, hist, sealed);
-  const priceChart = `<style>${HISTORY_CSS}</style>${historyChart(priceSeries, { asOf: endDay, ownLabel: sealed ? "TCGplayer market price, our nightly pull" : undefined })}<script>${HISTORY_JS}</script>`;
+  // One switchable chart for the sealed page: price, eBay listings counted, both, % change.
+  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull" }) || historyChart(priceSeries, { asOf: endDay });
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
   const sealedStrip = sealed ? summaryStrip({
@@ -3249,9 +3249,8 @@ export function renderCard(card, stamp, opts = {}) {
     .filter((point) => point && /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || "")) && Number.isFinite(Number(point.listingCount)) && Number(point.listingCount) >= 0)
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const listChart = sealed && listReal.length >= 2
-    ? `<h2>eBay listings counted</h2>${historyChart(listReal, { asOf: endDay, color: "#7fc79a", unit: "count", snap: "real" })}`
-    : "";
+  void listReal;
+  const listChart = "";
   const breakBits = [];
   const listings = Number(fact?.listings);
   if (listings >= 20 && fact?.listingsAsOf) breakBits.push(`<p>Active listings: ${listings} (as of ${esc(fact.listingsAsOf)}).</p>`);
