@@ -3051,8 +3051,7 @@ ${conditionLine(opts.conditionNote)}
 ${ebayBlock(opts.priceRead)}
 </div>
 </header>
-${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div>` : ""}
-<script>${HISTORY_JS}</script>
+${chartOn ? `<div class="cp-charts"><div class="cp-price-col" id="price">${priceChart}${rangeRow}</div></div><script>${HISTORY_JS}</script>` : ""}
 ${opts.itemReadHtml || ""}
 ${patternBlock(opts.patternRead)}
 ${sit.length ? `<section class="cp-sec"><h2>Where it sits</h2>${readListHtml(sit)}</section>` : ""}
