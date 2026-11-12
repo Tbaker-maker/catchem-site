@@ -14,7 +14,7 @@ import { POST_OFFICE_LINE } from "./post-office-flag.mjs";
 import { feedNews } from "../data/feed-news.mjs";
 import { isNaRelevant } from "./jp-news.mjs";
 import { altAttr, brandedTile, cataloguePath, nextImage, catalogueUrl, imageForId, imageTag, newsTile, newsVariant, officialSrc, phoneCardHeroImg, productTypeLabel, ptcgFile, tcgPid } from "./catalogue-image.mjs";
-import { SEALED_SHELF_CSS, shelfClientSource } from "./sealed-shelf.mjs";
+import { SEALED_SHELF_CSS, sealedFrameRel, shelfClientSource } from "./sealed-shelf.mjs";
 import { browserAssetUrl } from "./data.mjs";
 import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getAffiliateConfig, pokemonCatalogLine, pokemonSlug, productLink, sortPokemonCards, storeLinksHtml, tcgStoreUrl } from "./pokemon.mjs";
 import { queryShardIds } from "./search-shards.mjs";
@@ -3304,13 +3304,12 @@ export function renderCard(card, stamp, opts = {}) {
 <style>
 .glance{display:block;max-width:100%}
 .glance-photo{max-width:100%}
-.glance-photo{display:flex;align-items:center;justify-content:center;width:min(320px,100%);aspect-ratio:1/1;padding:18px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
-.glance-photo img{border-radius:12px;max-height:100%}
-.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(280px,100%);max-width:100%;height:auto;object-fit:contain;object-position:center}
+.glance-photo{display:flex;align-items:flex-end;justify-content:center;width:min(280px,100%);height:300px;padding:12px;box-sizing:border-box;border-radius:20px;background:radial-gradient(120% 100% at 50% 30%,#2a2620 0%,#16140f 75%);border:1px solid #2f2b26;overflow:hidden}
+.glance-photo img,.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:auto;max-width:100%;height:calc(var(--rel, 0.88) * 260px);max-height:100%;object-fit:contain;object-position:center bottom;border-radius:12px}
 @media (max-width:767px){
   .product-glance{padding-bottom:16px}
-  .glance-photo{width:min(156px,42vw);padding:8px}
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(140px,100%)}
+  .glance-photo{width:min(240px,78vw);height:280px;padding:10px}
+  .glance-photo img,.glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{height:calc(var(--rel, 0.88) * 240px)}
 }
 .win{display:inline-flex;align-items:center;min-height:44px;min-width:44px;margin:0 8px 6px 0;font:600 13px/1.2 var(--sans)}
 .glance-reads{margin:8px 0;padding-left:18px}
@@ -3323,11 +3322,7 @@ export function renderCard(card, stamp, opts = {}) {
 .sealed-rip dd{margin:2px 0 0;font:650 16px/1.2 var(--sans)}
 .sealed-rip .muted{font-size:14px}
 @media (min-width:768px){
-  .glance{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(200px,100%)}
-}
-@media (min-width:1100px){
-  .glance img.shot,.glance img.card-face,.glance img.card-face[data-tile="card"]{width:min(240px,100%)}
+  .glance{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
 }
 .yr{margin:2px 0 14px;max-width:100%}
 .yr-line{margin:0 0 9px;font:600 13px/1.25 var(--sans);letter-spacing:-.02em;white-space:nowrap}
@@ -3337,7 +3332,7 @@ export function renderCard(card, stamp, opts = {}) {
 @media(max-width:480px){.yr-line{font-size:11px;letter-spacing:-.03em}}
 </style>
 <div class="glance">
-<div class="glance-photo">${img}</div>
+<div class="glance-photo" style="--rel:${sealedFrameRel(card)}">${img}</div>
 <div>
 <p class="muted">${setBit} · ${esc(hrefKind)}</p>
 <h1>${esc(card.name)}</h1>
