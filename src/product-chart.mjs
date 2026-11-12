@@ -158,7 +158,10 @@ html.pc-cam .glance-photo{width:100%!important;max-width:none!important;aspect-r
 html.pc-cam .glance-photo img,html.pc-cam .cp-photo img{width:100%!important;max-width:none!important;height:auto!important;object-fit:contain}
 html.pc-cam h1{font:600 64px/1.02 var(--serif)!important;margin:8px 0 12px}
 html.pc-cam .px{font-size:28px!important}
-html.pc-cam .px span{font:600 72px/1 var(--serif)!important}
+html.pc-cam .px > span:first-child{font:600 72px/1 var(--serif)!important}
+html.pc-cam .px .itap{display:block;margin-top:8px}
+html.pc-cam .px .itap-i{display:none!important}
+html.pc-cam .px .itap-pop{display:block!important;position:static;width:auto;max-width:none;padding:0;border:0;background:transparent;box-shadow:none;font:500 28px/1.3 var(--sans)!important;color:inherit}
 html.pc-cam .sum-strip{display:flex!important;gap:16px;margin:12px 0 8px}
 html.pc-cam .sum-chip{font:600 28px/1.25 var(--sans)!important;padding:14px 18px!important}
 html.pc-cam .pc-mark{display:block;font:500 22px/1.35 var(--sans);opacity:.92;white-space:normal}html.pc-cam .pc-mark b{font:600 28px/1.1 var(--serif)}html.pc-cam .pc-mark-path{margin:0 6px 0 2px}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block;width:44px;height:44px;font:400 22px/44px var(--sans);top:8px;right:8px}html.pc-cam .pc{box-shadow:none;padding-top:12px}html.pc-cam .pc .hc-plot{height:min(46vh,780px)}
@@ -169,13 +172,14 @@ html.pc-cam #price{scroll-margin-top:8px}html.pc-cam .chg dd{font-size:28px}html
 html.pc-cam .glance{grid-template-columns:1fr;gap:18px}
 html.pc-cam .glance-photo{width:min(720px,86vw)!important;margin:0 auto}
 html.pc-cam h1{font-size:72px!important}
-html.pc-cam .px span{font-size:84px!important}
+html.pc-cam .px > span:first-child{font-size:84px!important}
+html.pc-cam .px .itap-pop{font-size:32px!important}
 html.pc-cam .pc .hc-plot{height:640px}
 }
 @media (orientation:landscape) and (min-width:1600px){
 html.pc-cam .wrap{padding:20px 48px}
 html.pc-cam h1{font-size:56px!important}
-html.pc-cam .px span{font-size:64px!important}
+html.pc-cam .px > span:first-child{font-size:64px!important}
 html.pc-cam .pc .hc-plot{height:420px}
 }
 @media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
