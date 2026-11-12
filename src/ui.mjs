@@ -1,5 +1,6 @@
 import { openDataHref, ITEM_SECTIONS } from "./open-data.mjs";
 import { artType } from "./art-type.mjs";
+import { marketOverMsrp, msrpSourceLabel } from "./msrp.mjs";
 import { REFUND_LINE } from "./policy.mjs";
 import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
@@ -3364,7 +3365,7 @@ ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
 ${itemRankHtml(card)}
 ${KV_CSS}<section id="stats"><h2>Key stats</h2>
-${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card) })}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
+${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card), extras: sealed && !held ? msrpFacts(opts.msrp, shown, endDay, sourceLine(card)) : [] })}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
 ${allReadsHtml || (readHtml ? `<section id="reads"><h2>Reads</h2>\n${readHtml}</section>` : "")}
 ${itemRelatedHtml(card)}
 ${supplyNote}
@@ -3652,7 +3653,29 @@ export function factsLines(row) {
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(row?.date || ""))) lines.push({ label: "Date", value: String(row.date).slice(0, 10) });
   if (typeof row?.source === "string" && row.source.trim()) lines.push({ label: "Source", value: row.source.trim() });
+  for (const extra of Array.isArray(row?.extras) ? row.extras : []) {
+    const label = String(extra?.label || "").trim();
+    const value = String(extra?.value || "").trim();
+    if (label && value) lines.push({ label, value });
+  }
   return lines;
+}
+
+// MSRP key stats for a sealed product: the sourced US MSRP with its source and
+// check date, and current market over MSRP. Left off when no sourced row.
+export function msrpFacts(msrp, market, marketDate, marketSource) {
+  const usd = Number(msrp && msrp.msrpUsd);
+  if (!(usd > 0)) return [];
+  const checked = priceDay(String(msrp.dateChecked || "").slice(0, 10));
+  const src = [msrpSourceLabel(msrp), "US", checked ? `checked ${checked}` : ""].filter(Boolean).join(", ");
+  const out = [{ label: "MSRP", value: `${money(usd)} (${src})` }];
+  const multiple = marketOverMsrp(market, usd);
+  if (multiple != null) {
+    const when = priceDay(String(marketDate || "").slice(0, 10));
+    const srcM = [String(marketSource || "").trim() || "TCGplayer market", when].filter(Boolean).join(", ");
+    out.push({ label: "Market / MSRP", value: `${multiple}x (${srcM})` });
+  }
+  return out;
 }
 
 export function renderFacts(row) {
