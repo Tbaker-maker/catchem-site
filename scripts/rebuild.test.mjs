@@ -73,7 +73,7 @@ const reads = { asOf: "2026-09-27", reads: [
   { id: "heating-tcgcsv-10", type: "heating", headline: "Alakazam is heating up, up 4.2% since yesterday.", price: 12.5, changePct: 4.2, source: "TCGplayer market", asOf: "2026-09-27", confidence: "Early", history: [12, 12.5], why: "One day is not a trend.", href: "/c/tcgcsv-10", set: "Base Set", image: "" },
   { id: "box-etb", type: "box", headline: "Elite Trainer Box works out to $3.50 a pack on the eBay ask.", price: 31.5, changePct: null, source: "eBay ask", asOf: "2026-09-27", confidence: "Tracked", history: [30, 31.5], why: "Median eBay ask divided by 9 packs.", href: "/p/sv3pt5-etb.html", set: "151" },
 ]};
-const movers = { asOf: "2026-09-27", note: "One day.", singles: [{ id: "tcgcsv-10", name: "Alakazam", set: "Base Set", price: 12.5, changePct: 4.2, href: "/c/tcgcsv-10" }], sealed: [], slabs: [] };
+const movers = { asOf: "2026-09-27", note: "TCGplayer market, one day. Slabs stay off this list.", singles: [{ id: "tcgcsv-10", name: "Alakazam", set: "Base Set", price: 12.5, changePct: 4.2, windowDays: 30, href: "/c/tcgcsv-10" }], sealed: [], slabs: [] };
 const receipts = { asOf: "2026-09-27", note: "No direction was written first.", hitRate: null, rows: [{ headline: "Umbreon VMAX, revisited: unchanged since yesterday.", price: 20, source: "TCGplayer market", why: "Not a hit or a miss." }] };
 const files = {
   "counts.json": counts,
@@ -360,6 +360,7 @@ t("a set page uses the catalogue id or the branded tile", setHtml.includes("func
 t("a visible row has a picture or a branded tile", visualGaps(cardPage).length === 0 && visualGaps(setHtml).length === 0 && visualGaps(renderSearch()).length === 0 && visualGaps((await (await renderPath("/artists/ken-sugimori", fetchImpl)).text())).length === 0 && visualGaps((await (await renderPath("/board", fetchImpl, { feed: true })).text())).length === 0);
 const board = await (await renderPath("/board", fetchImpl, { feed: true })).text();
 t("movers keep slabs off the list", board.includes("Slabs") && board.includes("graded feed") && board.includes("Alakazam"));
+t("a mover's % names its window, never one day", board.includes("+4.2% 30D") && !/one day/i.test(board) && board.includes("over 7 or 30 days"));
 const post = await (await renderPath("/post-office", fetchImpl)).text();
 t("post office drops the catalog line", !post.includes(LOCKED) && !post.includes('id="fresh"'));
 const method = await (await renderPath("/methodology", fetchImpl)).text();
