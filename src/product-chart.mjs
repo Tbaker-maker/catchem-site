@@ -149,12 +149,14 @@ export const PRODUCT_CHART_CSS = `.pc .pc-tabs{display:flex;gap:4px;padding:3px;
 .pc-mark{display:none;margin:6px 0 0;text-align:right;font:500 12px/1.2 var(--sans);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-mark b{font:600 14px/1 var(--serif)}.pc-mark b span{color:#d9b779}
 .pc-cam-x{display:none;position:absolute;top:4px;right:4px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:inherit;font:400 18px/28px var(--sans);opacity:.45;cursor:pointer;z-index:3}.pc-cam-x:hover,.pc-cam-x:focus-visible{opacity:1;outline:2px solid #d9b779}
 .pc-up{color:#7fc79a}.pc-down{color:#e88b7f}
-html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback,html.pc-cam .rv-actions,html.pc-cam .add-read,html.pc-cam .item-sec,html.pc-cam .cp-sec,html.pc-cam .menu-btn,html.pc-cam .store-links,html.pc-cam .vchips,html.pc-cam .sealed-ask,html.pc-cam .sealed-rip,html.pc-cam .chg,html.pc-cam .chg-src,html.pc-cam .yr,html.pc-cam #eur,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #related,html.pc-cam .dive-links,html.pc-cam #paid-status,html.pc-cam .paid-foot,html.pc-cam .legal-links,html.pc-cam .rot-badge{display:none!important}
+html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback,html.pc-cam .rv-actions,html.pc-cam .add-read,html.pc-cam .menu-btn,html.pc-cam .store-links,html.pc-cam .paid-foot,html.pc-cam .legal-links{display:none!important}
 html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:flex!important}
 html.pc-cam,html.pc-cam body{background:#100e0c;overflow:hidden}
 html.pc-cam .wrap{max-width:none;padding:16px 28px}
 html.pc-cam .product-glance > *:not(.glance){display:none!important}
 html.pc-cam .glance{display:grid!important;grid-template-columns:minmax(240px,32vw) 1fr;column-gap:28px;row-gap:6px;align-items:center;min-height:calc(100vh - 32px)}
+html.pc-cam .glance > div{display:contents}
+html.pc-cam .chg,html.pc-cam .yr,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur{display:block!important}
 html.pc-cam .glance-photo{grid-column:1;grid-row:1;width:100%!important;max-width:none!important;max-height:46vh;aspect-ratio:1/1;padding:8px!important;margin:0;align-self:center}
 html.pc-cam .glance > p,html.pc-cam .glance > h1{grid-column:1}
 html.pc-cam .glance > .px,html.pc-cam .glance > .sum-strip{grid-column:1}
@@ -172,11 +174,10 @@ html.pc-cam #price{margin:0}
 html.pc-cam .pc-mark{display:block;font:500 22px/1.3 var(--sans);opacity:.92;white-space:normal}html.pc-cam .pc-mark b{font:600 22px/1.1 var(--serif)}html.pc-cam .pc-mark-path{margin:0 6px 0 2px}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block;position:fixed;width:44px;height:44px;font:400 22px/44px var(--sans);top:12px;right:12px}html.pc-cam .pc{box-shadow:none;padding-top:8px;margin:0}html.pc-cam .pc .hc-plot{height:min(42vh,460px)}
 html.pc-cam .pc-tab{font-size:18px;min-height:48px}html.pc-cam .hc-pill{font:600 16px/1 var(--sans);min-height:44px;padding:0 12px}
 html.pc-cam .hc-price{font-size:28px}
-html.pc-cam #price ~ *{display:none!important}
 @media (orientation:portrait) and (min-height:1500px){
 html.pc-cam .product-glance{grid-template-columns:1fr}
 html.pc-cam .glance{grid-template-columns:1fr;min-height:0;justify-items:center}
-html.pc-cam .glance-photo,html.pc-cam .glance > p,html.pc-cam .glance > h1,html.pc-cam .glance > .px,html.pc-cam .glance > .sum-strip,html.pc-cam #price{grid-column:1;grid-row:auto;align-self:center;width:100%}
+html.pc-cam .glance-photo,html.pc-cam .glance > p,html.pc-cam .glance > h1,html.pc-cam .glance > .px,html.pc-cam .glance > .sum-strip,html.pc-cam #price,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur,html.pc-cam .chg,html.pc-cam .yr{grid-column:1;grid-row:auto;align-self:center;width:100%}
 html.pc-cam .glance-photo{width:min(420px,68vw)!important;max-height:28vh;margin:0 auto}
 html.pc-cam h1{font:600 64px/1.02 var(--serif)!important}
 html.pc-cam .px > span:first-child{font-size:76px!important}

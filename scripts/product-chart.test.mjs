@@ -62,6 +62,9 @@ t("camera mode hides Watch and Add this to your read, and keeps the product phot
 t("camera mode opens on the product so the name, price, and chart share the frame", PRODUCT_CHART_JS.includes('querySelector(".product-glance")') && PRODUCT_CHART_JS.includes('scrollIntoView({block:"start"})'));
 t("camera type is large enough to read on a 1080p frame", /html\.pc-cam \.pc-mark\{[^}]*font:500 22px/.test(PRODUCT_CHART_CSS) && PRODUCT_CHART_CSS.includes("html.pc-cam h1{font:600 64px") && PRODUCT_CHART_CSS.includes("html.pc-cam .px > span:first-child{font:600 72px") && PRODUCT_CHART_CSS.includes("html.pc-cam .sum-chip{font:600 28px") && PRODUCT_CHART_CSS.includes("min-height:1500px") && PRODUCT_CHART_CSS.includes("min-width:1600px"));
 t("camera mode shows the price source and date without a tap", PRODUCT_CHART_CSS.includes("html.pc-cam .px .itap-pop{display:block!important"));
+const camHide = (PRODUCT_CHART_CSS.match(/html\.pc-cam \.site-bar,[^{]+\{display:none!important\}/) || [""])[0];
+t("camera mode keeps change, year range, listings counted, stats and euro data", camHide.includes("site-bar") && !/\.chg[,{]/.test(camHide) && !/\.yr[,{]/.test(camHide) && !/#supply/.test(camHide) && !/#stats/.test(camHide) && !/#eur/.test(camHide) && !/\.item-sec/.test(camHide) && !/\.cp-sec/.test(camHide) && PRODUCT_CHART_CSS.includes("html.pc-cam .chg,html.pc-cam .yr,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur{display:block!important}") && !PRODUCT_CHART_CSS.includes("html.pc-cam #price ~ *"));
+t("camera mode hides nav, shop and footer chrome", ["site-bar", "shop-block", "shop-btns", "store-links", "site-foot"].every((c) => camHide.includes(`.${c}`)));
 
 // Pages: sealed gets all views, a card without counts gets price and % change.
 const sealed = renderCard({ id: "tcgcsv-9", name: "Test Elite Trainer Box", kind: "sealed", set: "Test", price: 60, asOf: "2026-10-12", hist: [["2026-10-01", 55], ["2026-10-12", 60]] }, "stamp", {

@@ -1,7 +1,18 @@
-// Product share card: 1200x630 PNG, real page fields, no condition label.
+// Product share card: 1200x630 PNG from the product's own data, no query-text prices.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { drawProductShare, renderProductSharePng, decodePng, handleProductShare, productShareUrl, sparkPoints } from "../src/product-share.mjs";
+import {
+  drawProductShare,
+  renderProductSharePng,
+  decodePng,
+  handleProductShare,
+  productShareUrl,
+  productShareId,
+  productShareCacheKey,
+  shareFieldsFromProduct,
+  usesFallbackGlyph,
+  sparkPoints,
+} from "../src/product-share.mjs";
 import { addShareMeta } from "../src/seo.mjs";
 
 const pts = [40, 42, 41, 48, 55, 53, 60];
@@ -33,21 +44,85 @@ const q = "&" + "quot;";
 const html = '<figure data-p="[[' + q + '2026-10-01' + q + ',40],[' + q + '2026-10-02' + q + ',0],[' + q + '2026-10-03' + q + ',60,' + q + q + ',' + q + '2026-10-01' + q + '],[' + q + '2026-10-04' + q + ',55]]"></figure>';
 assert.deepEqual(sparkPoints(html), [40, 55]);
 
-const url = productShareUrl({ name: "Lost Origin Elite Trainer Box", price: "$194.33", date: "Oct 30, 2026", source: "TCGplayer market", points: pts, image: "/data/cutouts/x.png" });
-assert.equal(url.startsWith("https://catchemtcg.com/og/product.png?"), true);
-assert.equal(url.includes("194.33"), true);
-assert.equal(url.includes("TCGplayer"), true);
-assert.equal(url.includes("40%2C42") || url.includes("40,42") || url.includes("pts=40"), true);
+assert.equal(usesFallbackGlyph("Pokémon Day 2026"), false);
+assert.equal(usesFallbackGlyph("Scarlet & Violet"), false);
+assert.equal(usesFallbackGlyph("#107"), false);
+assert.equal(usesFallbackGlyph("Hello!"), false);
+assert.equal(usesFallbackGlyph("É"), false);
+const accent = drawProductShare({ name: "Pokémon Day 2026", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+const fallbackName = drawProductShare({ name: "Pok?mon Day 2026", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+assert.notEqual(Buffer.from(accent).equals(Buffer.from(fallbackName)), true);
+const amp = drawProductShare({ name: "Scarlet & Violet", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+const ampFallback = drawProductShare({ name: "Scarlet ? Violet", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+assert.notEqual(Buffer.from(amp).equals(Buffer.from(ampFallback)), true);
+const hash = drawProductShare({ name: "#107", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+const hashFallback = drawProductShare({ name: "?107", price: "$1.00", date: "Nov 12, 2026", source: "TCGplayer market" });
+assert.notEqual(Buffer.from(hash).equals(Buffer.from(hashFallback)), true);
 
-const res = await handleProductShare(new Request(url), new URL(url), async () => new Response("", { status: 404 }));
-assert.equal(res.headers.get("content-type"), "image/png");
+assert.equal(productShareUrl("tcgcsv-277335"), "https://catchemtcg.com/og/product/tcgcsv-277335.png");
+assert.equal(productShareUrl({ id: "sv8pt5-etb" }), "https://catchemtcg.com/og/product/sv8pt5-etb.png");
+assert.equal(productShareUrl("../secret"), "");
+assert.equal(productShareId("/og/product/tcgcsv-277335.png"), "tcgcsv-277335");
+assert.equal(productShareId("/og/product.png"), "");
+
+const card = {
+  id: "tcgcsv-277335",
+  name: "Lost Origin Elite Trainer Box",
+  price: 194.33,
+  asOf: "2026-10-30",
+  source: "TCGplayer market",
+  hist: [["2026-10-01", 40], ["2026-10-02", 0], ["2026-10-03", 60], ["2026-10-04", 55]],
+};
+const fields = shareFieldsFromProduct(card);
+assert.equal(fields.name, "Lost Origin Elite Trainer Box");
+assert.equal(fields.price, "$194.33");
+assert.equal(fields.date, "Oct 30, 2026");
+assert.equal(fields.source, "TCGplayer market");
+assert.deepEqual(fields.points, [40, 60, 55]);
+
+const store = new Map();
+globalThis.caches = { default: {
+  async match(req) { return store.get(req.url) ? store.get(req.url).clone() : undefined; },
+  async put(req, res) { store.set(req.url, res.clone()); },
+} };
+const loadProduct = async (id) => (id === "tcgcsv-277335" ? { ...card } : null);
+const shareUrl = new URL("https://catchemtcg.com/og/product/tcgcsv-277335.png");
+const opts = { loadProduct, dataVersion: "2026-10-30", buildId: "abcdef1234567890" };
+const res = await handleProductShare(new Request(shareUrl), shareUrl, opts);
 assert.equal(res.status, 200);
+assert.equal(res.headers.get("content-type"), "image/png");
+assert.equal(res.headers.get("cdn-cache-control"), "no-store");
+assert.equal(res.headers.get("x-data-version"), "2026-10-30");
 const body = new Uint8Array(await res.arrayBuffer());
 assert.equal(body[0], 137);
 
+const fakeUrl = new URL("https://catchemtcg.com/og/product/tcgcsv-277335.png?p=%24999.00&n=Fake%20Card&d=Jan%201,%201999&src=Made%20up");
+const fake = await handleProductShare(new Request(fakeUrl), fakeUrl, opts);
+assert.equal(fake.status, 200);
+const fakeBody = new Uint8Array(await fake.arrayBuffer());
+assert.equal(Buffer.from(body).equals(Buffer.from(fakeBody)), true);
+
+const hit = await handleProductShare(new Request(shareUrl), shareUrl, opts);
+assert.equal(hit.headers.get("x-edge-cache"), "hit");
+const key = productShareCacheKey("tcgcsv-277335", "2026-10-30", "abcdef1234567890");
+assert.equal(new URL(key.url).searchParams.get("dv"), "2026-10-30");
+assert.equal(new URL(key.url).searchParams.get("bv"), "abcdef123456");
+assert.equal(new URL(key.url).pathname, "/og/product/tcgcsv-277335.png");
+
+const otherDay = await handleProductShare(new Request(shareUrl), shareUrl, { ...opts, dataVersion: "2026-11-12" });
+assert.equal(otherDay.headers.get("x-edge-cache"), null);
+const otherBuild = await handleProductShare(new Request(shareUrl), shareUrl, { ...opts, buildId: "bbbb22222222" });
+assert.equal(otherBuild.headers.get("x-edge-cache"), null);
+
+const missing = await handleProductShare(new Request("https://catchemtcg.com/og/product/no-such.png"), new URL("https://catchemtcg.com/og/product/no-such.png"), opts);
+assert.equal(missing.status, 404);
+const oldQuery = await handleProductShare(new Request("https://catchemtcg.com/og/product.png?n=Fake&p=%24999"), new URL("https://catchemtcg.com/og/product.png?n=Fake&p=%24999"), opts);
+assert.equal(oldQuery.status, 404);
+
 const page = addShareMeta(`<html><head><title>Lost Origin Elite Trainer Box · Catch'em</title></head><body><div data-rv-price="194.33" data-rv-date="2026-10-30"></div><img loading="eager" src="/data/cutouts/x.webp">${html}</body></html>`, "/p/tcgcsv-277335", "product");
-assert.match(page, /property="og:image" content="https:\/\/catchemtcg\.com\/og\/product\.png\?/);
-assert.match(page, /name="twitter:image" content="https:\/\/catchemtcg\.com\/og\/product\.png\?/);
+assert.match(page, /property="og:image" content="https:\/\/catchemtcg\.com\/og\/product\/tcgcsv-277335\.png"/);
+assert.match(page, /name="twitter:image" content="https:\/\/catchemtcg\.com\/og\/product\/tcgcsv-277335\.png"/);
+assert.equal(page.includes("/og/product.png?"), false);
 assert.equal(page.includes("twitter:image\" content=\"https://catchemtcg.com/data/cutouts/x.webp"), false);
 assert.doesNotMatch(page, /og:image" content="[^"]*sold/i);
 const src = readFileSync(new URL("../src/product-share.mjs", import.meta.url), "utf8");

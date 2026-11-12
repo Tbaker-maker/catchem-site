@@ -1,12 +1,20 @@
 // 1200x630 product share card as a PNG. X, Facebook, Discord and iMessage
 // do not render an SVG, so og:image and twitter:image point here.
-// Drawn from the page's own name, price, date, source and price points.
+// The public URL is /og/product/<id>.png. Name, price, date and source come
+// from the product's own data on the server, never from query text.
 // A PNG hero is copied on when one is passed. WebP is left off the card:
 // this worker has no WebP decoder.
+
+import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion } from "./data.mjs";
+import { BUILD_SHA } from "./build-stamp.mjs";
+import { edgeBuildId } from "./edge-cache.mjs";
+import { money } from "./clean-text.mjs";
 
 const W = 1200;
 const H = 630;
 const ORIGIN = "https://catchemtcg.com";
+const SHARE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // 5x7 glyphs, 5 bits per row, high bit is the left pixel.
 const FONT = {
@@ -59,12 +67,26 @@ const FONT = {
   "'": [6, 6, 4, 0, 0, 0, 0],
   "(": [2, 4, 8, 8, 8, 4, 2],
   ")": [8, 4, 2, 2, 2, 4, 8],
+  "!": [4, 4, 4, 4, 4, 0, 4],
+  "#": [10, 10, 31, 10, 31, 10, 10],
+  "&": [12, 18, 18, 12, 21, 18, 13],
+  "É": [10, 31, 16, 30, 16, 16, 31],
+  "é": [10, 14, 17, 31, 16, 17, 14],
 };
 
 function glyph(ch) {
   if (FONT[ch]) return FONT[ch];
   const up = String(ch || "").toUpperCase();
   return FONT[up] || FONT["?"];
+}
+
+// True when a character would be drawn as the '?' fallback, not as itself.
+export function usesFallbackGlyph(text) {
+  return [...String(text || "")].some((ch) => {
+    if (ch === "?") return false;
+    if (FONT[ch] || FONT[String(ch).toUpperCase()]) return false;
+    return true;
+  });
 }
 
 function fillRect(rgb, x, y, w, h, color) {
@@ -183,21 +205,59 @@ export function sparkPoints(html) {
     .map((p) => Math.round(Number(p[1]) * 100) / 100);
 }
 
-export function productShareUrl({ name = "", price = "", date = "", source = "", points = [], image = "" } = {}) {
-  const q = new URLSearchParams();
-  const n = String(name || "").replace(/\s+/g, " ").trim().slice(0, 90);
-  if (n) q.set("n", n);
-  const money = String(price || "").trim().slice(0, 24);
-  if (money) q.set("p", money);
-  const day = String(date || "").trim().slice(0, 40);
-  if (day) q.set("d", day);
-  const src = String(source || "").trim().slice(0, 48);
-  if (src) q.set("src", src);
-  const pts = (Array.isArray(points) ? points : []).map(Number).filter((n) => n > 0).slice(-36);
-  if (pts.length >= 2) q.set("pts", pts.map((n) => String(Math.round(n * 100) / 100)).join(","));
-  const img = String(image || "");
-  if (img.startsWith("/") && !img.includes("..") && !img.includes("\\") && img.length < 240) q.set("img", img);
-  return `${ORIGIN}/og/product.png?${q.toString()}`;
+export function productShareId(pathname) {
+  const m = String(pathname || "").match(/^\/og\/product\/([^/]+)\.png$/);
+  if (!m) return "";
+  let id = m[1];
+  try { id = decodeURIComponent(id); } catch { return ""; }
+  return SHARE_ID.test(id) ? id : "";
+}
+
+export function productShareUrl(id) {
+  const raw = typeof id === "string" ? id : (id && id.id) || "";
+  const safe = String(raw || "").trim();
+  if (!SHARE_ID.test(safe)) return "";
+  return `${ORIGIN}/og/product/${encodeURIComponent(safe)}.png`;
+}
+
+function formatDay(iso) {
+  const [y, mo, d] = String(iso).split("-").map(Number);
+  if (!(y > 0 && mo >= 1 && mo <= 12 && d >= 1)) return "";
+  return `${MONTHS[mo - 1]} ${d}, ${y}`;
+}
+
+function publicSource(card) {
+  const src = String(card && card.source || "").trim();
+  if (!src || /tcgcsv|ebay-browse-api|\.json/i.test(src)) return "TCGplayer market";
+  return src;
+}
+
+export function shareFieldsFromProduct(card) {
+  if (!card) return null;
+  const name = String(card.name || "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 90) || "Product";
+  const priceNum = Number(card.price);
+  const day = String(card.asOf || card.priceDate || "").slice(0, 10);
+  const hist = Array.isArray(card.hist) ? card.hist : [];
+  const points = hist
+    .filter((p) => Array.isArray(p) && Number(p[1]) > 0 && !p[3])
+    .slice(-36)
+    .map((p) => Math.round(Number(p[1]) * 100) / 100);
+  return {
+    name,
+    price: priceNum > 0 ? money(priceNum) : "",
+    date: /^\d{4}-\d{2}-\d{2}$/.test(day) ? formatDay(day) : "",
+    source: publicSource(card),
+    points,
+  };
+}
+
+export function productShareCacheKey(id, dataVersion = "", buildId = "") {
+  const url = new URL(`${ORIGIN}/og/product/${encodeURIComponent(id)}.png`);
+  const day = String(dataVersion || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) url.searchParams.set("dv", day);
+  url.searchParams.set("bv", edgeBuildId(buildId));
+  url.searchParams.sort();
+  return new Request(url.toString(), { method: "GET" });
 }
 
 function cleanName(value) {
@@ -412,34 +472,74 @@ function safeImagePath(value) {
   return "";
 }
 
-export async function handleProductShare(request, url, fetchImpl = fetch) {
-  const q = url.searchParams;
-  const points = String(q.get("pts") || "").split(",").map(Number).filter((n) => n > 0).slice(-36);
-  let image = null;
-  const img = safeImagePath(q.get("img") || "");
-  if (img && /\.png(?:$|\?)/i.test(img)) {
-    try {
-      const res = await fetchImpl(img);
-      if (res && res.ok) {
-        const buf = new Uint8Array(await res.arrayBuffer());
-        image = await decodePng(buf);
-      }
-    } catch { image = null; }
+function edgePngCache() {
+  try { return typeof caches !== "undefined" && caches.default ? caches.default : null; } catch { return null; }
+}
+
+function asPngHit(hit, dataVersion) {
+  const h = new Headers(hit.headers);
+  h.set("cdn-cache-control", "no-store");
+  h.set("x-edge-cache", "hit");
+  if (dataVersion) h.set("x-data-version", dataVersion);
+  return new Response(hit.body, { status: 200, headers: h });
+}
+
+export async function handleProductShare(request, url, opts = {}) {
+  if (typeof opts === "function") opts = { fetchImpl: opts };
+  const fetchImpl = opts.fetchImpl || fetch;
+  const id = productShareId(url.pathname);
+  if (!id) {
+    return new Response("Not found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
   }
-  const png = await renderProductSharePng({
-    name: q.get("n") || "Product",
-    price: q.get("p") || "",
-    date: q.get("d") || "",
-    source: q.get("src") || "TCGplayer market",
-    points,
-    image,
-  });
-  return new Response(request.method === "HEAD" ? null : png, {
-    status: 200,
-    headers: {
-      "content-type": "image/png",
-      "cache-control": "public, max-age=300",
-      "x-content-type-options": "nosniff",
-    },
-  });
+
+  const env = opts.env;
+  const ctx = opts.ctx;
+  if (env?.FEED_KV) setRawKv(env.FEED_KV, ctx?.waitUntil ? (job) => ctx.waitUntil(job) : undefined);
+  let dataVersion = String(opts.dataVersion || currentDataVersion() || "").slice(0, 10);
+  if (!dataVersion) {
+    dataVersion = String(await publicDataVersion(fetchImpl) || "").slice(0, 10);
+    if (dataVersion) setDataVersion(dataVersion);
+  }
+  const buildId = opts.buildId != null ? opts.buildId : BUILD_SHA;
+  const cache = edgePngCache();
+  const key = productShareCacheKey(id, dataVersion, buildId);
+  if (cache) {
+    try {
+      const hit = await cache.match(key);
+      if (hit) return asPngHit(hit, dataVersion);
+    } catch { /* miss */ }
+  }
+
+  const loadProduct = opts.loadProduct || ((pid) => bucketRow(pid, fetchImpl));
+  const card = await loadProduct(id);
+  const fields = shareFieldsFromProduct(card);
+  if (!fields) {
+    return new Response("Not found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+  const png = await renderProductSharePng(fields);
+  const headers = {
+    "content-type": "image/png",
+    "cache-control": "public, max-age=86400",
+    "cdn-cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  };
+  if (dataVersion) headers["x-data-version"] = dataVersion;
+  const res = new Response(request.method === "HEAD" ? null : png, { status: 200, headers });
+  if (cache && request.method !== "HEAD") {
+    try {
+      const stored = res.clone();
+      const h = new Headers(stored.headers);
+      h.set("cache-control", "public, max-age=86400");
+      h.delete("cdn-cache-control");
+      const put = cache.put(key, new Response(stored.body, { status: 200, headers: h })).catch(() => {});
+      if (ctx?.waitUntil) ctx.waitUntil(put); else await put;
+    } catch { /* never block the image on the cache */ }
+  }
+  return res;
 }

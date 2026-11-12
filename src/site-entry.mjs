@@ -34,8 +34,8 @@ export default {
         });
       }
     }
-    if ((request.method === "GET" || request.method === "HEAD") && path === "/og/product.png") {
-      return handleProductShare(request, url);
+    if ((request.method === "GET" || request.method === "HEAD") && /^\/og\/product\/[^/]+\.png$/.test(path)) {
+      return handleProductShare(request, url, { env, ctx });
     }
     return worker.fetch(request, env, ctx);
   },

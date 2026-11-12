@@ -1,13 +1,13 @@
 // Share and search tags for worker-rendered pages that do not set their own.
 // Every page gets a description, canonical URL, and Open Graph / Twitter tags.
-// Card and product pages use a 1200x630 PNG (/og/product.png) because X does
-// not render an SVG. Other pages keep og.png.
+// Card and product pages use a 1200x630 PNG (/og/product/<id>.png) because X does
+// not render an SVG. The image is built from the product's own data. Other pages keep og.png.
 // Product and card pages also get a unique title (name, type, set when it is not
 // already in the name, and the dated market price) and Product JSON-LD. Offers
 // are included only when a real market price is on the page. No ratings, review
 // counts, or sold counts are invented.
 
-import { productShareUrl, sparkPoints } from "./product-share.mjs";
+import { productShareUrl } from "./product-share.mjs";
 
 const ORIGIN = "https://catchemtcg.com";
 const OG_IMAGE = `${ORIGIN}/og.png`;
@@ -154,18 +154,8 @@ export function addShareMeta(html, pathname, kind) {
   const pageTitle = (kind === "card" || kind === "product") ? productPageTitle(kind, name, market, setName) : fullTitle;
   const desc = path === "/reads" ? "Pick the Pokémon cards, sets and sealed products you follow and get a dated read on them by email or Discord DM." : pageDescription(s, kind, name);
   const hero = pageImage(s, kind);
-  let share = "";
-  if (kind === "card" || kind === "product") {
-    const heroPath = hero.startsWith(ORIGIN) ? hero.slice(ORIGIN.length) : "";
-    share = productShareUrl({
-      name,
-      price: market?.money || "",
-      date: market?.date || "",
-      source: market ? "TCGplayer market" : "",
-      points: sparkPoints(s),
-      image: heroPath,
-    });
-  }
+  const itemId = (kind === "card" || kind === "product") ? (path.match(/^\/(?:p|c)\/([^/]+)$/) || [])[1] : "";
+  const share = itemId ? productShareUrl(itemId) : "";
   // X, Facebook, Discord and iMessage do not render an SVG share image.
   // Card and product pages use the composed PNG. Other pages use a raster
   // hero or og.png.
