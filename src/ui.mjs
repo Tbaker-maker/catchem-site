@@ -2826,7 +2826,7 @@ function readLink(card) {
   const id = String(card?.id || "");
   if (!id.startsWith("tcgcsv-")) return "";
   const kind = card.kind === "sealed" ? "sealed" : "card";
-  return `<p class="muted"><a class="tap" href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
+  return `<p class="muted add-read"><a class="tap" href="/reads?${kind}=${esc(id)}">Add this to your read</a></p>`;
 }
 
 
@@ -2975,6 +2975,17 @@ function conditionView(card, ladder, held) {
   return { html: `${blocks.join("")}${src}<script>${COND_JS}</script>`, selected };
 }
 
+// Public slug in the camera watermark when we have one. Opaque tcgcsv ids stay off it.
+function chartPath(card, opts = {}) {
+  const slug = String(opts.slug || card?.slug || "").trim();
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && !/^tcgcsv-\d+$/.test(slug)) {
+    return (card?.kind === "sealed" ? "/p/" : "/c/") + slug;
+  }
+  const cut = String(opts.catalogueSrc || "").match(/\/data\/cutouts\/([a-z0-9]+(?:-[a-z0-9]+)*)\.(?:webp|png|jpe?g)(?:\?|$)/i);
+  if (cut && card?.kind === "sealed") return "/p/" + cut[1];
+  return "";
+}
+
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit, held = false }) {
   const view = conditionView(card, opts.conditionLadder, held);
   const showPrice = view.selected ? money(view.selected.amount) : price;
@@ -2995,7 +3006,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
     .map((point) => [String(point.date).slice(0, 10), Number(point.listingCount), "n"])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   // One switchable chart: price, listings counted, both, % change (only views with data).
-  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, asOf: endDay });
+  const priceChart = productChart({ price: priceReal.length >= 2 ? priceSeries : [], listings: listReal, asOf: endDay, path: chartPath(card, opts) });
   const chartOn = !!(priceChart || rangeRow);
   const sit = readItems(opts.sitReads, card.id).filter((item) => SIT_KINDS.has(item.kind));
   const boardSrc = Array.isArray(opts.boardReads) ? opts.boardReads : (opts.productReads || []);
@@ -3237,7 +3248,7 @@ export function renderCard(card, stamp, opts = {}) {
   // wins on overlap, so fill only covers days after its last point.
   const priceSeries = cardPriceSeries(card, hist, sealed);
   // One switchable chart for the sealed page: price, eBay listings counted, both, % change.
-  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull" }) || historyChart(priceSeries, { asOf: endDay });
+  const priceChart = productChart({ price: priceSeries, listings: opts.listingSeries || [], asOf: endDay, ownLabel: "TCGplayer market price, our nightly pull", path: chartPath(card, opts) }) || historyChart(priceSeries, { asOf: endDay });
   // Quick-view sheets on this page still mount the shared history chart.
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);

@@ -36,6 +36,12 @@ export function chartViews(priceReal, listReal) {
   return views;
 }
 
+// Sealed pages open on Price + listings when that view exists; otherwise the first tab.
+export function defaultView(views) {
+  for (const row of views || []) if (row && row[0] === "both") return "both";
+  return views && views[0] ? views[0][0] : "";
+}
+
 // Y range for the price, combined, and % change views. Price views span at least
 // MIN_SPAN of the middle price (about +-5%), so a 1% move does not fill the plot.
 export const MIN_SPAN = 0.1;
@@ -47,19 +53,22 @@ export function yDomain(vals, view) {
   return [mn - pad, mx + pad];
 }
 
-export function productChart({ price = [], listings = [], asOf = "", ownLabel } = {}) {
+export function productChart({ price = [], listings = [], asOf = "", ownLabel, path = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
   const views = chartViews(priceReal.length, list.length);
   if (!views.length) return "";
+  const start = defaultView(views);
   const filled = priceReal.length >= 2 ? fillDaily(priceReal) : [];
   const dates = [...filled.map((p) => p[0]), ...list.map((p) => p[0])].sort();
   const spanDays = dates.length ? (Date.parse(dates.at(-1)) - Date.parse(dates[0])) / DAY : 0;
   const ranges = [["1M", 31], ["3M", 92], ["6M", 183], ["1Y", 366], ["All", 0]].filter(([, d]) => d === 0 || spanDays > d * 0.5);
   const pills = ranges.map(([l, d], i) => `<button type="button" class="hc-pill" data-days="${d}" aria-pressed="${i === ranges.length - 1 ? "true" : "false"}">${l}</button>`).join("");
   const tabs = views.length > 1
-    ? `<div class="pc-tabs" role="group" aria-label="Chart data">${views.map(([k, l], i) => `<button type="button" class="pc-tab" data-view="${k}" aria-pressed="${i === 0 ? "true" : "false"}">${esc(l)}</button>`).join("")}</div>`
+    ? `<div class="pc-tabs" role="group" aria-label="Chart data">${views.map(([k, l]) => `<button type="button" class="pc-tab" data-view="${k}" aria-pressed="${k === start ? "true" : "false"}">${esc(l)}</button>`).join("")}</div>`
     : "";
+  const rawPath = String(path || "");
+  const markPath = /^\/[pc]\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawPath) && !/\/tcgcsv-\d+$/.test(rawPath) ? rawPath : "";
   const srcs = (priceReal.length >= 2 ? historySources(priceReal, ownLabel) : []).map((line) => line.replace(/\d{4}-\d{2}-\d{2}/g, longDay));
   if (list.length >= 2) srcs.push(`eBay listings counted, active listings each night, ${longDay(list[0][0])} to ${longDay(list.at(-1)[0])}`);
   const lastDay = String(asOf || "").slice(0, 10) || (dates.at(-1) || "");
@@ -67,14 +76,14 @@ export function productChart({ price = [], listings = [], asOf = "", ownLabel } 
   const sum = priceReal.length >= 2
     ? `Price from ${esc(priceReal[0][0])} to ${esc(priceReal.at(-1)[0])}.${list.length >= 2 ? ` eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).` : ""}`
     : `eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).`;
-  return `<style>${PRODUCT_CHART_CSS}</style><figure class="hc pc" id="chart" data-view="${views[0][0]}" data-p="${esc(JSON.stringify(filled))}" data-l="${esc(JSON.stringify(list))}">
+  return `<style>${PRODUCT_CHART_CSS}</style><figure class="hc pc" id="chart" data-view="${start}" data-p="${esc(JSON.stringify(filled))}" data-l="${esc(JSON.stringify(list))}">
 <p class="hc-sum">${sum}</p>
 ${tabs}
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
-<p class="pc-mark" aria-hidden="true" data-day="${esc(lastDay ? longDay(lastDay) : "")}" data-src-price="TCGplayer market"${list.length >= 2 ? ` data-src-listings="eBay listings counted" data-src-both="TCGplayer market, eBay listings counted"` : ""}><b>Catch'em<span>.</span></b> <span class="pc-mark-t">${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</span></p>
+<p class="pc-mark" aria-hidden="true" data-day="${esc(lastDay ? longDay(lastDay) : "")}" data-src-price="TCGplayer market"${list.length >= 2 ? ` data-src-listings="eBay listings counted" data-src-both="TCGplayer market, eBay listings counted"` : ""}><b>Catch'em<span>.</span></b>${markPath ? ` <span class="pc-mark-path">${esc(markPath)}</span>` : ""} <span class="pc-mark-t">${esc(markSrc)}${lastDay ? `, ${esc(longDay(lastDay))}` : ""}</span></p>
 ${list.length >= 2 ? `<p class="pc-key muted"><span class="pc-k"><span class="pc-sw pc-sw-p"></span>Price</span><span class="pc-k"><span class="pc-sw pc-sw-l"></span>eBay listings counted (active listings each night)</span></p>` : ""}
 <p class="pc-src muted">${srcs.map(esc).join(". ")}${srcs.length ? "." : ""}</p>
 <p class="pc-foot"><button type="button" class="pc-cam-btn" aria-pressed="false">Camera mode</button></p>
@@ -98,8 +107,9 @@ export const PRODUCT_CHART_CSS = `.pc .pc-tabs{display:flex;gap:4px;padding:3px;
 .pc-mark{display:none;margin:6px 0 0;text-align:right;font:500 12px/1.2 var(--sans);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-mark b{font:600 14px/1 var(--serif)}.pc-mark b span{color:#d9b779}
 .pc-cam-x{display:none;position:absolute;top:4px;right:4px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:inherit;font:400 18px/28px var(--sans);opacity:.45;cursor:pointer;z-index:3}.pc-cam-x:hover,.pc-cam-x:focus-visible{opacity:1;outline:2px solid #d9b779}
 .pc-up{color:#7fc79a}.pc-down{color:#e88b7f}
-html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback{display:none!important}
-html.pc-cam .pc-mark{display:block}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block}html.pc-cam .pc{box-shadow:none;padding-top:38px}html.pc-cam .pc .hc-plot{height:260px}
+html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .dock,html.pc-cam .site-foot,html.pc-cam .shop-block,html.pc-cam .shop-btns,html.pc-cam .shop-note,html.pc-cam .skip-link,html.pc-cam .item-jump,html.pc-cam #qsheet,html.pc-cam #qback,html.pc-cam .rv-actions,html.pc-cam .add-read,html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:none!important}
+html.pc-cam .pc-mark{display:block;font:500 16px/1.35 var(--sans);opacity:.92;white-space:normal}html.pc-cam .pc-mark b{font:600 22px/1.1 var(--serif)}html.pc-cam .pc-mark-path{margin:0 6px 0 2px}html.pc-cam .pc-src,html.pc-cam .pc-key,html.pc-cam .pc-foot{display:none!important}html.pc-cam .pc-cam-x{display:block;width:44px;height:44px;font:400 22px/44px var(--sans);top:8px;right:8px}html.pc-cam .pc{box-shadow:none;padding-top:38px}html.pc-cam .pc .hc-plot{height:260px}
+html.pc-cam #price{scroll-margin-top:8px}html.pc-cam .chg dd{font-size:18px}html.pc-cam .yr-line{font-size:15px;letter-spacing:0;white-space:normal}
 @media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
 
 // Client script. Kept free of dashed strokes: the price line stays solid.
@@ -114,7 +124,7 @@ function grid$(v,span){return v>=100&&span>=20?"$"+Math.round(v).toLocaleString(
 function cnt(v){return Math.round(Number(v)).toLocaleString("en-US");}
 function pct(v){var r=Math.round(v*10)/10;return (r>0?"+":"")+r.toFixed(1)+"%";}
 function smooth(xy){var d="M"+xy[0][0].toFixed(1)+","+xy[0][1].toFixed(1);for(var i=0;i<xy.length-1;i++){var p0=xy[i-1]||xy[i],p1=xy[i],p2=xy[i+1],p3=xy[i+2]||p2;var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;var lo=Math.min(p1[1],p2[1]),hi=Math.max(p1[1],p2[1]);c1y=Math.max(lo,Math.min(hi,c1y));c2y=Math.max(lo,Math.min(hi,c2y));d+=" C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);}return d;}
-function cam(on){document.documentElement.classList.toggle("pc-cam",on);document.querySelectorAll(".pc-cam-btn").forEach(function(b){b.setAttribute("aria-pressed",on?"true":"false");b.textContent=on?"Exit camera mode":"Camera mode";});if(on){var f=document.querySelector("figure.pc");if(f&&f.scrollIntoView)f.scrollIntoView({block:"center"});}}
+function cam(on){document.documentElement.classList.toggle("pc-cam",on);document.querySelectorAll(".pc-cam-btn").forEach(function(b){b.setAttribute("aria-pressed",on?"true":"false");b.textContent=on?"Exit camera mode":"Camera mode";});if(on){var f=document.getElementById("price")||document.querySelector("figure.pc");if(f&&f.scrollIntoView)f.scrollIntoView({block:"start"});}}
 function mount(fig){if(fig.dataset.ready)return;fig.dataset.ready="1";
 var P=JSON.parse(fig.getAttribute("data-p")||"[]"),L=JSON.parse(fig.getAttribute("data-l")||"[]");
 var svg=fig.querySelector(".hc-svg"),plot=fig.querySelector(".hc-plot"),tip=fig.querySelector(".hc-tip"),gls=fig.querySelector(".hc-gls"),tags=fig.querySelector(".pc-tags"),ax=fig.querySelector(".hc-axis"),ul=fig.querySelector(".pc-ul"),ur=fig.querySelector(".pc-ur"),priceEl=fig.querySelector(".hc-price"),dateEl=fig.querySelector(".hc-date");
