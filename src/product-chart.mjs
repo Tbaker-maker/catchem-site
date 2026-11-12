@@ -68,6 +68,31 @@ export function yDomain(vals, view) {
   return [mn - pad, mx + pad];
 }
 
+// Visible x-axis for a tab and range pill. All (days = 0) uses the full price
+// history on Price, Price + listings, and % change. Listings bars start where
+// listings data starts; they do not shorten the axis. 1M / 3M / 6M / 1Y count
+// back from the later series in the current view.
+export function chartWindow(view, days, P, L) {
+  var bars = view === "listings" || view === "sold";
+  var useP = !bars, useL = bars || view === "both";
+  function ms(d) { return Date.parse(d + "T00:00:00Z"); }
+  var ends = [];
+  if (useP && P.length) ends.push(ms(P[P.length - 1][0]));
+  if (useL && L.length) ends.push(ms(L[L.length - 1][0]));
+  var end = Math.max.apply(null, ends);
+  var from = days ? end - days * 864e5 : -Infinity;
+  var p = useP ? P.filter(function (x) { return ms(x[0]) >= from; }) : [];
+  var l = useL ? L.filter(function (x) { return ms(x[0]) >= from; }) : [];
+  if (useP && p.filter(function (x) { return !x[3]; }).length < 2) p = P.slice(-2);
+  if (useL && l.length < 2) l = L.slice(-2);
+  var starts = [];
+  if (p.length) starts.push(ms(p[0][0]));
+  if (l.length) starts.push(ms(l[0][0]));
+  var t0 = Math.min.apply(null, starts), t1 = end;
+  if (t1 <= t0) t1 = t0 + 864e5;
+  return { from: from, t0: t0, t1: t1, p: p, l: l, useP: useP, useL: useL };
+}
+
 export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
@@ -132,6 +157,7 @@ html.pc-cam #price{scroll-margin-top:8px}html.pc-cam .chg dd{font-size:18px}html
 // Client script. Kept free of dashed strokes: the price line stays solid.
 export const PRODUCT_CHART_JS = `(function(){
 var yDomain=${yDomain.toString()};
+var chartWindow=${chartWindow.toString()};
 var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function ms(d){return Date.parse(d+"T00:00:00Z");}
 function short(d){var p=d.split("-");return M[+p[1]-1]+" "+(+p[2])+(+p[0]===new Date().getUTCFullYear()?"":", "+p[0]);}
@@ -149,16 +175,8 @@ var W=600,H=220,PT=16,PB=6,GOLD="#d9b779",GREEN="#7fc79a",gid="pg"+Math.random()
 var view=fig.getAttribute("data-view")||"price",days=0,st={};
 var Preal=function(arr){return arr.filter(function(p){return !p[3];});};
 function draw(){
-  L=view==="sold"?S:L0;var bars=view==="listings"||view==="sold";
-  var useP=!bars,useL=bars||view==="both";
-  var ends=[];if(useP&&P.length)ends.push(ms(P[P.length-1][0]));if(useL&&L.length)ends.push(ms(L[L.length-1][0]));
-  var end=Math.max.apply(null,ends),from=days?end-days*864e5:-Infinity;
-  // The overlay covers the nights that have both series.
-  if(view==="both"&&L.length)from=Math.max(from,ms(L[0][0]));
-  var p=useP?P.filter(function(x){return ms(x[0])>=from;}):[],l=useL?L.filter(function(x){return ms(x[0])>=from;}):[];
-  if(useP&&Preal(p).length<2)p=P.slice(-2);if(useL&&l.length<2)l=L.slice(-2);
-  var starts=[];if(p.length)starts.push(ms(p[0][0]));if(l.length)starts.push(ms(l[0][0]));
-  var t0=Math.min.apply(null,starts),t1=end;if(t1<=t0)t1=t0+864e5;
+  L=view==="sold"?S:L0;
+  var win=chartWindow(view,days,P,L),p=win.p,l=win.l,t0=win.t0,t1=win.t1,useP=win.useP,useL=win.useL,bars=!useP;
   var nDays=Math.max(1,Math.round((t1-t0)/864e5)),bw=Math.max(1.2,Math.min(14,W/(nDays+1)*0.7)),inset=useL?bw/2+1:0;
   function X(d){return inset+((ms(d)-t0)/(t1-t0))*(W-2*inset);}
   var body="",gl="",tg="";
