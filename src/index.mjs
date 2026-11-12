@@ -48,6 +48,7 @@ import { renderScanner, renderWeekly } from "./weekly.mjs";
 import { renderPromos } from "./promos.mjs";
 import { sealedRatingPanel, sealedShard } from "./sealed-rating.mjs";
 import { imageTag as picTag } from "./catalogue-image.mjs";
+import { EDITOR_TCG_PIDS } from "./editor-tcg-pids.mjs";
 import { pageChrome, freshLabel, newestStamp } from "./ui.mjs";
 import { attachSignals, chipLookup, signalRowHtml } from "./signal-chips.mjs";
 import { patternSentence, priceBits } from "./read-sheet.mjs";
@@ -1500,6 +1501,16 @@ const worker = {
       for (const path of editorImageFallbacks(rest)) {
         const hit = await fetchImpl("https://images.pokemontcg.io/" + path);
         if (hit && hit.ok) { img = hit; break; }
+      }
+      // images.pokemontcg.io has no files for me2pt5 and later sets. Those ids use
+      // the TCGplayer photo of the same product id (catalogue row or id map), never a name match.
+      if (!img && IMAGE_HOSTS.includes("tcgplayer-cdn.tcgplayer.com")) {
+        const key = rest.replace(/(?:_hires)?\.png$/, "").replace(/_A$/, "");
+        const pid = EDITOR_TCG_PIDS[key];
+        if (pid > 0) {
+          const hit = await fetchImpl("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_1000x1000.jpg");
+          if (hit && hit.ok && /^image\//.test(hit.headers.get("content-type") || "image/jpeg")) img = hit;
+        }
       }
       if (!img) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
       const out = new Response(img.body, {
