@@ -59,7 +59,7 @@ export function cacheKeyUrl(href) {
   return url.toString();
 }
 // Panel generation: bump when mid-day fact/copy changes must drop same-day edge HTML.
-export const PANEL_CACHE_GEN = "4";
+export const PANEL_CACHE_GEN = "5";
 export function edgeCacheKey(request, dataVersion = "", buildId = "") {
   const url = new URL(cacheKeyUrl(request.url));
   const day = String(dataVersion || "").slice(0, 10);

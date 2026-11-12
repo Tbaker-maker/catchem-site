@@ -10,7 +10,7 @@ import { msrpOf } from "./msrp.mjs";
 import { applySetSpark } from "./set-spark.mjs";
 import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
-import { liveStamp, BUILD_SHA } from "./build-stamp.mjs";
+import { BUILD_SHA, liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
 import { readUser } from "./quota.mjs";
 import { handleAlert, handleFollow, handleVote } from "./feed-api.mjs";
@@ -26,6 +26,7 @@ import { sealedDocument, SEALED_PATH } from "./office-sealed.mjs";
 import { officialSrc, imageForId, editorImageFallbacks, sealedCutoutSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
+import { marketDepthFor } from "./market-depth.mjs";
 import { homeFinderSource } from "./home-finder.mjs";
 const withChartKit = (page) => {
   let html = String(page);
@@ -328,7 +329,7 @@ function withCatalogue(list, images, cutDoc) {
 // build-feed). The old per-request bucket scan fetched ~70 buckets on a cold
 // isolate and tripped Cloudflare error 1102, so it is gone. Without the list,
 // only the build-time stale flag applies.
-const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase"]);
+const DATED_FACT_KINDS = new Set(["pokemon", "listings", "newsline", "news", "season", "release", "release-cycle", "rip", "rotation", "deep", "pattern-forming", "pattern-ending", "breadth", "set", "sealedchase", "sold-gap", "sold-pace", "sold-trend", "sell-through", "msrp-sold", "pop-growth", "gem-rate", "low-pop", "graded-spread", "eu-gap", "jp-en", "range52"]);
 async function omitStalePriceReads(reads, fetchImpl, opts = {}) {
   // The build-time stale flag is about prices. Dated facts (Pokemon, listings
   // counted, news, releases, rotation, deep reads) stay true on their own date.
@@ -924,6 +925,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const setSlugOk = !!(card && card.setSlug && /^[a-z0-9-]+$/.test(String(card.setSlug || "")));
     // One item-reads fetch feeds both the top-3 chips and the all-reads list.
     // Skip the 500KB+ rip-roi catalogue on the critical path (optional below).
+    // PkmnPrices market depth (eBay sold comps, pop, EUR): one small bucket file, in parallel.
+    const depthP = card ? marketDepthFor(card, fetchImpl) : Promise.resolve(null);
     const [
       packed,
       facts,
@@ -1170,7 +1173,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
       ]);
       msrp = msrpOf({ keys: [sealedId, card.id, cardId], pid: card.tcgPlayerId || cardId, redirects, pageId: cardId }, msrpDoc);
     }
-    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
+    const marketDepth = await depthP;
+    const pageBody = renderCard(premiumCard, stamp, { ...pageOpts, msrp, marketDepth, signalCard, priceCheck, priceHeld, conditionLadder, listingsHtml, notMovedHtml, rotationHtml, rotationFact, ratingHtml, cycleHtml, fact, diveHref, catalogueSrc: hit.src, catalogueCrop: hit.crop, catalogueAlts: hit.alts || [], listingSeries, productReads, sitReads, boardReads, patternRead, priceRead, conditionNote, pokemon, setLogo, ebayAsk, rip, itemReadHtml, comesFrom, promosInside, allReads });
     if (card) await Promise.resolve(writeProductHtml(opts, cardId, pageBody));
     return html(pageBody, card ? 200 : 404);
   }

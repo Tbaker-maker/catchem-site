@@ -1,11 +1,11 @@
 // Sealed product cards. Cutout on top, then the name, type, price date, and change.
-// Sizes come from the cutout file. Every card sits on one baseline.
+// Every card uses one frame: packs, bundles, and ETBs share a height, and boxes are larger.
 
 export const SEALED_SHELF_CSS = `
 .seal-shelf{display:flex;gap:22px;align-items:stretch;overflow-x:auto;padding:8px 2px 22px;scroll-snap-type:x mandatory}
 .seal-card{flex:0 0 auto;width:max-content;min-width:176px;max-width:320px;display:flex;flex-direction:column;gap:12px;padding:16px 16px 18px;border-radius:22px;background:#221e1a;color:#efe9de;text-decoration:none;border:1px solid rgba(255,255,255,.08);scroll-snap-align:start;box-shadow:0 10px 28px rgba(0,0,0,.22)}
-.seal-stage{height:244px;display:flex;align-items:flex-end;justify-content:center}
-.seal-stage img{height:calc(var(--rel, 1) * 228px);width:auto;max-width:none}
+.seal-stage{height:248px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.seal-stage img{height:calc(var(--rel, 0.88) * 220px);width:auto;max-width:240px;max-height:100%;object-fit:contain;object-position:center bottom}
 .seal-name{font:600 15px/1.3 var(--sans, sans-serif);letter-spacing:0}
 .seal-type{display:inline-flex;align-self:flex-start;padding:4px 10px;border-radius:999px;background:rgba(217,183,121,.16);color:#e4c98a;font:600 12px/1.2 var(--sans, sans-serif)}
 .seal-price{font:600 18px/1.2 var(--sans, sans-serif)}
@@ -40,6 +40,34 @@ const TYPE_LABEL = {
   upc: "UPC",
   case: "Case",
 };
+
+// One frame for every sealed photo. Packs, bundles, and ETBs share a height.
+// Booster boxes, collections, UPCs, and cases are the large frame. Nothing is cropped.
+export function sealedTypeKey(row) {
+  const raw = String((row && (row.productType || row.subtype)) || "").toLowerCase().trim();
+  if (raw) return raw;
+  const name = String((row && row.name) || "").toLowerCase();
+  if (name.indexOf("booster box") >= 0) return "booster-box";
+  if (name.indexOf("elite trainer") >= 0) return "etb";
+  if (name.indexOf("ultra premium") >= 0 || name.indexOf(" upc") >= 0) return "upc";
+  if (name.indexOf("booster bundle") >= 0) return "booster-bundle";
+  if (name.indexOf("sleeved") >= 0 && name.indexOf("pack") >= 0) return "sleeved-pack";
+  if (name.indexOf("booster pack") >= 0) return "booster-pack";
+  if (name.indexOf("blister") >= 0) return "blister";
+  if (name.indexOf("mini tin") >= 0) return "mini-tin";
+  if (name.indexOf(" tin") >= 0) return "tin";
+  if (name.indexOf("collection") >= 0) return "special-collection";
+  if (name.indexOf("case") >= 0) return "case";
+  if (name.indexOf("build") >= 0) return "build-battle";
+  if (name.indexOf("deck") >= 0) return "deck";
+  return "sealed";
+}
+
+export function sealedFrameRel(row) {
+  const key = sealedTypeKey(row);
+  if (key === "booster-box" || key === "special-collection" || key === "upc" || key === "case") return 1;
+  return 0.88;
+}
 
 function pointsOf(hist) {
   const out = [];
@@ -109,10 +137,9 @@ export function sealedShelfHtml(items, doc, asOf) {
     ids[item.id] = 1;
   }
   if (!cards.length) return { html: "", ids };
-  const maxH = Math.max(...cards.map((c) => c.cut.height));
   cards.sort((a, b) => a.cut.height - b.cut.height || String(a.item.name).localeCompare(String(b.item.name)));
   const html = cards.map(({ item, cut }) => {
-    const rel = Math.round((cut.height / maxH) * 1000) / 1000;
+    const rel = sealedFrameRel({ productType: cut.productType, name: item.name, subtype: item.subtype });
     const type = TYPE_LABEL[cut.productType] || "Sealed";
     const pts = pointsOf(item.hist);
     const day = asOfLabel((pts.length ? pts[pts.length - 1][0] : "") || asOf);
@@ -156,6 +183,8 @@ export function shelfClientSource() {
     money.toString(),
     chip.toString(),
     cutoutIndex.toString(),
+    sealedTypeKey.toString(),
+    sealedFrameRel.toString(),
     sealedShelfHtml.toString(),
     esc.toString(),
     "return sealedShelfHtml;",

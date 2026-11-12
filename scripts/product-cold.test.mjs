@@ -25,7 +25,8 @@ assert.match(index, /prewarmHtml/);
 assert.match(index, /prewarm=html/);
 assert.match(index, /html-skip/);
 assert.match(index, /PRODUCT_HTML_TTL = 300/);
-assert.match(index, /product-html:v5/);
+assert.match(index, /product-html:v5:\$\{build\}:\$\{v\}:\$\{id\}/);
+assert.match(index, /BUILD_SHA/);
 assert.match(index, /publicDataVersion/);
 assert.match(index, /signal-chips\.json ~422KB/);
 setDataVersion("2026-10-28");
@@ -45,5 +46,5 @@ assert.match(data, /i \+= 5/);
 assert.doesNotMatch(data, /seededBuckets/);
 console.log("product-cold ok");
 
-assert.equal(PANEL_CACHE_GEN, "4");
+assert.equal(PANEL_CACHE_GEN, "5");
 await runPrewarmBatchTests();
