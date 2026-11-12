@@ -12,6 +12,7 @@ import {
   emailLink,
   handleEmailLink,
   normalizeEmailRead,
+  emailMailingAddress,
   readsEmailHtml,
   readsEmailText,
   readsSubject,
@@ -181,6 +182,26 @@ const tiledMail = normalizeEmailRead({ headline: "Example Box listings counted",
 t("email lines carry the same tag and stage words", tiledMail.chips.map((c) => c.text).join("|") === "Few sellers hold most|Building|Listings -25% 7d");
 const oddMail = normalizeEmailRead({ headline: "Example Box", blurb: "Listings counted.", kind: "sealed", tiles: { listings: { tag: { word: "Buy now" } } } });
 t("email skips any other word", !oddMail.chips.length);
+
+
+const emptyLetter = readsEmailHtml({ lead: "Your Catch'em reads", day: "2026-10-13", reads: [], stopUrl: "https://catchemtcg.com/reads/email/stop?id=1&t=x", empty: true, mailingAddress: "" });
+t("the custom letter is 390 wide on a full-width desktop table and has no plan CTA", emptyLetter.includes("max-width:390px") && emptyLetter.includes('width="100%"') && emptyLetter.includes("No reads match this filter today.") && !emptyLetter.includes("premium filter") && !emptyLetter.includes("Join the Premium waitlist") && !emptyLetter.includes("$14.99") && emptyLetter.includes("Unsubscribe") && emptyLetter.includes("<!-- mailingAddress empty; a postal address is required before any real subscriber send -->"));
+t("the mailing address field stays empty until one is supplied", emailMailingAddress({}) === "" && emailMailingAddress({ MAILING_ADDRESS: "  100 Example St  " }) === "100 Example St");
+const filled = readsEmailHtml({ lead: "Your Catch'em reads", day: "2026-10-13", reads: [], stopUrl: "https://catchemtcg.com/reads/email/stop?id=1&t=x", mailingAddress: "100 Example St, Town, BC" });
+t("a supplied postal address shows in the custom letter", filled.includes("100 Example St, Town, BC"));
+const feed = [
+  { id: "r1", sku: "tcgcsv-1", headline: "Below card", blurb: "Ratio is below its usual premium.", premium: "below" },
+  { id: "r2", sku: "tcgcsv-2", headline: "Above card", blurb: "Ratio is above its usual premium.", premium: "above" },
+];
+const prepared = attachFeed([
+  { cardId: "tcgcsv-1", headline: "Below card", blurb: "Ratio is below its usual premium.", premium: "below" },
+  { cardId: "tcgcsv-2", headline: "Above card", blurb: "Ratio is above its usual premium.", premium: "above" },
+], feed).map(normalizeEmailRead).filter(Boolean);
+const matchedBelow = prepared.filter((read) => read.premium === "below");
+const letter = readsEmailHtml({ lead: "Your Catch'em reads", day: "2026-10-13", reads: matchedBelow, stopUrl: "https://catchemtcg.com/reads/email/stop?id=1&t=x" });
+t("a below-ratio filter only keeps the matching read", matchedBelow.length === 1 && letter.includes("Below card") && !letter.includes("Above card"));
+const none = readsEmailText({ lead: "Your Catch'em reads", day: "2026-10-13", reads: [], stopUrl: "https://catchemtcg.com/reads/email/stop?id=1&t=x", empty: true });
+t("an unmatched filter in plain text does not say premium filter", none.includes("No reads match this filter today.") && !none.includes("premium filter"));
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("reads email ok");

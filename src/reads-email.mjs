@@ -193,7 +193,19 @@ function button(href, label, light = false) {
   return `<a href="${esc(href)}" class="${light ? "ce-btn-light" : "ce-btn-dark"}" style="display:inline-block;min-height:44px;line-height:44px;padding:0 16px;margin:0 8px 8px 0;border-radius:999px;background:${bg};color:${color};text-decoration:none;font:600 15px/44px Arial,Helvetica,sans-serif;">${esc(label)}</a>`;
 }
 
-export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false }) {
+
+export function emailMailingAddress(env = {}) {
+  return String(env?.MAILING_ADDRESS || env?.mailingAddress || "").trim();
+}
+
+function caslEmailFooterHtml(mailingAddress = "") {
+  const addr = String(mailingAddress || "").trim();
+  return addr
+    ? `<p class="ce-soft" style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">${esc(addr)}</p>`
+    : "<!-- mailingAddress empty; a postal address is required before any real subscriber send -->";
+}
+
+export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false, mailingAddress = "" } = {}) {
   const when = readsDateLabel(day);
   const cards = (reads || []).map((read) => {
     const title = read.href
@@ -211,7 +223,7 @@ export function readsEmailHtml({ lead, day, reads, stopUrl, empty = false }) {
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><h2 class="ce-ink" style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${title}</h2>${flag ? `<p style="margin:8px 0 0;">${flag}</p>` : ""}${chips}${blurb}${open}${shops ? `<p style="margin:12px 0 0;">${shops}</p>` : ""}${note}</td></tr></table>`;
   }).join("");
   const emptyLine = !cards && empty
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:600 16px/1.45 Arial,Helvetica,sans-serif;color:#1c1c1e;">No reads match this premium filter today.</p></td></tr></table>`
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="margin:0 0 12px;background:#ffffff;border-radius:22px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:600 16px/1.45 Arial,Helvetica,sans-serif;color:#1c1c1e;">No reads match this filter today.</p></td></tr></table>`
     : "";
   const stop = stopUrl
     ? `<p class="ce-soft" style="margin:16px 0 0;color:#8e8e93;font:13px/1.45 Arial,Helvetica,sans-serif;">You follow this read. <a href="${esc(stopUrl)}" style="color:#636366;">Unsubscribe</a></p>`
@@ -222,17 +234,18 @@ ${darkCss()}
 </style></head>
 <body class="ce-page" style="margin:0;padding:0;background:#f2f2f7;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-page" style="background:#f2f2f7;"><tr><td align="center" style="padding:16px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;"><tr><td class="ce-ink ce-brand" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-soft" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:390px;"><tr><td class="ce-ink ce-brand" style="padding:8px 6px 14px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#1c1c1e;">Catch'em${when ? `<span class="ce-soft" style="float:right;color:#8e8e93;font-weight:500;">${esc(when)}</span>` : ""}</td></tr>
 <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ce-card" style="background:#ffffff;border-radius:22px;margin:0 0 12px;"><tr><td style="padding:18px 16px;"><p class="ce-ink" style="margin:0;font:700 22px/1.3 Arial,Helvetica,sans-serif;color:#1c1c1e;">${esc(lead || readsSubject(day))}</p></td></tr></table>
 ${cards || emptyLine}
 ${stop}
+${caslEmailFooterHtml(mailingAddress)}
 </td></tr></table>
 </td></tr></table></body></html>`;
 }
 
-export function readsEmailText({ lead, day, reads, stopUrl, empty = false }) {
+export function readsEmailText({ lead, day, reads, stopUrl, empty = false, mailingAddress = "" } = {}) {
   const parts = [lead || readsSubject(day)];
-  if (empty && !(reads || []).length) parts.push("No reads match this premium filter today.");
+  if (empty && !(reads || []).length) parts.push("No reads match this filter today.");
   for (const read of reads || []) {
     const chips = (read.chips || []).map((chip) => chip.text).join(", ");
     const flag = read.premium === "below" ? "Below its usual premium" : read.premium === "above" ? "Above its usual premium" : "";
@@ -241,6 +254,8 @@ export function readsEmailText({ lead, day, reads, stopUrl, empty = false }) {
     parts.push(lines.join("\n"));
   }
   if (stopUrl) parts.push(`Unsubscribe: ${stopUrl}`);
+  const addr = String(mailingAddress || "").trim();
+  if (addr) parts.push(addr);
   return parts.join("\n\n").trim();
 }
 
@@ -254,7 +269,8 @@ export function emailCopyOk(text) {
 }
 
 export function listHeaders(stopUrl) {
-  if (!/^https:\/\/catchemtcg\.com\/reads\/email\/stop\?/.test(String(stopUrl || ""))) return {};
+  const href = String(stopUrl || "");
+  if (!/^https:\/\/catchemtcg\.com\/(reads\/email\/stop|collection\/brief-email\/stop)\?/.test(href)) return {};
   return {
     "List-Unsubscribe": `<${stopUrl}>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -267,7 +283,7 @@ export async function emailLink(env, origin, purpose, discordId, email) {
   const to = validEmail(email);
   if (!secret || !/^\d{5,25}$/.test(id) || !to) return "";
   const mac = await hmacHex(secret, `${purpose}:${id}:${to}`);
-  const path = purpose === "stop" ? "/reads/email/stop" : "/reads/email/confirm";
+  const path = purpose === "stop" ? "/reads/email/stop" : purpose === "brief-stop" ? "/collection/brief-email/stop" : "/reads/email/confirm";
   const url = new URL(path, origin || ORIGIN);
   url.searchParams.set("id", id);
   url.searchParams.set("t", mac);
@@ -621,8 +637,9 @@ export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin =
   const tipHref = tip ? await lengthLink(env, origin, id, tip.to, doc.weekday || "") : "";
   const suggest = tip && tipHref ? { text: `${tip.why} ${LENGTH_LABEL[tip.to]} might suit you${doc.weekday ? ` on ${WEEKDAY_NAMES[doc.weekday]}s` : ""}.`, label: `Try ${LENGTH_LABEL[tip.to]}`, href: tipHref, to: tip.to } : null;
   const mode = openAccess(env) ? "open" : premiumMode(env);
-  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
-  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode });
+  const mailingAddress = emailMailingAddress(env);
+  const html = renderArticle(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode, mailingAddress });
+  const text = articleText(doc, { unsubscribe: stopUrl, more, suggest, premiumMode: mode, mailingAddress });
   return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };
 }
 
@@ -682,7 +699,7 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
       if (!reads.length && !(want && prepared.length)) { skipped++; continue; }
       const lead = scrub(member.lead || "") || readsSubject(day);
       const empty = want && prepared.length > 0 && matched.length === 0;
-      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty }), text: readsEmailText({ lead, day, reads, stopUrl, empty }) };
+      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env) }), text: readsEmailText({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env) }) };
     }
     const { html, text } = letter;
     if (!emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }
