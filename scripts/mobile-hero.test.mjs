@@ -53,6 +53,12 @@ const cardShop = cardMain.indexOf('<div class="shop-block">');
 const cardWatch = cardMain.indexOf('<p class="rv-actions">');
 t("card pages put the price before Buy and Watch", cardPrice > 0 && cardPrice < cardShop && cardPrice < cardWatch);
 t("card set link is a 44px target", card.includes('class="set-link"') && card.includes("/sets/ex-holon-phantoms"));
+const readAt = main.indexOf('class="muted add-read"');
+t("add this to your read sits above Watch so the dock does not cover it", readAt > 0 && readAt < watchAt);
+t("phone pages keep the dock clear and Status is a 44px target", style.includes("padding-bottom:88px") && style.includes("padding-bottom:calc(120px + env(safe-area-inset-bottom))") && /a\.tap,\.site-foot a\{min-height:44px;min-width:44px/.test(style));
+t("the set kicker is a 44 by 44 box", /set-link,\.print-run a[\s\S]*?min-height:44px;min-width:44px;display:inline-flex;align-items:center;box-sizing:border-box;padding:10px 12px/.test(style));
+const cardStyle = (card.match(/<style>([\s\S]*?)<\/style>/g) || []).join("\n");
+t("card set name link is at least 44px tall and wide", /cp-set a\{[^}]*min-height:44px;min-width:44px;padding:10px 12px/.test(cardStyle));
 
 if (fail) process.exit(1);
 console.log("mobile hero ok");
