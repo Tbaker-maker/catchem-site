@@ -289,6 +289,243 @@ const SIZE_JS = `<script id="sizes-boot">
 })();
 </script>`;
 
+// Download the picture, the price + chart overlay, and phone placement of the dock.
+const SHARE_JS = `<script id="share-boot">
+(function(){
+  var OVERLAY_PATH = ${JSON.stringify("/post-office/api/overlay")};
+  var GOLD = "#d9b779";
+  var data = {};
+  function $(id){ return document.getElementById(id); }
+  function pinIds(){
+    var list = window.pins || [];
+    var out = [];
+    for (var i = 0; i < list.length && out.length < 4; i++) {
+      var c = list[i];
+      var id = typeof c === "string" ? c : (c && (c.id || c.i)) || "";
+      if (id && out.indexOf(String(id)) < 0) out.push(String(id));
+    }
+    return out;
+  }
+  function overlayOn(){ var box = $("ov-on"); return !!(box && box.checked); }
+  function rebuild(){
+    var prev = $("preview");
+    if (prev && prev.style.display === "block" && $("btn-compose")) $("btn-compose").click();
+  }
+  function fetchOverlay(ids, done){
+    var key = ids.join(",");
+    if (!key) { done(); return; }
+    if (ids.every(function(id){ return data[id] !== undefined; })) { done(); return; }
+    fetch(OVERLAY_PATH + "?ids=" + encodeURIComponent(key), { credentials: "same-origin" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        (j && j.cards || []).forEach(function(c){ data[c.id] = c; });
+        ids.forEach(function(id){ if (data[id] === undefined) data[id] = null; });
+        done();
+      })
+      .catch(function(){ ids.forEach(function(id){ if (data[id] === undefined) data[id] = null; }); done(); });
+  }
+  function money(v){ return "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function nice(d){ var p = String(d).split("-"); return M[+p[1] - 1] + " " + (+p[2]) + ", " + p[0]; }
+  function curve(g, xy){
+    g.moveTo(xy[0][0], xy[0][1]);
+    for (var i = 0; i < xy.length - 1; i++) {
+      var p0 = xy[i - 1] || xy[i], p1 = xy[i], p2 = xy[i + 1], p3 = xy[i + 2] || p2;
+      var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      var lo = Math.min(p1[1], p2[1]), hi = Math.max(p1[1], p2[1]);
+      c1y = Math.max(lo, Math.min(hi, c1y)); c2y = Math.max(lo, Math.min(hi, c2y));
+      g.bezierCurveTo(c1x, c1y, c2x, c2y, p2[0], p2[1]);
+    }
+  }
+  function drawRow(g, card, x, y, w, h){
+    var pad = 18;
+    g.fillStyle = "#efe9de";
+    g.textAlign = "left";
+    g.textBaseline = "top";
+    g.font = "600 22px Georgia, 'Times New Roman', serif";
+    var name = String(card.name || "");
+    while (name.length > 4 && g.measureText(name).width > w * 0.42) name = name.slice(0, -2);
+    if (name !== String(card.name || "")) name = name.replace(/\\s+\\S*$/, "") + "…";
+    g.fillText(name, x + pad, y + 14);
+    var m = String(card.price).match(/^TCGplayer market: (\\$[\\d,]+(?:\\.\\d+)?) \\((\\d{4}-\\d{2}-\\d{2})\\)$/);
+    g.fillStyle = GOLD;
+    g.font = "600 34px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+    g.fillText(m ? m[1] : "", x + pad, y + 44);
+    g.fillStyle = "#c4baab";
+    g.font = "15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+    g.fillText("TCGplayer market, " + (m ? nice(m[2]) : ""), x + pad, y + 86);
+    var ch = card.chart;
+    var cx = x + w * 0.48, cw = w * 0.52 - pad, cy = y + 18, chh = h - 58;
+    if (!ch || !ch.points || ch.points.length < 2) {
+      g.fillStyle = "#8f8b85";
+      g.font = "14px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+      g.fillText("No 90-day series on file.", cx, cy + chh / 2 - 8);
+      return;
+    }
+    var first = ch.points[0][0], lastDay = ch.points[ch.points.length - 1][0];
+    var t0 = Date.parse(first + "T00:00:00Z"), t1 = Date.parse(lastDay + "T00:00:00Z");
+    var lo = ch.domain[0], hi = ch.domain[1];
+    function X(d){ return cx + (t1 > t0 ? (Date.parse(d + "T00:00:00Z") - t0) / (t1 - t0) : 1) * cw; }
+    function Y(v){ return cy + (1 - (v - lo) / (hi - lo || 1)) * chh; }
+    var xy = ch.points.map(function(p){ return [X(p[0]), Y(p[1])]; });
+    var floor = cy + chh;
+    var grad = g.createLinearGradient(0, cy, 0, floor);
+    grad.addColorStop(0, "rgba(217,183,121,0.28)");
+    grad.addColorStop(1, "rgba(217,183,121,0)");
+    g.beginPath(); curve(g, xy); g.lineTo(xy[xy.length - 1][0], floor); g.lineTo(xy[0][0], floor); g.closePath();
+    g.fillStyle = grad; g.fill();
+    g.beginPath(); curve(g, xy);
+    g.strokeStyle = GOLD; g.lineWidth = 2.5; g.lineCap = "round"; g.lineJoin = "round"; g.stroke();
+    g.font = "13px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+    g.fillStyle = "#c4baab";
+    g.textBaseline = "top";
+    g.textAlign = "left";
+    g.fillText(nice(first), cx, floor + 6);
+    g.textAlign = "right";
+    g.fillText(nice(lastDay) + " · last 90 days", cx + cw, floor + 6);
+    [[ch.high, "High"], [ch.low, "Low"]].forEach(function(tag, i){
+      if (i && tag[0][0] === ch.high[0] && tag[0][1] === ch.high[1]) return;
+      var px = X(tag[0][0]), py = Y(tag[0][1]);
+      g.beginPath(); g.arc(px, py, 4, 0, Math.PI * 2);
+      g.fillStyle = i ? "#efe9de" : "#12100e"; g.fill();
+      g.strokeStyle = "#efe9de"; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = "#efe9de";
+      g.font = "600 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+      g.textAlign = px > cx + cw * 0.6 ? "right" : "left";
+      g.textBaseline = i ? "top" : "bottom";
+      var label = tag[1] + " " + money(tag[0][1]) + " · " + nice(tag[0][0]);
+      g.fillText(label, px + (g.textAlign === "right" ? -8 : 8), py + (i ? 6 : -6));
+    });
+  }
+  // Called from the picture's paintBoard with its finished canvas.
+  window.__ceOverlay = function(canvas, sel){
+    if (!overlayOn()) return canvas;
+    var rows = (sel || []).map(function(c){ return data[c && c.id]; }).filter(function(c){ return c && c.price; });
+    var note = $("ov-note");
+    if (!rows.length) {
+      if (note) note.textContent = (sel || []).some(function(c){ return data[c && c.id] === undefined; }) ? "Loading prices…" : "No TCGplayer market price on file for these cards.";
+      return canvas;
+    }
+    if (note) note.textContent = "Price and chart: TCGplayer market, same date as the post text.";
+    var rowH = 150;
+    var out = document.createElement("canvas");
+    out.width = canvas.width;
+    out.height = canvas.height + rowH * rows.length;
+    var g = out.getContext("2d");
+    g.drawImage(canvas, 0, 0);
+    g.fillStyle = "#12100e";
+    g.fillRect(0, canvas.height, out.width, rowH * rows.length);
+    rows.forEach(function(card, k){
+      var y = canvas.height + k * rowH;
+      g.strokeStyle = "rgba(239,233,222,0.12)"; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(18, y + 0.5); g.lineTo(out.width - 18, y + 0.5); g.stroke();
+      drawRow(g, card, 0, y, out.width, rowH);
+    });
+    return out;
+  };
+  function fname(){
+    var ids = pinIds();
+    return "catchem-" + (ids.length ? ids.join("-").replace(/[^A-Za-z0-9-]/g, "").slice(0, 60) : "picture") + ".png";
+  }
+  function download(){
+    var prev = $("preview");
+    var src = prev && prev.getAttribute("src");
+    if (!src) return;
+    var a = document.createElement("a");
+    a.href = src;
+    a.download = fname();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function boot(){
+    var dock = $("compose-dock");
+    var prev = $("preview");
+    if (!dock || !prev || $("share-row")) return;
+    var opt = document.createElement("label");
+    opt.id = "ov-opt";
+    opt.style.cssText = "display:flex;align-items:center;gap:10px;min-height:44px;margin:4px 0";
+    opt.innerHTML = '<input type="checkbox" id="ov-on" style="width:22px;height:22px"> <span>Price, date, and 90-day chart on the picture</span>';
+    var note = document.createElement("p");
+    note.id = "ov-note";
+    note.className = "note";
+    var row = document.createElement("div");
+    row.id = "share-row";
+    row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:8px 0";
+    var dl = document.createElement("button");
+    dl.type = "button";
+    dl.className = "go";
+    dl.id = "go-download";
+    dl.textContent = "Download";
+    dl.disabled = true;
+    dl.onclick = download;
+    row.appendChild(dl);
+    prev.insertAdjacentElement("beforebegin", opt);
+    opt.insertAdjacentElement("afterend", note);
+    prev.insertAdjacentElement("afterend", row);
+    var sync = function(){ var has = !!prev.getAttribute("src"); dl.disabled = !has; dock.classList.toggle("dock-empty", !has); };
+    prev.addEventListener("load", sync);
+    sync();
+    $("ov-on").onchange = function(){
+      if (!overlayOn()) { note.textContent = ""; rebuild(); return; }
+      var ids = pinIds();
+      if (!ids.length) { note.textContent = "Pin a card first."; return; }
+      note.textContent = "Loading prices…";
+      fetchOverlay(ids, rebuild);
+    };
+    var make = $("btn-compose");
+    if (make) make.addEventListener("click", function(){
+      if (!overlayOn()) return;
+      var ids = pinIds();
+      if (ids.some(function(id){ return data[id] === undefined; })) fetchOverlay(ids, rebuild);
+    }, true);
+  }
+  // Phone: the tray, Make the picture, and the preview sit under the title, above the filters.
+  function phone(){
+    var dock = $("compose-dock");
+    var banner = $("banner");
+    if (!dock || !banner || !window.matchMedia) return;
+    var mq = window.matchMedia("(max-width: 899px)");
+    var home = document.createComment("compose-dock-home");
+    dock.parentNode.insertBefore(home, dock);
+    function place(){
+      if (mq.matches) { if (banner.nextSibling !== dock) banner.insertAdjacentElement("afterend", dock); dock.classList.add("dock-top"); }
+      else if (home.parentNode && home.nextSibling !== dock) { home.parentNode.insertBefore(dock, home.nextSibling); dock.classList.remove("dock-top"); }
+    }
+    place();
+    if (mq.addEventListener) mq.addEventListener("change", place);
+    // Pins are made further down, so a slim bar keeps Make the picture one tap away.
+    var make = $("btn-compose");
+    if (!make || $("phone-make")) return;
+    var bar = document.createElement("div");
+    bar.id = "phone-make";
+    bar.hidden = true;
+    bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:20;padding:8px 16px calc(8px + env(safe-area-inset-bottom));background:#12100e;border-top:1px solid #2f2b26";
+    var go = document.createElement("button");
+    go.type = "button";
+    go.className = "go";
+    go.style.cssText = "width:100%;min-height:48px";
+    go.onclick = function(){ make.click(); dock.scrollIntoView({ block: "start", behavior: "smooth" }); };
+    bar.appendChild(go);
+    document.body.appendChild(bar);
+    var seen = true;
+    function paint(){
+      var n = pinIds().length;
+      go.textContent = "Make the picture (" + n + ")";
+      bar.hidden = !(mq.matches && n > 0 && !seen);
+    }
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function(list){ seen = list[0].isIntersecting; paint(); }).observe(make);
+    }
+    document.addEventListener("click", function(){ setTimeout(paint, 0); }, true);
+    paint();
+  }
+  boot();
+  phone();
+})();
+</script>`;
+
 const AI_JS = `<script id="ai-boot">
 (function(){
   var tone = "informative";
@@ -412,16 +649,24 @@ const AI_JS = `<script id="ai-boot">
       var b = document.createElement("button");
       b.type = "button";
       b.className = "sec";
-      b.textContent = "Copy";
+      b.textContent = "Copy text";
       b.onclick = function(){ copy(text, b); };
+      var x = document.createElement("a");
+      x.className = "sec ai-x";
+      x.href = "https://x.com/intent/post?text=" + encodeURIComponent(text);
+      x.target = "_blank";
+      x.rel = "noopener";
+      x.textContent = "Post to X";
+      x.style.cssText = "display:inline-flex;align-items:center;min-height:44px;padding:0 14px;margin-left:8px;text-decoration:none;background:#1a1815;color:#efe9de;border:1px solid #403a33;border-radius:10px;font:600 14px/1 'IBM Plex Sans',system-ui,sans-serif";
       out.appendChild(p);
       out.appendChild(b);
+      out.appendChild(x);
     });
     var every = document.createElement("button");
     every.type = "button";
     every.id = "go-copy";
     every.className = "sec";
-    every.textContent = "Copy all";
+    every.textContent = "Copy all text";
     every.onclick = function(){ copy(all.join("\\n\\n"), every); };
     out.appendChild(every);
   }
@@ -818,6 +1063,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   }
   out = out.split("if (r[21]) o.mech = r[21];").join("if (r[21]) o.mech = r[21];\n  if (r[22]) o.cid = r[22];");
   out = out.split("let INDEX = [], tray = []").join("var INDEX = [], tray = []");
+  out = out.split('var png = canvas.toDataURL("image/png");').join('var png = (window.__ceOverlay ? window.__ceOverlay(canvas, sel) : canvas).toDataURL("image/png");');
   out = out.split("window.__PAPER_ROWS : CORE_ROWS.slice()").join("window.__PAPER_ROWS : []");
   out = out.replace(
     '<button type="button" data-view="replies">Replies</button>',
@@ -832,7 +1078,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
     '<button type="button" class="lab-only" data-view="desk">Desk lab</button>',
   );
   if (!out.includes('id="office-dock"')) {
-    const dockCss = '<style id="office-dock">#compose-dock{position:sticky;bottom:0;z-index:5;background:#12100e;padding:8px 0 12px}@media(min-width:900px){#compose-dock{position:static;padding:0}}</style>';
+    const dockCss = '<style id="office-dock">#compose-dock{position:sticky;bottom:0;z-index:5;background:#12100e;padding:8px 0 12px}#compose-dock.dock-top{position:static;padding:4px 0 8px;border-bottom:1px solid #2f2b26;margin-bottom:12px}#compose-dock.dock-top.dock-empty #sizes,#compose-dock.dock-top.dock-empty #share-row,#compose-dock.dock-top.dock-empty #ov-opt,#compose-dock.dock-top.dock-empty #ov-note,#compose-dock.dock-top.dock-empty #ai-panel,#compose-dock.dock-top.dock-empty #next-step{display:none}#seat-row[hidden],#edit-seat[hidden],#phone-make[hidden]{display:none!important}@media(min-width:900px){#compose-dock{position:static;padding:0}}</style>';
     out = out.includes("</head>") ? out.replace("</head>", dockCss + "</head>") : dockCss + out;
   }
   out = rewritePlayAssets(out);
@@ -845,6 +1091,7 @@ export function patchEditorHtml(html, asOf, mark = "") {
   }
   if (!out.includes('id="sizes-boot"')) out += SIZE_JS;
   if (!out.includes('id="ai-boot"')) out += AI_JS;
+  if (!out.includes('id="share-boot"')) out += SHARE_JS;
   if (mark && !out.includes('id="post-build"')) {
     const stamp = '<p id="post-build" style="margin:12px 16px 28px;color:#9a907f;font:13px/1.4 system-ui,sans-serif">' + escStamp(mark) + "</p>";
     out = out.includes("</body>") ? out.replace("</body>", stamp + "</body>") : out + stamp;

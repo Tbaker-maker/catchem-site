@@ -20,6 +20,7 @@ import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPi
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
 import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
+import { handleOverlay, OVERLAY_PATH } from "./office-overlay.mjs";
 import { officialSrc, imageForId, editorImageFallbacks, sealedCutoutSrc } from "./catalogue-image.mjs";
 import { ensureAffiliation } from "./affiliation.mjs";
 import { HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
@@ -1367,6 +1368,7 @@ const worker = {
     const feed = env?.FEED_ENABLED === "true";
     const readPage = request.method === "GET" || request.method === "HEAD";
     const officeKind = pageKind(url.pathname);
+    if (request.method === "GET" && url.pathname === OVERLAY_PATH) return handleOverlay(request, env, fetchImpl);
     // Closed (POST_OFFICE not on) shows the coming soon page to everyone. Open checks the allowlist.
     if (postOfficeOn(env) && (url.pathname === "/post-office/app" || url.pathname.startsWith("/post-office/") || officeKind === "post" || officeKind === "build")) {
       const officeUser = await readUser(request, env);
