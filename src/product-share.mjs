@@ -299,7 +299,7 @@ export function shareFactLines({ depth = null, listings = null, kind = "single" 
   const lines = [];
   const n = Number(listings && listings.n);
   const day = String(listings && listings.day || "").slice(0, 10);
-  if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted`);
+  if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted, ${formatDay(day)}`);
   const sold = depth && depth.sold;
   if (sold && sold.n >= 5 && sold.median > 0 && SHARE_ISO.test(String(sold.first || "")) && SHARE_ISO.test(String(sold.last || ""))) {
     const cash = money(sold.median);

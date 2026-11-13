@@ -84,12 +84,12 @@ assert.deepEqual(shareFactLines({
   kind: "single",
   listings: { n: 4, day: "2026-11-11" },
   depth: { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972 }, eur: { market: 10, asOf: "2026-11-11" } },
-}), ["4 listings counted", "Sold median $2,550.00", "2,972 graded"]);
+}), ["4 listings counted, Nov 11, 2026", "Sold median $2,550.00", "2,972 graded"]);
 assert.deepEqual(shareFactLines({
   kind: "sealed",
   listings: { n: 96, day: "2026-10-30" },
   depth: { sold: { n: 2, median: 10, first: "2026-01-01", last: "2026-01-02" }, pop: { total: 9 } },
-}), ["96 listings counted"]);
+}), ["96 listings counted, Oct 30, 2026"]);
 assert.deepEqual(shareFactLines({ listings: { n: 4 } }), []);
 const withFacts = drawProductShare({ name: "Lost Origin Elite Trainer Box", price: "$194.33", date: "Oct 30, 2026", source: "TCGplayer market", points: pts, facts: ["96 listings counted", "Sold median $1,400.00"] });
 assert.equal(Buffer.from(a).equals(Buffer.from(withFacts)), false);
