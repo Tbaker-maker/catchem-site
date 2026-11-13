@@ -81,3 +81,18 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   }
   return parts.join("\n");
 }
+
+// One large line for camera mode. Sold and pop sections are hidden there, so the
+// real numbers have to sit on this line. Listings counted stay on the summary chip.
+// A missing stat is left out. Nothing here is estimated.
+export function cameraLine(depth, { kind = "single" } = {}) {
+  if (!depth) return "";
+  const bits = [];
+  const s = depth.sold;
+  if (s && s.n >= 5 && s.median > 0 && ISO.test(s.first) && ISO.test(s.last)) bits.push(`Sold median ${usd(s.median)}`);
+  const p = depth.pop;
+  if (kind !== "sealed" && p && p.total > 0) bits.push(`${int(p.total)} graded`);
+  const e = depth.eur;
+  if (e && e.market > 0 && ISO.test(e.asOf)) bits.push(`Cardmarket ${eur(e.market)}`);
+  return bits.join(". ");
+}
