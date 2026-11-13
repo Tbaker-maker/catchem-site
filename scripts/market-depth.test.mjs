@@ -1,7 +1,7 @@
 // PkmnPrices market depth on product pages: sold comps, graded pop, Cardmarket EUR,
 // and the chart's Sold view. "Sold" appears only for actual eBay sold comps.
 import vm from "node:vm";
-import { marketDepthHtml, soldSeries, depthKey, marketDepthFor } from "../src/market-depth.mjs";
+import { marketDepthHtml, soldSeries, depthKey, marketDepthFor, cameraLine } from "../src/market-depth.mjs";
 import { productChart, chartViews, soldPoints, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
@@ -43,7 +43,8 @@ t("client script parses", parsed && PRODUCT_CHART_JS.includes('view==="sold"?S:L
 
 // page
 const page = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price }, "stamp", { marketDepth: depth });
-t("single page renders sold, pop and EUR blocks", page.includes('id="sold"') && page.includes('id="pop"') && page.includes('id="eur"'));
+t("single page renders sold, pop and EUR blocks", page.includes('id="sold"') && page.includes('id="pop"') && page.includes('id="eur"') && page.includes("Sold median $88.50") && page.includes("66,316 graded") && page.includes("Cardmarket €247.50"));
+t("camera line hides thin sold data and sealed pop", cameraLine({ ...depth, sold: { ...depth.sold, n: 4 } }, { kind: "single" }) === "66,316 graded. Cardmarket €247.50" && cameraLine(depth, { kind: "sealed" }) === "Sold median $88.50. Cardmarket €247.50" && !cameraLine(depth, { kind: "sealed" }).includes("graded"));
 const sealedPage = renderCard({ id: "tcgcsv-9", name: "Test Elite Trainer Box", kind: "sealed", set: "Test", price: 60, asOf: "2026-11-12", hist: [["2026-10-01", 55], ["2026-11-12", 60]] }, "stamp", { marketDepth: { ...depth, pop: null, graded: [] } });
 t("sealed page renders sold and EUR, no pop", sealedPage.includes('id="sold"') && sealedPage.includes('id="eur"') && !sealedPage.includes('id="pop"'));
 const held = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price, priceStatus: "checking" }, "stamp", { marketDepth: depth, priceHeld: true });

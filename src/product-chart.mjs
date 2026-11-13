@@ -93,7 +93,7 @@ export function chartWindow(view, days, P, L) {
   return { from: from, t0: t0, t1: t1, p: p, l: l, useP: useP, useL: useL };
 }
 
-export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "" } = {}) {
+export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "", cameraLine = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
   const soldPts = soldPoints(sold);
@@ -115,6 +115,8 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
   if (soldPts.length >= 2) srcs.push(`${soldSource || "eBay sold comps"} recorded per day, ${longDay(soldPts[0][0])} to ${longDay(soldPts.at(-1)[0])}; a day with no bar had no comp recorded`);
   const lastDay = String(asOf || "").slice(0, 10) || (dates.at(-1) || "");
   const markSrc = priceReal.length >= 2 ? "TCGplayer market" : "eBay listings counted";
+  const camLine = String(cameraLine || "").replace(/[\u2014\u2013]/g, "").trim();
+  const camHtml = camLine ? `<p class="md-cam">${esc(camLine)}</p>` : "";
   const sum = priceReal.length >= 2
     ? `Price from ${esc(priceReal[0][0])} to ${esc(priceReal.at(-1)[0])}.${list.length >= 2 ? ` eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).` : ""}`
     : `eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).`;
@@ -122,6 +124,7 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
 <p class="hc-sum">${sum}</p>
 ${tabs}
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
+${camHtml}
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
@@ -153,7 +156,19 @@ html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .
 html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:flex!important}
 html.pc-cam,html.pc-cam body{background:#100e0c;overflow:hidden}
 html.pc-cam .wrap{max-width:none;padding:16px 28px}
-html.pc-cam .product-glance > *:not(.glance){display:none!important}
+html.pc-cam .product-glance:not(.card-page) > *:not(.glance){display:none!important}
+html.pc-cam .product-glance.card-page > *:not(style):not(.cp-head):not(.cp-charts):not(#eur):not(#stats){display:none!important}
+html.pc-cam .card-page{display:grid!important;grid-template-columns:minmax(240px,32vw) minmax(0,1fr);column-gap:28px;row-gap:8px;align-items:center;min-height:calc(100vh - 32px)}
+html.pc-cam .cp-head,html.pc-cam .cp-id{display:contents}
+html.pc-cam .cp-photo{grid-column:1;grid-row:1}
+html.pc-cam .cp-id > h1,html.pc-cam .cp-id > .cp-price,html.pc-cam .cp-id > .cp-src,html.pc-cam .cp-id > .sum-strip,html.pc-cam .cp-id > .list-note,html.pc-cam .cp-id > .chg,html.pc-cam .cp-id > .chg-src{grid-column:1}
+html.pc-cam .cp-id > *:not(h1):not(.cp-price):not(.cp-src):not(.sum-strip):not(.list-note):not(.chg):not(.chg-src){display:none!important}
+html.pc-cam .cp-charts{grid-column:2;grid-row:1 / span 12;align-self:center;margin:0}
+html.pc-cam .cp-now{font:600 64px/1 var(--serif)!important;color:var(--gold)}
+html.pc-cam .cp-date,html.pc-cam .cp-src{font:500 22px/1.3 var(--sans)!important}
+html.pc-cam .md-sold,html.pc-cam .md-pop{display:none!important}
+.md-cam{display:none}
+html.pc-cam .md-cam{display:block!important;margin:8px 0 0;font:600 22px/1.35 var(--sans)}
 html.pc-cam .glance{display:grid!important;grid-template-columns:minmax(240px,32vw) 1fr;column-gap:28px;row-gap:6px;align-items:center;min-height:calc(100vh - 32px)}
 html.pc-cam .glance > div{display:contents}
 html.pc-cam .chg,html.pc-cam .yr,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur{display:block!important}
@@ -185,6 +200,9 @@ html.pc-cam .px .itap-pop{font-size:28px!important}
 html.pc-cam .sum-chip{font:600 28px/1.25 var(--sans)!important}
 html.pc-cam .pc .hc-plot{height:520px}
 html.pc-cam .pc-tab{font-size:22px;min-height:56px}
+html.pc-cam .product-glance.card-page{grid-template-columns:1fr;min-height:0}
+html.pc-cam .cp-photo,html.pc-cam .cp-charts,html.pc-cam .cp-id > h1,html.pc-cam .cp-id > .cp-price,html.pc-cam .cp-id > .sum-strip,html.pc-cam .cp-id > .chg{grid-column:1;grid-row:auto;width:100%}
+html.pc-cam .cp-now{font-size:72px!important}
 }
 @media (orientation:landscape) and (min-width:1600px){
 html.pc-cam .wrap{padding:16px 40px}
