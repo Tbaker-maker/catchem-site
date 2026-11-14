@@ -2487,6 +2487,25 @@ function countedListings(fact, series, endDay) {
   return ch ? { n: ch.n, day: rowDay, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n: Number(row.listingCount), day: rowDay, pct: null, prevDay: "" };
 }
 
+// The page chip and Key stats use the same count. listingsEntry (itemListings) wins
+// when it disagrees with the chart series. When they match, the series row keeps its window.
+function pageListings(fact, series, endDay, itemListings) {
+  const fileN = Number(itemListings && itemListings.n);
+  const fileDay = String(itemListings && (itemListings.day || itemListings.date) || "").slice(0, 10);
+  const file = Number.isFinite(fileN) && fileN >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(fileDay) ? { n: Math.round(fileN), day: fileDay } : null;
+  const seriesRow = countedListings(fact, series, endDay);
+  if (file && seriesRow && file.n === seriesRow.n && file.day === seriesRow.day) return seriesRow;
+  if (file) {
+    const pct = Number(itemListings.pct);
+    const days = Number(itemListings.days);
+    if (Number.isFinite(pct) && days > 0 && itemListings.prevDay) {
+      return { n: file.n, day: file.day, pct, days, from: itemListings.from, prevDay: itemListings.prevDay };
+    }
+    return file;
+  }
+  return seriesRow;
+}
+
 // One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
 // exact start day is left out. Nothing shows when no window has a number.
 export function changeTable(series, endDay) {
@@ -3030,7 +3049,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const strip = summaryStrip({
     prefix: view.selected ? view.selected.key : conditionPrefix(card, held),
     price: held ? "" : showPrice,
-    listings: countedListings(opts.fact, opts.listingSeries, endDay),
+    listings: pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings),
     rotation: rotationChipLabel(opts.rotationFact),
   });
   const num = String(card.num || "").trim();
@@ -3064,8 +3083,17 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const mon = pokemonStripHtml(monStrip);
   const rotation = String(opts.rotationFact || "");
   const printRun = isRotatedSet(card) ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>` : "";
-  const factBlock = (factList || rotation || mon || printRun)
-    ? `<section class="cp-sec" id="stats"><h2>Key stats</h2>${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
+  const range = held ? null : yearRange(priceSeries, endDay);
+  const listRow = held ? null : pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings);
+  const keyDl = renderFacts(held ? {} : {
+    market: view.selected ? Number(view.selected.amount) : Number(card.price),
+    low: Number(opts.fact?.low) > 0 ? opts.fact.low : (Number(card.low) > 0 ? card.low : null),
+    date: view.selected ? String(view.selected.date || "") : endDay,
+    source: sourceLine(card),
+    extras: keyStatExtras({ range, listings: listRow, depth: opts.marketDepth, kind: "single" }),
+  });
+  const factBlock = (factList || rotation || mon || printRun || keyDl)
+    ? `<section class="cp-sec" id="stats"><h2>Key stats</h2>${keyDl}${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
     : "";
   const panels = [opts.ratingHtml, opts.cycleHtml].map((html) => String(html || "").trim()).filter(Boolean).join("");
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
@@ -3292,7 +3320,7 @@ export function renderCard(card, stamp, opts = {}) {
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
-    listings: countedListings(fact, opts.listingSeries, endDay) || opts.itemListings || null,
+    listings: pageListings(fact, opts.listingSeries, endDay, opts.itemListings),
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
   const breakBits = [];
@@ -3314,6 +3342,11 @@ export function renderCard(card, stamp, opts = {}) {
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
+  const statExtras = held ? [] : [
+    ...keyStatExtras({ range: yearRange(priceSeries, endDay), listings: pageListings(fact, opts.listingSeries, endDay, opts.itemListings), depth: opts.marketDepth, kind: "sealed" }),
+    ...msrpFacts(opts.msrp, shown, endDay, sourceLine(card)),
+  ];
+  const factsHtml = renderFacts(held ? {} : { market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card), extras: statExtras });
   const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
   const priceHtml = price
     ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${priceKnow(card, endDay, opts)}</p>`
@@ -3381,7 +3414,7 @@ ${ripValueBlock(opts.rip)}
 ${opts.notMovedHtml || ""}
 ${itemRankHtml(card)}
 ${KV_CSS}<section id="stats"><h2>Key stats</h2>
-${renderFacts({ market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card), extras: sealed && !held ? msrpFacts(opts.msrp, shown, endDay, sourceLine(card)) : [] })}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
+${factsHtml}${released ? `<p class="muted">Released ${esc(released)}</p>` : ""}</section>
 ${allReadsHtml || (readHtml ? `<section id="reads"><h2>Reads</h2>\n${readHtml}</section>` : "")}
 ${itemRelatedHtml(card)}
 ${supplyNote}
@@ -3661,7 +3694,10 @@ const KV_CSS = `<style>.kv{margin:8px 0 16px;padding:4px 16px;border-radius:18px
 
 export function factsLines(row) {
   const lines = [];
-  if (Number(row?.market) > 0) lines.push({ label: "Market", value: money(row.market) });
+  if (Number(row?.market) > 0) {
+    const when = priceDay(String(row.date || "").slice(0, 10));
+    lines.push({ label: "Market", value: when ? `${money(row.market)}, ${when}` : money(row.market) });
+  }
   if (Number(row?.low) > 0) {
     const when = priceDay(String(row.lowDate || row.date || "").slice(0, 10));
     const short = when ? when.replace(/, \d{4}$/, "") : "";
@@ -3675,6 +3711,41 @@ export function factsLines(row) {
     if (label && value) lines.push({ label, value });
   }
   return lines;
+}
+
+function euroAmount(n) {
+  return `€${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Key stats that are not the market row. A missing number is left off.
+// Graded pop is singles only. Sold comps need 5 or more real comps. Nothing is estimated.
+export function keyStatExtras({ held = false, range = null, listings = null, depth = null, kind = "single" } = {}) {
+  if (held) return [];
+  const out = [];
+  if (range && Number(range.low) > 0 && Number(range.high) > 0 && priceDay(range.lowDate) && priceDay(range.highDate)) {
+    const name = range.label === "12-month" ? "12-month" : String(range.label || "Range");
+    out.push({ label: `${name} low`, value: `${money(range.low)}, ${priceDay(range.lowDate)}` });
+    out.push({ label: `${name} high`, value: `${money(range.high)}, ${priceDay(range.highDate)}` });
+  }
+  const n = Number(listings && listings.n);
+  const listedDay = priceDay(listings && (listings.day || listings.date));
+  if (Number.isFinite(n) && n >= 0 && listedDay) {
+    out.push({ label: "Listings counted", value: `${Math.round(n).toLocaleString("en-US")} on ${listedDay}` });
+  }
+  const eur = depth && depth.eur;
+  if (eur && Number(eur.market) > 0 && priceDay(eur.asOf)) {
+    out.push({ label: "Cardmarket", value: `${euroAmount(eur.market)}, ${priceDay(eur.asOf)}` });
+  }
+  const sold = depth && depth.sold;
+  if (sold && sold.n >= 5 && Number(sold.median) > 0 && priceDay(sold.first) && priceDay(sold.last)) {
+    out.push({ label: "Sold comps", value: `${money(sold.median)} median, ${Math.round(Number(sold.n)).toLocaleString("en-US")} comps, ${priceDay(sold.first)} to ${priceDay(sold.last)}` });
+  }
+  const pop = depth && depth.pop;
+  if (kind !== "sealed" && pop && Number(pop.total) > 0) {
+    const when = priceDay(pop.asOf || (depth && depth.asOf));
+    out.push({ label: "Graded", value: `${Math.round(Number(pop.total)).toLocaleString("en-US")} graded${when ? `, ${when}` : ""}` });
+  }
+  return out;
 }
 
 // MSRP key stats for a sealed product: the sourced US MSRP with its source and
