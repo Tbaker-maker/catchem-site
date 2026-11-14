@@ -5,9 +5,9 @@
 // A PNG hero is copied on when one is passed. WebP is left off the card:
 // this worker has no WebP decoder.
 
-import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion, loadJson, loadDiveIndex, loadItemRead } from "./data.mjs";
-import { marketDepthFor } from "./market-depth.mjs";
-import { listingsEntry } from "./features.mjs";
+import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion, loadJson } from "./data.mjs";
+import { marketDepthFor, gradedPopLabel } from "./market-depth.mjs";
+import { loadProductListings } from "./listings-count.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { edgeBuildId } from "./edge-cache.mjs";
 import { money } from "./clean-text.mjs";
@@ -276,48 +276,23 @@ export function listingsCountedFromEntry(entry) {
   return { n: Math.round(n), day };
 }
 
-// Same count as the page chip. Sealed uses listings-counted.json via listingsEntry.
-// A single is not in that file, so the item-read count is the chip. Never the chart series.
+// Same count as the page chip. Sealed is the latest dated dive row.
+// A single is the item-read count. listings-counted.json does not win.
 export async function shareListings(card, fetchImpl = fetch) {
-  if (!card || !card.id) return null;
-  try {
-    const doc = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
-    let key = String(card.id);
-    if (card.kind === "sealed") {
-      const diveMap = await loadDiveIndex(fetchImpl);
-      const id = key;
-      key = (diveMap && diveMap.byTcgcsv && diveMap.byTcgcsv[id]) || ((diveMap && diveMap.ids || []).includes(id) ? id : "");
-      if (!key) return null;
-      return listingsCountedFromEntry(listingsEntry(doc, key));
-    }
-    const fromFile = listingsCountedFromEntry(listingsEntry(doc, key));
-    if (fromFile) return fromFile;
-    if (card.setSlug) {
-      const row = await loadItemRead(card.setSlug, card.id, fetchImpl);
-      const listed = row && row.listings;
-      const day = String(listed && listed.date || "").slice(0, 10);
-      const n = Number(listed && listed.n);
-      if (Number.isInteger(n) && n >= 0 && SHARE_ISO.test(day)) return { n, day };
-    }
-  } catch { return null; }
-  return null;
+  return loadProductListings(card, fetchImpl);
 }
 
-// Lines for the share card. Listings counted, sold median, and graded pop
-// only when those numbers are real. Pop stays off sealed. EUR is not drawn:
-// the bitmap font has no euro sign, and the page already shows Cardmarket.
+// Lines for the share card. Listings counted and graded pop only when those
+// numbers are real. Sold comps stay off until the comps are proven.
+// Pop is the total across PSA, BGS, CGC and SGC, with the pop date, singles only.
+// EUR is not drawn: the bitmap font has no euro sign, and the page already shows Cardmarket.
 export function shareFactLines({ depth = null, listings = null, kind = "single" } = {}) {
   const lines = [];
   const n = Number(listings && listings.n);
   const day = String(listings && listings.day || "").slice(0, 10);
   if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted, ${formatDay(day)}`);
-  const sold = depth && depth.sold;
-  if (sold && sold.n >= 5 && sold.median > 0 && SHARE_ISO.test(String(sold.first || "")) && SHARE_ISO.test(String(sold.last || ""))) {
-    const cash = money(sold.median);
-    if (cash) lines.push(`Sold median ${cash}`);
-  }
-  const pop = depth && depth.pop;
-  if (kind !== "sealed" && pop && Number(pop.total) > 0) lines.push(`${Math.round(Number(pop.total)).toLocaleString("en-US")} graded`);
+  const popLabel = kind !== "sealed" ? gradedPopLabel(depth && depth.pop) : "";
+  if (popLabel) lines.push(popLabel);
   return lines.slice(0, 3);
 }
 
@@ -364,11 +339,12 @@ export function drawProductShare(opts = {}) {
   const meta = [source, date].filter(Boolean).join("  ");
   drawText(rgb, meta, textX, hasPhoto ? 410 : 430, 4, dim);
   const facts = (Array.isArray(opts.facts) ? opts.facts : [])
-    .map((lineText) => [...String(lineText)].filter((ch) => FONT[ch] || FONT[String(ch).toUpperCase()]).join("").replace(/\s+/g, " ").trim().slice(0, 42))
+    .map((lineText) => [...String(lineText)].filter((ch) => FONT[ch] || FONT[String(ch).toUpperCase()]).join("").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .slice(0, 3);
   facts.forEach((lineText, i) => {
-    drawText(rgb, lineText, textX, (hasPhoto ? 448 : 468) + i * 28, 3, ink);
+    const scale = textWidth(lineText, 3) <= maxW ? 3 : 2;
+    drawText(rgb, lineText, textX, (hasPhoto ? 448 : 468) + i * 28, scale, ink);
   });
 
   const pts = (Array.isArray(opts.points) ? opts.points : []).map(Number).filter((n) => n > 0).slice(-36);
@@ -599,13 +575,17 @@ export async function handleProductShare(request, url, opts = {}) {
     });
   }
   let holdDoc = null;
+  let holdUnreadable = false;
   if (opts.holdDoc !== undefined) holdDoc = opts.holdDoc;
   else if (opts.loadHold !== false) {
     try {
       holdDoc = typeof opts.loadHold === "function" ? await opts.loadHold(card) : await loadJson("price-hold.json", fetchImpl);
-    } catch { holdDoc = null; }
+      if (!holdDoc || typeof holdDoc !== "object") holdUnreadable = true;
+    } catch {
+      holdUnreadable = true;
+    }
   }
-  const held = shareHeld(card, holdDoc, opts);
+  const held = holdUnreadable || shareHeld(card, holdDoc, opts);
   const fields = shareFieldsFromProduct(card, { held });
   if (!fields) {
     return new Response("Not found", {

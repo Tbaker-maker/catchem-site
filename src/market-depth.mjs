@@ -82,16 +82,24 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   return parts.join("\n");
 }
 
-// One large line for camera mode. Sold and pop sections are hidden there, so the
-// real numbers have to sit on this line. Listings counted stay on the summary chip.
+export function gradedPopLabel(pop) {
+  const total = Number(pop && pop.total);
+  if (!(total > 0)) return "";
+  const when = day(pop.asOf);
+  return `${int(total)} graded, PSA, BGS, CGC and SGC${when ? `, ${when}` : ""}`;
+}
+
+// One large line for camera mode. Sold comps stay off this line until the
+// comps are proven. Graded pop is singles only: the total across graders,
+// with the pop date. Listings counted stay on the summary chip.
 // A missing stat is left out. Nothing here is estimated.
 export function cameraLine(depth, { kind = "single" } = {}) {
   if (!depth) return "";
   const bits = [];
-  const s = depth.sold;
-  if (s && s.n >= 5 && s.median > 0 && ISO.test(s.first) && ISO.test(s.last)) bits.push(`Sold median ${usd(s.median)}`);
-  const p = depth.pop;
-  if (kind !== "sealed" && p && p.total > 0) bits.push(`${int(p.total)} graded`);
+  if (kind !== "sealed") {
+    const label = gradedPopLabel(depth.pop);
+    if (label) bits.push(label);
+  }
   const e = depth.eur;
   if (e && e.market > 0 && ISO.test(e.asOf)) bits.push(`Cardmarket ${eur(e.market)}`);
   return bits.join(". ");
