@@ -5,7 +5,9 @@
 // A PNG hero is copied on when one is passed. WebP is left off the card:
 // this worker has no WebP decoder.
 
-import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion } from "./data.mjs";
+import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion, loadJson } from "./data.mjs";
+import { marketDepthFor, gradedPopLabel } from "./market-depth.mjs";
+import { loadProductListings } from "./listings-count.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { edgeBuildId } from "./edge-cache.mjs";
 import { money } from "./clean-text.mjs";
@@ -232,9 +234,11 @@ function publicSource(card) {
   return src;
 }
 
-export function shareFieldsFromProduct(card) {
+export function shareFieldsFromProduct(card, opts = {}) {
   if (!card) return null;
   const name = String(card.name || "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 90) || "Product";
+  const held = opts.held === true || opts.priceHeld === true || card.priceHeld === true || card.held === true || card.priceStatus === "checking" || card.priceStatus === "held";
+  if (held) return { name, price: "", date: "", source: "", points: [] };
   const priceNum = Number(card.price);
   const day = String(card.asOf || card.priceDate || "").slice(0, 10);
   const hist = Array.isArray(card.hist) ? card.hist : [];
@@ -249,6 +253,47 @@ export function shareFieldsFromProduct(card) {
     source: publicSource(card),
     points,
   };
+}
+
+const SHARE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+// True when this product's price is held. A held card shows no price and no key numbers.
+export function shareHeld(card, holdDoc = null, opts = {}) {
+  if (!card) return false;
+  if (opts.priceHeld === true || opts.held === true || card.priceHeld === true || card.held === true) return true;
+  const status = String(card.priceStatus || "");
+  if (status === "checking" || status === "held") return true;
+  const ids = holdDoc && holdDoc.ids;
+  return !!(ids && card.id && Object.prototype.hasOwnProperty.call(ids, card.id));
+}
+
+// listingsEntry().listingsCounted. Not the chart series. A miss is null.
+export function listingsCountedFromEntry(entry) {
+  const lc = entry && entry.listingsCounted;
+  const n = Number(lc && lc.n);
+  const day = String(lc && lc.date || "").slice(0, 10);
+  if (!Number.isFinite(n) || n < 0 || !SHARE_ISO.test(day)) return null;
+  return { n: Math.round(n), day };
+}
+
+// Same count as the page chip. Sealed is the latest dated dive row.
+// A single is the item-read count. listings-counted.json does not win.
+export async function shareListings(card, fetchImpl = fetch) {
+  return loadProductListings(card, fetchImpl);
+}
+
+// Lines for the share card. Listings counted and graded pop only when those
+// numbers are real. Sold comps stay off until the comps are proven.
+// Pop is the total across PSA, BGS, CGC and SGC, with the pop date, singles only.
+// EUR is not drawn: the bitmap font has no euro sign, and the page already shows Cardmarket.
+export function shareFactLines({ depth = null, listings = null, kind = "single" } = {}) {
+  const lines = [];
+  const n = Number(listings && listings.n);
+  const day = String(listings && listings.day || "").slice(0, 10);
+  if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted, ${formatDay(day)}`);
+  const popLabel = kind !== "sealed" ? gradedPopLabel(depth && depth.pop) : "";
+  if (popLabel) lines.push(popLabel);
+  return lines.slice(0, 3);
 }
 
 export function productShareCacheKey(id, dataVersion = "", buildId = "") {
@@ -293,12 +338,20 @@ export function drawProductShare(opts = {}) {
   const source = String(opts.source || "").replace(/[^\w .]/g, "").slice(0, 32) || "TCGplayer market";
   const meta = [source, date].filter(Boolean).join("  ");
   drawText(rgb, meta, textX, hasPhoto ? 410 : 430, 4, dim);
+  const facts = (Array.isArray(opts.facts) ? opts.facts : [])
+    .map((lineText) => [...String(lineText)].filter((ch) => FONT[ch] || FONT[String(ch).toUpperCase()]).join("").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  facts.forEach((lineText, i) => {
+    const scale = textWidth(lineText, 3) <= maxW ? 3 : 2;
+    drawText(rgb, lineText, textX, (hasPhoto ? 448 : 468) + i * 28, scale, ink);
+  });
 
   const pts = (Array.isArray(opts.points) ? opts.points : []).map(Number).filter((n) => n > 0).slice(-36);
   const boxX = hasPhoto ? 448 : 56;
-  const boxY = hasPhoto ? 460 : 490;
+  const boxY = facts.length ? (hasPhoto ? 540 : 548) : (hasPhoto ? 460 : 490);
   const boxW = hasPhoto ? 696 : 1088;
-  const boxH = hasPhoto ? 130 : 100;
+  const boxH = facts.length ? (hasPhoto ? 72 : 64) : (hasPhoto ? 130 : 100);
   if (pts.length >= 2) {
     fillRect(rgb, boxX, boxY, boxW, boxH, panel);
     const min = Math.min(...pts);
@@ -515,14 +568,40 @@ export async function handleProductShare(request, url, opts = {}) {
 
   const loadProduct = opts.loadProduct || ((pid) => bucketRow(pid, fetchImpl));
   const card = await loadProduct(id);
-  const fields = shareFieldsFromProduct(card);
+  if (!card) {
+    return new Response("Not found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+  let holdDoc = null;
+  let holdUnreadable = false;
+  if (opts.holdDoc !== undefined) holdDoc = opts.holdDoc;
+  else if (opts.loadHold !== false) {
+    try {
+      holdDoc = typeof opts.loadHold === "function" ? await opts.loadHold(card) : await loadJson("price-hold.json", fetchImpl);
+      if (!holdDoc || typeof holdDoc !== "object") holdUnreadable = true;
+    } catch {
+      holdUnreadable = true;
+    }
+  }
+  const held = holdUnreadable || shareHeld(card, holdDoc, opts);
+  const fields = shareFieldsFromProduct(card, { held });
   if (!fields) {
     return new Response("Not found", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
     });
   }
-  const png = await renderProductSharePng(fields);
+  let facts = [];
+  if (!held && opts.shareExtras !== false) {
+    try {
+      const depth = typeof opts.loadDepth === "function" ? await opts.loadDepth(card) : await marketDepthFor(card, fetchImpl);
+      const listings = typeof opts.loadListings === "function" ? await opts.loadListings(card) : await shareListings(card, fetchImpl);
+      facts = shareFactLines({ depth, listings, kind: card.kind === "sealed" ? "sealed" : "single" });
+    } catch { facts = []; }
+  }
+  const png = await renderProductSharePng({ ...fields, facts });
   const headers = {
     "content-type": "image/png",
     "cache-control": "public, max-age=86400",

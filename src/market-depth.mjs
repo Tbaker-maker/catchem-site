@@ -81,3 +81,26 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   }
   return parts.join("\n");
 }
+
+export function gradedPopLabel(pop) {
+  const total = Number(pop && pop.total);
+  if (!(total > 0)) return "";
+  const when = day(pop.asOf);
+  return `${int(total)} graded, PSA, BGS, CGC and SGC${when ? `, ${when}` : ""}`;
+}
+
+// One large line for camera mode. Sold comps stay off this line until the
+// comps are proven. Graded pop is singles only: the total across graders,
+// with the pop date. Listings counted stay on the summary chip.
+// A missing stat is left out. Nothing here is estimated.
+export function cameraLine(depth, { kind = "single" } = {}) {
+  if (!depth) return "";
+  const bits = [];
+  if (kind !== "sealed") {
+    const label = gradedPopLabel(depth.pop);
+    if (label) bits.push(label);
+  }
+  const e = depth.eur;
+  if (e && e.market > 0 && ISO.test(e.asOf)) bits.push(`Cardmarket ${eur(e.market)}`);
+  return bits.join(". ");
+}
