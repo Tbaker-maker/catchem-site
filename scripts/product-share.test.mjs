@@ -17,6 +17,8 @@ import {
   usesFallbackGlyph,
   sparkPoints,
 } from "../src/product-share.mjs";
+import { renderCard } from "../src/ui.mjs";
+import { resolveListings } from "../src/listings-count.mjs";
 import { addShareMeta } from "../src/seo.mjs";
 
 const pts = [40, 42, 41, 48, 55, 53, 60];
@@ -86,8 +88,8 @@ assert.deepEqual(fields.points, [40, 60, 55]);
 assert.deepEqual(shareFactLines({
   kind: "single",
   listings: { n: 4, day: "2026-11-11" },
-  depth: { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972 }, eur: { market: 10, asOf: "2026-11-11" } },
-}), ["4 listings counted, Nov 11, 2026", "Sold median $2,550.00", "2,972 graded"]);
+  depth: { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01" }, eur: { market: 10, asOf: "2026-11-11" } },
+}), ["4 listings counted, Nov 11, 2026", "2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"]);
 assert.deepEqual(shareFactLines({
   kind: "sealed",
   listings: { n: 96, day: "2026-10-30" },
@@ -144,7 +146,7 @@ assert.equal(shareHeld(card, { ids: { "tcgcsv-277335": true } }), true);
 assert.deepEqual(listingsCountedFromEntry({ listingsCounted: { n: 42, date: "2026-10-30" } }), { n: 42, day: "2026-10-30" });
 assert.equal(listingsCountedFromEntry({ listingsCounted: { n: 1 } }), null);
 
-const depth = { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972 } };
+const depth = { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01" } };
 const baseFields = shareFieldsFromProduct(card);
 async function sharePng(extra) {
   const url = new URL("https://catchemtcg.com/og/product/tcgcsv-277335.png");
@@ -159,12 +161,12 @@ async function sharePng(extra) {
   assert.equal(res.status, 200);
   return new Uint8Array(await res.arrayBuffer());
 }
-const normalFacts = ["4 listings counted, Nov 11, 2026", "Sold median $2,550.00", "2,972 graded"];
+const normalFacts = ["4 listings counted, Nov 11, 2026", "2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"];
 assert.deepEqual(shareFactLines({ kind: "single", listings: { n: 4, day: "2026-11-11" }, depth }), normalFacts);
 const normalPng = await renderProductSharePng({ ...baseFields, facts: normalFacts });
 assert.equal(Buffer.from(await sharePng({ buildId: "normalnormal01" })).equals(Buffer.from(normalPng)), true);
 
-const noneFacts = ["Sold median $2,550.00", "2,972 graded"];
+const noneFacts = ["2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"];
 assert.deepEqual(shareFactLines({ kind: "single", listings: null, depth }), noneFacts);
 const nonePng = await renderProductSharePng({ ...baseFields, facts: noneFacts });
 assert.equal(Buffer.from(await sharePng({ buildId: "nolistings0001", loadListings: async () => null })).equals(Buffer.from(nonePng)), true);
@@ -186,20 +188,39 @@ assert.equal(Buffer.from(await sharePng({
   loadListings: async () => ({ n: 96, day: "2026-10-30" }),
 })).equals(Buffer.from(heldPng)), true);
 
-const listed = await shareListings({ id: "tcgcsv-1", kind: "sealed", name: "Box" }, async (url) => {
+const diveFetch = async (url) => {
   const u = String(url);
   if (u.includes("listings-counted.json")) {
-    return new Response(JSON.stringify({ products: [{ id: "swsh7-bb", listingsCounted: { n: 42, date: "2026-10-30" } }] }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ products: [{ id: "swsh7-bb", listingsCounted: { n: 42, date: "2026-10-29" } }] }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (u.includes("research/pulse/dive/index.json")) {
-    return new Response(JSON.stringify({ ids: ["swsh7-bb"], byTcgcsv: { "tcgcsv-1": "swsh7-bb" } }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ ids: ["swsh7-bb", "sv8pt5-etb"], byTcgcsv: { "tcgcsv-1": "swsh7-bb", "tcgcsv-2": "sv8pt5-etb" } }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (u.includes("/dive/swsh7-bb")) {
-    return new Response(JSON.stringify({ series: [{ date: "2026-11-01", listingCount: 999 }] }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ series: [{ date: "2026-10-29", listingCount: 42 }, { date: "2026-11-14", listingCount: 132 }] }), { status: 200, headers: { "content-type": "application/json" } });
+  }
+  if (u.includes("/dive/sv8pt5-etb")) {
+    return new Response(JSON.stringify({ series: [{ date: "2026-11-14", listingCount: 87 }] }), { status: 200, headers: { "content-type": "application/json" } });
   }
   return new Response("no", { status: 404 });
-});
-assert.deepEqual(listed, { n: 42, day: "2026-10-30" });
+};
+const listed = await shareListings({ id: "tcgcsv-1", kind: "sealed", name: "Box" }, diveFetch);
+assert.deepEqual(listed, { n: 132, day: "2026-11-14" });
+const noFile = await shareListings({ id: "tcgcsv-2", kind: "sealed", name: "Missing file" }, diveFetch);
+assert.deepEqual(noFile, { n: 87, day: "2026-11-14" });
+
+const diveSeries = [{ date: "2026-10-29", listingCount: 42 }, { date: "2026-11-14", listingCount: 132 }];
+const staleFile = { n: 42, day: "2026-10-29" };
+const sealedCard = { id: "tcgcsv-1", name: "Enhanced Booster Box", kind: "sealed", set: "Mega", price: 200, asOf: "2026-11-14", source: "TCGplayer market", hist: [["2026-11-01", 190], ["2026-11-14", 200]] };
+const stalePage = renderCard(sealedCard, "stamp", { listingSeries: diveSeries, itemListings: staleFile });
+const barePage = renderCard(sealedCard, "stamp", { listingSeries: diveSeries });
+const chipCount = resolveListings({ kind: "sealed", series: diveSeries, itemListings: staleFile });
+assert.deepEqual(chipCount, { n: 132, day: "2026-11-14" });
+assert.deepEqual(shareFactLines({ kind: "sealed", listings: chipCount }), ["132 listings counted, Nov 14, 2026"]);
+assert.equal(stalePage.includes("132 listings counted"), true);
+assert.equal(stalePage.includes("42 listings counted"), false);
+assert.equal(barePage.includes("132 listings counted"), true);
+assert.equal(barePage.includes("<dt>Listings counted</dt>") && barePage.includes("132 on Nov 14, 2026"), true);
 
 const page = addShareMeta(`<html><head><title>Lost Origin Elite Trainer Box · Catch'em</title></head><body><div data-rv-price="194.33" data-rv-date="2026-10-30"></div><img loading="eager" src="/data/cutouts/x.webp">${html}</body></html>`, "/p/tcgcsv-277335", "product");
 assert.match(page, /property="og:image" content="https:\/\/catchemtcg\.com\/og\/product\/tcgcsv-277335\.png"/);
@@ -212,5 +233,18 @@ assert.equal(/\bloadDive\(/.test(src), false);
 assert.equal(src.includes("image: opts.image"), false);
 assert.doesNotMatch(src, /[\u2014\u2013]/);
 assert.doesNotMatch(src, /\b(NM|Near Mint|buy now|sell now)\b/);
+
+const blankPng = await renderProductSharePng({ name: card.name, price: "", date: "", source: "", points: [], facts: [] });
+const holdUrl = new URL("https://catchemtcg.com/og/product/tcgcsv-277335.png");
+const holdDown = await handleProductShare(new Request(holdUrl), holdUrl, {
+  loadProduct: async () => ({ ...card, kind: "single" }),
+  dataVersion: "2026-10-30",
+  buildId: "holddown000001",
+  loadHold: async () => { throw new Error("price-hold.json down"); },
+  loadDepth: async () => depth,
+  loadListings: async () => ({ n: 4, day: "2026-11-11" }),
+});
+assert.equal(holdDown.status, 200);
+assert.equal(Buffer.from(new Uint8Array(await holdDown.arrayBuffer())).equals(Buffer.from(blankPng)), true);
 
 console.log("product-share ok");

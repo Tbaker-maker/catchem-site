@@ -6,7 +6,7 @@ import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { productChart } from "./product-chart.mjs";
-import { marketDepthHtml, soldSeries, cameraLine } from "./market-depth.mjs";
+import { marketDepthHtml, soldSeries, cameraLine, gradedPopLabel } from "./market-depth.mjs";
 import { readSheet, patternSentence, priceBits } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
@@ -21,6 +21,7 @@ import { PAID_FOOTER, PAID_NOTE, affEbay, affTcg, ebayQuery, ebaySearchUrl, getA
 import { queryShardIds } from "./search-shards.mjs";
 import { createRank } from "./catalog-rank.mjs";
 import { FEATURE_CSS, releasesBody, longDay } from "./features.mjs";
+import { resolveListings } from "./listings-count.mjs";
 import { freshRandom, freshSeed, freshOrder, pickWording, readSeen, markSeen, SEEN_KEY } from "./fresh.mjs";
 import { glanceChips, interestScore, listingsWording, pinIds, rankLead, readMove } from "./feed-rank.mjs";
 import { PRACTICE_NOTE, PACK_SIZE, SLOTS, TIERS, buildPack, seededRandom } from "./practice.mjs";
@@ -2487,23 +2488,20 @@ function countedListings(fact, series, endDay) {
   return ch ? { n: ch.n, day: rowDay, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay } : { n: Number(row.listingCount), day: rowDay, pct: null, prevDay: "" };
 }
 
-// The page chip and Key stats use the same count. listingsEntry (itemListings) wins
-// when it disagrees with the chart series. When they match, the series row keeps its window.
-function pageListings(fact, series, endDay, itemListings) {
-  const fileN = Number(itemListings && itemListings.n);
-  const fileDay = String(itemListings && (itemListings.day || itemListings.date) || "").slice(0, 10);
-  const file = Number.isFinite(fileN) && fileN >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(fileDay) ? { n: Math.round(fileN), day: fileDay } : null;
-  const seriesRow = countedListings(fact, series, endDay);
-  if (file && seriesRow && file.n === seriesRow.n && file.day === seriesRow.day) return seriesRow;
-  if (file) {
-    const pct = Number(itemListings.pct);
-    const days = Number(itemListings.days);
-    if (Number.isFinite(pct) && days > 0 && itemListings.prevDay) {
-      return { n: file.n, day: file.day, pct, days, from: itemListings.from, prevDay: itemListings.prevDay };
-    }
-    return file;
+// The page chip and Key stats use the same count.
+// Sealed uses the latest dated dive row, never a listings-counted.json row.
+// Singles use the item-read count when that row is present.
+function pageListings(fact, series, endDay, itemListings, kind = "single") {
+  const row = kind === "sealed"
+    ? resolveListings({ kind: "sealed", series })
+    : resolveListings({ kind: "single", itemListings });
+  if (row) {
+    const ch = listingChange(series, row.day);
+    if (ch && ch.n === row.n) return { n: row.n, day: row.day, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay };
+    return { n: row.n, day: row.day };
   }
-  return seriesRow;
+  if (kind === "sealed") return null;
+  return countedListings(fact, series, endDay);
 }
 
 // One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
@@ -3049,7 +3047,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const strip = summaryStrip({
     prefix: view.selected ? view.selected.key : conditionPrefix(card, held),
     price: held ? "" : showPrice,
-    listings: pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings),
+    listings: pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings, "single"),
     rotation: rotationChipLabel(opts.rotationFact),
   });
   const num = String(card.num || "").trim();
@@ -3084,16 +3082,14 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const rotation = String(opts.rotationFact || "");
   const printRun = isRotatedSet(card) ? `<p class="print-run">${esc(PRINT_RUN_LINE)} <a href="/rotation">Rotation and print runs</a>.</p>` : "";
   const range = held ? null : yearRange(priceSeries, endDay);
-  const listRow = held ? null : pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings);
+  const listRow = held ? null : pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings, "single");
   const keyDl = renderFacts(held ? {} : {
-    market: view.selected ? Number(view.selected.amount) : Number(card.price),
     low: Number(opts.fact?.low) > 0 ? opts.fact.low : (Number(card.low) > 0 ? card.low : null),
-    date: view.selected ? String(view.selected.date || "") : endDay,
-    source: sourceLine(card),
+    lowDate: endDay,
     extras: keyStatExtras({ range, listings: listRow, depth: opts.marketDepth, kind: "single" }),
   });
   const factBlock = (factList || rotation || mon || printRun || keyDl)
-    ? `<section class="cp-sec" id="stats"><h2>Key stats</h2>${keyDl}${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
+    ? `${KV_CSS}<section class="cp-sec" id="stats"><h2>Key stats</h2>${keyDl}${factList ? `<ul class="cp-facts">${factList}</ul>` : ""}${rotation}${printRun}${mon}</section>`
     : "";
   const panels = [opts.ratingHtml, opts.cycleHtml].map((html) => String(html || "").trim()).filter(Boolean).join("");
   const also = (card.also || []).map((row) => `<a href="/c/${esc(row.id)}">${esc(row.name)}</a>`).join(" · ");
@@ -3318,9 +3314,10 @@ export function renderCard(card, stamp, opts = {}) {
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
+  const sealedListings = pageListings(fact, opts.listingSeries, endDay, opts.itemListings, "sealed") || opts.itemListings || null;
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
-    listings: pageListings(fact, opts.listingSeries, endDay, opts.itemListings),
+    listings: sealedListings,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
   const breakBits = [];
@@ -3342,11 +3339,12 @@ export function renderCard(card, stamp, opts = {}) {
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, sealed: true });
   const released = priceDay(String(card.release || "").slice(0, 10));
   void also;
+  const showMarket = Number(shown) > 0;
   const statExtras = held ? [] : [
-    ...keyStatExtras({ range: yearRange(priceSeries, endDay), listings: pageListings(fact, opts.listingSeries, endDay, opts.itemListings), depth: opts.marketDepth, kind: "sealed" }),
+    ...keyStatExtras({ range: yearRange(priceSeries, endDay), listings: sealedListings, depth: opts.marketDepth, kind: "sealed" }),
     ...msrpFacts(opts.msrp, shown, endDay, sourceLine(card)),
   ];
-  const factsHtml = renderFacts(held ? {} : { market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), date: endDay, source: sourceLine(card), extras: statExtras });
+  const factsHtml = renderFacts(held ? {} : { market: shown, low: Number(fact?.low) > 0 ? fact.low : (Number(card.low) > 0 ? card.low : null), lowDate: endDay, date: showMarket ? "" : endDay, source: sourceLine(card), extras: statExtras });
   const askFallback = !price && Number(card.askPrice) > 0 ? money(card.askPrice) : "";
   const priceHtml = price
     ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${price}</span>${priceKnow(card, endDay, opts)}</p>`
@@ -3718,7 +3716,8 @@ function euroAmount(n) {
 }
 
 // Key stats that are not the market row. A missing number is left off.
-// Graded pop is singles only. Sold comps need 5 or more real comps. Nothing is estimated.
+// Graded pop is singles only. Sold comps stay in the sold section, not here,
+// until those comps are proven. Nothing is estimated.
 export function keyStatExtras({ held = false, range = null, listings = null, depth = null, kind = "single" } = {}) {
   if (held) return [];
   const out = [];
@@ -3736,15 +3735,8 @@ export function keyStatExtras({ held = false, range = null, listings = null, dep
   if (eur && Number(eur.market) > 0 && priceDay(eur.asOf)) {
     out.push({ label: "Cardmarket", value: `${euroAmount(eur.market)}, ${priceDay(eur.asOf)}` });
   }
-  const sold = depth && depth.sold;
-  if (sold && sold.n >= 5 && Number(sold.median) > 0 && priceDay(sold.first) && priceDay(sold.last)) {
-    out.push({ label: "Sold comps", value: `${money(sold.median)} median, ${Math.round(Number(sold.n)).toLocaleString("en-US")} comps, ${priceDay(sold.first)} to ${priceDay(sold.last)}` });
-  }
-  const pop = depth && depth.pop;
-  if (kind !== "sealed" && pop && Number(pop.total) > 0) {
-    const when = priceDay(pop.asOf || (depth && depth.asOf));
-    out.push({ label: "Graded", value: `${Math.round(Number(pop.total)).toLocaleString("en-US")} graded${when ? `, ${when}` : ""}` });
-  }
+  const popLabel = kind !== "sealed" ? gradedPopLabel(depth && depth.pop) : "";
+  if (popLabel) out.push({ label: "Graded", value: popLabel });
   return out;
 }
 
