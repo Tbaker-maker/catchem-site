@@ -14,6 +14,7 @@ t("views: price and listings", chartViews(5, 3).map((v) => v[0]).join() === "pri
 t("views: listings only", chartViews(1, 3).map((v) => v[0]).join() === "listings");
 t("views: nothing to chart", chartViews(1, 1).length === 0 && productChart({ price: [["2026-10-01", 5, "n"]], listings: [] }) === "");
 t("no demand, sales, or MSRP tab exists", !chartViews(9, 9).some(([k, l]) => /demand|sale|sold|msrp/i.test(k + l)));
+t("supply tab is labelled listings counted", chartViews(5, 3).some(([k, l]) => k === "listings" && l === "Listings counted") && chartViews(5, 3).some(([k, l]) => k === "both" && l === "Price + listings counted"));
 
 const lp = listingPoints([
   { date: "2026-10-03", listingCount: 7 }, { date: "2026-10-01", listingCount: 0 }, { date: "bad", listingCount: 4 },

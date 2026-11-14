@@ -32,8 +32,8 @@ export function listingPoints(rows) {
 export function chartViews(priceReal, listReal, soldReal = 0) {
   const views = [];
   if (priceReal >= 2) views.push(["price", "Price"]);
-  if (listReal >= 2) views.push(["listings", "Listings"]);
-  if (priceReal >= 2 && listReal >= 2) views.push(["both", "Price + listings"]);
+  if (listReal >= 2) views.push(["listings", "Listings counted"]);
+  if (priceReal >= 2 && listReal >= 2) views.push(["both", "Price + listings counted"]);
   if (soldReal >= 2) views.push(["sold", "Sold (eBay)"]);
   if (priceReal >= 2) views.push(["change", "% change"]);
   return views;
@@ -51,7 +51,7 @@ export function soldPoints(rows) {
   return [...map.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
-// Sealed pages open on Price + listings when that view exists; otherwise the first tab.
+// Sealed pages open on Price + listings counted when that view exists; otherwise the first tab.
 export function defaultView(views) {
   for (const row of views || []) if (row && row[0] === "both") return "both";
   return views && views[0] ? views[0][0] : "";
