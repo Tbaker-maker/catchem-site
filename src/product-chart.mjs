@@ -172,6 +172,11 @@ html.pc-cam .md-cam{display:block!important;margin:8px 0 0;font:600 22px/1.35 va
 html.pc-cam .glance{display:grid!important;grid-template-columns:minmax(240px,32vw) 1fr;column-gap:28px;row-gap:6px;align-items:center;min-height:calc(100vh - 32px)}
 html.pc-cam .glance > div{display:contents}
 html.pc-cam .chg,html.pc-cam .yr,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur{display:block!important}
+html.pc-cam #stats{grid-column:1;max-height:240px;overflow:auto}
+html.pc-cam #stats h2{margin:0 0 4px;font:600 14px/1.2 var(--sans)}
+html.pc-cam #stats .kv{margin:0;padding:4px 10px}
+html.pc-cam #stats .kv div{padding:4px 0}
+html.pc-cam .glance-photo{max-height:28vh}
 html.pc-cam .glance-photo{grid-column:1;grid-row:1;width:100%!important;max-width:none!important;max-height:46vh;aspect-ratio:1/1;padding:8px!important;margin:0;align-self:center}
 html.pc-cam .glance > p,html.pc-cam .glance > h1{grid-column:1}
 html.pc-cam .glance > .px,html.pc-cam .glance > .sum-strip{grid-column:1}

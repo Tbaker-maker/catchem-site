@@ -5,8 +5,9 @@
 // A PNG hero is copied on when one is passed. WebP is left off the card:
 // this worker has no WebP decoder.
 
-import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion, loadDive, loadDiveIndex, loadItemRead } from "./data.mjs";
+import { bucketRow, setRawKv, setDataVersion, publicDataVersion, currentDataVersion, loadJson, loadDiveIndex, loadItemRead } from "./data.mjs";
 import { marketDepthFor } from "./market-depth.mjs";
+import { listingsEntry } from "./features.mjs";
 import { BUILD_SHA } from "./build-stamp.mjs";
 import { edgeBuildId } from "./edge-cache.mjs";
 import { money } from "./clean-text.mjs";
@@ -233,9 +234,11 @@ function publicSource(card) {
   return src;
 }
 
-export function shareFieldsFromProduct(card) {
+export function shareFieldsFromProduct(card, opts = {}) {
   if (!card) return null;
   const name = String(card.name || "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 90) || "Product";
+  const held = opts.held === true || opts.priceHeld === true || card.priceHeld === true || card.held === true || card.priceStatus === "checking" || card.priceStatus === "held";
+  if (held) return { name, price: "", date: "", source: "", points: [] };
   const priceNum = Number(card.price);
   const day = String(card.asOf || card.priceDate || "").slice(0, 10);
   const hist = Array.isArray(card.hist) ? card.hist : [];
@@ -254,33 +257,41 @@ export function shareFieldsFromProduct(card) {
 
 const SHARE_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
-function lastListing(series) {
-  const pts = [];
-  for (const row of series || []) {
-    const d = Array.isArray(row) ? row[0] : row && row.date;
-    const n = Number(Array.isArray(row) ? row[1] : row && row.listingCount);
-    const day = String(d || "").slice(0, 10);
-    if (!SHARE_ISO.test(day) || !Number.isFinite(n) || n < 0) continue;
-    pts.push([day, Math.round(n)]);
-  }
-  pts.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  if (!pts.length) return null;
-  return { n: pts[pts.length - 1][1], day: pts[pts.length - 1][0] };
+// True when this product's price is held. A held card shows no price and no key numbers.
+export function shareHeld(card, holdDoc = null, opts = {}) {
+  if (!card) return false;
+  if (opts.priceHeld === true || opts.held === true || card.priceHeld === true || card.held === true) return true;
+  const status = String(card.priceStatus || "");
+  if (status === "checking" || status === "held") return true;
+  const ids = holdDoc && holdDoc.ids;
+  return !!(ids && card.id && Object.prototype.hasOwnProperty.call(ids, card.id));
 }
 
-// Last real listings counted night. Sealed uses the dive series. A single uses
-// its item-read count. A miss returns null. Never estimated.
+// listingsEntry().listingsCounted. Not the chart series. A miss is null.
+export function listingsCountedFromEntry(entry) {
+  const lc = entry && entry.listingsCounted;
+  const n = Number(lc && lc.n);
+  const day = String(lc && lc.date || "").slice(0, 10);
+  if (!Number.isFinite(n) || n < 0 || !SHARE_ISO.test(day)) return null;
+  return { n: Math.round(n), day };
+}
+
+// Same count as the page chip. Sealed uses listings-counted.json via listingsEntry.
+// A single is not in that file, so the item-read count is the chip. Never the chart series.
 export async function shareListings(card, fetchImpl = fetch) {
   if (!card || !card.id) return null;
   try {
+    const doc = await loadJson("listings-counted.json", fetchImpl).catch(() => null);
+    let key = String(card.id);
     if (card.kind === "sealed") {
       const diveMap = await loadDiveIndex(fetchImpl);
-      const id = String(card.id);
-      const sealedId = (diveMap && diveMap.byTcgcsv && diveMap.byTcgcsv[id]) || ((diveMap && diveMap.ids || []).includes(id) ? id : "");
-      if (!sealedId) return null;
-      const dive = await loadDive(sealedId, fetchImpl);
-      return lastListing(dive && dive.series);
+      const id = key;
+      key = (diveMap && diveMap.byTcgcsv && diveMap.byTcgcsv[id]) || ((diveMap && diveMap.ids || []).includes(id) ? id : "");
+      if (!key) return null;
+      return listingsCountedFromEntry(listingsEntry(doc, key));
     }
+    const fromFile = listingsCountedFromEntry(listingsEntry(doc, key));
+    if (fromFile) return fromFile;
     if (card.setSlug) {
       const row = await loadItemRead(card.setSlug, card.id, fetchImpl);
       const listed = row && row.listings;
@@ -581,7 +592,21 @@ export async function handleProductShare(request, url, opts = {}) {
 
   const loadProduct = opts.loadProduct || ((pid) => bucketRow(pid, fetchImpl));
   const card = await loadProduct(id);
-  const fields = shareFieldsFromProduct(card);
+  if (!card) {
+    return new Response("Not found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+  let holdDoc = null;
+  if (opts.holdDoc !== undefined) holdDoc = opts.holdDoc;
+  else if (opts.loadHold !== false) {
+    try {
+      holdDoc = typeof opts.loadHold === "function" ? await opts.loadHold(card) : await loadJson("price-hold.json", fetchImpl);
+    } catch { holdDoc = null; }
+  }
+  const held = shareHeld(card, holdDoc, opts);
+  const fields = shareFieldsFromProduct(card, { held });
   if (!fields) {
     return new Response("Not found", {
       status: 404,
@@ -589,14 +614,14 @@ export async function handleProductShare(request, url, opts = {}) {
     });
   }
   let facts = [];
-  if (opts.shareExtras !== false) {
+  if (!held && opts.shareExtras !== false) {
     try {
       const depth = typeof opts.loadDepth === "function" ? await opts.loadDepth(card) : await marketDepthFor(card, fetchImpl);
       const listings = typeof opts.loadListings === "function" ? await opts.loadListings(card) : await shareListings(card, fetchImpl);
       facts = shareFactLines({ depth, listings, kind: card.kind === "sealed" ? "sealed" : "single" });
     } catch { facts = []; }
   }
-  const png = await renderProductSharePng({ ...fields, facts, image: opts.image });
+  const png = await renderProductSharePng({ ...fields, facts });
   const headers = {
     "content-type": "image/png",
     "cache-control": "public, max-age=86400",
