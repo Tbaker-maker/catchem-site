@@ -85,11 +85,17 @@ assert.equal(fields.price, "$194.33");
 assert.equal(fields.date, "Oct 30, 2026");
 assert.equal(fields.source, "TCGplayer market");
 assert.deepEqual(fields.points, [40, 60, 55]);
+const popLabel = "2972 graded across BGS, CGC, PSA and SGC, as of 2026-11-01";
 assert.deepEqual(shareFactLines({
   kind: "single",
   listings: { n: 4, day: "2026-11-11" },
-  depth: { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01" }, eur: { market: 10, asOf: "2026-11-11" } },
-}), ["4 listings counted, Nov 11, 2026", "2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"]);
+  depth: { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01", label: popLabel }, eur: { market: 10, asOf: "2026-11-11" } },
+}), ["4 listings counted, Nov 11, 2026", popLabel]);
+assert.deepEqual(shareFactLines({
+  kind: "single",
+  listings: { n: 4, day: "2026-11-11" },
+  depth: { pop: { total: 2972, asOf: "2026-11-01" } },
+}), ["4 listings counted, Nov 11, 2026"]);
 assert.deepEqual(shareFactLines({
   kind: "sealed",
   listings: { n: 96, day: "2026-10-30" },
@@ -146,7 +152,7 @@ assert.equal(shareHeld(card, { ids: { "tcgcsv-277335": true } }), true);
 assert.deepEqual(listingsCountedFromEntry({ listingsCounted: { n: 42, date: "2026-10-30" } }), { n: 42, day: "2026-10-30" });
 assert.equal(listingsCountedFromEntry({ listingsCounted: { n: 1 } }), null);
 
-const depth = { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01" } };
+const depth = { sold: { n: 14, median: 2550, first: "2026-08-28", last: "2026-11-06" }, pop: { total: 2972, asOf: "2026-11-01", label: popLabel } };
 const baseFields = shareFieldsFromProduct(card);
 async function sharePng(extra) {
   const url = new URL("https://catchemtcg.com/og/product/tcgcsv-277335.png");
@@ -161,12 +167,12 @@ async function sharePng(extra) {
   assert.equal(res.status, 200);
   return new Uint8Array(await res.arrayBuffer());
 }
-const normalFacts = ["4 listings counted, Nov 11, 2026", "2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"];
+const normalFacts = ["4 listings counted, Nov 11, 2026", popLabel];
 assert.deepEqual(shareFactLines({ kind: "single", listings: { n: 4, day: "2026-11-11" }, depth }), normalFacts);
 const normalPng = await renderProductSharePng({ ...baseFields, facts: normalFacts });
 assert.equal(Buffer.from(await sharePng({ buildId: "normalnormal01" })).equals(Buffer.from(normalPng)), true);
 
-const noneFacts = ["2,972 graded, PSA, BGS, CGC and SGC, Nov 1, 2026"];
+const noneFacts = [popLabel];
 assert.deepEqual(shareFactLines({ kind: "single", listings: null, depth }), noneFacts);
 const nonePng = await renderProductSharePng({ ...baseFields, facts: noneFacts });
 assert.equal(Buffer.from(await sharePng({ buildId: "nolistings0001", loadListings: async () => null })).equals(Buffer.from(nonePng)), true);

@@ -284,7 +284,7 @@ export async function shareListings(card, fetchImpl = fetch) {
 
 // Lines for the share card. Listings counted and graded pop only when those
 // numbers are real. Sold comps stay off until the comps are proven.
-// Pop is the total across PSA, BGS, CGC and SGC, with the pop date, singles only.
+// The pop line is pop.label from market depth, singles only.
 // EUR is not drawn: the bitmap font has no euro sign, and the page already shows Cardmarket.
 export function shareFactLines({ depth = null, listings = null, kind = "single" } = {}) {
   const lines = [];

@@ -82,16 +82,22 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   return parts.join("\n");
 }
 
+// The market-depth file owns this line: the total across the graders that
+// have a count, plus the pop date. A missing label is left off. Graders are
+// not named here.
 export function gradedPopLabel(pop) {
   const total = Number(pop && pop.total);
   if (!(total > 0)) return "";
-  const when = day(pop.asOf);
-  return `${int(total)} graded, PSA, BGS, CGC and SGC${when ? `, ${when}` : ""}`;
+  const label = String(pop.label || "").replace(/\s+/g, " ").trim();
+  if (!label || label.length > 180) return "";
+  if (!/graded/i.test(label)) return "";
+  if (/[<>&]|[\u2013\u2014]/.test(label)) return "";
+  return label;
 }
 
 // One large line for camera mode. Sold comps stay off this line until the
-// comps are proven. Graded pop is singles only: the total across graders,
-// with the pop date. Listings counted stay on the summary chip.
+// comps are proven. Graded pop is singles only, and the words are pop.label.
+// Listings counted stay on the summary chip.
 // A missing stat is left out. Nothing here is estimated.
 export function cameraLine(depth, { kind = "single" } = {}) {
   if (!depth) return "";
