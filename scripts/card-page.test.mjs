@@ -133,7 +133,8 @@ const sealed = renderCard({
 t("sealed page keeps its chart and skips the single sections", sealed.includes("eBay listings counted") && sealed.includes('data-view="listings"') && !sealed.includes("Where it sits") && !sealed.includes("Reads about this card") && !sealed.includes('class="card-page"') && sealed.includes("30 listings counted") && !sealed.includes("NM "));
 
 const yearCard = renderCard({ ...card, hist: [[day(-365), 10], [end, 15]] }, "stamp", {
-  fact: { listings: 18, listingsAsOf: end, price: 15, asOf: end },
+  fact: { price: 15, asOf: end },
+  itemListings: { n: 18, day: end },
   rotationFact: '<p class="rot-badge"><a href="/rotation" aria-label="Rotation: regulation mark G, Standard"><span class="rm">G</span> Regulation mark G · Standard</a></p>',
 });
 t("summary chips use the exact year, the listing count, and the rotation mark", yearCard.includes("$15.00") && !yearCard.includes("NM $") && yearCard.includes("<dt>1Y</dt><dd class=\"up\">+50%</dd>") && yearCard.includes("18 listings counted, Oct 13") && yearCard.includes("G · Standard"));
