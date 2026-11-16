@@ -2489,19 +2489,16 @@ function countedListings(fact, series, endDay) {
 }
 
 // The page chip and Key stats use the same count.
-// Sealed uses the latest dated dive row, never a listings-counted.json row.
-// Singles use the item-read count when that row is present.
+// Sealed uses the latest dated dive row. Singles use the item-read count.
+// listings-counted.json is not a source. A miss is null.
 function pageListings(fact, series, endDay, itemListings, kind = "single") {
   const row = kind === "sealed"
     ? resolveListings({ kind: "sealed", series })
     : resolveListings({ kind: "single", itemListings });
-  if (row) {
-    const ch = listingChange(series, row.day);
-    if (ch && ch.n === row.n) return { n: row.n, day: row.day, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay };
-    return { n: row.n, day: row.day };
-  }
-  if (kind === "sealed") return null;
-  return countedListings(fact, series, endDay);
+  if (!row) return null;
+  const ch = listingChange(series, row.day);
+  if (ch && ch.n === row.n) return { n: row.n, day: row.day, from: ch.from, pct: ch.pct, days: ch.days, prevDay: ch.fromDay };
+  return { n: row.n, day: row.day };
 }
 
 // One signed, colored change table: 7D / 30D / 90D / 1Y. A window with no
@@ -3314,7 +3311,7 @@ export function renderCard(card, stamp, opts = {}) {
   const historyJs = `<script>${HISTORY_JS}</script>`;
   const rangeRow = yearRangeHtml(priceSeries, endDay);
   const changeHtml = sealed ? changeTable(priceSeries.length ? priceSeries : hist, endDay) : "";
-  const sealedListings = pageListings(fact, opts.listingSeries, endDay, opts.itemListings, "sealed") || opts.itemListings || null;
+  const sealedListings = pageListings(fact, opts.listingSeries, endDay, opts.itemListings, "sealed");
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
     listings: sealedListings,
