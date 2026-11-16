@@ -28,13 +28,16 @@ export async function marketDepthFor(card, fetchImpl = fetch) {
     const doc = await smallJson(`market-depth/${b}.json`, fetchImpl);
     const item = doc?.items?.[key];
     if (!item) return null;
-    return { ...item, asOf: String(doc.asOf || "").slice(0, 10), source: doc.source || "eBay sold comps via PkmnPrices", popSource: doc.popSource || "", eurSource: doc.eurSource || "" };
+    const items = doc.items && typeof doc.items === "object" ? doc.items : {};
+    const bandReady = Object.values(items).some((row) => row && row.pop && typeof row.pop.label === "string" && row.pop.label.trim());
+    return { ...item, asOf: String(doc.asOf || "").slice(0, 10), source: doc.source || "eBay sold comps via PkmnPrices", popSource: doc.popSource || "", eurSource: doc.eurSource || "", bandReady };
   } catch { return null; }
 }
 
 // Daily sold series for the chart's Sold view.
 export function soldSeries(depth) {
-  return Array.isArray(depth?.daily) ? depth.daily.filter((p) => Array.isArray(p) && ISO.test(p[0]) && Number.isInteger(p[1])) : [];
+  if (!depth || depth.bandReady !== true) return [];
+  return Array.isArray(depth.daily) ? depth.daily.filter((p) => Array.isArray(p) && ISO.test(p[0]) && Number.isInteger(p[1])) : [];
 }
 
 const GRADER_ORDER = ["PSA", "BGS", "CGC", "SGC"];
@@ -44,7 +47,9 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   const asOf = day(depth.asOf);
   const parts = [];
   const s = depth.sold;
-  if (s && s.n >= 5 && s.median > 0 && ISO.test(s.first) && ISO.test(s.last)) {
+  // Sold comps stay off until Catchem-data #557's band is in the file.
+  // The band derive writes pop.label. No label in the bucket means the old file.
+  if (depth.bandReady === true && s && s.n >= 5 && s.median > 0 && ISO.test(s.first) && ISO.test(s.last)) {
     const what = kind === "sealed" ? "eBay sold comps" : "eBay sold comps, raw copies in any condition";
     const lines = [
       `<li><span>Median</span><b>${usd(s.median)}</b></li>`,

@@ -10,7 +10,7 @@ const t = (name, ok) => { console.log(`${ok ? "  ok " : "  FAIL"} ${name}`); if 
 const visible = (html) => html.replace(/<style>[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 const depth = {
-  asOf: "2026-11-12", source: "eBay sold comps via PkmnPrices", popSource: "PSA, BGS, CGC and SGC population reports via PkmnPrices (GemRate)", eurSource: "Cardmarket via PkmnPrices",
+  asOf: "2026-11-12", bandReady: true, source: "eBay sold comps via PkmnPrices", popSource: "PSA, BGS, CGC and SGC population reports via PkmnPrices (GemRate)", eurSource: "Cardmarket via PkmnPrices",
   sold: { n: 18, read: 20, median: 88.5, p25: 80, p75: 95.25, first: "2026-10-20", last: "2026-11-11", dropped: 2, days: 90, currency: "USD", truncated: true },
   graded: [{ label: "PSA 10", n: 7, median: 420, last: "2026-11-10" }, { label: "https://x", n: 9, median: 1, last: "2026-11-10" }],
   daily: [["2026-11-07", 7], ["2026-11-10", 1], ["2026-11-11", 8]],
@@ -26,6 +26,8 @@ t("pop shows counts by grader with date and source", single.includes("66,316") &
 t("EUR shows with date", single.includes("€247.50 · Nov 11, 2026"));
 t("sealed: no condition label, no pop", !/Near Mint|\bNM\b|raw copies/.test(visible(sealed)) && !sealed.includes('id="pop"'));
 t("thin sold data is hidden", marketDepthHtml({ ...depth, sold: { ...depth.sold, n: 4 }, graded: [], pop: null, eur: null }) === "");
+t("sold stays off until the band data is in", !marketDepthHtml({ ...depth, bandReady: false }).includes('id="sold"') && soldSeries({ ...depth, bandReady: false }).length === 0);
+t("Gyarados Star comps are withheld", !marketDepthHtml({ ...depth, sold: null, pop: { total: 2972, asOf: "2026-11-01", label: "2972 graded across BGS, CGC, PSA and SGC, as of 2026-11-01" } }).includes('id="sold"') && !marketDepthHtml({ ...depth, sold: { n: 14, median: 2550, p25: 1875, p75: 3487.5, first: "2026-08-28", last: "2026-11-06", days: 90 }, bandReady: false }).includes("2,550"));
 t("nothing to show is empty", marketDepthHtml(null) === "" && marketDepthHtml({}) === "");
 t("no advice, no dashes", !hasAdvice(visible(single + sealed)) && !/[\u2013\u2014]/.test(single + sealed));
 t("depth key is the tcgcsv id", depthKey({ id: "tcgcsv-509980" }) === "tcgcsv-509980" && depthKey({ id: "sv3-223", pid: 509980 }) === "tcgcsv-509980" && depthKey({ id: "x" }) === "");
