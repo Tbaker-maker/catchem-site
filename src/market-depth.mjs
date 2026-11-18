@@ -20,6 +20,22 @@ export function depthKey(card) {
   return pid > 0 ? `tcgcsv-${pid}` : "";
 }
 
+// #557 writes this sentence into market-depth/meta.json once the band has run.
+// The old file says "half-price/double filter" and does not carry it.
+export function bandFromMeta(meta) {
+  return typeof meta?.note === "string" && meta.note.includes("private band");
+}
+
+// One pop count. The label and the grader rows use the sum of published
+// grader totals. pop.total can be larger (copies not in those rows).
+export function popCount(pop) {
+  const graders = pop && pop.graders && typeof pop.graders === "object" ? pop.graders : {};
+  const summed = Object.values(graders).reduce((s, g) => s + (Number(g && g.total) > 0 ? Number(g.total) : 0), 0);
+  if (summed > 0) return summed;
+  const total = Number(pop && pop.total);
+  return total > 0 ? total : 0;
+}
+
 export async function marketDepthFor(card, fetchImpl = fetch) {
   const key = depthKey(card);
   if (!key) return null;
@@ -28,8 +44,11 @@ export async function marketDepthFor(card, fetchImpl = fetch) {
     const doc = await smallJson(`market-depth/${b}.json`, fetchImpl);
     const item = doc?.items?.[key];
     if (!item) return null;
-    const items = doc.items && typeof doc.items === "object" ? doc.items : {};
-    const bandReady = Object.values(items).some((row) => row && row.pop && typeof row.pop.label === "string" && row.pop.label.trim());
+    let bandReady = false;
+    try {
+      const meta = await smallJson("market-depth/meta.json", fetchImpl);
+      bandReady = bandFromMeta(meta);
+    } catch { bandReady = false; }
     return { ...item, asOf: String(doc.asOf || "").slice(0, 10), source: doc.source || "eBay sold comps via PkmnPrices", popSource: doc.popSource || "", eurSource: doc.eurSource || "", bandReady };
   } catch { return null; }
 }
@@ -47,8 +66,7 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
   const asOf = day(depth.asOf);
   const parts = [];
   const s = depth.sold;
-  // Sold comps stay off until Catchem-data #557's band is in the file.
-  // The band derive writes pop.label. No label in the bucket means the old file.
+  // Sold comps stay off until market-depth/meta.json carries the #557 band note.
   if (depth.bandReady === true && s && s.n >= 5 && s.median > 0 && ISO.test(s.first) && ISO.test(s.last)) {
     const what = kind === "sealed" ? "eBay sold comps" : "eBay sold comps, raw copies in any condition";
     const lines = [
@@ -67,16 +85,18 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
 <p class="muted">${esc(what)} in the ${int(s.days || 90)} days to ${esc(asOf)}${s.truncated ? ", newest 20 read" : ""}.${esc(dropped)} Source: ${esc(depth.source)}, as of ${esc(asOf)}.</p></section>`);
   }
   const p = depth.pop;
-  if (kind !== "sealed" && p && p.total > 0) {
+  const counted = popCount(p);
+  if (kind !== "sealed" && p && counted > 0) {
     const rows = GRADER_ORDER.filter((g) => p.graders?.[g]?.total > 0).map((g) => {
       const r = p.graders[g];
       const top = Object.entries(r.top || {}).sort((a, b) => Number(b[0]) - Number(a[0])).map(([k, v]) => `${k}: ${int(v)}`).join(" · ");
       const extra = [r.pristine ? `Pristine 10: ${int(r.pristine)}` : "", r.blackLabel ? `Black Label: ${int(r.blackLabel)}` : ""].filter(Boolean).join(" · ");
       return `<li><span>${g}</span><b>${int(r.total)} graded${top ? ` · ${top}` : ""}${extra ? ` · ${extra}` : ""}</b></li>`;
     });
-    const gem = Number.isFinite(Number(p.gemRate)) && p.gemRate !== null ? `<li><span>Gem rate</span><b>${Number(p.gemRate).toFixed(1)}% (${int(p.gems)} of ${int(p.total)})</b></li>` : "";
+    const same = counted === Number(p.total);
+    const gem = same && Number.isFinite(Number(p.gemRate)) && p.gemRate !== null ? `<li><span>Gem rate</span><b>${Number(p.gemRate).toFixed(1)}% (${int(p.gems)} of ${int(counted)})</b></li>` : "";
     parts.push(`<section class="cp-sec md-pop" id="pop"><h2>Graded population</h2>
-<ul class="cp-facts"><li><span>Total graded</span><b>${int(p.total)}</b></li>${gem}${rows.join("")}</ul>
+<ul class="cp-facts"><li><span>Total graded</span><b>${int(counted)}</b></li>${gem}${rows.join("")}</ul>
 <p class="muted">${p.variant ? `Printing: ${esc(p.variant)}. ` : ""}Counts from ${esc(p.asOf ? day(p.asOf) : asOf)}${p.changed ? `, last change ${esc(day(p.changed))}` : ""}. Source: ${esc(depth.popSource || "grader population reports via PkmnPrices")}.</p></section>`);
   }
   const e = depth.eur;
@@ -91,8 +111,7 @@ export function marketDepthHtml(depth, { kind = "single" } = {}) {
 // have a count, plus the pop date. A missing label is left off. Graders are
 // not named here.
 export function gradedPopLabel(pop) {
-  const total = Number(pop && pop.total);
-  if (!(total > 0)) return "";
+  if (!(popCount(pop) > 0)) return "";
   const label = String(pop.label || "").replace(/\s+/g, " ").trim();
   if (!label || label.length > 180) return "";
   if (!/graded/i.test(label)) return "";
