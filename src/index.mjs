@@ -1033,10 +1033,6 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     if (card && card.kind === "sealed" && sealedId) {
       const entry = listingsEntry(counted, sealedId);
       listingsHtml = listingsBlock(entry);
-      const lc = entry?.listingsCounted;
-      if (lc && Number.isFinite(Number(lc.n)) && Number(lc.n) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(String(lc.date || ""))) {
-        pageOpts.itemListings = pageOpts.itemListings || { n: Number(lc.n), day: String(lc.date).slice(0, 10) };
-      }
     }
     let notMovedHtml = "";
     if (card && nm && nm.on !== false) {

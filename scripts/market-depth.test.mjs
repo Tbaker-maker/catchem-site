@@ -1,7 +1,7 @@
 // PkmnPrices market depth on product pages: sold comps, graded pop, Cardmarket EUR,
 // and the chart's Sold view. "Sold" appears only for actual eBay sold comps.
 import vm from "node:vm";
-import { marketDepthHtml, soldSeries, depthKey, marketDepthFor } from "../src/market-depth.mjs";
+import { marketDepthHtml, soldSeries, depthKey, marketDepthFor, cameraLine, gradedPopLabel, popCount, bandFromMeta } from "../src/market-depth.mjs";
 import { productChart, chartViews, soldPoints, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
@@ -10,11 +10,11 @@ const t = (name, ok) => { console.log(`${ok ? "  ok " : "  FAIL"} ${name}`); if 
 const visible = (html) => html.replace(/<style>[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 const depth = {
-  asOf: "2026-11-12", source: "eBay sold comps via PkmnPrices", popSource: "PSA, BGS, CGC and SGC population reports via PkmnPrices (GemRate)", eurSource: "Cardmarket via PkmnPrices",
+  asOf: "2026-11-12", bandReady: true, source: "eBay sold comps via PkmnPrices", popSource: "PSA, BGS, CGC and SGC population reports via PkmnPrices (GemRate)", eurSource: "Cardmarket via PkmnPrices",
   sold: { n: 18, read: 20, median: 88.5, p25: 80, p75: 95.25, first: "2026-10-20", last: "2026-11-11", dropped: 2, days: 90, currency: "USD", truncated: true },
   graded: [{ label: "PSA 10", n: 7, median: 420, last: "2026-11-10" }, { label: "https://x", n: 9, median: 1, last: "2026-11-10" }],
   daily: [["2026-11-07", 7], ["2026-11-10", 1], ["2026-11-11", 8]],
-  pop: { variant: "Holofoil", variants: 1, total: 66316, gems: 14846, gemRate: 22.39, graders: { PSA: { total: 50000, gems: 12000, top: { "10": 12000, "9": 25000 } }, BGS: { total: 1835, gems: 378, top: { "9.5": 374 }, pristine: 4 } }, asOf: "2026-11-01", changed: "2026-10-30" },
+  pop: { variant: "Holofoil", variants: 1, total: 66316, gems: 14846, gemRate: 22.39, graders: { PSA: { total: 50000, gems: 12000, top: { "10": 12000, "9": 25000 } }, BGS: { total: 16316, gems: 2846, top: { "9.5": 374 }, pristine: 4 } }, asOf: "2026-11-01", changed: "2026-10-30", label: "66316 graded across BGS and PSA, as of 2026-11-01" },
   eur: { market: 247.5, asOf: "2026-11-11" },
 };
 const single = marketDepthHtml(depth, { kind: "single" });
@@ -23,9 +23,17 @@ t("sold block shows median, count, middle half and dates", single.includes("$88.
 t("sold block names source and as-of date", single.includes("Source: eBay sold comps via PkmnPrices, as of Nov 12, 2026"));
 t("graded medians shown, a malformed label is not", single.includes("PSA 10") && single.includes("$420.00") && !single.includes("https://x"));
 t("pop shows counts by grader with date and source", single.includes("66,316") && single.includes("PSA") && single.includes("10: 12,000") && single.includes("Pristine 10: 4") && single.includes("Counts from Nov 1, 2026") && single.includes("GemRate"));
+const mismatch = { variant: "Holofoil", total: 414, gems: 2, gemRate: 0.48, asOf: "2026-10-21", graders: { BGS: { total: 6, gems: 0, top: {} }, CGC: { total: 89, gems: 1, top: {} }, PSA: { total: 224, gems: 1, top: {} } }, label: "319 graded across BGS, CGC and PSA, as of 2026-10-21" };
+const mismatchHtml = marketDepthHtml({ ...depth, pop: mismatch }, { kind: "single" });
+const mismatchPage = renderCard({ id: "tcgcsv-86667", name: "Test Card", kind: "single", set: "Test", price: 10, asOf: "2026-11-12", hist: [["2026-10-01", 80], ["2026-11-11", 90]] }, "stamp", { marketDepth: { ...depth, pop: mismatch } });
+t("pop count matches the grader sum when total is larger", popCount(mismatch) === 319 && mismatchHtml.includes("<b>319</b>") && !mismatchHtml.includes("<b>414</b>") && !mismatchHtml.includes("of 414") && mismatchPage.includes("319 graded across BGS, CGC and PSA, as of 2026-10-21"));
+t("band marker is the meta note", bandFromMeta({ note: "Raw comps are the exact item, in USD, inside the private band around the TCGplayer market on the comp date." }) === true && bandFromMeta({ note: "Sold = eBay sold comps, raw copies, exact item, half-price/double filter applied." }) === false && bandFromMeta(null) === false);
+
 t("EUR shows with date", single.includes("€247.50 · Nov 11, 2026"));
 t("sealed: no condition label, no pop", !/Near Mint|\bNM\b|raw copies/.test(visible(sealed)) && !sealed.includes('id="pop"'));
 t("thin sold data is hidden", marketDepthHtml({ ...depth, sold: { ...depth.sold, n: 4 }, graded: [], pop: null, eur: null }) === "");
+t("sold stays off until the band data is in", !marketDepthHtml({ ...depth, bandReady: false }).includes('id="sold"') && soldSeries({ ...depth, bandReady: false }).length === 0);
+t("Gyarados Star comps are withheld", !marketDepthHtml({ ...depth, sold: null, pop: { total: 2972, asOf: "2026-11-01", label: "2972 graded across BGS, CGC, PSA and SGC, as of 2026-11-01" } }).includes('id="sold"') && !marketDepthHtml({ ...depth, sold: { n: 14, median: 2550, p25: 1875, p75: 3487.5, first: "2026-08-28", last: "2026-11-06", days: 90 }, bandReady: false }).includes("2,550"));
 t("nothing to show is empty", marketDepthHtml(null) === "" && marketDepthHtml({}) === "");
 t("no advice, no dashes", !hasAdvice(visible(single + sealed)) && !/[\u2013\u2014]/.test(single + sealed));
 t("depth key is the tcgcsv id", depthKey({ id: "tcgcsv-509980" }) === "tcgcsv-509980" && depthKey({ id: "sv3-223", pid: 509980 }) === "tcgcsv-509980" && depthKey({ id: "x" }) === "");
@@ -43,11 +51,26 @@ t("client script parses", parsed && PRODUCT_CHART_JS.includes('view==="sold"?S:L
 
 // page
 const page = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price }, "stamp", { marketDepth: depth });
-t("single page renders sold, pop and EUR blocks", page.includes('id="sold"') && page.includes('id="pop"') && page.includes('id="eur"'));
+t("single page renders sold, pop and EUR blocks", page.includes('id="sold"') && page.includes('id="pop"') && page.includes('id="eur"') && page.includes("$88.50") && page.includes("66316 graded across BGS and PSA, as of 2026-11-01") && page.includes("Cardmarket €247.50") && !page.includes("Sold median"));
+t("camera line leaves sold comps off and dates graded pop", cameraLine(depth, { kind: "single" }) === "66316 graded across BGS and PSA, as of 2026-11-01. Cardmarket €247.50" && !cameraLine(depth, { kind: "single" }).includes("Sold") && cameraLine({ ...depth, sold: { ...depth.sold, n: 4 } }, { kind: "single" }) === "66316 graded across BGS and PSA, as of 2026-11-01. Cardmarket €247.50" && cameraLine(depth, { kind: "sealed" }) === "Cardmarket €247.50" && !cameraLine(depth, { kind: "sealed" }).includes("graded"));
+const popLabel = "2972 graded across BGS, CGC, PSA and SGC, as of 2026-11-01";
+const popFixture = { total: 2972, asOf: "2026-11-01", label: popLabel };
+t("graded pop label renders pop.label", gradedPopLabel(popFixture) === popLabel && cameraLine({ ...depth, pop: popFixture }, { kind: "single" }) === `${popLabel}. Cardmarket €247.50` && gradedPopLabel({ total: 2972, asOf: "2026-11-01" }) === "" && !gradedPopLabel(popFixture).includes("PSA, BGS, CGC and SGC"));
+const labeledPage = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price }, "stamp", { marketDepth: { ...depth, pop: popFixture } });
+const labeledStats = (labeledPage.match(/<section class="cp-sec" id="stats">[\s\S]*?<\/section>/) || [""])[0];
+t("key stats use the fixture pop.label", labeledStats.includes(`<dd>${popLabel}</dd>`) && !labeledStats.includes("PSA, BGS, CGC and SGC"));
 const sealedPage = renderCard({ id: "tcgcsv-9", name: "Test Elite Trainer Box", kind: "sealed", set: "Test", price: 60, asOf: "2026-11-12", hist: [["2026-10-01", 55], ["2026-11-12", 60]] }, "stamp", { marketDepth: { ...depth, pop: null, graded: [] } });
 t("sealed page renders sold and EUR, no pop", sealedPage.includes('id="sold"') && sealedPage.includes('id="eur"') && !sealedPage.includes('id="pop"'));
-const held = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price, priceStatus: "checking" }, "stamp", { marketDepth: depth, priceHeld: true });
+t("sealed key stats skip sold comps and graded pop", !sealedPage.includes("<dt>Sold comps</dt>") && sealedPage.includes('id="sold"') && sealedPage.includes("<dt>Cardmarket</dt>") && sealedPage.includes("€247.50, Nov 11, 2026") && !sealedPage.includes("<dt>Graded</dt>") && !sealedPage.includes("<dt>Date</dt>") && !/Near Mint|\bNM\b/.test((sealedPage.match(/<section id="stats">[\s\S]*?<\/section>/) || [""])[0]));
+const held = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price, priceStatus: "checking" }, "stamp", { marketDepth: depth, priceHeld: true, itemListings: { n: 4, day: "2026-11-11" } });
 t("a held price page shows no depth numbers", !held.includes('id="sold"'));
+t("a held price page shows no key stats numbers", !held.includes("<dt>Market</dt>") && !held.includes("<dt>Sold comps</dt>") && !held.includes("<dt>Graded</dt>") && !held.includes("<dt>Cardmarket</dt>") && !held.includes("<dt>Listings counted</dt>") && !held.includes("$90.00"));
+const thinPage = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: [["2026-10-01", 80], ["2026-11-12", 90]] }, "stamp", { marketDepth: { ...depth, sold: { ...depth.sold, n: 4 }, pop: null, eur: null } });
+t("thin sold stays off key stats", !thinPage.includes("<dt>Sold comps</dt>") && !thinPage.includes("<dt>Graded</dt>") && !thinPage.includes("<dt>Cardmarket</dt>"));
+const days = [];
+for (let i = 400; i >= 0; i--) days.push([new Date(Date.parse("2026-11-12T00:00:00Z") - i * 86400000).toISOString().slice(0, 10), 40 + (i % 5)]);
+const ranged = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", low: 12, hist: days }, "stamp", { marketDepth: depth, itemListings: { n: 4, day: "2026-11-11" }, listingSeries: [{ date: "2026-11-12", listingCount: 9 }] });
+t("key stats use the item-read count when it disagrees with the chart", ranged.includes("<dt>12-month low</dt>") && ranged.includes("<dt>12-month high</dt>") && ranged.includes("<dt>Listings counted</dt>") && ranged.includes("4 on Nov 11, 2026") && ranged.includes("4 listings counted") && !ranged.includes("9 listings counted") && !ranged.includes("<dt>Sold comps</dt>") && ranged.includes("66316 graded across BGS and PSA, as of 2026-11-01") && ranged.includes("€247.50, Nov 11, 2026") && !ranged.includes("<dt>Market</dt>") && !ranged.includes("<dt>Date</dt>") && ranged.includes("$90.00") && !ranged.includes("Sold median"));
 const noDepth = renderCard({ id: "tcgcsv-8", name: "Test Card", kind: "single", set: "Test", price: 90, asOf: "2026-11-12", hist: price }, "stamp", {});
 t("without depth the page says no sold", !/\bsold\b/i.test(visible(noDepth)));
 
