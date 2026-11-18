@@ -1,7 +1,7 @@
 // PkmnPrices market depth on product pages: sold comps, graded pop, Cardmarket EUR,
 // and the chart's Sold view. "Sold" appears only for actual eBay sold comps.
 import vm from "node:vm";
-import { marketDepthHtml, soldSeries, depthKey, marketDepthFor, cameraLine, gradedPopLabel } from "../src/market-depth.mjs";
+import { marketDepthHtml, soldSeries, depthKey, marketDepthFor, cameraLine, gradedPopLabel, popCount, bandFromMeta } from "../src/market-depth.mjs";
 import { productChart, chartViews, soldPoints, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
@@ -14,7 +14,7 @@ const depth = {
   sold: { n: 18, read: 20, median: 88.5, p25: 80, p75: 95.25, first: "2026-10-20", last: "2026-11-11", dropped: 2, days: 90, currency: "USD", truncated: true },
   graded: [{ label: "PSA 10", n: 7, median: 420, last: "2026-11-10" }, { label: "https://x", n: 9, median: 1, last: "2026-11-10" }],
   daily: [["2026-11-07", 7], ["2026-11-10", 1], ["2026-11-11", 8]],
-  pop: { variant: "Holofoil", variants: 1, total: 66316, gems: 14846, gemRate: 22.39, graders: { PSA: { total: 50000, gems: 12000, top: { "10": 12000, "9": 25000 } }, BGS: { total: 1835, gems: 378, top: { "9.5": 374 }, pristine: 4 } }, asOf: "2026-11-01", changed: "2026-10-30", label: "66316 graded across BGS and PSA, as of 2026-11-01" },
+  pop: { variant: "Holofoil", variants: 1, total: 66316, gems: 14846, gemRate: 22.39, graders: { PSA: { total: 50000, gems: 12000, top: { "10": 12000, "9": 25000 } }, BGS: { total: 16316, gems: 2846, top: { "9.5": 374 }, pristine: 4 } }, asOf: "2026-11-01", changed: "2026-10-30", label: "66316 graded across BGS and PSA, as of 2026-11-01" },
   eur: { market: 247.5, asOf: "2026-11-11" },
 };
 const single = marketDepthHtml(depth, { kind: "single" });
@@ -23,6 +23,12 @@ t("sold block shows median, count, middle half and dates", single.includes("$88.
 t("sold block names source and as-of date", single.includes("Source: eBay sold comps via PkmnPrices, as of Nov 12, 2026"));
 t("graded medians shown, a malformed label is not", single.includes("PSA 10") && single.includes("$420.00") && !single.includes("https://x"));
 t("pop shows counts by grader with date and source", single.includes("66,316") && single.includes("PSA") && single.includes("10: 12,000") && single.includes("Pristine 10: 4") && single.includes("Counts from Nov 1, 2026") && single.includes("GemRate"));
+const mismatch = { variant: "Holofoil", total: 414, gems: 2, gemRate: 0.48, asOf: "2026-10-21", graders: { BGS: { total: 6, gems: 0, top: {} }, CGC: { total: 89, gems: 1, top: {} }, PSA: { total: 224, gems: 1, top: {} } }, label: "319 graded across BGS, CGC and PSA, as of 2026-10-21" };
+const mismatchHtml = marketDepthHtml({ ...depth, pop: mismatch }, { kind: "single" });
+const mismatchPage = renderCard({ id: "tcgcsv-86667", name: "Test Card", kind: "single", set: "Test", price: 10, asOf: "2026-11-12", hist: [["2026-10-01", 80], ["2026-11-11", 90]] }, "stamp", { marketDepth: { ...depth, pop: mismatch } });
+t("pop count matches the grader sum when total is larger", popCount(mismatch) === 319 && mismatchHtml.includes("<b>319</b>") && !mismatchHtml.includes("<b>414</b>") && !mismatchHtml.includes("of 414") && mismatchPage.includes("319 graded across BGS, CGC and PSA, as of 2026-10-21"));
+t("band marker is the meta note", bandFromMeta({ note: "Raw comps are the exact item, in USD, inside the private band around the TCGplayer market on the comp date." }) === true && bandFromMeta({ note: "Sold = eBay sold comps, raw copies, exact item, half-price/double filter applied." }) === false && bandFromMeta(null) === false);
+
 t("EUR shows with date", single.includes("€247.50 · Nov 11, 2026"));
 t("sealed: no condition label, no pop", !/Near Mint|\bNM\b|raw copies/.test(visible(sealed)) && !sealed.includes('id="pop"'));
 t("thin sold data is hidden", marketDepthHtml({ ...depth, sold: { ...depth.sold, n: 4 }, graded: [], pop: null, eur: null }) === "");
