@@ -2,6 +2,7 @@
 // Prices are month end TCGplayer market figures on file. Nothing here is filled in.
 
 import { ALLOWED_IMAGE_HOSTS, allowedImageUrl, BRAND } from "./brand.mjs";
+import { sealedCutoutSrc } from "./catalogue-image.mjs";
 
 export const AS_OF = "2026-10-27";
 export const SOURCE = "TCGplayer market";
@@ -100,12 +101,14 @@ export function kindHeight(kind) {
   return KIND_HEIGHT[kind] || 40;
 }
 
-export function productImage(row) {
-  const pid = Number(row && row.tcgPlayerId);
-  if (Number.isInteger(pid) && pid > 0) {
-    return allowedImageUrl("https://tcgplayer-cdn.tcgplayer.com/product/" + pid + "_in_400x400.jpg");
-  }
-  return allowedImageUrl((row && (row.logo || row.image)) || "");
+// A passed cutout only. A miss is empty so the stage can draw a neutral tile.
+// Never the TCGplayer CDN jpg and never a card-img proxy.
+export function productImage(row, cutDoc) {
+  const cut = sealedCutoutSrc(row, cutDoc);
+  const src = cut && cut.src ? String(cut.src) : "";
+  if (!src.startsWith("/data/cutouts/")) return "";
+  if (/\.jpe?g(?:$|\?)/i.test(src)) return "";
+  return src;
 }
 
 export function pctLabel(n) {
@@ -120,6 +123,92 @@ export function prettyDay(iso) {
   const d = String(iso || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return "";
   return MONTHS[Number(d.slice(5, 7)) - 1] + " " + Number(d.slice(8, 10)) + ", " + d.slice(0, 4);
+}
+
+export function foldSetName(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/&/g, " and ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function setTail(name) {
+  const raw = String(name || "");
+  if (raw.includes(":")) return raw.split(":").slice(1).join(":");
+  if (raw.includes(" - ")) return raw.split(" - ").slice(1).join(" - ");
+  return raw;
+}
+
+export function releaseForSet(name, sets) {
+  const want = foldSetName(name);
+  if (!want) return null;
+  let best = null;
+  for (const row of sets || []) {
+    if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.release || ""))) continue;
+    const tail = foldSetName(setTail(row.name)).replace(/ base set$/, "");
+    const full = foldSetName(row.name);
+    let ok = tail === want || full === want;
+    if (want === "sun and moon" && (tail === "sm base set" || full === "sm base set")) ok = true;
+    if (want === "151" && /\b151\b/.test(full) && !full.includes("promo")) ok = true;
+    if (!ok) continue;
+    const len = tail.length || full.length;
+    if (!best || len < best.len) best = { release: String(row.release), len };
+  }
+  return best ? best.release : null;
+}
+
+export function attachReleases(doc, setsDoc) {
+  const sets = setsDoc && Array.isArray(setsDoc.sets) ? setsDoc.sets : [];
+  const rows = (doc && Array.isArray(doc.rows) ? doc.rows : []).map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const release = row.release || releaseForSet(row.set, sets);
+    return release ? { ...row, release } : row;
+  });
+  return { ...(doc || {}), rows };
+}
+
+// A month before release with no percent is a quiet blank. A real percent stays.
+export function quietBlank(cell, release) {
+  if (!cell) return false;
+  const hasPct = cell.pct != null && Number.isFinite(Number(cell.pct));
+  if (hasPct) return false;
+  if (cell.missing === "before release") return true;
+  const rel = String(release || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rel) || !cell.month) return false;
+  return cell.month < rel.slice(0, 7);
+}
+
+// Pulse doc flag stays off. Only a proven icon may render, and only when it is on.
+export const MOMENTUM_LABELS = Object.freeze({
+  "momentum-picking-up": "Picking up",
+  "momentum-slowing": "Slowing",
+  "momentum-flat": "Flat",
+  "duration-longer": "Longer than usual",
+  "duration-shorter": "Shorter than usual",
+  "duration-usual": "About usual",
+  "pattern-same": "Same as last time",
+  "pattern-different": "Different from last time",
+});
+
+export function momentumOn(doc) {
+  return !!(doc && doc.flag === "on");
+}
+
+export function visibleMomentum(row, flagOn) {
+  if (flagOn !== true) return [];
+  const list = Array.isArray(row && row.momentum) ? row.momentum : [];
+  const out = [];
+  for (const icon of list) {
+    if (!icon || icon.proven !== true) continue;
+    const label = MOMENTUM_LABELS[icon.id];
+    if (!label) continue;
+    out.push({ id: icon.id, label });
+  }
+  return out;
 }
 
 function monthLabel(ym) {
@@ -142,12 +231,12 @@ function money(n) {
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function stage(row) {
+function stage(row, cutDoc) {
   const h = kindHeight(row.type);
-  const src = productImage(row);
+  const src = productImage(row, cutDoc);
   const inner = src
     ? `<img alt="" style="height:${h}px" src="${esc(src)}">`
-    : `<span class="bv-ph" style="height:${h}px"></span>`;
+    : `<span class="bv-ph" style="height:${h}px" aria-hidden="true"></span>`;
   return `<span class="bv-stage" data-baseline="${BASELINE}" data-kind="${esc(row.type)}" data-h="${h}">${inner}</span>`;
 }
 
@@ -163,13 +252,22 @@ function monthsOf(rows) {
 
 export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
   const months = monthsOf(rows);
+  const cutDoc = opts.cutouts || null;
+  const showMomentum = opts.momentum === true;
   const head = [`<div class="bv-hh">Product</div>`]
     .concat(months.map((m) => `<div class="bv-hh">${esc(monthLabel(m))}</div>`))
     .join("");
   const body = rows.map((row) => {
-    const name = `<div class="bv-name">${stage(row)}<span class="bv-copy"><strong>${esc(row.set)}</strong><span>${esc(TYPE_LABEL[row.type] || "Sealed")}</span></span></div>`;
+    const icons = visibleMomentum(row, showMomentum);
+    const mom = icons.length
+      ? `<span class="bv-mom">${icons.map((icon) => `<span class="bv-chip">${esc(icon.label)}</span>`).join("")}</span>`
+      : "";
+    const name = `<div class="bv-name">${stage(row, cutDoc)}<span class="bv-copy"><strong>${esc(row.set)}</strong><span>${esc(TYPE_LABEL[row.type] || "Sealed")}</span>${mom}</span></div>`;
     const cells = months.map((month) => {
       const c = (row.cells || []).find((item) => item.month === month) || { month, pct: null };
+      if (quietBlank(c, row.release)) {
+        return `<span class="bv-blank" data-month="${esc(month)}"></span>`;
+      }
       const label = pctLabel(c.pct);
       const up = c.direction === "up";
       const down = c.direction === "down";
@@ -209,7 +307,7 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
       <div class="bv-heat" style="--m:${months.length}">${head}${body}</div>
     </div>
     ${legend}
-    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(source)}, ${esc(prettyDay(asOf))}. A blank month says No reading. These rows are on file.</p>
+    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(source)}, ${esc(prettyDay(asOf))}. A month with no price says No reading. A month before release is blank. These rows are on file.</p>
   </section>`;
 }
 
@@ -221,7 +319,9 @@ export const BRAND_CSS = `
 .bv-nav a[aria-current="page"]{background:${BRAND.gold};color:#1a1407;border-color:${BRAND.gold}}
 .bv-kicker{margin:14px 0 0;color:${BRAND.gold};font:600 12px/1 ${BRAND.font};letter-spacing:.08em;text-transform:uppercase}
 .bv-page h1{margin:8px 0 6px;font:600 34px/1.05 ${BRAND.font};letter-spacing:-0.03em}
-.bv-src{margin:0 0 16px;color:${BRAND.dim};font:15px/1.4 ${BRAND.font}}
+.bv-src{margin:0 0 2px;color:${BRAND.dim};font:15px/1.4 ${BRAND.font}}
+.bv-asof{margin:0 0 16px;color:${BRAND.ink};font:600 20px/1.3 ${BRAND.font};letter-spacing:-0.02em}
+.bv-asof span{color:${BRAND.gold}}
 .bv-card{background:#1a1815;border:1px solid ${BRAND.line};border-radius:${BRAND.radius}px;padding:14px}
 .bv-scroll{overflow-x:auto;border-radius:16px}
 .bv-heat{display:grid;grid-template-columns:168px repeat(var(--m), minmax(96px, 1fr));gap:6px;min-width:600px}
@@ -230,11 +330,14 @@ export const BRAND_CSS = `
 .bv-name{display:flex;gap:8px;align-items:flex-end;min-height:76px;position:sticky;left:0;background:#1a1815;z-index:2;overflow:hidden;padding-right:6px;box-shadow:6px 0 8px -6px rgba(0,0,0,.55)}
 .bv-stage{height:${BASELINE}px;display:flex;align-items:flex-end;justify-content:center;flex:0 0 auto;width:72px;padding:4px 4px 0;border-radius:12px;background:rgba(239,233,222,.16)}
 .bv-stage img,.bv-ph{width:auto;max-width:64px;display:block;object-fit:contain;object-position:center bottom;border-radius:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
-.bv-ph{width:36px;border-radius:8px;background:#2a2622}
+.bv-ph{width:62%;min-width:28px;border-radius:10px;background:#2c2926}
 .bv-copy{display:flex;flex-direction:column;min-width:0;padding-bottom:4px;overflow:hidden}
 .bv-copy strong{font-weight:600;font-size:14px;line-height:1.2;font-family:${BRAND.font};letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bv-copy span{color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
+.bv-copy > span:not(.bv-mom){color:${BRAND.dim};font:12px/1.3 ${BRAND.font}}
+.bv-mom{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.bv-chip{border:1px solid ${BRAND.line};border-radius:999px;padding:3px 8px;color:${BRAND.ink};font:600 11px/1.2 ${BRAND.font}}
 .bv-cell{min-width:44px;min-height:44px;border:0;border-radius:14px;background:rgba(239,233,222,.06);color:${BRAND.dim};font-family:${BRAND.font};font-size:15px;font-weight:600;line-height:1.15;padding:8px 4px}
+.bv-blank{min-width:44px;min-height:44px;border-radius:14px;background:transparent}
 .bv-up{background:rgba(46,110,72,var(--wash));color:${BRAND.ink}}
 .bv-down{background:rgba(140,55,55,var(--wash));color:${BRAND.ink}}
 .bv-cell:focus-visible{outline:2px solid ${BRAND.gold};outline-offset:2px}
@@ -252,12 +355,13 @@ export const BRAND_CSS = `
 .bv-shares{display:grid;gap:14px;margin-top:22px}
 @media (max-width:520px){
 .bv-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.bv-heat{grid-template-columns:120px repeat(var(--m),minmax(72px,1fr));min-width:calc(120px + var(--m) * 78px)}
+.bv-heat{grid-template-columns:148px repeat(var(--m),minmax(72px,1fr));min-width:calc(148px + var(--m) * 78px)}
 .bv-hh{min-height:32px;font-size:11px;line-height:1.15}
 .bv-hh:first-child,.bv-name{position:sticky;left:0;z-index:2;background:#1a1815}
 .bv-name{min-height:72px;margin-top:0;box-shadow:6px 0 8px -6px rgba(0,0,0,.55);overflow:hidden}
-.bv-stage{width:44px;padding:2px}
-.bv-stage img,.bv-ph{max-width:40px}
+.bv-stage{width:56px;padding:2px}
+.bv-stage img{max-width:52px}
+.bv-ph{max-width:40px}
 .bv-copy strong{font-size:12px}
 .bv-copy span{font-size:11px}
 .bv-cell{font-size:13px;padding:8px 2px}
@@ -284,6 +388,8 @@ export function rowsFromPulseDoc(doc) {
       logo: r.logo || null,
       about: r.about || null,
       usedMirror: !!r.usedMirror,
+      release: r.release || null,
+      momentum: Array.isArray(r.momentum) ? r.momentum : null,
       cells: (r.cells || []).map((c) => {
         const pct = c && c.pct != null && Number.isFinite(Number(c.pct)) ? Number(c.pct) : null;
         const built = cell(c.month, pct, c.price != null ? Number(c.price) : null, c.priceDate || null);
@@ -291,6 +397,7 @@ export function rowsFromPulseDoc(doc) {
         built.mirrored = c.mirrored === true || c.priceSource === "archived-market";
         built.readAt = c.readAt || c.readDate || null;
         built.listingsCount = c.listingsCount != null ? c.listingsCount : null;
+        built.missing = c.missing || null;
         return built;
       }),
     }));
@@ -304,17 +411,16 @@ export function medianFromDoc(doc) {
     .map((ym) => ({ ym, pct: med[ym] }));
 }
 
-export function brandPageFromDoc(doc) {
+export function brandPageFromDoc(doc, opts = {}) {
   const rows = rowsFromPulseDoc(doc);
   const use = rows.length ? rows : PULSE_SAMPLE;
+  const cutouts = opts.cutouts || null;
   const asOf = (doc && doc.asOf) || AS_OF;
   const source = (doc && doc.source) || SOURCE;
   const about = (doc && doc.about) || "";
   const medians = medianFromDoc(doc);
   const last = medians[medians.length - 1] || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
-  const months = monthsOf(use);
-  // Prefer the latest months in view, including phones. Reduced motion stays put.
-  const heat = heatmapHtml(use, { asOf, source, median: last, about });
+  const heat = heatmapHtml(use, { asOf, source, median: last, about, cutouts, momentum: momentumOn(doc) });
   const pulse = {
     id: "pulse-median",
     title: "Sealed market median",
@@ -332,12 +438,13 @@ export function brandPageFromDoc(doc) {
     title: lead ? lead.name : "Sealed",
     big: money(leadCell && leadCell.price),
     sealed: true,
-    imageUrl: lead ? productImage(lead) : "",
+    imageUrl: lead ? productImage(lead, cutouts) : "",
     lines: ["Month change " + pctLabel(leadCell && leadCell.pct)],
     source,
     date: prettyDay(asOf),
     href: "https://catchemtcg.com/sealed-pulse",
   };
+  const day = prettyDay(asOf);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sealed Market Pulse</title><style>${BRAND_CSS}
 .bv-skip{position:absolute;left:8px;top:-60px;z-index:1000;background:#111;color:#fff;padding:8px 12px;border-radius:6px}
 .bv-skip:focus{top:8px}
@@ -354,7 +461,8 @@ export function brandPageFromDoc(doc) {
 <main id="main" tabindex="-1">
 <p class="bv-kicker">Sealed Market Pulse</p>
 <h1>Month end market.</h1>
-<p class="bv-src">${esc(source)}. ${esc(prettyDay(asOf))}.</p>
+<p class="bv-src">${esc(source)}.</p>
+<p class="bv-asof" data-as-of="${esc(String(asOf).slice(0, 10))}"><span>Data date</span> ${esc(day)}.</p>
 ${heat}
 <p class="bv-note">${esc(MIRROR_NOTE)}</p>
 <section class="bv-shares" id="shares" aria-labelledby="shares-h">
@@ -480,8 +588,13 @@ export async function sealedPulseResponse(request, env = {}) {
   const { loadJson } = await import("./data.mjs");
   const fetchImpl = env.PUBLIC_FETCH || fetch;
   let doc = null;
+  let cuts = null;
+  let sets = null;
   try { doc = await loadJson("sealed-market-pulse.json", fetchImpl); } catch { doc = null; }
-  const html = brandPageFromDoc(doc || { asOf: AS_OF, source: SOURCE, marketMedian: Object.fromEntries(MARKET_MEDIAN.map((m) => [m.ym, m.pct])), rows: PULSE_SAMPLE });
+  try { cuts = await loadJson("sealed-cutouts.json", fetchImpl); } catch { cuts = null; }
+  try { sets = await loadJson("sets.json", fetchImpl); } catch { sets = null; }
+  const base = doc || { asOf: AS_OF, source: SOURCE, marketMedian: Object.fromEntries(MARKET_MEDIAN.map((m) => [m.ym, m.pct])), rows: PULSE_SAMPLE };
+  const html = brandPageFromDoc(attachReleases(base, sets), { cutouts: cuts });
   return new Response(html, {
     status: 200,
     headers: {
