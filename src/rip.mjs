@@ -1,6 +1,7 @@
 // Rip value: history-based estimates from data/derived/rip-roi.json.
 // Every number on the page is a field from that file, with its date.
 import { esc } from "./ui.mjs";
+import { beatOddsText } from "./read-sheet.mjs";
 import { brandedTile } from "./catalogue-image.mjs";
 import { shortDate } from "./ir-cycle.mjs";
 
@@ -123,7 +124,9 @@ export function ripBody(doc, ctx = {}) {
     const price = cash(row.price);
     const pull = cash(row.contentsEV);
     const roi = pct(row.roiPct);
-    const beat = pct(row.beatChance);
+    const beat = beatOddsText(row.beatChance, row.sims);
+    const beatSrc = [String(row.priceSource || "").trim(), shortDate(row.priceAsOf)].filter(Boolean).join(", ");
+    const beatLine = beat && (Number(row.beatChance) <= 0 || Number(row.beatChance) >= 100) && beatSrc ? `${beat}. ${beatSrc}` : beat;
     const typical = cash(row.median);
     const whenBits = [];
     const priceDay = shortDate(row.priceAsOf);
@@ -137,7 +140,7 @@ export function ripBody(doc, ctx = {}) {
     ].join("");
     const more = [
       stat("ROI", roi, "rip-more"),
-      stat("Chance an opening beats the price", beat, "rip-more"),
+      stat("Chance an opening beats the price", beatLine, "rip-more"),
       stat("Typical opening", typical, "rip-more"),
     ].join("");
     const nums = `${lead ? `<div class="rip-line rip-line-lead">${lead}</div>` : ""}${more ? `<div class="rip-line rip-line-more">${more}</div>` : ""}`;
