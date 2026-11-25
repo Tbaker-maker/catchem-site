@@ -51,6 +51,19 @@ const CSS = `<style>
 @media (prefers-reduced-motion:reduce){.ce-needle{animation:none;transform:rotate(var(--end,0deg))}}
 </style>`;
 
+const BAND_WORDS = {
+  "Extreme fear": "far below the middle of its own range",
+  "Fear": "below the middle of its own range",
+  "Neutral": "near the middle of its own range",
+  "Greed": "above the middle of its own range",
+  "Extreme greed": "far above the middle of its own range",
+};
+
+function bandWords(band) {
+  const raw = String(band || "");
+  return BAND_WORDS[raw] || raw;
+}
+
 function moodInk(band) {
   if (band === "Extreme fear" || band === "Fear") return "#8eb7ff";
   if (band === "Greed" || band === "Extreme greed") return "#d9b779";
@@ -82,7 +95,7 @@ function whyLine(reasons) {
 
 export function meterPlainLine(meter) {
   if (!meter || meter.mood == null || !meter.moodBand || meter.heat == null || !meter.heatBand) return "";
-  const line = `Market: ${meter.moodBand} ${meter.mood}, Heat: ${meter.heatBand}`;
+  const line = `Market: ${bandWords(meter.moodBand)} ${meter.mood}, Heat: ${meter.heatBand}`;
   return adviceFree(line) ? line : "";
 }
 
@@ -94,14 +107,15 @@ export function gaugeHtml(slice, { href = "/meter", asOf = "", published = true,
   const why = whyLine(slice.reasons);
   const used = Number(slice.used) || 0;
   const when = String(asOf || "").slice(0, 10);
-  const label = `${kicker}: ${slice.moodBand} ${mood}, Heat ${slice.heatBand}. ${used} components${when ? ` on ${when}` : ""}.`;
+  const shownBand = bandWords(slice.moodBand);
+  const label = `${kicker}: ${shownBand} ${mood}, Heat ${slice.heatBand}. ${used} components${when ? ` on ${when}` : ""}.`;
   if (!adviceFree(label) || (why && !adviceFree(why))) return "";
   const ink = moodInk(slice.moodBand);
   const explain = meterPlainExplain(when);
   return `${CSS}<a class="ce-meter" id="market-meter" href="${esc(href)}" aria-label="${esc(label)}" style="display:block;min-height:188px;margin:14px 0;padding:14px 16px 12px;border-radius:22px;background:#1a1815;border:1px solid #2c2823;color:#efe9de;text-decoration:none">
 <div style="display:flex;align-items:flex-end;gap:12px">
 <div style="flex:1;min-width:0">
-<p style="margin:0 0 2px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#a89f90">Fear and greed</p>
+<p style="margin:0 0 2px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#a89f90">Price breadth</p>
 <svg viewBox="0 0 220 112" width="100%" height="112" aria-hidden="true" style="display:block;width:100%;height:112px">
 <defs><linearGradient id="ce-meter-arc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8eb7ff"/><stop offset="0.5" stop-color="#efe9de"/><stop offset="1" stop-color="#d9b779"/></linearGradient></defs>
 <path d="${ARC}" fill="none" stroke="url(#ce-meter-arc)" stroke-width="12" stroke-linecap="round"/>
@@ -110,7 +124,7 @@ export function gaugeHtml(slice, { href = "/meter", asOf = "", published = true,
 <circle cx="110" cy="96" r="5" fill="#efe9de"/>
 </g>
 </svg>
-<p style="margin:0;font:650 28px/1.1 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;color:${ink}">${mood} <span style="font-size:15px;font-weight:600;color:#efe9de">${esc(slice.moodBand)}</span></p>
+<p style="margin:0;font:650 28px/1.1 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;color:${ink}">${mood} <span style="font-size:15px;font-weight:600;color:#efe9de">${esc(shownBand)}</span></p>
 </div>
 <div style="flex:0 0 auto;margin-bottom:6px;border-radius:999px;padding:8px 12px;background:#2a2118;color:#f0a05a;font:600 13px/1.2 -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;white-space:nowrap"><svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M6 13c3 0 5-2.2 5-5.1C11 5.2 8.2 3 7.2 1.2 7 1 6.6.6 6.2 1.1 5.6 2.6 4 3.4 3.2 4.6 2.2 6.1 1 7.2 1 8.6 1 11 3.2 13 6 13z" fill="#f0a05a"/></svg>Heat ${esc(slice.heatBand)} ${heat}</div>
 </div>
@@ -167,7 +181,7 @@ function barRow(part) {
 
 function sliceLine(name, slice, href) {
   if (!slice || slice.mood == null) return "";
-  const body = `${esc(name)}: ${esc(slice.moodBand)} ${slice.mood}, Heat ${esc(slice.heatBand)} ${slice.heat}. ${slice.used} components.`;
+  const body = `${esc(name)}: ${esc(bandWords(slice.moodBand))} ${slice.mood}, Heat ${esc(slice.heatBand)} ${slice.heat}. ${slice.used} components.`;
   const inner = href ? `<a href="${esc(href)}" style="color:inherit;text-decoration:none">${body}</a>` : body;
   return `<p style="margin:0 0 8px;font:500 15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#efe9de">${inner}</p>`;
 }
@@ -197,11 +211,11 @@ export function renderMeterPage(doc, { range = "1m", set = "" } = {}) {
   const sets = Object.entries(doc.sets || {}).sort((a, b) => String(a[1].name || a[0]).localeCompare(String(b[1].name || b[0])));
   const inputs = focus.inputs || doc.market.inputs || [];
   return `<main id="main" tabindex="-1" class="wrap"><h1>Market meter</h1>
-<p class="muted">Mood and activity for the whole market. Fear and greed are labels for the price action, not instructions.</p>
+<p class="muted">Price breadth and activity for tracked sets. The score is how those sets are moving, not a social mood and not an instruction.</p>
 ${gaugeHtml(focus, { href: gaugeHref, asOf: doc.asOf, published: true, kicker })}
 <p style="margin:8px 0 12px">${chip("1m", "1M")}${chip("all", "All")}</p>
 <div style="min-height:180px">${historySvg(points)}</div>
-<p class="muted" style="margin-top:4px">Gold is fear and greed. Blue is heat. ${esc(points[0]?.d || "")} to ${esc(points[points.length - 1]?.d || "")}.</p>
+<p class="muted" style="margin-top:4px">Gold is the price breadth score. Blue is heat. ${esc(points[0]?.d || "")} to ${esc(points[points.length - 1]?.d || "")}.</p>
 <h2>Components</h2>
 ${inputs.map(barRow).join("") || `<p class="muted">No component is on file for this day.</p>`}
 <h2>Sealed and singles</h2>
