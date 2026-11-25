@@ -113,7 +113,11 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
   const srcs = (priceReal.length >= 2 ? historySources(priceReal, ownLabel) : []).map((line) => line.replace(/\d{4}-\d{2}-\d{2}/g, longDay));
   if (list.length >= 2) srcs.push(`eBay listings counted, active listings each night, ${longDay(list[0][0])} to ${longDay(list.at(-1)[0])}`);
   if (soldPts.length >= 2) srcs.push(`${soldSource || "eBay sold comps"} recorded per day, ${longDay(soldPts[0][0])} to ${longDay(soldPts.at(-1)[0])}; a day with no bar had no comp recorded`);
-  const lastDay = String(asOf || "").slice(0, 10) || (dates.at(-1) || "");
+  // The watermark date is the last day with data on this chart, never later.
+  // A product whose price stopped on Nov 15 must not be stamped with the board day.
+  const asOfDay = String(asOf || "").slice(0, 10);
+  const dataEnd = dates.at(-1) || "";
+  const lastDay = dataEnd && (!asOfDay || dataEnd < asOfDay) ? dataEnd : asOfDay;
   const markSrc = priceReal.length >= 2 ? "TCGplayer market" : "eBay listings counted";
   const camLine = String(cameraLine || "").replace(/[\u2014\u2013]/g, "").trim();
   const camHtml = camLine ? `<p class="md-cam">${esc(camLine)}</p>` : "";
