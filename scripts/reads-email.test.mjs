@@ -8,14 +8,18 @@ import { gatePlan } from "../src/reads.mjs";
 import {
   attachFeed,
   deliverOutboxEmails,
+  dryRunOutboxEmails,
   emailCopyOk,
   emailLink,
   handleEmailLink,
+  handleEmailWebhook,
+  indexEmail,
   normalizeEmailRead,
   emailMailingAddress,
   readsEmailHtml,
   readsEmailText,
   readsSubject,
+  signWebhook,
 } from "../src/reads-email.mjs";
 
 let fail = 0;
@@ -119,6 +123,8 @@ const link = await emailLink(env, "https://catchemtcg.com", "stop", ID, TO);
 const stopped = await handleEmailLink(new Request(link), env);
 const stoppedHtml = await stopped.text();
 t("the unsubscribe link works in one click", stopped.status === 200 && stoppedHtml.includes("Email stopped") && !/[\u2013\u2014]/.test(stoppedHtml));
+const planOff = JSON.parse(store.m.get(`reads:d:${ID}`));
+t("stop turns plan.channels.email off without sign-in", planOff.channels.email === false && planOff.email === "");
 const afterStop = await deliverOutboxEmails({
   store,
   env,
@@ -128,6 +134,12 @@ const afterStop = await deliverOutboxEmails({
   articleCtx: null,
 });
 t("a stopped member gets no later letter", afterStop.sent === 0 && calls.length === 1);
+await store.put(`reads:d:${ID}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
+await store.put(`reads-email:${ID}`, JSON.stringify({ email: TO, status: "confirmed" }));
+const postedStop = await handleEmailLink(new Request(link, { method: "POST" }), env);
+const postedHtml = await postedStop.text();
+const planPost = JSON.parse(store.m.get(`reads:d:${ID}`));
+t("a one click POST stops mail without sign-in", postedStop.status === 200 && postedHtml.includes("Email stopped") && planPost.channels.email === false && calls.length === 1);
 
 const session = await signSession({ sub: "d:" + ID, premium: false }, env.SESSION_SECRET);
 const save = await handleReads(new Request("https://catchemtcg.com/api/reads", {
@@ -152,7 +164,7 @@ t("open access keeps a daily email read", openPlan.plan.frequency === "daily" &&
 const free = gatePlan({ channels: { email: true }, email: TO, frequency: "daily", sets: ["me-30th-celebration"] }, { premium: false, openAccess: false });
 t("switch off: free email is still a weekly read", free.plan.frequency === "weekly" && free.plan.channels.email === true && free.plan.email === "");
 
-const allow = new Set(["support@catchemtcg.com", "reads@catchemtcg.com", "you@email.com", TO]);
+const allow = new Set(["support@catchemtcg.com", "reads@catchemtcg.com", "you@example.com", "you@email.com", TO, "bounce@example.com", "complaint@example.com", "keep@example.com"]);
 const roots = ["src", "scripts", "newsletter"];
 const found = [];
 const walk = (dir) => {
@@ -202,6 +214,85 @@ const letter = readsEmailHtml({ lead: "Your Catch'em reads", day: "2026-10-13", 
 t("a below-ratio filter only keeps the matching read", matchedBelow.length === 1 && letter.includes("Below card") && !letter.includes("Above card"));
 const none = readsEmailText({ lead: "Your Catch'em reads", day: "2026-10-13", reads: [], stopUrl: "https://catchemtcg.com/reads/email/stop?id=1&t=x", empty: true });
 t("an unmatched filter in plain text does not say premium filter", none.includes("No reads match this filter today.") && !none.includes("premium filter"));
+
+const FAKE_SECRET = "whsec_" + btoa("0123456789abcdef0123456789abcdef");
+const hookEnv = { ...env, READS_EMAIL_WEBHOOK_SECRET: FAKE_SECRET };
+const hookId = "223456789012345678";
+const hookTo = "bounce@example.com";
+await store.put(`reads:d:${hookId}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
+await store.put(`reads-email:${hookId}`, JSON.stringify({ email: hookTo, status: "confirmed" }));
+await indexEmail(store, hookId, hookTo);
+const closed = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", { method: "POST", body: "{}" }), env);
+t("a webhook with no secret fails closed", closed.status === 503);
+const bounceBody = JSON.stringify({ type: "email.bounced", data: { to: [hookTo] } });
+const ts = String(Math.floor(Date.now() / 1000));
+const bad = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", {
+  method: "POST",
+  headers: { "svix-id": "msg_test", "svix-timestamp": ts, "svix-signature": "v1,bm90LXZhbGlk" },
+  body: bounceBody,
+}), hookEnv);
+t("a bad webhook signature is refused", bad.status === 401);
+const staleSig = await signWebhook(FAKE_SECRET, "msg_test", String(Number(ts) - 3600), bounceBody);
+const stale = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", {
+  method: "POST",
+  headers: { "svix-id": "msg_test", "svix-timestamp": String(Number(ts) - 3600), "svix-signature": staleSig },
+  body: bounceBody,
+}), hookEnv);
+t("an old webhook signature is refused", stale.status === 401 && JSON.parse(store.m.get(`reads-email:${hookId}`)).status === "confirmed");
+const sig = await signWebhook(FAKE_SECRET, "msg_bounce", ts, bounceBody);
+const bounced = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", {
+  method: "POST",
+  headers: { "svix-id": "msg_bounce", "svix-timestamp": ts, "svix-signature": sig },
+  body: bounceBody,
+}), hookEnv);
+const bouncedJson = await bounced.json();
+const hookPlan = JSON.parse(store.m.get(`reads:d:${hookId}`));
+const hookRec = JSON.parse(store.m.get(`reads-email:${hookId}`));
+t("a signed bounce stops that address", bounced.status === 200 && bouncedJson.stopped === 1 && hookRec.status === "stopped" && hookPlan.channels.email === false && !JSON.stringify(bouncedJson).includes(hookTo));
+const compId = "323456789012345678";
+const compTo = "complaint@example.com";
+await store.put(`reads:d:${compId}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
+await store.put(`reads-email:${compId}`, JSON.stringify({ email: compTo, status: "confirmed" }));
+await indexEmail(store, compId, compTo);
+const compBody = JSON.stringify({ type: "email.complained", data: { to: [compTo] } });
+const compSig = await signWebhook(FAKE_SECRET, "msg_comp", ts, compBody);
+const complained = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", {
+  method: "POST",
+  headers: { "svix-id": "msg_comp", "svix-timestamp": ts, "svix-signature": compSig },
+  body: compBody,
+}), hookEnv);
+const complainedJson = await complained.json();
+t("a signed complaint stops that address", complained.status === 200 && complainedJson.stopped === 1 && JSON.parse(store.m.get(`reads-email:${compId}`)).status === "stopped" && JSON.parse(store.m.get(`reads:d:${compId}`)).channels.email === false);
+const keepId = "423456789012345678";
+const keepTo = "keep@example.com";
+await store.put(`reads:d:${keepId}`, JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
+await store.put(`reads-email:${keepId}`, JSON.stringify({ email: keepTo, status: "confirmed" }));
+await indexEmail(store, keepId, keepTo);
+const keepBody = JSON.stringify({ type: "email.delivered", data: { to: [keepTo] } });
+const keepSig = await signWebhook(FAKE_SECRET, "msg_keep", ts, keepBody);
+const kept = await handleEmailWebhook(new Request("https://catchemtcg.com/api/reads/email/webhook", {
+  method: "POST",
+  headers: { "svix-id": "msg_keep", "svix-timestamp": ts, "svix-signature": keepSig },
+  body: keepBody,
+}), hookEnv);
+const keptJson = await kept.json();
+t("a delivery event does not stop mail", kept.status === 200 && keptJson.stopped === 0 && JSON.parse(store.m.get(`reads:d:${keepId}`)).channels.email === true);
+const dryCalls = [];
+const dry = await dryRunOutboxEmails({
+  store,
+  env: { FEED_KV: store, CUSTOM_READS_TOKEN: TOKEN },
+  outbox: {
+    day: "2026-11-25",
+    members: [{ discordId: keepId, lead: "Your weekly Catch'em read, Nov 25.", reads: [{ line: "Pikachu is $1.00, as of Nov 25.", name: "Pikachu", cardId: "tcgcsv-1" }] }],
+  },
+  fetchImpl: async () => { dryCalls.push("send"); return new Response("no"); },
+  feedReads: [],
+  articleCtx: null,
+});
+const dryBlob = JSON.stringify(dry);
+t("dry run renders a masked letter and sends nothing", dry.sent === 0 && dry.armed === false && dry.letters.length === 1 && dry.letters[0].to === "k***@example.com" && dry.letters[0].text.includes("Pikachu") && !dryBlob.includes(keepTo) && !dryBlob.includes(keepId) && dryCalls.length === 0);
+const routed = await worker.fetch(new Request("https://catchemtcg.com/api/reads/email/webhook", { method: "POST", body: "{}" }), env, { waitUntil() {} });
+t("the worker webhook fails closed without the secret", routed.status === 503);
 
 if (fail) { console.log(fail + " failed"); process.exit(1); }
 console.log("reads email ok");
