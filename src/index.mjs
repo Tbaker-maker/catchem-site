@@ -1481,7 +1481,7 @@ const worker = {
       return handleReturnVisit(url, fetchImpl);
     }
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/og/card.svg") {
-      return handleShareCard(request, url);
+      return handleShareCard(request, url, (id) => bucketRow(id, fetchImpl));
     }
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/img/")) {
       return handleSetLogo(request, url.pathname, fetchImpl);
