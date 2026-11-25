@@ -19,7 +19,7 @@ import { handleVariantTracker, renderVariants } from "./variant-tracker.mjs";
 import { handleBriefEmailStatus, handleBriefEmailStop } from "./morning-brief-email.mjs";
 import { handleReads, handleReadsClick, loadStoredPlan, renderReadsPage, readsPickerEnabled } from "./reads.mjs";
 import { handleReadsPipe, isPipePath, readsPipeReady } from "./reads-pipe.mjs";
-import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleLengthLink } from "./reads-email.mjs";
+import { emailSendAllowed, emailView, handleBrief, handleEmailLink, handleEmailWebhook, handleLengthLink } from "./reads-email.mjs";
 import { handleIdeas, handlePostText, handleVideoQuota, pocketRows } from "./ai.mjs";
 import { handleOverlay, OVERLAY_PATH } from "./office-overlay.mjs";
 import { sealedDocument, SEALED_PATH } from "./office-sealed.mjs";
@@ -1382,6 +1382,7 @@ const worker = {
     if (url.pathname === "/reads/email/confirm" || url.pathname === "/reads/email/stop") {
       return handleEmailLink(request, env);
     }
+    if (url.pathname === "/api/reads/email/webhook") return handleEmailWebhook(request, env);
     if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/favicon.ico" || url.pathname === "/favicon.svg")) {
       return new Response(request.method === "HEAD" ? null : FAVICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
     }

@@ -392,6 +392,7 @@ export async function rememberEmail(store, sub, rawEmail, env, fetchImpl = fetch
     confirmSentAt: status === "pending" && same ? (prev?.confirmSentAt || "") : (status === "confirmed" ? (prev?.confirmSentAt || "") : ""),
   };
   await store.put(key, JSON.stringify(rec));
+  await indexEmail(store, id, email, prev?.email || "");
   if (status === "confirmed") return "confirmed";
   if (!emailSendAllowed(env)) return "off";
   if (rec.confirmSentAt) return "pending";
@@ -647,10 +648,192 @@ export async function articleLetter({ env, id, plan, ctx, day, stopUrl, origin =
   return { html, text, length: doc.length, weekday: doc.weekday || "", path: doc.path, away: !!doc.away, quiet: !!doc.quiet, suggest };
 }
 
-export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null, articleCtx = undefined } = {}) {
-  if (!emailSendAllowed(env)) return { armed: false, sent: 0, skipped: 0 };
+export const WEBHOOK_SECRET = "READS_EMAIL_WEBHOOK_SECRET";
+
+function webhookBytes(secret) {
+  const raw = String(secret || "").trim();
+  if (!raw.startsWith("whsec_")) return null;
+  let bin = "";
+  try { bin = atob(raw.slice(6)); } catch { return null; }
+  if (bin.length < 16) return null;
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+async function hmacB64(keyBytes, text) {
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text));
+  let bin = "";
+  for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+export async function signWebhook(secret, id, timestamp, body) {
+  const key = webhookBytes(secret);
+  if (!key || !id || !timestamp) return "";
+  const mac = await hmacB64(key, `${id}.${timestamp}.${body}`);
+  return `v1,${mac}`;
+}
+
+export async function webhookSignatureOk(secret, headers, body, nowSec = Math.floor(Date.now() / 1000)) {
+  const key = webhookBytes(secret);
+  const id = String(headers?.["svix-id"] || "");
+  const ts = String(headers?.["svix-timestamp"] || "");
+  const sig = String(headers?.["svix-signature"] || "");
+  if (!key || !id || !ts || !sig) return false;
+  const stamp = Number(ts);
+  if (!Number.isFinite(stamp) || Math.abs(nowSec - stamp) > 300) return false;
+  const expect = `v1,${await hmacB64(key, `${id}.${ts}.${body}`)}`;
+  return sig.split(" ").some((part) => sameText(part, expect));
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(text)));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function emailToKey(email) {
+  const to = validEmail(email);
+  return to ? `reads-email-to:${await sha256Hex(to)}` : "";
+}
+
+async function emailBlockKey(email) {
+  const to = validEmail(email);
+  return to ? `reads-email-block:${await sha256Hex(to)}` : "";
+}
+
+export async function indexEmail(store, id, email, prevEmail = "") {
+  const next = validEmail(email);
+  const prev = validEmail(prevEmail);
+  const who = String(id || "").replace(/^d:/, "");
+  if (!store || !next || !/^\d{5,25}$/.test(who)) return;
+  if (prev && prev !== next) {
+    const oldKey = await emailToKey(prev);
+    if (oldKey) await store.delete(oldKey);
+  }
+  await store.put(await emailToKey(next), JSON.stringify({ id: who }));
+}
+
+async function addressBlocked(store, email) {
+  const key = await emailBlockKey(email);
+  if (!store || !key) return false;
+  return !!(await store.get(key, "json"));
+}
+
+export async function stopAddress(store, rawEmail, why = "bounce") {
+  const email = validEmail(rawEmail);
+  if (!store || !email) return { stopped: false };
+  await store.put(await emailBlockKey(email), JSON.stringify({
+    at: new Date().toISOString(),
+    why: why === "complaint" ? "complaint" : "bounce",
+  }));
+  const row = await store.get(await emailToKey(email), "json");
+  const id = String(row?.id || "");
+  if (!/^\d{5,25}$/.test(id)) return { stopped: true };
+  const rec = await store.get(emailKey(id), "json");
+  if (!rec || validEmail(rec.email) !== email) return { stopped: true };
+  rec.status = "stopped";
+  rec.updatedAt = new Date().toISOString();
+  await store.put(emailKey(id), JSON.stringify(rec));
+  await setPlanEmail(store, id, false);
+  return { stopped: true };
+}
+
+function jsonResponse(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+  });
+}
+
+export async function handleEmailWebhook(request, env) {
+  if (request.method !== "POST") return jsonResponse({ ok: false, error: "Use POST." }, 405);
+  const secret = String(env?.[WEBHOOK_SECRET] || "");
+  const body = await request.text();
+  if (body.length > 200000) return jsonResponse({ ok: false, error: "Too large." }, 413);
+  if (!webhookBytes(secret)) return jsonResponse({ ok: false, error: "Not set up." }, 503);
+  const headers = {
+    "svix-id": request.headers.get("svix-id") || "",
+    "svix-timestamp": request.headers.get("svix-timestamp") || "",
+    "svix-signature": request.headers.get("svix-signature") || "",
+  };
+  if (!await webhookSignatureOk(secret, headers, body)) return jsonResponse({ ok: false, error: "Not allowed." }, 401);
+  let doc;
+  try { doc = JSON.parse(body); } catch { return jsonResponse({ ok: false, error: "Bad payload." }, 400); }
+  const type = String(doc?.type || "");
+  if (type !== "email.bounced" && type !== "email.complained") return jsonResponse({ ok: true, stopped: 0 });
+  const store = env?.FEED_KV;
+  if (!store) return jsonResponse({ ok: false, error: "Storage is not bound." }, 503);
+  const tos = Array.isArray(doc?.data?.to) ? doc.data.to : [];
+  let stopped = 0;
+  const why = type === "email.complained" ? "complaint" : "bounce";
+  for (const raw of tos.slice(0, 20)) {
+    const result = await stopAddress(store, raw, why);
+    if (result.stopped) stopped += 1;
+  }
+  return jsonResponse({ ok: true, stopped });
+}
+
+function redactLetter(value, id, email) {
+  let out = String(value || "");
+  const to = validEmail(email);
+  if (to) out = out.split(to).join(maskEmail(to));
+  const who = String(id || "");
+  if (/^\d{5,25}$/.test(who)) out = out.split(who).join("***");
+  return out;
+}
+
+async function memberLetter({ store, env, member, day, feed, article, origin }) {
+  const id = String(member?.discordId || "");
+  if (!/^\d{5,25}$/.test(id)) return { skip: "bad member" };
+  const rec = await store.get(emailKey(id), "json");
+  const plan = await store.get(`reads:d:${id}`, "json");
+  if (plan?.channels?.email !== true) return { skip: "email off" };
+  const email = validEmail(rec?.email);
+  if (!email || rec.status !== "confirmed") {
+    return {
+      skip: "not confirmed",
+      confirm: !!(email && rec?.status === "pending" && !rec.confirmSentAt),
+      id,
+      email,
+    };
+  }
+  if (await addressBlocked(store, email)) return { skip: "bounced or complaint" };
+  const stopUrl = await emailLink(env, origin, "stop", id, email);
+  if (!stopUrl) return { skip: "no stop link" };
+  const stats = await loadStats(store, id);
+  let letter = await articleLetter({ env, id, plan, ctx: await article(), day, stopUrl, origin, stats });
+  if (letter?.skip) return { skip: "quiet" };
+  if (letter && (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html))) letter = null;
+  if (!letter) {
+    const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
+    const want = plan?.premiumRatio === "below" || plan?.premiumRatio === "above" ? plan.premiumRatio : "";
+    const matched = want ? prepared.filter((read) => read.premium === want) : prepared;
+    const reads = [...matched, ...(want ? [] : addonCards(member))];
+    if (!reads.length && !(want && prepared.length)) return { skip: "nothing to send" };
+    const lead = scrub(member.lead || "") || readsSubject(day);
+    const empty = want && prepared.length > 0 && matched.length === 0;
+    const mailingAddress = emailMailingAddress(env);
+    letter = {
+      html: readsEmailHtml({ lead, day, reads, stopUrl, empty, mailingAddress, premiumRatio: want }),
+      text: readsEmailText({ lead, day, reads, stopUrl, empty, mailingAddress, premiumRatio: want }),
+    };
+  }
+  if (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html)) return { skip: "copy held" };
+  return {
+    id,
+    email,
+    stopUrl,
+    html: letter.html,
+    text: letter.text,
+    length: letter.length || "",
+    weekday: letter.weekday || "",
+    away: letter.away === true,
+  };
+}
+
+async function letterContext({ store, env, outbox, fetchImpl, origin, feedReads, articleCtx }) {
   const day = String(outbox?.day || "");
-  if (!store || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { armed: true, sent: 0, skipped: 0 };
+  if (!store || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   let feed = feedReads;
   if (!Array.isArray(feed)) {
     try {
@@ -668,59 +851,67 @@ export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetc
     }
     return ctx;
   };
+  return { day, feed, article, origin };
+}
+
+export async function dryRunOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null, articleCtx = undefined } = {}) {
+  const ctx = await letterContext({ store, env, outbox, fetchImpl, origin, feedReads, articleCtx });
+  if (!ctx) return { dry: true, armed: false, sent: 0, letters: [], reasons: { "no letter day": 1 } };
+  const reasons = {};
+  const letters = [];
+  const skip = (reason) => { reasons[reason] = (reasons[reason] || 0) + 1; };
+  for (const member of outbox.members || []) {
+    const built = await memberLetter({ store, env, member, day: ctx.day, feed: ctx.feed, article: ctx.article, origin: ctx.origin });
+    if (built.skip) {
+      skip(built.skip);
+      letters.push({ to: "", subject: readsSubject(ctx.day), text: "", html: "", skipped: built.skip });
+      continue;
+    }
+    letters.push({
+      to: maskEmail(built.email),
+      subject: readsSubject(ctx.day),
+      text: redactLetter(built.text, built.id, built.email),
+      html: redactLetter(built.html, built.id, built.email),
+      skipped: "",
+    });
+  }
+  return { dry: true, armed: false, sent: 0, letters, reasons };
+}
+
+export async function deliverOutboxEmails({ store, env, outbox, fetchImpl = fetch, origin = ORIGIN, feedReads = null, articleCtx = undefined } = {}) {
+  if (!emailSendAllowed(env)) return { armed: false, sent: 0, skipped: 0, reasons: { "email key unset": 1 } };
+  const ctx = await letterContext({ store, env, outbox, fetchImpl, origin, feedReads, articleCtx });
+  if (!ctx) return { armed: true, sent: 0, skipped: 0, reasons: { "no letter day": 1 } };
+  const { day } = ctx;
   const ledgerKey = `reads-email-sent:${day}`;
   const prior = await store.get(ledgerKey, "json");
   const ledger = new Set(Array.isArray(prior) ? prior.map(String) : []);
   let sent = 0;
   let skipped = 0;
+  const reasons = {};
+  const skip = (reason) => { skipped++; reasons[reason] = (reasons[reason] || 0) + 1; };
   for (const member of outbox.members || []) {
-    if (sent >= 80) break;
+    if (sent >= 80) { skip("daily cap"); continue; }
     const id = String(member?.discordId || "");
-    if (!/^\d{5,25}$/.test(id)) continue;
-    if (ledger.has(id)) { skipped++; continue; }
-    const rec = await store.get(emailKey(id), "json");
-    const plan = await store.get(`reads:d:${id}`, "json");
-    if (plan?.channels?.email !== true) { skipped++; continue; }
-    const email = validEmail(rec?.email);
-    if (!email || rec.status !== "confirmed") {
-      if (email && rec.status === "pending" && !rec.confirmSentAt) {
-        await sendConfirmEmail({ env, store, id, email, origin, fetchImpl });
-      }
-      skipped++;
-      continue;
-    }
-    const stopUrl = await emailLink(env, origin, "stop", id, email);
-    if (!stopUrl) { skipped++; continue; }
-    const stats = await loadStats(store, id);
-    let letter = await articleLetter({ env, id, plan, ctx: await article(), day, stopUrl, origin, stats });
-    if (letter?.skip) { skipped++; continue; }
-    if (letter && (!emailCopyOk(letter.text) || /[\u2013\u2014]/.test(letter.html))) letter = null;
-    if (!letter) {
-      const prepared = attachFeed(member.reads || [], feed).map(normalizeEmailRead).filter(Boolean);
-      const want = plan?.premiumRatio === "below" || plan?.premiumRatio === "above" ? plan.premiumRatio : "";
-      const matched = want ? prepared.filter((read) => read.premium === want) : prepared;
-      const reads = [...matched, ...(want ? [] : addonCards(member))];
-      if (!reads.length && !(want && prepared.length)) { skipped++; continue; }
-      const lead = scrub(member.lead || "") || readsSubject(day);
-      const empty = want && prepared.length > 0 && matched.length === 0;
-      letter = { html: readsEmailHtml({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env), premiumRatio: want }), text: readsEmailText({ lead, day, reads, stopUrl, empty, mailingAddress: emailMailingAddress(env), premiumRatio: want }) };
-    }
-    const { html, text } = letter;
-    if (!emailCopyOk(text) || /[\u2013\u2014]/.test(html)) { skipped++; continue; }
+    if (ledger.has(id)) { skip("already sent today"); continue; }
+    const built = await memberLetter({ store, env, member, day, feed: ctx.feed, article: ctx.article, origin: ctx.origin });
+    if (built.confirm) await sendConfirmEmail({ env, store, id: built.id, email: built.email, origin, fetchImpl });
+    if (built.skip) { skip(built.skip); continue; }
     const ok = await postResend({
       env,
-      to: email,
+      to: built.email,
       subject: readsSubject(day),
-      html,
-      text,
-      headers: listHeaders(stopUrl),
+      html: built.html,
+      text: built.text,
+      headers: listHeaders(built.stopUrl),
       fetchImpl,
     });
-    if (!ok) { skipped++; continue; }
-    ledger.add(id);
+    if (!ok) { skip("provider declined"); continue; }
+    await indexEmail(store, built.id, built.email);
+    ledger.add(built.id);
     sent++;
     await store.put(ledgerKey, JSON.stringify([...ledger]));
-    await recordSend(store, id, { day, length: letter.length || "", weekday: letter.weekday || "" }, letter.away === true);
+    await recordSend(store, built.id, { day, length: built.length, weekday: built.weekday }, built.away);
   }
-  return { armed: true, sent, skipped };
+  return { armed: true, sent, skipped, reasons };
 }

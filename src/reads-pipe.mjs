@@ -3,7 +3,7 @@
 // needs the CUSTOM_READS_TOKEN worker secret as a bearer token. Nothing here
 // is public, and the token is never echoed back.
 
-import { deliverOutboxEmails } from "./reads-email.mjs";
+import { deliverOutboxEmails, dryRunOutboxEmails } from "./reads-email.mjs";
 
 export const FOLLOWS_KEY = "custom-reads:follows";
 export const OUTBOX_KEY = "custom-reads:outbox";
@@ -99,12 +99,16 @@ export async function handleReadsPipe(request, env) {
       try { doc = JSON.parse(text); } catch { return json({ ok: false, error: "Bad outbox." }, 400); }
       const clean = cleanOutbox(doc);
       if (!clean) return json({ ok: false, error: "Bad outbox." }, 400);
+      if (url.searchParams.get("dry") === "1") {
+        const preview = await dryRunOutboxEmails({ store, env, outbox: clean, origin: url.origin, articleCtx: null, feedReads: [] });
+        return json({ ok: true, dry: true, sent: 0, armed: false, day: clean.day, letters: preview.letters, reasons: preview.reasons });
+      }
       await store.put(OUTBOX_KEY, JSON.stringify(clean));
-      let email = { armed: false, sent: 0, skipped: 0 };
+      let email = { armed: false, sent: 0, skipped: 0, reasons: {} };
       try {
         email = await deliverOutboxEmails({ store, env, outbox: clean, origin: url.origin });
       } catch {
-        email = { armed: false, sent: 0, skipped: 0 };
+        email = { armed: false, sent: 0, skipped: 0, reasons: { "send step failed": 1 } };
       }
       return json({ ok: true, day: clean.day, members: clean.members.length, email });
     }

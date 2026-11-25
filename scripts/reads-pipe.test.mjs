@@ -47,6 +47,19 @@ t("the outbox cannot be written without the bearer", r.status === 401);
 r = await handleReadsPipe(req("/api/reads/outbox", { headers: auth }), env);
 body = await r.json();
 t("the bot reads the outbox", body.day === "2026-10-17" && body.members.length === 1);
+await store.put("reads-email:123456789012345678", JSON.stringify({ email: "member@example.com", status: "confirmed" }));
+await store.put("reads:d:123456789012345678", JSON.stringify({ channels: { discord: true, email: true }, frequency: "weekly", email: "" }));
+const beforeDry = store.m.get("custom-reads:outbox");
+r = await handleReadsPipe(req("/api/reads/outbox?dry=1", {
+  method: "POST",
+  headers: { ...auth, "content-type": "application/json" },
+  body: JSON.stringify({
+    day: "2026-11-25",
+    members: [{ discordId: "123456789012345678", email: "member@example.com", lead: "Your weekly Catch'em read, Nov 25.", reads: [{ line: "Pikachu is $1.00, as of Nov 25.", name: "Pikachu", cardId: "tcgcsv-1" }] }],
+  }),
+}), env);
+body = await r.json();
+t("a dry run renders the letter, stores nothing, and sends nothing", r.status === 200 && body.dry === true && body.sent === 0 && body.armed === false && store.m.get("custom-reads:outbox") === beforeDry && body.letters[0].to === "m***@example.com" && body.letters[0].text.includes("Pikachu") && !JSON.stringify(body).includes("member@example.com"));
 t("a bad outbox day is refused", cleanOutbox({ day: "today", members: [] }) === null);
 
 r = await handleReadsPipe(req("/api/reads/export?id=123456789012345678", { method: "DELETE", headers: auth }), env);
