@@ -240,7 +240,8 @@ export function shareFieldsFromProduct(card, opts = {}) {
   const held = opts.held === true || opts.priceHeld === true || card.priceHeld === true || card.held === true || card.priceStatus === "checking" || card.priceStatus === "held";
   if (held) return { name, price: "", date: "", source: "", points: [] };
   const priceNum = Number(card.price);
-  const day = String(card.asOf || card.priceDate || "").slice(0, 10);
+  // No price on file, no date: a date alone reads as a current price day.
+  const day = priceNum > 0 ? String(card.asOf || card.priceDate || "").slice(0, 10) : "";
   const hist = Array.isArray(card.hist) ? card.hist : [];
   const points = hist
     .filter((p) => Array.isArray(p) && Number(p[1]) > 0 && !p[3])

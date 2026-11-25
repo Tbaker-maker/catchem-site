@@ -178,6 +178,9 @@ const nonePng = await renderProductSharePng({ ...baseFields, facts: noneFacts })
 assert.equal(Buffer.from(await sharePng({ buildId: "nolistings0001", loadListings: async () => null })).equals(Buffer.from(nonePng)), true);
 
 const heldFields = shareFieldsFromProduct({ ...card, priceStatus: "checking" });
+const noPriceFields = shareFieldsFromProduct({ ...card, price: null, asOf: "2026-11-25", hist: [["2026-10-16", 30], ["2026-11-15", 40]] });
+assert.equal(noPriceFields.price, "");
+assert.equal(noPriceFields.date, ""); // no price on file means no date on the share image
 assert.equal(heldFields.price, "");
 assert.deepEqual(heldFields.points, []);
 const heldPng = await renderProductSharePng({ ...heldFields, facts: [] });

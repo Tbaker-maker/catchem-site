@@ -33,6 +33,11 @@ t("ranges 1M to All on a year of data", ["31", "92", "183", "366", "0"].every((d
 t("price 0 is not a point; carried days name the last real day", !p.some((x) => x[0] === day(392) && !x[3]) && p.filter((x) => x[3]).every((x) => x[1] > 0 && /^\d{4}-\d{2}-\d{2}$/.test(x[3])));
 t("listings are the real nights only", JSON.stringify(l) === JSON.stringify([[day(390), 40], [day(395), 31]]));
 t("fan-site days keep their tag for the soft line and source", p.some((x) => x[2] === "f") && html.includes("PokeVizInvestor"));
+// Watermark date is the last day with data, never the later board day (fake values).
+const staleChart = productChart({ price: [["2026-10-16", 30], ["2026-11-15", 40]], asOf: "2026-11-25" });
+t("watermark date is the last price day when the price stopped early", staleChart.includes('data-day="Nov 15, 2026"') && staleChart.includes("TCGplayer market, Nov 15, 2026") && !staleChart.includes("Nov 25, 2026"));
+const freshChart = productChart({ price: [["2026-10-16", 30], ["2026-11-25", 40]], asOf: "2026-11-25" });
+t("watermark date is the board day when the data reaches it", freshChart.includes('data-day="Nov 25, 2026"'));
 const words = visible(html);
 t("no sales, sold, demand, supply, or MSRP words", !/\b(sales?|sold|demand|supply|msrp)\b/i.test(words));
 t("no em or en dashes", !/[\u2014\u2013]/.test(html));
