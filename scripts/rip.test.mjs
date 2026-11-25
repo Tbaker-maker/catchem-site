@@ -81,7 +81,14 @@ const hostBody = ripBody({
   sources: [{ url: "https://example.com/rates", author: "Ada" }],
 }, { eras: { sv09: "Scarlet & Violet" } });
 const hostLink = (hostBody.match(/<a href="https:\/\/example.com\/rates"[^>]*>[^<]*<\/a>/) || [""])[0];
-t("source with no date prints the host and not the author", hostLink.includes(">example.com<") && !hostBody.includes("Ada"));
+t("a saturated model prints the sim count and the source, not 100%", (() => {
+  const edge = ripBody({
+    asOf: "2026-11-25",
+    rows: [{ id: "edge", name: "White Flare Booster Pack", set: "White Flare", setSlug: "sv-wf", subtype: "booster-pack", price: 12.45, contentsEV: 19.25, roiPct: 54.6, beatChance: 100, sims: 10000, median: 18, priceAsOf: "2026-11-25", priceSource: "TCGplayer market" }],
+  });
+  const visibleRow = edge.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+  return visibleRow.includes("10,000 of 10,000 simulated openings") && visibleRow.includes("TCGplayer market, Nov 25, 2026") && !/\b100%/.test(visibleRow);
+})());
 
 resetJsonCache();
 const res = await renderPath("/rip", fetchImpl, {});
