@@ -73,6 +73,10 @@ export function extractMarketPrice(html) {
     if (!date) return null;
     return { money: formatMoney(rvPrice), date, price: rvPrice, dateIso: rvDate };
   }
+  // A held or missing header price has no number in the title, preview or Offer.
+  // Without this, the scan below picked a later number on the page (a range low,
+  // or the cheapest card in a Pokemon strip) and showed it as this item's price.
+  if (/class="(?:cp-now|px)">Price being checked</.test(s)) return null;
   const src = headerPriceHtml(html);
   const m = src.match(/(\$[0-9][0-9,]*\.[0-9]{2})[\s\S]{0,200}?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{1,2}, [0-9]{4})/);
   if (!m) return null;
