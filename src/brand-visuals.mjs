@@ -568,12 +568,20 @@ export function pulseShareCard() {
 export function sealedShareCard() {
   const row = PULSE_SAMPLE[0];
   const oct = row.cells[row.cells.length - 1];
+  // The page stays on a neutral tile until a cutout passes. The share card
+  // still clips that cutout into the plate, the same way the product PNG
+  // draws a plate only when a photo is present.
+  const cutouts = {
+    products: [
+      { id: row.id, siteId: row.id, tcgPlayerId: row.tcgPlayerId, pass: true, file: "cutouts/swsh7-booster-box.webp" },
+    ],
+  };
   return {
     id: "sealed-box",
     title: row.name,
     big: money(oct.price),
     sealed: true,
-    imageUrl: productImage(row) || "",
+    imageUrl: productImage(row, cutouts) || "",
     lines: ["Month change " + pctLabel(oct.pct)],
     source: SOURCE,
     date: prettyDay(AS_OF),
