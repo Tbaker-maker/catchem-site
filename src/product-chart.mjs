@@ -93,7 +93,7 @@ export function chartWindow(view, days, P, L) {
   return { from: from, t0: t0, t1: t1, p: p, l: l, useP: useP, useL: useL };
 }
 
-export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "" } = {}) {
+export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "", cameraLine = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
   const soldPts = soldPoints(sold);
@@ -115,6 +115,8 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
   if (soldPts.length >= 2) srcs.push(`${soldSource || "eBay sold comps"} recorded per day, ${longDay(soldPts[0][0])} to ${longDay(soldPts.at(-1)[0])}; a day with no bar had no comp recorded`);
   const lastDay = String(asOf || "").slice(0, 10) || (dates.at(-1) || "");
   const markSrc = priceReal.length >= 2 ? "TCGplayer market" : "eBay listings counted";
+  const camLine = String(cameraLine || "").replace(/[\u2014\u2013]/g, "").trim();
+  const camHtml = camLine ? `<p class="md-cam">${esc(camLine)}</p>` : "";
   const sum = priceReal.length >= 2
     ? `Price from ${esc(priceReal[0][0])} to ${esc(priceReal.at(-1)[0])}.${list.length >= 2 ? ` eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).` : ""}`
     : `eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).`;
@@ -122,6 +124,7 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
 <p class="hc-sum">${sum}</p>
 ${tabs}
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
+${camHtml}
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
@@ -153,14 +156,35 @@ html.pc-cam .site-bar,html.pc-cam .stale-banner,html.pc-cam #fresh,html.pc-cam .
 html.pc-cam .glance-photo,html.pc-cam .cp-photo{display:flex!important}
 html.pc-cam,html.pc-cam body{background:#100e0c;overflow:hidden}
 html.pc-cam .wrap{max-width:none;padding:16px 28px}
-html.pc-cam .product-glance > *:not(.glance){display:none!important}
+html.pc-cam .product-glance:not(.card-page) > *:not(.glance){display:none!important}
+html.pc-cam .product-glance.card-page > *:not(style):not(.cp-head):not(.cp-charts):not(#eur):not(#stats){display:none!important}
+html.pc-cam .card-page{display:grid!important;grid-template-columns:minmax(240px,32vw) minmax(0,1fr);column-gap:28px;row-gap:8px;align-items:center;min-height:calc(100vh - 32px)}
+html.pc-cam .cp-head,html.pc-cam .cp-id{display:contents}
+html.pc-cam .cp-photo{grid-column:1;grid-row:1}
+html.pc-cam .cp-id > h1,html.pc-cam .cp-id > .cp-price,html.pc-cam .cp-id > .cp-src,html.pc-cam .cp-id > .sum-strip,html.pc-cam .cp-id > .list-note,html.pc-cam .cp-id > .chg,html.pc-cam .cp-id > .chg-src{grid-column:1}
+html.pc-cam .cp-id > *:not(h1):not(.cp-price):not(.cp-src):not(.sum-strip):not(.list-note):not(.chg):not(.chg-src){display:none!important}
+html.pc-cam .cp-charts{grid-column:2;grid-row:1;align-self:start;margin:0}
+html.pc-cam .cp-now{font:600 64px/1 var(--serif)!important;color:var(--gold)}
+html.pc-cam .cp-date,html.pc-cam .cp-src{font:500 22px/1.3 var(--sans)!important}
+html.pc-cam .md-sold,html.pc-cam .md-pop{display:none!important}
+.md-cam{display:none}
+html.pc-cam .md-cam{display:block!important;margin:8px 0 0;font:600 22px/1.35 var(--sans)}
 html.pc-cam .glance{display:grid!important;grid-template-columns:minmax(240px,32vw) 1fr;column-gap:28px;row-gap:6px;align-items:center;min-height:calc(100vh - 32px)}
 html.pc-cam .glance > div{display:contents}
 html.pc-cam .chg,html.pc-cam .yr,html.pc-cam #supply,html.pc-cam #stats,html.pc-cam #eur{display:block!important}
+html.pc-cam #stats,html.pc-cam #eur,html.pc-cam #supply{grid-column:2;align-self:start;max-height:none;overflow:visible}
+html.pc-cam #stats{grid-row:2}
+html.pc-cam #eur{grid-row:3}
+html.pc-cam #supply{grid-row:4}
+html.pc-cam #stats h2{margin:0 0 4px;font:600 14px/1.2 var(--sans)}
+html.pc-cam #stats .kv{margin:0;padding:2px 10px}
+html.pc-cam #stats .kv div{padding:2px 0}
+html.pc-cam #stats .kv dt,html.pc-cam #stats .kv dd{font-size:13px;line-height:1.2}
+html.pc-cam .glance-photo{max-height:28vh}
 html.pc-cam .glance-photo{grid-column:1;grid-row:1;width:100%!important;max-width:none!important;max-height:46vh;aspect-ratio:1/1;padding:8px!important;margin:0;align-self:center}
 html.pc-cam .glance > p,html.pc-cam .glance > h1{grid-column:1}
 html.pc-cam .glance > .px,html.pc-cam .glance > .sum-strip{grid-column:1}
-html.pc-cam #price{grid-column:2;grid-row:1 / span 8;align-self:center;margin:0}
+html.pc-cam #price{grid-column:2;grid-row:1;align-self:start;margin:0}
 html.pc-cam .glance-photo img,html.pc-cam .cp-photo img{width:100%!important;max-width:none!important;height:auto!important;object-fit:contain}
 html.pc-cam h1{font:600 48px/1.02 var(--serif)!important;margin:4px 0 8px}
 html.pc-cam .px{font-size:22px!important;margin:0}
@@ -185,12 +209,50 @@ html.pc-cam .px .itap-pop{font-size:28px!important}
 html.pc-cam .sum-chip{font:600 28px/1.25 var(--sans)!important}
 html.pc-cam .pc .hc-plot{height:520px}
 html.pc-cam .pc-tab{font-size:22px;min-height:56px}
+html.pc-cam .product-glance.card-page{grid-template-columns:1fr;min-height:0}
+html.pc-cam .cp-photo,html.pc-cam .cp-charts,html.pc-cam .cp-id > h1,html.pc-cam .cp-id > .cp-price,html.pc-cam .cp-id > .sum-strip,html.pc-cam .cp-id > .chg{grid-column:1;grid-row:auto;width:100%}
+html.pc-cam .cp-now{font-size:72px!important}
 }
 @media (orientation:landscape) and (min-width:1600px){
-html.pc-cam .wrap{padding:16px 40px}
-html.pc-cam h1{font-size:44px!important}
-html.pc-cam .px > span:first-child{font-size:56px!important}
-html.pc-cam .pc .hc-plot{height:380px}
+html.pc-cam .wrap{padding:8px 20px;box-sizing:border-box}
+html.pc-cam .glance,html.pc-cam .card-page{align-items:start!important;align-content:start!important;min-height:0!important;height:calc(100vh - 16px)!important;overflow:hidden}
+html.pc-cam .glance{grid-template-columns:168px minmax(300px,440px) minmax(0,1fr)!important;grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto!important;column-gap:16px;row-gap:2px}
+html.pc-cam .glance-photo{grid-column:1;grid-row:1 / span 5;width:168px!important;height:168px!important;max-height:168px!important;aspect-ratio:auto}
+html.pc-cam .glance > div > p.muted:not(.list-note):not(.add-read){grid-column:2;grid-row:1;margin:0}
+html.pc-cam .glance h1{grid-column:2;grid-row:2;margin:0}
+html.pc-cam .glance .px{grid-column:2;grid-row:3;margin:0}
+html.pc-cam .glance .sum-strip{grid-column:2;grid-row:4;margin:0}
+html.pc-cam .glance .list-note{grid-column:2;grid-row:5;margin:0}
+html.pc-cam .glance #stats{grid-column:1 / span 2;grid-row:6;align-self:start}
+html.pc-cam .glance #supply{grid-column:1 / span 2;grid-row:7;margin:0}
+html.pc-cam .glance #price{grid-column:3;grid-row:1 / span 6;align-self:stretch;min-height:0;margin:0}
+html.pc-cam .glance #eur{grid-column:3;grid-row:7;margin:0;max-height:96px;overflow:auto}
+html.pc-cam .glance .rot-badge,html.pc-cam .glance #related{grid-column:3;grid-row:7;align-self:end;justify-self:start;max-height:72px;overflow:auto;margin:0}
+html.pc-cam .card-page{grid-template-columns:168px minmax(300px,460px) minmax(0,1fr)!important;grid-template-rows:auto auto auto auto auto auto auto minmax(0,1fr)!important;column-gap:16px;row-gap:2px}
+html.pc-cam .cp-photo{grid-column:1;grid-row:1 / span 6;width:168px!important;height:168px!important;max-height:168px!important;aspect-ratio:auto}
+html.pc-cam .card-page h1{grid-column:2;grid-row:1;margin:0}
+html.pc-cam .cp-id > .cp-price{grid-column:2!important;grid-row:2!important;margin:0;width:auto;justify-content:flex-start}
+html.pc-cam .cp-src{grid-column:2;grid-row:3;margin:0}
+html.pc-cam .card-page .sum-strip{grid-column:2;grid-row:4;margin:0}
+html.pc-cam .card-page .chg{grid-column:2;grid-row:5;margin:0;max-width:none}
+html.pc-cam .card-page .chg-src{grid-column:2;grid-row:6;margin:0}
+html.pc-cam .card-page .list-note{grid-column:2;grid-row:7;margin:0}
+html.pc-cam .card-page #stats{grid-column:1 / span 2;grid-row:8;align-self:start}
+html.pc-cam .card-page #eur{grid-column:3;grid-row:8;margin:0;max-height:120px;overflow:auto}
+html.pc-cam .cp-charts{grid-column:3;grid-row:1 / span 8;align-self:stretch;min-height:0;margin:0}
+html.pc-cam h1{font-size:28px!important;line-height:1.1}
+html.pc-cam .px > span:first-child{font-size:36px!important}
+html.pc-cam .cp-now{font-size:36px!important}
+html.pc-cam .sum-chip{font:600 15px/1.25 var(--sans)!important;padding:4px 8px!important;min-height:32px}
+html.pc-cam .glance-photo,html.pc-cam .cp-photo{max-height:168px!important}
+html.pc-cam .pc .hc-plot{height:min(32vh,300px)}
+html.pc-cam #stats h2{margin:0 0 2px;font-size:13px}
+html.pc-cam #stats .kv{margin:0;padding:2px 8px}
+html.pc-cam #stats .kv div{padding:1px 0;min-width:0}
+html.pc-cam #stats .kv dt,html.pc-cam #stats .kv dd{font-size:13px;line-height:1.25}
+html.pc-cam #stats .kv dd{min-width:0}
+html.pc-cam #stats .cp-facts{margin:4px 0 0}
+html.pc-cam #stats .cp-facts li{padding:2px 0}
 }
 @media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
 

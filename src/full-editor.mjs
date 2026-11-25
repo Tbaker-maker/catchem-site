@@ -186,7 +186,7 @@ export function patchPaperRows(rows, lite) {
 // paywall copy ships in the editor (Tyler, Nov 11 2026). Runs after cleanOfficeCopy.
 const BRANDING_COPY = [
   [">Premium · monetize</button>", ">Remove branding</button>"],
-  ['data-seat="free">Free · fun</button>', 'data-seat="free">Keep branding</button>'],
+  ['data-seat="free">Free · fun</button>', 'data-seat="free">Keep branding</button><button type="button" class="ghost" id="seat-pay" data-seat="studio">Remove branding</button>'],
   ["Free edit. Catch'Em stays on the picture. Premium ($9/mo) if you monetize.", "Catch'Em is on the picture. Remove branding any time, free."],
   ["Free is fun and wears Catch'Em. Premium takes Catch'Em off if you monetize. ", "Catch'Em branding is on by default and free to remove. "],
   ["<b>Free · fun</b>", "<b>Keep branding</b>"],
@@ -200,7 +200,20 @@ const BRANDING_COPY = [
   ["Fact sits under the card. Premium file. Long-press.", "Fact sits under the card. Branding off. Long-press."],
   ["Fact sits under the card. Catch'Em stays .  fun is free. Premium takes the mark off to monetize. Long-press.", "Fact sits under the card. Catch'Em is on it. Remove branding takes it off, free. Long-press."],
   ["how to (get paid|monetize|farm impressions)", "how to (get paid|monet[a-z]+|farm impressions)"],
+  ["/how to (get paid|farm impressions)|payout|revenue share/i", "/how to (get paid|monet[a-z]+|farm impressions)/i"],
   ["Refuse. Monetization-coaching posts are ineligible.", "Refuse. Payout-coaching posts are ineligible."],
+  ["Refuse. That coaching post is ineligible.", "Refuse. Payout-coaching posts are ineligible."],
+  ['<span>Facts write the picture. Catch\'Em stays on the edit. The desk is yours.</span>', '<span>Facts write the picture. Catch\'Em stays on the edit. The desk is yours. Free for everyone.</span>'],
+  [`<b>Keep branding</b>
+          <span>Facts write the picture. Catch'Em stays on the edit. The desk is yours. Free for everyone.</span>
+        </button>`, `<b>Keep branding</b>
+          <span>Facts write the picture. Catch'Em stays on the edit. The desk is yours. Free for everyone.</span>
+        </button>
+        <button type="button" class="seat" id="seat-studio" data-seat="studio">
+          <b>Remove branding</b>
+          <span>Your mark or a clean file. Catch'Em comes off the edit. Free for everyone.</span>
+        </button>`],
+  ['localStorage.setItem("ce-seat", "free")', 'localStorage.setItem("ce-seat", "studio")'],
 ];
 export const PLAN_COPY = /premium|\$9\b|\/mo\b|monetiz|paywall|\bper month\b|a month\b/i;
 

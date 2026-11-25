@@ -35,6 +35,7 @@ const dive = { ids: ["me1-enhanced-booster-box"], byTcgcsv: { "tcgcsv-644300": "
 const fetchImpl = async (url) => {
   const u = String(url);
   if (u.endsWith("/dive/index.json")) return new Response(JSON.stringify(dive));
+  if (u.includes("/dive/me1-enhanced-booster-box")) return new Response(JSON.stringify({ series: [{ date: "2026-10-12", listingCount: 37 }] }));
   const rel = (u.split("/research/assets/public/")[1]||"").split("?")[0];
   if (rel && rel in files) return new Response(typeof files[rel] === "string" ? files[rel] : JSON.stringify(files[rel]));
   return new Response("nope", { status: 404 });
