@@ -40,6 +40,14 @@ const bareMeta = addShareMeta(bare, "/p/tcgcsv-000", "product");
 const bareProduct = ldOf(bareMeta, "Product");
 t("a product with no price has no Offer and no invented price", !!(bareProduct && !bareProduct.offers && bareMeta.includes("<title>Mystery Box price · Sealed · Catch'em</title>") && !/\$[0-9]/.test(bareMeta.match(/<meta name="description"[^>]*>/)[0])));
 t("extractMarketPrice ignores a missing price", extractMarketPrice(bare) === null);
+// Held price pages: the card header says Price being checked, and later on the page a
+// Pokemon strip or a range line carries other dated prices. Fake values only.
+const heldCard = `<html><head><title>Test Charizard · Catch'em</title></head><body><h1>Test Charizard</h1><p class="cp-price"><span class="cp-cond-label"></span><span class="cp-now">Price being checked</span></p><p>Every Charizard card we price: 9 cards, $3.86 to $877.96 on Nov 25, 2026.</p></body></html>`;
+const heldBox = `<html><head><title>Test Box · Catch'em</title></head><body><h1>Test Box</h1><p class="px">Price being checked</p><p>Since Sep 26 low $2,999.19, Oct 15, 2026</p></body></html>`;
+t("a held card has no price in the title, preview or Offer", extractMarketPrice(heldCard) === null);
+t("a held sealed product has no price in the title, preview or Offer", extractMarketPrice(heldBox) === null);
+const heldMeta = addShareMeta(heldCard, "/c/tcgcsv-9003", "card");
+t("held page title and Offer carry no dollar amount", !/<title>[^<]*\$/.test(heldMeta) && !heldMeta.includes('"@type":"Offer"') && !/og:title" content="[^"]*\$/.test(heldMeta));
 
 const card = `<html><head><title>Charizard · Catch'em</title></head><body><p class="cp-set"><a href="/sets/base-set">Base Set</a> · #4</p><img alt="Charizard" loading="eager" src="/data/editor/tcg/base1/4_hires.png"><span>$968.91</span><span>Oct 13, 2026</span></body></html>`;
 const cardMeta = addShareMeta(card, "/c/tcgcsv-42382", "card");
