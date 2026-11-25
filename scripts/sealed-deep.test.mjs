@@ -20,14 +20,14 @@ const card = {
 };
 const html = renderCard(card, "stamp", {
   ebayAsk: { amount: 159.99, count: 40, asOf: "2026-10-13", tcgListed: 140, tcgMarket: 80, cheapest: { price: 149.5, url: "https://www.ebay.com/itm/149" } },
-  rip: { contentsEV: 20.03, roiPct: 36.3, beatChance: 100, median: 17.05, priceSource: "TCGplayer market", asOf: "2026-10-13" },
+  rip: { contentsEV: 20.03, roiPct: 36.3, beatChance: 100, sims: 10000, median: 17.05, priceSource: "TCGplayer market", asOf: "2026-10-13" },
   listingSeries: [
     { date: "2026-10-12", listingCount: 40 },
     { date: "2026-10-13", listingCount: 30 },
   ],
 });
 t("eBay ask keeps the median and the date", html.includes("<dt>Median ask</dt>") && html.includes("$159.99") && html.includes("Middle price of 40 eBay listings counted") && html.includes("Oct 13, 2026") && html.includes("Cheapest real listing") && html.includes("TCGplayer listed median") && html.includes("Middle price of TCGplayer listings") && html.includes("recent TCGplayer sales") && !html.includes("<dt>Ask</dt>") && !html.includes("ebay-browse-api"));
-t("rip value uses the file fields", html.includes("Rip value") && html.includes("Average pull value") && html.includes("$20.03") && html.includes("ROI") && html.includes("36.3%") && html.includes("Chance an opening beats the price") && html.includes("100%") && html.includes("Typical opening") && html.includes("$17.05") && html.includes("TCGplayer market, Oct 13, 2026"));
+t("rip value uses the file fields", html.includes("Rip value") && html.includes("Average pull value") && html.includes("$20.03") && html.includes("ROI") && html.includes("36.3%") && html.includes("Chance an opening beats the price") && html.includes("10,000 of 10,000 simulated openings") && html.includes("TCGplayer market, Oct 13, 2026") && !html.includes(">100%<") && html.includes("Typical opening") && html.includes("$17.05"));
 t("listings counted chart stays", html.includes("eBay listings counted") && html.includes("30 listings counted"));
 const bare = renderCard(card, "stamp", {});
 t("missing ask and rip stay off", !bare.includes("eBay ask $") && !bare.includes("Median ask") && !bare.includes("<h2>Rip value</h2>"));

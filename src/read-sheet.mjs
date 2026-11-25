@@ -19,6 +19,20 @@ function dayLabel(iso) {
   return `${months[Number(s.slice(5, 7)) - 1]} ${Number(s.slice(8, 10))}, ${s.slice(0, 4)}`;
 }
 
+export function beatOddsText(beat, sims) {
+  const x = Number(beat);
+  if (!Number.isFinite(x)) return "";
+  const n = Number(sims);
+  const runs = Number.isInteger(n) && n > 0 ? n.toLocaleString("en-US") : "";
+  if (x <= 0 || x >= 100) {
+    if (!runs) return "";
+    return x >= 100 ? `${runs} of ${runs} simulated openings` : `0 of ${runs} simulated openings`;
+  }
+  const rounded = Math.round(x * 10) / 10;
+  const pct = (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)) + "%";
+  return runs ? `${pct} of ${runs} simulated openings` : pct;
+}
+
 function asPct(n) {
   const v = Number(n);
   if (!Number.isFinite(v)) return null;
@@ -283,7 +297,11 @@ export function factCards(f) {
   const v = f.variants;
   if (Array.isArray(v) && v.length >= 2) byId.variants = card("Variants", v.map((x) => `${x.name} ${money(x.price)}`).join(" · "), `TCGplayer market, ${dayLabel(v[0].asOf)}`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"variants\">");
   const rip = f.rip;
-  if (rip && rip.contentsEV > 0 && rip.price > 0) byId.rip = card("Rip value", `Expected contents ${money(rip.contentsEV)} vs ${money(rip.price)} sealed (${pp(rip.roiPct)}).${Number.isFinite(rip.beatChance) ? ` ${rip.beatChance}% of simulated openings beat the price.` : ""}`, `History-based estimate from dated pull rates, ${dayLabel(rip.asOf)}. Not advice`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"rip\">");
+  if (rip && rip.contentsEV > 0 && rip.price > 0) {
+    const odds = beatOddsText(rip.beatChance, rip.sims);
+    const oddsBit = odds ? ` ${odds} beat the price.` : "";
+    byId.rip = card("Rip value", `Expected contents ${money(rip.contentsEV)} vs ${money(rip.price)} sealed (${pp(rip.roiPct)}).${oddsBit}`, `History-based estimate from dated pull rates, ${dayLabel(rip.asOf)}. Not advice`).replace("<article class=\"rd-card\">", "<article class=\"rd-card\" data-bd=\"rip\">");
+  }
   const sims = (Array.isArray(f.similar) ? f.similar : []).filter((x) => safeSrc(x.image) && String(x.href || "").startsWith("/")).slice(0, 4).map((x) =>
     `<a class="rd-sim" href="${esc(x.href)}"><img alt="" loading="lazy" src="${esc(safeSrc(x.image))}" width="44" height="62"><span><b>${esc(cleanTitle(x.name))}</b><small>${esc([x.number, money(x.price)].filter(Boolean).join(" · "))}</small></span></a>`).join("");
   const similar = sims ? `<article class="rd-card" data-bd="similar"><h3>Similar by price in this set</h3><div class="rd-sims">${sims}</div><p class="muted">${esc(`TCGplayer market, ${dayLabel(f.asOf)}`)}</p></article>` : "";

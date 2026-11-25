@@ -1085,6 +1085,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
           contentsEV: row.contentsEV,
           roiPct: row.roiPct,
           beatChance: row.beatChance,
+          sims: row.sims,
           median: row.median,
           priceSource: row.priceSource || "",
           asOf,
