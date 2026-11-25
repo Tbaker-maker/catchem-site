@@ -72,28 +72,87 @@ function dayText(value) {
   return "";
 }
 
+// Set cards carry the visitor's own count. Card and read cards carry only a
+// product id: name, price, change, source and date are read from that
+// product's data on the server, so a URL cannot put a number on the card.
 export function shareCardUrl(fields) {
   const q = new URLSearchParams();
   const kind = kindOf(fields);
   q.set("k", kind);
+  if (kind !== "set") {
+    const id = shareId(fields && fields.id);
+    if (!id) return "";
+    q.set("id", id);
+    return `${ORIGIN}/og/card.svg?${q.toString()}`;
+  }
   const name = clip(fields && fields.name, 80);
   if (name) q.set("n", name);
   const num = clip(fields && fields.num, 24);
   if (num && !/^not in the file$/i.test(num)) q.set("num", num);
-  const price = moneyText(fields && fields.price);
-  if (price) q.set("p", price.replace(/[$,]/g, ""));
-  const change = changeText(fields && fields.change);
-  if (change) q.set("c", change.replace("%", ""));
   const img = safeImagePath(fields && fields.img);
   if (img) q.set("img", img);
   const setName = clip(fields && fields.setName, 48);
   if (setName) q.set("set", setName);
   const era = clip(fields && fields.era, 32);
   if (era) q.set("era", era);
-  if (fields && fields.sealed) q.set("s", "1");
   const day = dayText(fields && fields.date);
   if (day) q.set("d", day);
   return `${ORIGIN}/og/card.svg?${q.toString()}`;
+}
+
+export function shareId(value) {
+  const m = String(value || "").trim().match(/^(?:\/[cp]\/)?(tcgcsv-\d{1,9})$/);
+  return m ? m[1] : "";
+}
+
+const DAY_MS = 86400000;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function longDay(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : "";
+}
+
+// Fields for a card or read share card, from the product's own data row.
+// Fails closed: a held price, no price, or no dated price shows no number.
+// The date is the day of the last price on file, never later.
+export function cardFieldsFromRow(row) {
+  if (!row || typeof row !== "object" || !shareId(row.id)) return null;
+  const sealed = row.kind === "sealed";
+  const out = {
+    name: clip(row.name, 80) || "Catch'em",
+    num: sealed ? "" : clip(row.num, 24),
+    setName: clip(row.set || row.ownSet, 48),
+    sealed,
+    img: safeImagePath(row.scan ? "/data/editor/tcg/" + row.scan : ""),
+    price: "",
+    change: "",
+    source: "",
+    date: "",
+    cond: "",
+  };
+  const held = row.priceStatus === "checking" || row.priceStatus === "held" || row.priceHeld === true || row.held === true;
+  const price = Number(row.price);
+  if (held || !(price > 0)) return out;
+  const hist = (Array.isArray(row.hist) ? row.hist : [])
+    .filter((p) => Array.isArray(p) && /^\d{4}-\d{2}-\d{2}$/.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
+  const asOf = dayText(row.asOf || row.priceDate);
+  const last = hist.length ? hist[hist.length - 1] : null;
+  let day = asOf;
+  if (last && (!day || last[0] < day)) day = last[0];
+  if (!day) return out;
+  out.price = moneyText(price);
+  out.date = longDay(day);
+  out.source = "TCGplayer market";
+  out.cond = !sealed && row.condition === "NM" ? "NM" : "";
+  if (last && last[0] === day && Number(last[1]) === price) {
+    const cut = new Date(Date.parse(`${day}T00:00:00Z`) - 7 * DAY_MS).toISOString().slice(0, 10);
+    const start = hist.filter((p) => p[0] <= cut).pop();
+    if (start && Number(start[1]) > 0) {
+      const c = changeText((price / Number(start[1]) - 1) * 100);
+      if (c) out.change = `${c} 7D`;
+    }
+  }
+  return out;
 }
 
 export function setCompleteShareUrl(fields = {}) {
@@ -115,15 +174,9 @@ export function setCompleteShareUrl(fields = {}) {
 
 export function readShareUrl(read) {
   if (!read || typeof read !== "object") return "";
-  return shareCardUrl({
-    kind: "read",
-    name: read.name || read.headline || "",
-    num: read.number || "",
-    price: read.price,
-    change: read.changePct,
-    img: read.image,
-    setName: read.set || "",
-  });
+  const href = String(read.href || "").match(/^\/[cp]\/(tcgcsv-\d+)$/);
+  const id = shareId(read.sku) || shareId(read.productId) || (href ? href[1] : "") || shareId(read.id);
+  return id ? shareCardUrl({ kind: "read", id }) : "";
 }
 
 function setCompleteSvg(q) {
@@ -159,19 +212,21 @@ ${dateLine}
 `;
 }
 
-export function shareSvg(search) {
+export function shareSvg(search, row = null) {
   const q = search instanceof URLSearchParams ? search : new URLSearchParams(String(search || ""));
   if (String(q.get("k") || "").toLowerCase() === "set") return setCompleteSvg(q);
-  const name = clip(q.get("n"), 80) || "Catch'em";
-  const num = clip(q.get("num"), 24);
-  const price = moneyText(q.get("p"));
-  const change = changeText(q.get("c"));
-  const img = safeImagePath(q.get("img"));
-  const setName = clip(q.get("set"), 48);
-  const era = clip(q.get("era"), 32);
+  // Name, price, change, source and date never come from the URL.
+  const f = cardFieldsFromRow(row) || { name: "Catch'em", num: "", setName: "", sealed: false, img: "", price: "", change: "", source: "", date: "", cond: "" };
+  const name = f.name;
+  const num = f.num;
+  const price = f.price;
+  const change = f.change;
+  const img = f.img;
+  const setName = f.setName;
+  const era = clip(row && row.era, 32);
   const eraColor = ERA_COLOR[era.toLowerCase()] || BRAND.gold;
   const up = change.startsWith("+");
-  const sealed = q.get("s") === "1";
+  const sealed = f.sealed;
   const changeColor = !change ? BRAND.dim : up ? BRAND.up : BRAND.dim;
   const photo = img
     ? `<image href="${xml(ORIGIN + img)}" x="56" y="78" width="280" height="392" preserveAspectRatio="xMidYMid meet" clip-path="url(#cardclip)"/>`
@@ -181,7 +236,7 @@ export function shareSvg(search) {
     : "";
   const numLine = num ? `<text x="390" y="250" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="28">${xml(num)}</text>` : "";
   const priceLine = price
-    ? `<text x="390" y="360" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="72">${xml(price)}</text><text x="390" y="408" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="22">${sealed ? "" : (q.get("cond") === "NM" ? "NM · " : "")}TCGplayer market</text>`
+    ? `<text x="390" y="360" fill="${BRAND.ink}" font-family="${BRAND.font}" font-size="72">${xml(price)}</text><text x="390" y="408" fill="${BRAND.gold}" font-family="${BRAND.font}" font-size="22">${sealed ? "" : (f.cond === "NM" ? "NM · " : "")}${xml(f.source)}, ${xml(f.date)}</text>`
     : `<text x="390" y="360" fill="${BRAND.dim}" font-family="${BRAND.font}" font-size="28">No market price on file</text>`;
   const changeLine = change
     ? `<text x="390" y="470" fill="${changeColor}" font-family="${BRAND.font}" font-size="36" font-weight="700">${xml(change)}</text>`
@@ -205,11 +260,20 @@ ${changeLine}
 `;
 }
 
-export function handleShareCard(request, url) {
-  const svg = shareSvg(url.searchParams);
+export async function handleShareCard(request, url, loadRow = null) {
+  const q = url.searchParams;
+  let row = null;
+  if (String(q.get("k") || "").toLowerCase() !== "set") {
+    const id = shareId(q.get("id"));
+    if (id && typeof loadRow === "function") {
+      try { row = await loadRow(id); } catch { row = null; }
+      if (row && shareId(row.id) !== id) row = null;
+    }
+  }
+  const svg = shareSvg(q, row);
   const headers = {
     "content-type": "image/svg+xml; charset=utf-8",
-    "cache-control": "public, max-age=86400",
+    "cache-control": row ? "public, max-age=3600" : "public, max-age=300",
     "x-content-type-options": "nosniff",
   };
   return new Response(request.method === "HEAD" ? null : svg, { status: 200, headers });
