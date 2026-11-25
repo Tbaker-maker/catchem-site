@@ -19,7 +19,7 @@ t("needle animates once", html.includes("ce-meter-swing") && html.includes("pref
 t("fear is blue and greed is gold", html.includes("#8eb7ff") && html.includes("#d9b779"));
 t("heat pill is beside the score", html.includes("Heat Cool 28") && html.includes("68"));
 t("why line uses the real numbers", html.includes("6 of 78") && html.includes("+0.1%") && html.includes("145 of 276") && html.includes("4 components") && html.includes("2026-10-19"));
-t("plain line sits under the number", html.includes('id="market-meter-plain"') && html.indexOf("Fear and greed") < html.indexOf('id="market-meter-plain"') && html.indexOf("68 <span") < html.indexOf('id="market-meter-plain"') && meterPlainExplain("2026-10-19") === "A score of how tracked sets are moving, including how many are up. Oct 19." && html.includes(meterPlainExplain("2026-10-19")) && adviceFree(meterPlainExplain("2026-10-19")) && meterPlainExplain("") === "A score of how tracked sets are moving, including how many are up.");
+t("plain line sits under the number", html.includes('id="market-meter-plain"') && html.indexOf("Price breadth") < html.indexOf('id="market-meter-plain"') && html.indexOf("68 <span") < html.indexOf('id="market-meter-plain"') && meterPlainExplain("2026-10-19") === "A score of how tracked sets are moving, including how many are up. Oct 19." && html.includes(meterPlainExplain("2026-10-19")) && adviceFree(meterPlainExplain("2026-10-19")) && meterPlainExplain("") === "A score of how tracked sets are moving, including how many are up.");
 t("no advice and no em dash", adviceFree(html) && !/[\u2014\u2013]/.test(html) && !/\b(buy|sell|load up|time to)\b/i.test(html));
 t("a missing slice draws nothing", gaugeHtml(null) === "" && gaugeHtml({ mood: null, heat: 10, heatBand: "Cold" }) === "");
 t("unpublished meter draws nothing", gaugeHtml(slice, { published: false }) === "");
@@ -42,14 +42,14 @@ const doc = {
 };
 const page = renderMeterPage(doc, { range: "1m" });
 t("meter page defaults to 1M and offers All", page.includes('href="/meter"') && page.includes('href="/meter?range=all"') && page.includes('aria-current="true"'));
-t("page has component bars and era and set rows", page.includes("Breadth") && page.includes("Sealed") && page.includes("Singles") && page.includes("Extreme fear 10") && page.includes("SV: Scarlet") && page.includes("not shown") === false);
+t("page has component bars and era and set rows", page.includes("Breadth") && page.includes("Sealed") && page.includes("Singles") && page.includes("far below the middle of its own range 10") && page.includes("SV: Scarlet") && page.includes("not shown") === false);
 t("vintage is explained and not invented", page.includes("too short for two proven inputs") && !page.includes("Vintage:"));
 const all = renderMeterPage(doc, { range: "all", set: "sv-scarlet-and-violet-151" });
 t("All and a set stay on one tap", all.includes('href="/meter?range=all&set=sv-scarlet-and-violet-151"') || all.includes('href="/meter?set=sv-scarlet-and-violet-151&range=all"') || all.includes("range=all"));
 t("empty file does not invent a score", renderMeterPage(null).includes("not on file") && !renderMeterPage(null).includes(">68<"));
 
 const mail = meterEmailBlock({ asOf: "2026-10-19", ...slice });
-t("email line matches the compact form", meterPlainLine(slice) === "Market: Greed 68, Heat: Cool" && mail.includes("Market: Greed 68, Heat: Cool"));
+t("email line matches the compact form", meterPlainLine(slice) === "Market: above the middle of its own range 68, Heat: Cool" && mail.includes("Market: above the middle of its own range 68, Heat: Cool"));
 t("email is a white table with dark hooks and no svg", mail.includes('bgcolor="#ffffff"') && mail.includes("ce-card") && mail.includes("ce-ink") && mail.includes("ce-dim") && !mail.includes("<svg") && mail.includes("6 of 78"));
 t("email block is self contained", blockAgain(slice) === "" || mail.includes("Open the meter"));
 
@@ -59,6 +59,9 @@ const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
 t("set page reserves the gauge slot", ui.includes("${opts.meterHtml || \"\"}"));
 t("/meter is a page", pageKind("/meter") === "meter");
 t("score 0 and 100 still render", gaugeHtml({ ...slice, mood: 0, moodBand: "Extreme fear" }).includes("--end:-90.0deg") && gaugeHtml({ ...slice, mood: 100, moodBand: "Extreme greed" }).includes("--end:90.0deg"));
+const scare = ["Extreme fear", "Extreme greed", "Fear", "Greed"];
+const rendered = [html, page, mail, all].join("\n");
+t("scare band names do not render", scare.every((word) => !rendered.includes(word)) && html.includes("above the middle of its own range") && page.includes("below the middle of its own range"));
 
 fail += runBrandVisualTests();
 if (fail) process.exit(1);
