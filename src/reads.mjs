@@ -6,7 +6,7 @@ import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
 import { banGuard } from "./advice-rules.mjs";
 import { SIGNAL_CSS, TILE_JS, chipForSample, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
-import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay } from "./reads-article.mjs";
+import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay, cleanPoints } from "./reads-article.mjs";
 import { entitled } from "./open-access.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
@@ -91,6 +91,7 @@ export function blankPlan() {
     lengthByDay: {},
     focus: "",
     premiumRatio: "",
+    points: [],
   };
 }
 
@@ -194,6 +195,7 @@ export function gatePlan(plan, opts = {}) {
   next.focus = plan?.focus === "vintage" ? "vintage" : "";
   const askedRatio = String(plan?.premiumRatio || "");
   next.premiumRatio = askedRatio === "below" || askedRatio === "above" ? askedRatio : "";
+  next.points = cleanPoints(plan?.points);
   next.lengthByDay = cleanLengthByDay(plan?.lengthByDay, premium === true);
   if (!premium && Object.values(plan?.lengthByDay || {}).includes("deep")) notes.push("Deep dive days are in Premium, so those days are Standard.");
   return { plan: next, notes };
@@ -271,6 +273,7 @@ export function planFromFields(fields) {
     lengthByDay: Object.fromEntries(WEEKDAYS.map((w) => [w, String(get("len_" + w) || "")]).filter((row) => row[1])),
     focus: all("focus").includes("vintage") ? "vintage" : "",
     premiumRatio: String(get("premiumRatio") || ""),
+    points: cleanPoints(all("point")),
   };
 }
 
@@ -442,6 +445,7 @@ export function planToFollow(discordId, plan) {
     news: plan?.addons?.news === true || plan?.addons?.all === true,
     games: plan?.addons?.games === true || plan?.addons?.all === true,
     premiumRatio: plan?.premiumRatio === "below" || plan?.premiumRatio === "above" ? plan.premiumRatio : "",
+    points: cleanPoints(plan?.points),
     savedAt: String(plan?.savedAt || ""),
   };
 }

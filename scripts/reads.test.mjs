@@ -1,5 +1,6 @@
 import { pageKind, renderPath } from "../src/index.mjs";
 import { bumpClick, emailLetter, emailSendAllowed, gatePlan, handleReads, planFromFields, planToFollow, preSend, renderReadsPage, sampleRead, typePlan, upsertFollow } from "../src/reads.mjs";
+import { PLAN_POINTS } from "../src/reads-article.mjs";
 
 let fail = 0;
 const t = (name, cond) => {
@@ -47,6 +48,8 @@ t("an email letter keeps a short news line and drops a long body", letter.includ
 t("email does not send without a key", emailSendAllowed({}) === false && emailSendAllowed({ READS_EMAIL_KEY: "abc" }) === true);
 t("clicks store counts only", JSON.stringify(bumpClick({ opens: 1, taps: 0, note: "secret" }, "tap")) === JSON.stringify({ opens: 1, taps: 1 }));
 t("reads is a page", pageKind("/reads") === "reads");
+const pointed = gatePlan(planFromFields(new URLSearchParams("point=breadth&point=nope&point=news")), { premium: false });
+t("a breadth point is kept in letter order and a fake id is dropped", pointed.plan.points.join(",") === "breadth,news" && planToFollow("42", pointed.plan).points.join(",") === "breadth,news" && PLAN_POINTS.indexOf("breadth") === 5 && gatePlan({}, { premium: false }).plan.points.length === 0);
 const poolLines = {
   "set:sv-prismatic-evolutions": "SV: Prismatic Evolutions: top cards on TCGplayer market are #161/131 at $1,250.07, as of Oct 17.",
   "pokemon:Umbreon": "Umbreon ex 161/131, Prismatic Evolutions is $1,250.07 on TCGplayer market, as of Oct 17.",
