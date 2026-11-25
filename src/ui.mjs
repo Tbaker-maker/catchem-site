@@ -3263,7 +3263,7 @@ function ripValueBlock(rip) {
   add("Typical opening", money(rip.median));
   if (!bits.length) return "";
   const src = [String(rip.priceSource || "").trim(), when].filter(Boolean).join(", ");
-  return `<section class="sealed-rip"><h2>Rip value</h2><dl>${bits.join("")}</dl>${src ? `<p class="muted">${esc(src)}</p>` : ""}</section>`;
+  return `<section class="sealed-rip" id="rip"><h2>Rip value</h2><dl>${bits.join("")}</dl>${src ? `<p class="muted">${esc(src)}</p>` : ""}</section>`;
 }
 
 function premiumFlagLine(card) {

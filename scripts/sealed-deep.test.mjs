@@ -35,7 +35,7 @@ const single = renderCard({ ...card, kind: "single", hist: [["2026-10-01", 70], 
   ebayAsk: { amount: 10, asOf: "2026-10-13", source: "ebay-browse-api" },
   rip: { contentsEV: 5, roiPct: 1, beatChance: 2, median: 4, asOf: "2026-10-13" },
 });
-t("a single does not take the sealed rip block", !single.includes("<h2>Rip value</h2>") && !single.includes("eBay ask $"));
+t("a single does not take the sealed rip block", !single.includes("<h2>Rip value</h2>") && !single.includes('id="rip"') && !single.includes("eBay ask $"));
 // Condition is a single-card idea. A sealed page never asks for one or talks about one.
 const sealedText = html.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<script[\s\S]*?<\/script>/g, " ");
 t("a sealed page has no condition field or condition line", !/name="condition"/.test(html) && !/\bcondition\b/i.test(sealedText.replace(/<[^>]+>/g, " ")) && !/\b(NM|Near Mint)\b/.test(sealedText.replace(/<[^>]+>/g, " ")) && html.includes('id="paid-form"'));

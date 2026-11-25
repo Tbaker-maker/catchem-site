@@ -16,4 +16,4 @@ export function openDataHref(card) {
 }
 
 // Section ids an item page can carry, in page order, with their jump labels.
-export const ITEM_SECTIONS = [["price", "Price"], ["supply", "Listings"], ["rank", "In its set"], ["stats", "Key stats"], ["reads", "Reads"], ["related", "Related"]];
+export const ITEM_SECTIONS = [["price", "Price"], ["supply", "Listings"], ["rip", "Rip value"], ["rank", "In its set"], ["stats", "Key stats"], ["reads", "Reads"], ["related", "Related"]];
