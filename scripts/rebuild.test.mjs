@@ -348,8 +348,13 @@ t("a 6-month marker needs the day 183 back", rangeMarker([["2026-09-26", 12], ["
 {
   const today = await (await renderPath("/today", fetchImpl)).text();
   const visible = today.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
-  t("today lists the morning lines and keeps the listings line off", pageKind("/today") === "today" && today.includes("<h1>Today</h1>") && today.includes("Biggest move") && today.includes("74.2%") && today.includes("$12.55") && today.includes("The listings line is off.") && today.includes("Delta Reign") && today.includes("No set move was shipped.") && today.includes("Share card") && today.includes("catchem-today.png") && !visible.includes("tcgcsv"));
+  t("today lists the morning lines and keeps the listings line off", pageKind("/today") === "today" && today.includes("<h1>Today</h1>") && today.includes("Biggest move") && today.includes("74.2%") && today.includes("$12.55") && !visible.includes("listings line is off") && today.includes("Delta Reign") && today.includes("No set move was shipped.") && today.includes("Share card") && today.includes("catchem-today.png") && !visible.includes("tcgcsv"));
   const drawn = renderToday({ asOf: "2026-10-09", supply: "on", lines: [{ slot: "supply", text: "Fewer copies listed: Unbroken Bonds Booster Box eBay listings fell 5.6% in 7 days (18 → 17)." }] }, "");
+  // Live sweep Nov 25: /today printed "The listings line is off." to readers.
+  const offDoc = { asOf: "2026-11-25", supply: "off", lines: [{ slot: "mover", text: "Mew #105: $17.57 (Nov 18) to $13.00 (Nov 25) on TCGplayer market." }, { slot: "supply", text: "Fewer copies listed: Unbroken Bonds Booster Box." }] };
+  const off = renderToday(offDoc, "");
+  const offText = off.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+  t("today with the listings line off prints no flag sentence and no listings line", off.includes("Mew #105") && !/line is off|flag/i.test(offText) && !off.includes("Fewer copies listed"));
   t("a kept listings line is the only supply sentence", drawn.includes("Fewer copies listed") && !drawn.includes("The listings line is off."));
 }
 t("a card picture is the catalogue hit for that id", cardPage.includes("/data/editor/tcg/base1/1_hires.png") && !cardPage.includes("tcgplayer-cdn.tcgplayer.com") && !cardPage.includes("images.pokemontcg.io"));
