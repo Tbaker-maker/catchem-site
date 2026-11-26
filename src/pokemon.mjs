@@ -136,7 +136,7 @@ export function withNightlyPrices(cards, rows, held, idsByCard = null) {
 // One nightly id per catalogue card: its own product id, else the one tcgcsv id
 // that shares its picture path in the public image map. Two ids on one path is
 // no match, so a card is never priced from a sibling printing. No name join.
-export function nightlyIdsByCard(cards, images) {
+export function nightlyIdsByCard(cards, images, redirects = null) {
   const byPath = new Map();
   if (images && typeof images === "object") {
     for (const [id, path] of Object.entries(images)) {
@@ -147,8 +147,11 @@ export function nightlyIdsByCard(cards, images) {
   const out = new Map();
   for (const card of Array.isArray(cards) ? cards : []) {
     const direct = nightlyIdOf(card);
+    // Catalogue redirects (redirects.json products, built nightly by Catchem-data
+    // from the same picture path join) cover cards the image map does not.
+    const moved = String((redirects && redirects[card?.id]) || "").match(/^\/c\/(tcgcsv-\d+)$/);
     const path = images && typeof images === "object" ? images[card?.id] : "";
-    const id = direct || (cardPath(path) ? byPath.get(path) || "" : "");
+    const id = direct || (moved ? moved[1] : "") || (cardPath(path) ? byPath.get(path) || "" : "");
     if (id) out.set(card.id, id);
   }
   return out;

@@ -151,13 +151,16 @@ t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/s
     "ecard2-H29": { name: "Umbreon", artist: "Mitsuhiro Arita", setName: "Aquapolis", number: "H29", price: 1252.62, priceFinish: "holofoil", priceUpdatedAt: "2026/08/22", priceSource: "tcgplayer via pokemontcg.io" },
     "ex2-24": { name: "Umbreon", artist: "Ken Sugimori", setName: "Sandstorm", number: "24", price: 200, priceFinish: "holofoil", priceUpdatedAt: "2026/08/22", priceSource: "tcgplayer via pokemontcg.io" },
     "ex11-17": { name: "Umbreon", artist: "Kagemaru Himeno", setName: "Delta Species", number: "17", price: 504.41, priceFinish: "holofoil", priceUpdatedAt: "2026/08/22", priceSource: "tcgplayer via pokemontcg.io" },
+    "neo2-13": { name: "Umbreon", artist: "Kagemaru Himeno", setName: "Neo Discovery", number: "13", price: 817.16, priceFinish: "holofoil", priceUpdatedAt: "2026/08/22", priceSource: "tcgplayer via pokemontcg.io" },
   } };
-  const attrs = { cards: { "ecard2-H29": { dex: 197 }, "ex2-24": { dex: 197 }, "ex11-17": { dex: 197 } } };
+  const redirectsDoc = { products: { "ex2-24": "/c/tcgcsv-700003" }, sets: {} };
+  const attrs = { cards: { "ecard2-H29": { dex: 197 }, "ex2-24": { dex: 197 }, "ex11-17": { dex: 197 }, "neo2-13": { dex: 197 } } };
   const images = { images: { "ecard2-H29": "/img/ecard2/H29", "tcgcsv-700001": "/img/ecard2/H29", "ex11-17": "/img/ex11/17", "tcgcsv-700002": "/img/ex11/17" } };
   const bucket = (n) => String(n % 100).padStart(2, "0");
   const rowsByBucket = {
     [bucket(700001)]: [{ id: "tcgcsv-700001", name: "Umbreon (H29)", kind: "single", price: 980.5, printing: "Holofoil", asOf: "2026-11-25", source: "TCGplayer market" }],
     [bucket(700002)]: [{ id: "tcgcsv-700002", name: "Umbreon (17)", kind: "single", price: 560, printing: "Holofoil", asOf: "2026-11-25", source: "TCGplayer market" }],
+    [bucket(700003)]: [{ id: "tcgcsv-700003", name: "Umbreon (24)", kind: "single", price: 210.25, printing: "Holofoil", asOf: "2026-11-25", source: "TCGplayer market" }],
   };
   const hold = { asOf: "2026-11-25", ids: { "tcgcsv-700002": "unverified" } };
   const fake = async (input) => {
@@ -166,6 +169,7 @@ t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/s
       : url.endsWith("data/card-attrs.json") ? attrs
       : url.endsWith("catalogue-images.json") ? images
       : url.endsWith("price-hold.json") ? hold
+      : url.endsWith("redirects.json") ? redirectsDoc
       : /buckets\/(\d\d)\.json$/.test(url) ? (rowsByBucket[url.match(/buckets\/(\d\d)\.json$/)[1]] || [])
       : null;
     return body ? new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } }) : new Response("", { status: 404 });
@@ -174,6 +178,11 @@ t("empty summary chips stay off", !bare.includes('<p class="sum-strip">') && !/s
   t("a Pokemon page prices a card from tonight's row, with tonight's date", page.includes("$980.50") && page.includes("Nov 25, 2026"));
   t("a Pokemon page never prints the catalogue import price or its Aug 22 date", !page.includes("$1,252.62") && !page.includes("$200.00") && !page.includes("Aug 22"));
   t("a held card on a Pokemon page shows no price", !page.includes("$560.00") && !page.includes("$504.41"));
+  // Catalogue redirects (Catchem-data #604) join cards the image map misses.
+  t("a Pokemon page prices a card through its catalogue redirect", page.includes("$210.25") && !page.includes("$200.00"));
+  const only = await (await renderPath("/c/neo2-13", fake, {})).text();
+  const onlyText = only.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
+  t("a catalogue-only card page never prints the import price or its date", only.includes("Umbreon") && !onlyText.includes("$817.16") && !onlyText.includes("Aug 22"));
 }
 
 if (fail) process.exit(1);
