@@ -242,7 +242,9 @@ export function shareFieldsFromProduct(card, opts = {}) {
   const priceNum = Number(card.price);
   // No price on file, no date: a date alone reads as a current price day.
   const day = priceNum > 0 ? String(card.asOf || card.priceDate || "").slice(0, 10) : "";
-  const hist = Array.isArray(card.hist) ? card.hist : [];
+  // The page says "Price being checked" when there is no price on file, so the
+  // share image draws no price line either (Generations ETB, live sweep Nov 25).
+  const hist = Array.isArray(card.hist) && priceNum > 0 ? card.hist : [];
   const points = hist
     .filter((p) => Array.isArray(p) && Number(p[1]) > 0 && !p[3])
     .slice(-36)
@@ -287,11 +289,13 @@ export async function shareListings(card, fetchImpl = fetch) {
 // numbers are real. Sold comps stay off until the comps are proven.
 // The pop line is pop.label from market depth, singles only.
 // EUR is not drawn: the bitmap font has no euro sign, and the page already shows Cardmarket.
-export function shareFactLines({ depth = null, listings = null, kind = "single" } = {}) {
+export function shareFactLines({ depth = null, listings = null, kind = "single", priceDay = "" } = {}) {
   const lines = [];
   const n = Number(listings && listings.n);
   const day = String(listings && listings.day || "").slice(0, 10);
-  if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted, ${formatDay(day)}`);
+  // A count older than the price day is the last count, not today's (live sweep Nov 25).
+  const older = SHARE_ISO.test(String(priceDay || "")) && day < String(priceDay);
+  if (Number.isFinite(n) && n >= 0 && SHARE_ISO.test(day)) lines.push(`${Math.round(n).toLocaleString("en-US")} listings counted, ${older ? "last count " : ""}${formatDay(day)}`);
   const popLabel = kind !== "sealed" ? gradedPopLabel(depth && depth.pop) : "";
   if (popLabel) lines.push(popLabel);
   return lines.slice(0, 3);
@@ -599,7 +603,7 @@ export async function handleProductShare(request, url, opts = {}) {
     try {
       const depth = typeof opts.loadDepth === "function" ? await opts.loadDepth(card) : await marketDepthFor(card, fetchImpl);
       const listings = typeof opts.loadListings === "function" ? await opts.loadListings(card) : await shareListings(card, fetchImpl);
-      facts = shareFactLines({ depth, listings, kind: card.kind === "sealed" ? "sealed" : "single" });
+      facts = shareFactLines({ depth, listings, kind: card.kind === "sealed" ? "sealed" : "single", priceDay: Number(card.price) > 0 ? String(card.asOf || "").slice(0, 10) : "" });
     } catch { facts = []; }
   }
   const png = await renderProductSharePng({ ...fields, facts });

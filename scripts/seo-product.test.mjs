@@ -17,6 +17,7 @@ const etb = `<html><head><title>Prismatic Evolutions Elite Trainer Box · Catch'
 <h1>Prismatic Evolutions Elite Trainer Box</h1>
 <div data-rv-price="49.99" data-rv-date="2026-11-11"></div>
 <img alt="Prismatic Evolutions Elite Trainer Box" loading="eager" src="/data/cutouts/sv8pt5-etb.webp">
+<div class="yr"><p class="yr-line">12-month low $40.00 (Feb 2, 2026) · high $61.00 (Jan 9, 2026)</p></div>
 <section class="item-sec" id="related"><h2>Related items</h2><div class="rel-grid"><a href="/p/tcgcsv-111"><b>Prismatic Evolutions Booster Bundle</b></a></div></section>
 </body></html>`;
 const etbMeta = addShareMeta(etb, "/p/tcgcsv-999001", "product");
@@ -27,6 +28,13 @@ t("product meta description includes set, type, price and date", etbMeta.include
 t("product canonical points at the product path", etbMeta.includes('<link rel="canonical" href="https://catchemtcg.com/p/tcgcsv-999001">'));
 t("product Open Graph and X tags use the composed PNG, not the hero", etbMeta.includes(`property="og:title" content="${etbTitle}"`) && etbMeta.includes(`property="og:description" content="${etbDesc}"`) && etbMeta.includes('property="og:type" content="product"') && etbMeta.includes('property="og:image" content="https://catchemtcg.com/og/product/tcgcsv-999001.png"') && etbMeta.includes('property="og:image:width" content="1200"') && etbMeta.includes('property="og:image:height" content="630"') && etbMeta.includes('name="twitter:card" content="summary_large_image"') && etbMeta.includes('name="twitter:image" content="https://catchemtcg.com/og/product/tcgcsv-999001.png"') && !etbMeta.includes('twitter:image" content="https://catchemtcg.com/data/cutouts/sv8pt5-etb.webp"') && !etbMeta.includes("/og/product.png?"));
 t("set name already in the product name is not repeated in the title", (etbMeta.match(/<title>([^<]*)<\/title>/)||[])[1] === etbTitle && !etbTitle.includes("SV8.5"));
+
+// Live sweep Nov 25: og:description promised a 12-month range on pages that start Oct 8.
+const young = etb.replace(/<div class="yr">[\s\S]*?<\/div>/, '<div class="yr"><p class="yr-line">Since Oct 8 low $20.76 (Nov 21) · high $400.00 (Oct 8)</p></div>');
+const youngMeta = addShareMeta(young, "/c/tcgcsv-713257", "product");
+t("a page with under a year of prices names its own range start", youngMeta.includes("Price chart, high and low since Oct 8 on Catch'em.") && !youngMeta.includes("12-month"));
+const noRange = addShareMeta(etb.replace(/<div class="yr">[\s\S]*?<\/div>/, ""), "/p/tcgcsv-999001", "product");
+t("a page with no range on file promises no range", noRange.includes("Price chart on Catch'em.") && !noRange.includes("12-month"));
 
 const product = ldOf(etbMeta, "Product");
 const crumbs = ldOf(etbMeta, "BreadcrumbList");

@@ -141,7 +141,11 @@ export function pageDescription(html, kind, name) {
   if (!market) return base;
   const typ = kind === "product" ? "sealed" : "card";
   const where = setName ? ` in ${setName}` : "";
-  return `${name} (${typ})${where}: ${market.money} TCGplayer market on ${market.date}. Price chart and 12-month range on Catch'em.`;
+  // The range is whatever the page has on file, so say its start, never a fixed 12 months.
+  const page = String(html || "");
+  const since = (page.match(/(?:High and low since|Since) ([A-Z][a-z]{2} \d{1,2}(?:, \d{4})?)(?: low\b|<|\s*$)/) || [])[1];
+  const range = /12-month (?:low|high)/.test(page) ? "Price chart and 12-month range" : since ? `Price chart, high and low since ${since}` : "Price chart";
+  return `${name} (${typ})${where}: ${market.money} TCGplayer market on ${market.date}. ${range} on Catch'em.`;
 }
 
 export function addShareMeta(html, pathname, kind) {

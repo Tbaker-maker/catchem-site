@@ -30,3 +30,14 @@ assert.equal(cleanText("Prices labeled TCGplayer market come via TCGCSV, publish
 assert.equal(cleanText("Mega Evolution\u2014Delta Reign", Y), "Mega Evolution: Delta Reign");
 assert.equal(cleanText("A \u2014 B", Y), "A, B");
 console.log("clean-text ok");
+
+// Live sweep Nov 25: home said "come from the public TCGplayer feed", other pages
+// "come from TCGplayer, published the day before the date shown". One sentence sitewide.
+{
+  const { readFileSync } = await import("node:fs");
+  const home = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const ui = readFileSync(new URL("../src/ui.mjs", import.meta.url), "utf8");
+  const said = (txt) => [...new Set((txt.match(/Prices labeled TCGplayer market come [^.<]*\./g) || []))];
+  const all = [...new Set([...said(home), ...said(ui)])];
+  assert.deepEqual(all, ["Prices labeled TCGplayer market come from TCGplayer, published the day before the date shown."]);
+}

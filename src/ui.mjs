@@ -141,6 +141,8 @@ export function withoutSoldClaim(text) {
 export function isVolumeRow(row) {
   if (!row || typeof row !== "object") return false;
   if (row.readKind !== "volume" && row.kind !== "volume") return false;
+  // Near Mint is a card condition. A sealed product never gets a volume row.
+  if (row.itemKind === "sealed" || row.productKind === "sealed" || row.sealed === true || /^\/p\//.test(String(row.href || ""))) return false;
   const s = row.sold;
   if (!s || s.source !== "TCGplayer sales via PokemonPriceTracker" || s.condition !== "Near Mint") return false;
   if (!Number.isInteger(s.count30d) || s.count30d <= 0) return false;
@@ -1727,7 +1729,7 @@ ${body}
 <nav class="dock" aria-label="Primary">
 ${dockNav(active, feed)}
 </nav>
-<footer class="site-foot"><p>Prices and counts are informational. Each number shows its source and date.</p><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come via TCGCSV, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a>${trackOpen ? ' · <a href="/track-record">Track record</a>' : ""} · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
+<footer class="site-foot"><p>Prices and counts are informational. Each number shows its source and date.</p><p>Not affiliated with Nintendo, The Pokémon Company, or Creatures.</p><p>Catch'em. From Base Set to the latest drops. Card names are © Pokémon / Nintendo / Creatures / GAME FREAK. Catch'em is a fan project and is not endorsed by them or by TCGplayer. Prices labeled TCGplayer market come from TCGplayer, published the day before the date shown.</p><p>This product uses TCGplayer data but is not endorsed or certified by TCGplayer.</p><p class="paid-foot"><small>${PAID_FOOTER}</small></p><p><a href="/methodology">How the numbers are made</a>${trackOpen ? ' · <a href="/track-record">Track record</a>' : ""} · <a href="/rotation">Rotation and print runs</a> · <a href="/status">Status</a> · <a href="mailto:support@catchemtcg.com">support@catchemtcg.com</a></p><p class="legal-links"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/disclaimer">Disclaimer</a></p>${foot}</footer>
 <script>var menuBtn=document.querySelector(".menu-btn");var siteNav=document.getElementById("site-nav");if(menuBtn&&siteNav)menuBtn.addEventListener("click",function(){var open=siteNav.classList.toggle("open");menuBtn.setAttribute("aria-expanded",open?"true":"false")});document.addEventListener("keydown",function(ev){if(ev.key!=="/"||ev.metaKey||ev.ctrlKey||ev.altKey||ev.defaultPrevented)return;var el=ev["tar"+"get"];var tag=el&&el.tagName;if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(el&&el.isContentEditable))return;var box=document.getElementById("q");if(box){ev.preventDefault();box.focus();return;}if(location.pathname!=="/search")location.href="/search";});if(window.catchemMount) catchemMount(document); else if(typeof catchemMount==="function") catchemMount(document);
 window.cropCardEdge=function(img){
   if(!img||img.getAttribute("data-cropped")==="1"||img.getAttribute("data-crop-card")!=="1") return;
@@ -2511,7 +2513,7 @@ export function changeTable(series, endDay) {
   return `<style>.chg{display:grid;grid-template-columns:repeat(${cells.length},minmax(0,1fr));gap:6px;margin:10px 0 14px;padding:6px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid #2f2b26;max-width:420px}.chg div{padding:8px 6px;border-radius:12px;text-align:center}.chg dt{font:500 12px/1.2 var(--sans);color:var(--dim)}.chg dd{margin:3px 0 0;font:650 15px/1.2 var(--sans)}.chg .up{color:#7fc79a}.chg .down{color:#e0877a}</style><dl class="chg" aria-label="Price change">${cells.map(([label, n]) => `<div><dt>${label}</dt><dd class="${n > 0 ? "up" : n < 0 ? "down" : ""}">${n > 0 ? "+" : ""}${n}%</dd></div>`).join("")}</dl><p class="chg-src muted" style="margin:-8px 0 12px;font-size:13px">Change in TCGplayer market price${priceDay(endDay) ? ` to ${esc(priceDay(endDay).replace(/, \d{4}$/, ""))}` : ""}${infoTap(`TCGplayer market price, our dated nightly files${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`;
 }
 
-function summaryStrip({ nm = false, prefix = "", price = "", year = null, listings = null, rotation = "" } = {}) {
+function summaryStrip({ nm = false, prefix = "", price = "", priceDate = "", year = null, listings = null, rotation = "" } = {}) {
   const bits = [];
   const tag = String(prefix || (nm ? "NM" : "")).trim();
   if (price) bits.push(`<span class="sum-chip">${tag ? `${esc(tag)} ` : ""}${esc(price)}</span>`);
@@ -2531,7 +2533,9 @@ function summaryStrip({ nm = false, prefix = "", price = "", year = null, listin
     const fromBit = Number.isFinite(Number(listings.from)) && Number(listings.from) >= 0 && fromShort ? `, from ${Number(listings.from).toLocaleString("en-US")} on ${esc(fromShort)}` : "";
     const win = Number.isFinite(pct) && days > 0 && listings.prevDay ? { tag: `${days}D`, said: `over ${days} days, since ${esc(fromWhen || priceDay(listings.prevDay))}` } : null;
     const arrow = !win ? "" : pct === 0 ? `<span class="sum-arrow" aria-label="Flat ${win.said}">\u2192 0% ${win.tag}</span>` : `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(pct)}% ${win.said}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(pct)}% ${win.tag}</span>`;
-    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${short ? `, ${esc(short)}` : ""}${fromBit}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${short ? `, ${short}` : ""}`)}</span>`);
+    // An older count beside today's price says it is the last count, not today's.
+    const older = price && /^\d{4}-\d{2}-\d{2}$/.test(String(priceDate || "")) && String(listings.day).slice(0, 10) < String(priceDate);
+    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${short ? `, ${older ? "last count " : ""}${esc(short)}` : ""}${fromBit}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${short ? `, ${short}` : ""}`)}</span>`);
     listed = true;
   }
   if (rotation) bits.push(`<span class="sum-chip">${esc(rotation)}</span>`);
@@ -3044,6 +3048,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const strip = summaryStrip({
     prefix: view.selected ? view.selected.key : conditionPrefix(card, held),
     price: held ? "" : showPrice,
+    priceDate: endDay,
     listings: pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings, "single"),
     rotation: rotationChipLabel(opts.rotationFact),
   });
@@ -3326,6 +3331,7 @@ export function renderCard(card, stamp, opts = {}) {
   const sealedListings = pageListings(fact, opts.listingSeries, endDay, opts.itemListings, "sealed");
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
+    priceDate: endDay,
     listings: sealedListings,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";

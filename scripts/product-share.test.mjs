@@ -181,6 +181,7 @@ const heldFields = shareFieldsFromProduct({ ...card, priceStatus: "checking" });
 const noPriceFields = shareFieldsFromProduct({ ...card, price: null, asOf: "2026-11-25", hist: [["2026-10-16", 30], ["2026-11-15", 40]] });
 assert.equal(noPriceFields.price, "");
 assert.equal(noPriceFields.date, ""); // no price on file means no date on the share image
+assert.deepEqual(noPriceFields.points, []); // and no price line: the page says Price being checked
 assert.equal(heldFields.price, "");
 assert.deepEqual(heldFields.points, []);
 const heldPng = await renderProductSharePng({ ...heldFields, facts: [] });
@@ -256,4 +257,7 @@ const holdDown = await handleProductShare(new Request(holdUrl), holdUrl, {
 assert.equal(holdDown.status, 200);
 assert.equal(Buffer.from(new Uint8Array(await holdDown.arrayBuffer())).equals(Buffer.from(blankPng)), true);
 
+// Live sweep Nov 25: the share image printed "31 LISTINGS COUNTED, NOV 6, 2026" under the Nov 25 price.
+assert.equal(shareFactLines({ listings: { n: 31, day: "2026-11-06" }, priceDay: "2026-11-25" })[0].includes("last count"), true);
+assert.equal(shareFactLines({ listings: { n: 31, day: "2026-11-25" }, priceDay: "2026-11-25" })[0].includes("last count"), false);
 console.log("product-share ok");
