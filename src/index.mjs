@@ -8,7 +8,7 @@ import { isFeedPath, loadLatestFeed, redirectPath } from "./feed.mjs";
 import { itemReadBlock } from "./item-read.mjs";
 import { msrpOf } from "./msrp.mjs";
 import { applySetSpark } from "./set-spark.mjs";
-import { bucketRow, bucketRows, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
+import { bucketRow, bucketRows, bucketRowsKvFirst, bucketOf, longHistOf, loadJson, loadReadFacts, loadItemRead, loadSetIndexes, loadCatalogue, loadDive, loadDiveIndex, loadPokemonBundle, loadFeedNews, proxyPublic, fetchRepo, smallJson, idBucket, setRawKv, seedProdRowsFromBucket, warmBucket, publicDataVersion, setDataVersion, currentDataVersion } from "./data.mjs";
 import { editorDocument, patchedPaper, pocketDocument, pocketImageUrl, PAPER_PATH, POCKET_PATH, POCKET_IMG_PREFIX } from "./full-editor.mjs";
 import { BUILD_SHA, liveStamp } from "./build-stamp.mjs";
 import { beginDiscord, finishDiscord, handleSession, handleSignIn, inviteOnlyDocument, logout, officeAllowed } from "./auth.mjs";
@@ -40,7 +40,7 @@ const withChartKit = (page) => {
 };
 import { practicePool, practiceSets, packArt } from "./practice.mjs";
 import { listingsBlock, listingsEntry, notMovedBlock, rotationBadge, rotationRow, setValueBlock, SET_PAIRS } from "./features.mjs";
-import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip } from "./pokemon.mjs";
+import { setAffiliateConfig, speciesPageToken, pokemonSlug, nightlyIdsForPage, nightlySpeciesStrip, nightlyIdsByCard, withNightlyPrices } from "./pokemon.mjs";
 import { cardArtHtml, cardMarkBadge, setChipHtml, watchlistBody } from "./ir-cycle.mjs";
 import { ratingPanel, shardOf } from "./card-rating.mjs";
 import { indexListBody, indexPageBody } from "./indexes.mjs";
@@ -840,7 +840,13 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         return html(renderNotFound(stamp, pageOpts), 404);
       }
       const images = await catalogueMap(fetchImpl);
-      const cards = page.cards.map((card) => { const pic = officialSrc({ id: card.id, kind: "single", tcgPlayerId: card.tcgPlayerId || "" }, images); return { ...card, image: pic.src, imageAlts: pic.alts }; });
+      const idsByCard = nightlyIdsByCard(page.cards, images);
+      const ids = [...new Set(idsByCard.values())];
+      // Tonight's row per card: FEED_KV first, then one bucket text per bucket.
+      const rows = await bucketRowsKvFirst(ids, fetchImpl).catch(() => new Map());
+      const hold = await loadJson("price-hold.json", fetchImpl).catch(() => null);
+      const priced = withNightlyPrices(page.cards, rows, hold?.ids, idsByCard);
+      const cards = priced.map((card) => { const pic = officialSrc({ id: card.id, kind: "single", tcgPlayerId: card.tcgPlayerId || "" }, images); return { ...card, image: pic.src, imageAlts: pic.alts }; });
       return html(renderPokemon({ ...page, cards }, stamp, pageOpts));
     } catch {
       return html(`<main class="wrap"><h1>Not in the catalog</h1><p class="muted">The catalog did not load.</p><p><a href="/search">Search</a></p></main>`, 200);

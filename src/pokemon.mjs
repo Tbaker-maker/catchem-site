@@ -116,6 +116,44 @@ export function nightlyIdsForPage(page, images, rows) {
   return out;
 }
 
+// A Pokémon page prices each card from tonight's bucket row only. The catalogue
+// price is an old import snapshot (tcgplayer via pokemontcg.io), so it is never
+// shown. No nightly row, a sealed row, no dated price, or a held id: no price.
+export function withNightlyPrices(cards, rows, held, idsByCard = null) {
+  const get = (id) => (rows instanceof Map ? rows.get(id) : rows ? rows[id] : null);
+  const hold = held && typeof held === "object" ? held : {};
+  return (Array.isArray(cards) ? cards : []).map((card) => {
+    const id = (idsByCard instanceof Map && idsByCard.get(card?.id)) || nightlyIdOf(card);
+    const row = id ? get(id) : null;
+    const price = Number(row?.price);
+    const date = String(row?.asOf || "").slice(0, 10);
+    const ok = row && row.kind !== "sealed" && price > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date) && !hold[id];
+    if (!ok) return { ...card, price: null, priceDate: "", finish: "", source: "" };
+    return { ...card, price, priceDate: date, finish: String(row.printing || "").trim(), source: "TCGplayer market" };
+  });
+}
+
+// One nightly id per catalogue card: its own product id, else the one tcgcsv id
+// that shares its picture path in the public image map. Two ids on one path is
+// no match, so a card is never priced from a sibling printing. No name join.
+export function nightlyIdsByCard(cards, images) {
+  const byPath = new Map();
+  if (images && typeof images === "object") {
+    for (const [id, path] of Object.entries(images)) {
+      if (!/^tcgcsv-\d+$/.test(id) || !cardPath(path)) continue;
+      byPath.set(path, byPath.has(path) ? "" : id);
+    }
+  }
+  const out = new Map();
+  for (const card of Array.isArray(cards) ? cards : []) {
+    const direct = nightlyIdOf(card);
+    const path = images && typeof images === "object" ? images[card?.id] : "";
+    const id = direct || (cardPath(path) ? byPath.get(path) || "" : "");
+    if (id) out.set(card.id, id);
+  }
+  return out;
+}
+
 // Price range for one Pokémon page from tonight's quotes only. A catalogue
 // price on the card is not used. A quote needs a price and a date.
 export function nightlySpeciesStrip(page, quotes, ids) {
