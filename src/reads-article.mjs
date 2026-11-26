@@ -13,6 +13,14 @@ import { patternBarsEmail, patternFromGate } from "./pattern-track.mjs";
 import { flagForItem, flagWord } from "./premium-ratio.mjs";
 import { meterEmailBlock, meterPlainLine } from "./market-meter.mjs";
 
+// Same order as Catchem-data scripts/lib/custom-reads.mjs PLAN_POINTS.
+export const PLAN_POINTS = ["top", "group", "up", "down", "listings", "breadth", "sets", "vintage", "pattern", "rotation", "news"];
+
+export function cleanPoints(points) {
+  const asked = new Set((Array.isArray(points) ? points : []).map(String));
+  return PLAN_POINTS.filter((id) => asked.has(id));
+}
+
 const GUARD = banGuard("email article");
 export const SITE = "https://catchemtcg.com";
 export const LENGTHS = ["glance", "standard", "deep"];
@@ -690,6 +698,7 @@ export function followFromPlan(plan, sendDay = "") {
     product: p.product === "sealed" || p.sealed === true ? "sealed" : "singles",
     focus: p.focus === "vintage" ? "vintage" : "",
     premiumRatio: p.premiumRatio === "below" || p.premiumRatio === "above" ? p.premiumRatio : "",
+    points: cleanPoints(p.points),
     length: pickLength.length,
     weekday: pickLength.weekday,
   };
