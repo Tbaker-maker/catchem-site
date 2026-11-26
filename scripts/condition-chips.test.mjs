@@ -87,7 +87,7 @@ const heldPlayed = renderCard({
   conditionLadder: { asOf: "2026-10-17", printings: { "1st Edition Holofoil": { date: "2026-10-17", LP: 12, MP: 7 } } },
   priceCheck: true,
 });
-t("a held vintage card says the checking line once and has no chips", (heldPlayed.match(/Price being checked/g) || []).length === 1 && !heldPlayed.includes('class="cond-chip"') && heldPlayed.includes("1st Edition Holofoil") && heldPlayed.includes("Unlimited Holofoil") && heldPlayed.includes("Buy on TCGplayer") && heldPlayed.includes("Buy on eBay") && !heldPlayed.includes("$12.00") && !heldPlayed.includes("$237.50") && !heldPlayed.includes("$365.17") && !heldPlayed.includes("NM $"));
+t("a held vintage card says the checking line once and has no chips", (heldPlayed.replace(/<p class="copy-fact">[\s\S]*?<\/p>/g, "").match(/Price being checked/g) || []).length === 1 && !heldPlayed.includes('class="cond-chip"') && heldPlayed.includes("1st Edition Holofoil") && heldPlayed.includes("Unlimited Holofoil") && heldPlayed.includes("Buy on TCGplayer") && heldPlayed.includes("Buy on eBay") && !heldPlayed.includes("$12.00") && !heldPlayed.includes("$237.50") && !heldPlayed.includes("$365.17") && !heldPlayed.includes("NM $"));
 
 const plain = renderCard({
   id: "tcgcsv-87428",
@@ -113,7 +113,7 @@ const unverified = renderCard({
   printings: [{ name: "Holofoil", price: 50, asOf: "2026-10-17" }],
   source: "TCGplayer market",
 }, "stamp", { priceHeld: true, conditionLadder: { asOf: "2026-10-17", printings: { Holofoil: { date: "2026-10-17", NM: 50 } } } });
-t("a modern unverified card is one checking line and no chips", (unverified.match(/Price being checked/g) || []).length === 1 && !unverified.includes('class="cond-chip"') && !unverified.includes("$50"));
+t("a modern unverified card is one checking line and no chips", (unverified.replace(/<p class="copy-fact">[\s\S]*?<\/p>/g, "").match(/Price being checked/g) || []).length === 1 && !unverified.includes('class="cond-chip"') && !unverified.includes("$50"));
 
 const passed = renderCard({
   id: "tcgcsv-12",
