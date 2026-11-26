@@ -270,7 +270,7 @@ export function factCards(f) {
   if (r && r.high && r.low && dayLabel(r.high.date) && dayLabel(r.low.date) && r.high.date !== r.low.date) {
     const lines = [
       `High ${money(r.high.price)} on ${dayLabel(r.high.date)}. Low ${money(r.low.price)} on ${dayLabel(r.low.date)}.`,
-      r.daysSinceHigh > 0 && Number.isFinite(r.fromHighPct) ? `${r.daysSinceHigh} days since the last high, now ${Math.abs(r.fromHighPct)}% under it.` : (r.daysSinceHigh === 0 ? "At its high on file tonight." : ""),
+      r.daysSinceHigh > 0 && Number.isFinite(r.fromHighPct) ? `${r.daysSinceHigh} ${r.daysSinceHigh === 1 ? "day" : "days"} since the last high, now ${Math.abs(r.fromHighPct)}% under it.` : (r.daysSinceHigh === 0 ? "At its high on file tonight." : ""),
       f.rank && f.rank.rank > 0 ? `No. ${f.rank.rank} of ${f.rank.of} by price in ${f.rank.set}.` : "",
     ].filter(Boolean);
     range = `<article class="rd-card" data-bd="range"><h3>${esc(dayLabel(r.from) ? `High and low since ${shortDay(r.from)}` : "High and low")}</h3>${lines.map((x) => `<p>${esc(x)}</p>`).join("")}<p class="muted">${esc(`TCGplayer market, ${dayLabel(r.from)} to ${dayLabel(r.now?.date || f.asOf)}`)}</p></article>`;
