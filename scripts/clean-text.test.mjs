@@ -41,3 +41,11 @@ console.log("clean-text ok");
   const all = [...new Set([...said(home), ...said(ui)])];
   assert.deepEqual(all, ["Prices labeled TCGplayer market come from TCGplayer, published the day before the date shown."]);
 }
+
+// Live sweep 2, Nov 25: copy fact printed "catchemtcg.com/p/TCGplayer-279606", a dead link.
+{
+  assert.equal(cleanText("Tin: $51.77 TCGplayer market, Nov 25. catchemtcg.com/p/tcgcsv-279606"), "Tin: $51.77 TCGplayer market, Nov 25. catchemtcg.com/p/tcgcsv-279606");
+  assert.equal(cleanText("Prices come via TCGCSV"), "Prices come from TCGplayer");
+  assert.equal(cleanText("Source: tcgcsv nightly"), "Source: TCGplayer nightly");
+}
+console.log("copy fact links keep their product id");

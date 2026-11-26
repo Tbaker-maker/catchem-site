@@ -39,4 +39,10 @@ t("empty facts hide sections", !readSheet({ id: "x", name: "X" }, { facts: { id:
 const chart = historyChart([["2026-10-01", 5, "n"], ["2026-10-03", 6, "n"]]);
 t("no About this chart box", !chart.includes("About this chart") && !chart.includes("hc-about"));
 t("tooltip names the source", chart.includes("srcOf(p)") || !chart.includes("<script"));
+// Live sweep 2, Nov 25: "1 days since the last high" on /c/tcgcsv-98146.
+{
+  const { factCards } = await import("../src/read-sheet.mjs");
+  const one = factCards({ range: { from: "2024-02-08", high: { price: 27.36, date: "2026-11-24" }, low: { price: 13.43, date: "2024-07-04" }, daysSinceHigh: 1, fromHighPct: -2.6, now: { price: 26.65, date: "2026-11-25" } } });
+  t("one day since the last high is singular", one.range.includes("1 day since the last high") && !one.range.includes("1 days"));
+}
 if (fail) process.exit(1);

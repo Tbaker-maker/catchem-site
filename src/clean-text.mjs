@@ -38,7 +38,9 @@ export function cleanText(t, nowYear) {
   s = s.replace(/[.,]?\s*\bebay-browse-api\b\.?/gi, (m) => (m.trim().startsWith(".") ? "." : ""));
   s = s.replace(/\b(comes?|came)\s+via\s+TCGCSV\b/gi, "$1 from TCGplayer");
   s = s.replace(/\s+via\s+TCGCSV\b/gi, "");
-  s = s.replace(/\bTCGCSV\b/gi, "TCGplayer");
+  // A product id in a path or URL (catchemtcg.com/p/tcgcsv-279606) is a link,
+  // not a source name. Renaming it broke every copied fact link (live Nov 25).
+  s = s.replace(/(?<![\w/])TCGCSV\b(?!-\d)/gi, "TCGplayer");
   // ISO date (not inside a longer token)
   s = s.replace(/(?<![\w/-])(\d{4}-\d{2}-\d{2})(?![\w/-])/g, (iso) => niceDay(iso, nowYear));
   s = s.replace(/TCGplayer(?:\s+TCGplayer)+/g, "TCGplayer").replace(/\s{2,}/g, " ");
