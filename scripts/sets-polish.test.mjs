@@ -20,4 +20,9 @@ t("no-parent set gets a gradient name tile", sets.includes('<span class="set-til
 t("official logos stay", sets.includes('src="/img/me3/logo.png"'));
 t("no micro brand label in tiles", !/set-tile[^]*?Catch'em<\/span>/.test(sets.split("</main>")[0].split("<h1>Sets</h1>")[1] || ""));
 t("set list script carries the split", renderSetShell("x", "s", {}).includes("function splitName"));
+// Live sweep 2, Nov 25: /sets printed "e-Reader Sample Cards ... 1 cards".
+{
+  const one = renderSets({ sets: [{ slug: "e-reader-sample-cards", name: "e-Reader Sample Cards", era: "WOTC", single: 1, sealed: 0, release: "2002-08-01" }] }, "");
+  t("a set with one card says 1 card", one.includes(">1 card<") && !one.includes("1 cards"));
+}
 if (fail) process.exit(1);

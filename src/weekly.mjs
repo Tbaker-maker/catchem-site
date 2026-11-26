@@ -41,7 +41,8 @@ export function listingFields(row) {
   const prev = Number(row?.prev ?? row?.fromN);
   return {
     id: String(row?.id || "").trim(),
-    name: String(row?.name || row?.id || "").trim(),
+    // No name means no row (listingItem drops it). An id is never shown as a name.
+    name: String(row?.name || "").trim(),
     kind: isSealed(row) ? "sealed" : "single",
     date,
     prevDate,
@@ -165,7 +166,7 @@ function listingItem(row) {
   const href = productHref(f.id, f.kind);
   const pct = f.prev > 0 ? Math.round(((f.n - f.prev) / f.prev) * 1000) / 10 : null;
   const change = pct == null ? "" : `, ${pct > 0 ? "+" : ""}${pct}%`;
-  const text = `${f.name}: ${f.n} listings counted on ${dayLabel(f.date)}, from ${f.prev} on ${dayLabel(f.prevDate)}${change}.`;
+  const text = `${f.name}: ${f.n} ${f.n === 1 ? "listing" : "listings"} counted on ${dayLabel(f.date)}, from ${f.prev} on ${dayLabel(f.prevDate)}${change}.`;
   const inner = `<span><b>${esc(text)}</b></span>`;
   const post = href ? makePostLink({
     ids: f.id,

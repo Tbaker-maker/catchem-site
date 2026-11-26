@@ -1861,7 +1861,7 @@ export function renderSets(index, stamp, opts = {}) {
     const when = monthYear(s.release);
     const cards = Number(s.single) || 0;
     const sealed = Number(s.sealed) || 0;
-    const count = [cards ? `${cards.toLocaleString("en-US")} cards` : "", sealed ? `${sealed} sealed` : ""].filter(Boolean).join(" · ");
+    const count = [cards ? `${cards.toLocaleString("en-US")} ${cards === 1 ? "card" : "cards"}` : "", sealed ? `${sealed} sealed` : ""].filter(Boolean).join(" · ");
     return `<a class="sb-card" data-name="${esc(String(s.name || "").toLowerCase())}" data-release="${esc(s.release || "")}" data-sealed="${sealed}" data-value="${Number(s.value) > 0 ? Number(s.value) : 0}" href="/sets/${esc(s.slug)}">${face}<span class="sb-name">${esc(s.name)}</span><span class="sb-meta">${when ? `<span>${esc(when)}</span>` : ""}<span class="sb-pill">${esc(ERA_SHORT[s.era] || s.era)}</span></span>${count ? `<span class="sb-count">${esc(count)}</span>` : ""}</a>`;
   };
   const byNew = (a, b) => String(b.release || "").localeCompare(String(a.release || ""));
