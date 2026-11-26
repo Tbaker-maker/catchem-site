@@ -1647,6 +1647,8 @@ const worker = {
         try { preview = await loadJson("reads-preview.json", fetchImpl); } catch { preview = null; }
         let chipDoc = null;
         try { chipDoc = await loadJson("signal-chips.json", fetchImpl); } catch { chipDoc = null; }
+        let breadth = null;
+        try { breadth = await loadJson("feed/mood-gap.json", fetchImpl); } catch { breadth = null; }
         reads = {
           plan: stored,
           signedIn: !!viewer?.sub,
@@ -1663,6 +1665,7 @@ const worker = {
           sealed: url.searchParams.get("sealed") || "",
           picker: readsPickerEnabled(env),
           preview: preview && preview.lines ? { lines: preview.lines, chip: chipDoc?.preview || null, chips: chipDoc || null } : null,
+          breadth,
         };
       }
       let premium = false;

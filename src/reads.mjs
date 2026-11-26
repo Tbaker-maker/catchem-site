@@ -3,10 +3,10 @@
 
 import { readUser } from "./quota.mjs";
 import { FOLLOWS_KEY, readsPipeReady } from "./reads-pipe.mjs";
-import { banGuard } from "./advice-rules.mjs";
+import { banGuard, hasAdvice } from "./advice-rules.mjs";
 import { SIGNAL_CSS, TILE_JS, chipForSample, signalRowHtml } from "./signal-chips.mjs";
 import { clearEmailChoice, rememberEmail, validEmail } from "./reads-email.mjs";
-import { WEEKDAYS, WEEKDAY_NAMES, cleanLength, cleanLengthByDay, cleanPoints } from "./reads-article.mjs";
+import { WEEKDAYS, WEEKDAY_NAMES, breadthSectionHtml, cleanLength, cleanLengthByDay, cleanPoints, PLAN_POINTS } from "./reads-article.mjs";
 import { entitled } from "./open-access.mjs";
 // Shared advice-phrase rules (Catchem-data rules/advice-phrases.json). Flag, never rewrite.
 const READ_GUARD = banGuard("read");
@@ -92,6 +92,7 @@ export function blankPlan() {
     focus: "",
     premiumRatio: "",
     points: [],
+    letterName: "",
   };
 }
 
@@ -101,6 +102,7 @@ export const PRESETS = [
   { id: "chase", label: "Chase card hunter", note: "Illustration Rares and SIRs, Glance read." },
   { id: "vintage", label: "Vintage fan", note: "WOTC era cards, before mid 2003." },
   { id: "completer", label: "Set completer", note: "Your set, Deep dive read." },
+  { id: "breadth", label: "Market breadth", note: "Adds market breadth when that public file is on." },
 ];
 
 export const LENGTH_CHOICES = [
@@ -124,6 +126,12 @@ function cleanList(value, cap = 25) {
 function productId(value) {
   const id = String(value || "").trim();
   return /^tcgcsv-[A-Za-z0-9-]+$/.test(id) ? id : "";
+}
+
+export function cleanLetterName(value) {
+  const text = String(value || "").replace(/[\u2014\u2013]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+  if (!text || hasAdvice(text)) return "";
+  return text;
 }
 
 export function followCount(plan) {
@@ -196,6 +204,7 @@ export function gatePlan(plan, opts = {}) {
   const askedRatio = String(plan?.premiumRatio || "");
   next.premiumRatio = askedRatio === "below" || askedRatio === "above" ? askedRatio : "";
   next.points = cleanPoints(plan?.points);
+  next.letterName = cleanLetterName(plan?.letterName);
   next.lengthByDay = cleanLengthByDay(plan?.lengthByDay, premium === true);
   if (!premium && Object.values(plan?.lengthByDay || {}).includes("deep")) notes.push("Deep dive days are in Premium, so those days are Standard.");
   return { plan: next, notes };
@@ -274,6 +283,7 @@ export function planFromFields(fields) {
     focus: all("focus").includes("vintage") ? "vintage" : "",
     premiumRatio: String(get("premiumRatio") || ""),
     points: cleanPoints(all("point")),
+    letterName: cleanLetterName(get("letter_name")),
   };
 }
 
@@ -537,6 +547,11 @@ export function renderReadsPage(state = {}) {
   const beacon = signedIn
     ? `<script>fetch("/api/reads/click",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"open",id:"reads"})}).catch(function(){});</script>`
     : "";
+  const breadthHtml = breadthSectionHtml(state.breadth, { on: true });
+  const letterName = cleanLetterName(shown.letterName);
+  const pointOn = new Set(cleanPoints(shown.points));
+  const keptPoints = PLAN_POINTS.filter((id) => id !== "breadth" && pointOn.has(id)).map((id) => `<input type="hidden" name="point" value="${esc(id)}">`).join("");
+  const group = (title, key, count, inner) => `<details class="rd-group"><summary>${esc(title)} <span class="rd-count" data-count-for="${esc(key)}">${count}</span></summary>${inner}</details>`;
   return `<main id="main" tabindex="-1" class="rd-wrap">
 <style>
 .rd-wrap{max-width:440px;margin:0 auto;padding:16px 14px 96px;background:#f2f2f7;color:#1c1c1e;border-radius:28px}
@@ -559,12 +574,27 @@ export function renderReadsPage(state = {}) {
 .rd-day{border:0;margin:0 0 10px;padding:0}
 .rd-day legend{font-size:13px;color:#636366;margin:0 0 6px;padding:0}
 .rd-mail input{display:block;width:100%;box-sizing:border-box;min-height:44px;margin-top:6px;border:0;border-radius:16px;background:#f2f2f7;padding:0 14px;font-size:16px}
+.rd-wrap{display:flex;flex-direction:column}
+#rd-form{order:1}
+#rd-preview{order:2}
+.rd-group{margin:0 0 10px;border-radius:16px;background:#f8f8fa;padding:4px 12px}
+.rd-group>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;cursor:pointer}
+.rd-group:not([open]) > :not(summary){display:none}
+.rd-count{min-width:28px;text-align:center;border-radius:999px;background:#e5e5ea;color:#1c1c1e;font:600 13px/28px var(--sans,system-ui);padding:0 8px}
+@media (min-width:1280px){
+  .rd-wrap{max-width:1100px;display:grid;grid-template-columns:minmax(0,1fr) 380px;align-items:start}
+  .rd-wrap>h1,.rd-wrap>.rd-note{grid-column:1 / -1}
+  #rd-form{order:0;grid-column:1}
+  #rd-preview{order:0;grid-column:2;position:sticky;top:12px}
+}
 </style>
 <h1>Your reads</h1>
 <section class="rd-card" id="rd-preview">
 <h2 id="rd-sample-h">${sampleHead}</h2>
+<p class="rd-note" id="rd-letter-name">${esc(letterName || "Untitled letter")}</p>
 <p class="rd-sample" id="rd-sample">${esc(sample)}</p>
 <p class="rd-note" id="rd-sample-note">${sampleNote}</p>
+${breadthHtml ? `<div id="rd-breadth"${(shown.points || []).includes("breadth") ? "" : " hidden"}>${breadthHtml}</div>` : ""}
 <style>${SIGNAL_CSS}</style>
 <div id="rd-chip">${matched ? signalRowHtml(matched, { href: "", light: true, asOf }) : ""}</div>
 <script>${TILE_JS}</script>
@@ -592,42 +622,20 @@ ${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
 <h2>Quick start</h2>
 <div class="rd-chips">${PRESETS.map((row) => `<button type="button" class="rd-preset" data-preset="${row.id}" title="${esc(row.note)}">${esc(row.label)}</button>`).join("")}</div>
 <p class="rd-note" id="rd-preset-note">Tap one to fill the picks below. Nothing saves until you tap Save.</p>
-<h2>Sets</h2>
-<p class="rd-rec">Recommended starts on ME: 30th Celebration. Tap to change it.</p>
-<div class="rd-chips">${SET_CHOICES.map((row) => choice("set", row.slug, row.name, (shown.sets || []).includes(row.slug))).join("")}</div>
-<h2>Pokemon</h2>
-<div class="rd-chips">${POKEMON_CHOICES.map((name) => choice("pokemon", name, name, (shown.pokemon || []).includes(name))).join("")}</div>
-<h2>Rarity</h2>
-<div class="rd-chips">${RARITIES.map((name) => choice("rarity", name, name, (shown.rarities || []).includes(name))).join("")}</div>
-<h2>Era</h2>
-<div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}${choice("focus", "vintage", "Vintage, WOTC era", shown.focus === "vintage")}</div>
-<h2>Generation</h2>
-<div class="rd-chips">${GENERATIONS.map((row) => choice("generation", row[0], row[1], (shown.generations || []).includes(row[0]))).join("")}</div>
-<h2>Artist</h2>
-<p class="rd-note">Only cards with an illustrator credit on file show up here.</p>
-<div class="rd-chips">${ARTIST_CHOICES.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div>
-<details class="rd-more"${ARTIST_MORE.some((row) => (shown.artists || []).includes(row.slug)) ? " open" : ""}><summary>More artists</summary><div class="rd-chips">${ARTIST_MORE.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div></details>
-<h2>Premium ratio</h2>
-<div class="rd-chips">${radio("premiumRatio", "all", "All", shown.premiumRatio !== "below" && shown.premiumRatio !== "above", false)}${radio("premiumRatio", "below", "Below its usual premium only", shown.premiumRatio === "below", false)}${radio("premiumRatio", "above", "Above its usual premium only", shown.premiumRatio === "above", false)}</div>
-<p class="rd-note">All keeps every read. The other two keep only reads with that flag. A single uses its set booster box. A set with no booster box stays out of both.</p>
-<h2>Singles or sealed</h2>
-<div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>
-${keep ? `<h2>Your watchlist</h2><div class="rd-chips">${keep}</div>` : ""}
-<h2>How often</h2>
-<div class="rd-chips">
-${radio("frequency", "daily", "Daily", shown.frequency === "daily", !premium)}
-${radio("frequency", "weekly", "Weekly", (shown.frequency || "weekly") === "weekly", false)}
-${radio("frequency", "monthly", "Monthly", shown.frequency === "monthly", !premium)}
-${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", !premium)}
-</div>
+<label class="rd-mail">Name your letter<input type="text" name="letter_name" maxlength="60" autocomplete="off" value="${esc(letterName)}"></label>
+${group("Sets", "set", (shown.sets || []).length, `<p class="rd-rec">Recommended starts on ME: 30th Celebration. Tap to change it.</p><div class="rd-chips">${SET_CHOICES.map((row) => choice("set", row.slug, row.name, (shown.sets || []).includes(row.slug))).join("")}</div>`)}
+${group("Pokemon", "pokemon", (shown.pokemon || []).length, `<div class="rd-chips">${POKEMON_CHOICES.map((name) => choice("pokemon", name, name, (shown.pokemon || []).includes(name))).join("")}</div>`)}
+${group("Rarity", "rarity", (shown.rarities || []).length, `<div class="rd-chips">${RARITIES.map((name) => choice("rarity", name, name, (shown.rarities || []).includes(name))).join("")}</div>`)}
+${group("Era", "era", (shown.eras || []).length + (shown.focus === "vintage" ? 1 : 0), `<div class="rd-chips">${ERAS.map((name) => choice("era", name, name, (shown.eras || []).includes(name))).join("")}${choice("focus", "vintage", "Vintage, WOTC era", shown.focus === "vintage")}</div>`)}
+${group("Generation", "generation", (shown.generations || []).length, `<div class="rd-chips">${GENERATIONS.map((row) => choice("generation", row[0], row[1], (shown.generations || []).includes(row[0]))).join("")}</div>`)}
+${group("Artist", "artist", (shown.artists || []).length, `<p class="rd-note">Only cards with an illustrator credit on file show up here.</p><div class="rd-chips">${ARTIST_CHOICES.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div><details class="rd-more"${ARTIST_MORE.some((row) => (shown.artists || []).includes(row.slug)) ? " open" : ""}><summary>More artists</summary><div class="rd-chips">${ARTIST_MORE.map((row) => choice("artist", row.slug, row.name, (shown.artists || []).includes(row.slug))).join("")}</div></details>`)}
+${group("Letter sections", "point", pointOn.has("breadth") ? 1 : 0, `<p class="rd-note">Sections stay in one fixed order. Market breadth is the only section this round. A saved section that is not ready yet stays on the plan and is not shown as a blank block.</p><div class="rd-chips">${keptPoints}${choice("point", "breadth", "Market breadth", pointOn.has("breadth"))}</div>`)}
+${group("Premium ratio", "premium", shown.premiumRatio === "below" || shown.premiumRatio === "above" ? 1 : 0, `<div class="rd-chips">${radio("premiumRatio", "all", "All", shown.premiumRatio !== "below" && shown.premiumRatio !== "above", false)}${radio("premiumRatio", "below", "Below its usual premium only", shown.premiumRatio === "below", false)}${radio("premiumRatio", "above", "Above its usual premium only", shown.premiumRatio === "above", false)}</div><p class="rd-note">All keeps every read. The other two keep only reads with that flag. A single uses its set booster box. A set with no booster box stays out of both.</p>`)}
+${group("Singles or sealed", "product", 1, `<div class="rd-chips">${radio("product", "singles", "Singles", shown.product !== "sealed", false)}${radio("product", "sealed", "Sealed", shown.product === "sealed", false)}</div>`)}
+${keep ? group("Your watchlist", "keep", (shown.watch || []).length, `<div class="rd-chips">${keep}</div>`) : ""}
+${group("How often", "frequency", 1, `<div class="rd-chips">${radio("frequency", "daily", "Daily", shown.frequency === "daily", !premium)}${radio("frequency", "weekly", "Weekly", (shown.frequency || "weekly") === "weekly", false)}${radio("frequency", "monthly", "Monthly", shown.frequency === "monthly", !premium)}${radio("frequency", "quarterly", "Quarterly", shown.frequency === "quarterly", !premium)}</div>`)}
 ${whereItGoes(shown, state)}
-<h2>Add-ons</h2>
-<div class="rd-chips">
-${choice("news", "1", "Pokemon news", shown.addons?.news === true)}
-${choice("games", "1", "Video games", shown.addons?.games === true)}
-${choice("all", "1", "All in one", shown.addons?.all === true)}
-</div>
-<p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>
+${group("Add-ons", "addons", ["news", "games", "all"].filter((key) => shown.addons?.[key] === true).length, `<div class="rd-chips">${choice("news", "1", "Pokemon news", shown.addons?.news === true)}${choice("games", "1", "Video games", shown.addons?.games === true)}${choice("all", "1", "All in one", shown.addons?.all === true)}</div><p class="rd-note">Off unless you turn one on. All in one turns on every add-on.</p>`)}
 <button type="submit">Save</button>
 <p class="rd-note" id="rd-save-note"></p>
 </form>
@@ -678,8 +686,22 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     }
     var host = document.getElementById("rd-chip");
     if (host) host.innerHTML = best ? best.html : "";
+    form.querySelectorAll("details.rd-group").forEach(function(box){
+      var mark = box.querySelector("[data-count-for]");
+      if (!mark) return;
+      mark.textContent = String(box.querySelectorAll('input[type="checkbox"]:checked').length);
+    });
+    var breadth = document.getElementById("rd-breadth");
+    if (breadth) breadth.hidden = vals("point").indexOf("breadth") < 0;
+    var nameEl = document.getElementById("rd-letter-name");
+    var nameInput = form.querySelector('[name="letter_name"]');
+    if (nameEl && nameInput) {
+      var titled = String(nameInput.value || "").replace(/\\s+/g, " ").trim();
+      nameEl.textContent = titled || "Untitled letter";
+    }
   }
   form.addEventListener("change", paint);
+  form.addEventListener("input", paint);
   function setAll(name, values){
     var nodes = form.querySelectorAll('input[name="' + name + '"]');
     for (var i = 0; i < nodes.length; i++) if (!nodes[i].disabled) nodes[i].checked = values.indexOf(nodes[i].value) >= 0;
@@ -692,7 +714,8 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     sealed: function(){ pickOne("product", "sealed"); setAll("rarity", []); setAll("era", []); setAll("artist", []); setAll("generation", []); setAll("focus", []); pickOne("length", "standard"); },
     chase: function(){ pickOne("product", "singles"); setAll("rarity", ["Special Illustration Rare", "Illustration Rare"]); setAll("focus", []); pickOne("length", "glance"); },
     vintage: function(){ pickOne("product", "singles"); setAll("rarity", []); setAll("era", []); setAll("focus", ["vintage"]); },
-    completer: function(){ pickOne("product", "singles"); setAll("focus", []); pickOne("length", "standard"); pickOne("length", "deep"); }
+    completer: function(){ pickOne("product", "singles"); setAll("focus", []); pickOne("length", "standard"); pickOne("length", "deep"); },
+    breadth: function(){ var nodes = form.querySelectorAll('input[name="point"]'); for (var i = 0; i < nodes.length; i++) if (nodes[i].value === "breadth" && !nodes[i].disabled) nodes[i].checked = true; }
   };
   var dayButtons = form.querySelectorAll("[data-days]");
   for (var d = 0; d < dayButtons.length; d++) {
@@ -718,7 +741,10 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
   function vals(name){
     var nodes = form.querySelectorAll('input[name="'+name+'"]');
     var out = [];
-    for (var i = 0; i < nodes.length; i++) if (nodes[i].checked) out.push(nodes[i].value);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (node.type === "hidden" || node.checked) out.push(node.value);
+    }
     return out;
   }
   function one(name){
@@ -749,7 +775,9 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
       premiumRatio: one("premiumRatio"),
       addons: { news: vals("news").indexOf("1") >= 0, games: vals("games").indexOf("1") >= 0, all: vals("all").indexOf("1") >= 0 },
       length: one("length") || "standard",
-      focus: vals("focus").indexOf("vintage") >= 0 ? "vintage" : ""
+      focus: vals("focus").indexOf("vintage") >= 0 ? "vintage" : "",
+      letterName: (form.querySelector('[name="letter_name"]') || {}).value || "",
+      points: vals("point")
     };
   }
   function applyPlan(plan){
@@ -768,6 +796,9 @@ ${choice("all", "1", "All in one", shown.addons?.all === true)}
     setAll("games", plan.addons && plan.addons.games ? ["1"] : []);
     setAll("all", plan.addons && plan.addons.all ? ["1"] : []);
     if (plan.length) pickOne("length", plan.length);
+    var name = form.querySelector('[name="letter_name"]');
+    if (name && typeof plan.letterName === "string") name.value = plan.letterName;
+    if (Array.isArray(plan.points)) setAll("point", plan.points);
   }
   function saveNote(msg){
     var el = document.getElementById("rd-save-note");

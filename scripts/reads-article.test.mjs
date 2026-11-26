@@ -97,7 +97,7 @@ const offPage = renderReadsPage({ signedIn: true });
 const onPage = renderReadsPage({ signedIn: true, emailArmed: true, premium: true });
 t("while the key is unset /reads says coming soon and has no email field", offPage.includes("Email delivery is coming soon.") && !offPage.includes('type="email"') && !offPage.includes('type="radio" name="length"'));
 t("with the key set /reads shows email and the length choice", onPage.includes('type="email"') && onPage.includes('type="radio" name="length"') && !onPage.includes("coming soon"));
-t("four collector presets as 44px rounded buttons", PRESETS.length === 4 && ["Sealed collector", "Chase card hunter", "Vintage fan", "Set completer"].every((l) => offPage.includes(l)) && offPage.includes(".rd-preset{min-height:44px") && offPage.includes("Vintage, WOTC era"));
+t("five quick start presets as 44px rounded buttons", PRESETS.length === 5 && ["Sealed collector", "Chase card hunter", "Vintage fan", "Set completer", "Market breadth"].every((l) => offPage.includes(l)) && offPage.includes(".rd-preset{min-height:44px") && offPage.includes("Vintage, WOTC era"));
 t("the picker copy has no dashes", !/[\u2013\u2014]/.test(offPage + onPage));
 
 // Send path: #291 ledger and routes, article body

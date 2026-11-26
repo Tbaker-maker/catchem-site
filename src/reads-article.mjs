@@ -580,6 +580,48 @@ function caslFooterText(mailingAddress = "") {
   return caslAddressLine(mailingAddress);
 }
 
+// Market breadth section from the public mood-gap payload. Omitted when the
+// flag is off, the file is missing, or the public read is empty. G is left
+// off unless the payload says the backtest passed.
+export function breadthSectionHtml(payload, { on = false } = {}) {
+  if (on !== true || !payload || typeof payload !== "object") return "";
+  const pub = payload.publicRead;
+  if (!pub || typeof pub !== "object") return "";
+  const line = String(pub.line || pub.headline || "").trim();
+  const source = String(pub.source || "").trim();
+  const asOf = String(pub.asOf || pub.endDate || "").slice(0, 10);
+  if (!okCopy(line) || !source || !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return "";
+  if (payload.backtest?.passed !== true && /\bG\b/.test(line)) return "";
+  const facts = (Array.isArray(payload.facts) ? payload.facts : []).filter((fact) => fact && okCopy(fact.text) && String(fact.source || "").trim() && /^\d{4}-\d{2}-\d{2}$/.test(String(fact.date || "").slice(0, 10)));
+  const since = okCopy(payload.sinceLastWeek) ? String(payload.sinceLastWeek).trim() : "";
+  const factHtml = facts.map((fact) => para(`${fact.text} ${String(fact.source).trim()}, ${day(fact.date)}.`)).join("");
+  const share = payload.share && typeof payload.share === "object" ? payload.share : null;
+  const permalink = String(share?.permalink || pub.permalink || "").trim();
+  const passed = payload.backtest?.passed === true;
+  const nums = share?.numbers && typeof share.numbers === "object" ? share.numbers : {};
+  const bits = [];
+  for (const [key, value] of Object.entries(nums)) {
+    if (value == null || value === "") continue;
+    if ((key === "G" || key === "g") && !passed) continue;
+    const label = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[^A-Za-z0-9]+/g, " ").trim();
+    if (!label || !okCopy(`${label} ${value}`)) continue;
+    bits.push(`${label} ${value}`);
+  }
+  const series = Array.isArray(share?.series) ? share.series : [];
+  for (const row of series) {
+    const points = Array.isArray(row?.points) ? row.points : [];
+    const last = points[points.length - 1];
+    const name = String(row?.name || "").trim();
+    if (!name || !last || last.v == null || !/^\d{4}-\d{2}-\d{2}$/.test(String(last.d || ""))) continue;
+    const bit = `${name} ${last.v} on ${day(last.d)}`;
+    if (okCopy(bit)) bits.push(bit);
+  }
+  const shareHtml = /^https:\/\/catchemtcg\.com\//.test(permalink)
+    ? `<p style="margin:12px 0 0"><a href="${esc(permalink)}" class="ce-ink" style="color:${C.ink};font-weight:600;text-decoration:underline">Open the share card</a></p>${bits.length ? para(bits.join(". ") + ".") : ""}`
+    : "";
+  return card(h2("Market breadth") + `<p class="ce-ink" style="margin:0;font:600 16px/1.4 ${FONT};color:${C.ink}">${esc(line)}</p>` + (since ? para(since) : "") + factHtml + para(`${source}, ${day(asOf)}.`) + shareHtml, "market-breadth");
+}
+
 export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads", more = "", page = false, suggest = null, mailingAddress = "" } = {}) {
   const L = doc.length;
   const when = day(doc.asOf);
@@ -618,6 +660,7 @@ export function renderArticle(doc, { unsubscribe = "", manage = SITE + "/reads",
     if (doc.ups.length) body.push(card(h2("Also moving up") + doc.ups.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-up"));
     if (doc.downs.length) body.push(card(h2("Moving down") + doc.downs.map((i) => `<div id="move-${esc(i.id)}">${row(i, { deep: L === "deep" })}</div>`).join(""), "moving-down"));
     if (doc.supply.length) body.push(card(h2("Listings counted") + para("Draining means fewer eBay listings counted than the night before. Stacking means more. A listing is not a sale.", ";margin-top:0;font-size:13px") + doc.supply.map(supplyRow).join(""), "supply"));
+    if (doc.breadthHtml) body.push(doc.breadthHtml);
     if (doc.building?.length) body.push(buildingCard(doc.building));
     if (L === "deep" && doc.setCompare.length) body.push(card(h2("Set by set") + doc.setCompare.map((r) => `<p class="ce-dim" style="margin:0 0 8px;font:400 14px/1.4 ${FONT};color:${C.dim}"><b class="ce-ink" style="color:${C.ink}">${esc(r.set)}</b>: ${r.up} up, ${r.down} down, of ${r.n} in this read.</p>`).join(""), "sets"));
     if (doc.vintage) body.push(card(h2("Vintage note") + row(doc.vintage, { deep: L === "deep" }), "vintage"));
@@ -713,7 +756,7 @@ export async function loadContext(fetchImpl = fetch) {
   const get = (f) => loadJson(f, fetchImpl).catch(() => null);
   const { fetchRepo } = await import("./data.mjs");
   const getTags = () => fetchRepo(PATH_TAGS, fetchImpl).then((r) => (r && r.ok ? r.json() : null)).catch(() => null);
-  const [reads, hold, movers, listings, sets, chips, tags, premium, meter] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags(), get("premium-ratio.json"), get("market-meter.json")]);
+  const [reads, hold, movers, listings, sets, chips, tags, premium, meter, moodGap] = await Promise.all([get("reads.json"), get("price-hold.json"), get("movers.json"), get("listings-counted.json"), get("sets.json"), get("signal-chips.json"), getTags(), get("premium-ratio.json"), get("market-meter.json"), get("feed/mood-gap.json")]);
   const holdIds = hold?.ids && typeof hold.ids === "object" ? hold.ids : {};
   const bags = new Map();
   const spark = async (id) => {
@@ -723,7 +766,7 @@ export async function loadContext(fetchImpl = fetch) {
     const doc = bags.get(b);
     return doc?.rows?.[id] ? unpackSpark(doc.rows[id], doc.asOf) : [];
   };
-  return { reads, holdIds, movers, listings, sets, chips, tags, premium, meter, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
+  return { reads, holdIds, movers, listings, sets, chips, tags, premium, meter, moodGap, spark, asOf: String(movers?.asOf || reads?.asOf || "") };
 }
 
 // Watched items get their own 30 day history from the sparks file.
@@ -747,7 +790,13 @@ export async function articleForPlan(plan, ctx, asOf, lengthOverride = "", histo
   const length = lengthOverride || follow.length;
   const watched = await watchedFor(follow, ctx);
   const doc = buildArticle({ follow, ctx: { ...ctx, watched }, asOf: asOf || ctx.asOf, length, history });
-  if (doc) doc.weekday = follow.weekday;
+  if (doc) {
+    doc.weekday = follow.weekday;
+    if ((follow.points || []).includes("breadth")) {
+      const html = breadthSectionHtml(ctx?.moodGap, { on: true });
+      if (html) doc.breadthHtml = html;
+    }
+  }
   return doc;
 }
 
