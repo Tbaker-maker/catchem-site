@@ -1537,7 +1537,13 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .row.mover img{flex:none;width:48px;height:48px;object-fit:contain;border-radius:8px;background:#211e1a}
 .row.mover a{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:2px;overflow-wrap:break-word}
 .row.mover a b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal}
-.row.mover .mover-stat{flex:0 0 auto;white-space:nowrap;text-align:right;padding-left:8px}
+.row.mover .mover-stat{flex:0 1 auto;display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px;padding-left:8px;max-width:46%;white-space:normal;min-width:0}
+.row.mover .mover-pct{font:700 22px/1.1 var(--sans);color:#efe9de}
+.row.mover .mover-ends{font:500 12px/1.35 var(--sans);color:var(--dim,#c4baab)}
+@media (max-width:700px){
+  .row.mover{flex-wrap:wrap;align-items:flex-start}
+  .row.mover .mover-stat{flex:1 1 100%;max-width:100%;padding:4px 0 0}
+}
 .row.mover svg{display:block;width:100%;max-width:160px;height:36px}
 img,svg{max-width:100%}
 .filters input,.filters select{max-width:100%;min-width:0}
@@ -3628,13 +3634,44 @@ export function renderMovers(doc, stamp, opts = {}) {
     const d = pts.map((v, i) => `${i ? "L" : "M"}${(4 + i * step).toFixed(1)},${(h - 4 - ((v - min) / span) * (h - 8)).toFixed(1)}`).join(" ");
     return `<svg width="96" height="36" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="#d9b779" stroke-width="2"/></svg>`;
   };
+  const day = (v) => {
+    const s = String(v || "").slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+  };
+  // From and to come from named fields or real history points. Never a price
+  // guessed backward from the percent. Listings counted stays off until Intel
+  // names the field (Intel #007).
+  const endsOf = (r) => {
+    const pts = (Array.isArray(r.hist) ? r.hist : [])
+      .filter((p) => Array.isArray(p) && day(p[0]) && Number(p[1]) > 0)
+      .map((p) => [day(p[0]), Number(p[1])])
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    let from = Number(r.fromPrice ?? r.startPrice);
+    let to = Number(r.toPrice ?? r.endPrice);
+    let fromDay = day(r.fromDate || r.startDate);
+    let toDay = day(r.toDate || r.endDate);
+    if (!(from > 0) || !fromDay) {
+      if (pts.length < 2) return "";
+      from = pts[0][1];
+      fromDay = pts[0][0];
+    }
+    if (!(to > 0) || !toDay) {
+      if (pts.length < 2) return "";
+      to = pts[pts.length - 1][1];
+      toDay = pts[pts.length - 1][0];
+    }
+    const a = priceDay(fromDay);
+    const b = priceDay(toDay);
+    if (!(from > 0) || !(to > 0) || !a || !b) return "";
+    return `${money(from)} ${a} to ${money(to)} ${b}`;
+  };
   const row = (r, withSpark) => {
-    // The change is the bigger of 7 and 30 days (bestMove), so name the window.
     const win = Number.isInteger(r.windowDays) && r.windowDays > 0 ? ` ${r.windowDays}D` : "";
-    const pct = Number.isFinite(r.changePct) ? `${r.changePct > 0 ? "+" : ""}${r.changePct}%${win}` : "";
+    const pct = Number.isFinite(Number(r.changePct)) ? `${Number(r.changePct) > 0 ? "+" : ""}${r.changePct}%${win}` : "";
     const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
-    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><b class="mover-stat">${money(r.price) || naChip()} <span class="muted">${pct}</span></b></div>`;
+    const ends = endsOf(r);
+    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><div class="mover-stat">${pct ? `<b class="mover-pct">${esc(pct)}</b>` : ""}${ends ? `<span class="mover-ends">${esc(ends)}</span>` : ""}</div></div>`;
   };
   const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(moversNote(doc?.note))}</p>
