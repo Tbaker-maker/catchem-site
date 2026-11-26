@@ -1539,7 +1539,7 @@ img.shot[data-tile="card"]{width:min(280px,100%);height:auto;aspect-ratio:63/88}
 .row.mover a b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal}
 .row.mover .mover-stat{flex:0 1 auto;display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px;padding-left:8px;max-width:46%;white-space:normal;min-width:0}
 .row.mover .mover-pct{font:700 22px/1.1 var(--sans);color:#efe9de}
-.row.mover .mover-ends{font:500 12px/1.35 var(--sans);color:var(--dim,#c4baab)}
+.row.mover .mover-ends{font:500 12px/1.35 var(--sans);color:var(--dim,#c4baab)}.row.mover .mover-dollar{font:600 13px/1.3 var(--sans)}
 @media (max-width:700px){
   .row.mover{flex-wrap:wrap;align-items:flex-start}
   .row.mover .mover-stat{flex:1 1 100%;max-width:100%;padding:4px 0 0}
@@ -3665,15 +3665,29 @@ export function renderMovers(doc, stamp, opts = {}) {
     if (!(from > 0) || !(to > 0) || !a || !b) return "";
     return `${money(from)} ${a} to ${money(to)} ${b}`;
   };
+  // Dollar change from the row's own from and to prices. The lists are ordered
+  // by it (live Nov 25: +18.9% ranked above +180.5%), so the row shows it and the
+  // heading says so, but only when the rows really are in that order.
+  const dollarOf = (r) => {
+    const from = Number(r.fromPrice ?? r.startPrice);
+    const to = Number(r.toPrice ?? r.endPrice ?? r.price);
+    return from > 0 && to > 0 ? Math.round((to - from) * 100) / 100 : null;
+  };
+  const dollarRanked = (rows) => {
+    const d = (rows || []).slice(0, 12).map(dollarOf);
+    return d.length >= 2 && d.every((v) => v !== null) && d.every((v, i) => i === 0 || Math.abs(v) <= Math.abs(d[i - 1]) + 0.005);
+  };
   const row = (r, withSpark) => {
     const win = Number.isInteger(r.windowDays) && r.windowDays > 0 ? ` ${r.windowDays}D` : "";
+    const dz = dollarOf(r);
+    const dollar = dz === null || dz === 0 ? "" : `${dz > 0 ? "+" : "-"}${money(Math.abs(dz))}`;
     const pct = Number.isFinite(Number(r.changePct)) ? `${Number(r.changePct) > 0 ? "+" : ""}${r.changePct}%${win}` : "";
     const face = imageTag(r.catalogueSrc || "", "row", r.name || "", r);
     const line = withSpark ? spark(r.hist) : "";
     const ends = endsOf(r);
-    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><div class="mover-stat">${pct ? `<b class="mover-pct">${esc(pct)}</b>` : ""}${ends ? `<span class="mover-ends">${esc(ends)}</span>` : ""}</div></div>`;
+    return `<div class="row mover">${face}<a href="${esc(r.href)}"><b>${esc(r.name)}</b><span class="muted">${esc(r.set || "")}</span>${line}</a><div class="mover-stat">${pct ? `<b class="mover-pct">${esc(pct)}</b>` : ""}${dollar ? `<span class="mover-dollar">${esc(dollar)}</span>` : ""}${ends ? `<span class="mover-ends">${esc(ends)}</span>` : ""}</div></div>`;
   };
-  const block = (title, rows) => `<h2>${title}</h2>${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
+  const block = (title, rows) => `<h2>${title}</h2>${dollarRanked(rows) ? `<p class="muted mover-rank">Ranked by dollar change, largest first.</p>` : ""}${(rows || []).slice(0, 12).map((r) => row(r, true)).join("") || `<p class="muted">Nothing to show.</p>`}${(rows || []).length > 12 ? `<details><summary>Show more</summary>${(rows || []).slice(12).map((r) => row(r, false)).join("")}</details>` : ""}`;
   const body = `<main id="main" tabindex="-1" class="wrap"><p class="muted">Updated ${esc(doc?.asOf || "")}. ${esc(moversNote(doc?.note))}</p>
 <h1>Movers</h1>
 <div id="index-charts"></div>
