@@ -6,6 +6,7 @@ import { splitName } from "./display-name.mjs";
 import { needsTile, setTile, SET_TILE_CSS } from "./set-tile.mjs";
 import { historyChart, mergeHistory, HISTORY_CSS, HISTORY_JS } from "./history-chart.mjs";
 import { productChart } from "./product-chart.mjs";
+import { copyFactHtml, readFactInput, COPY_FACT_CSS, COPY_FACT_JS } from "./copy-fact.mjs";
 import { marketDepthHtml, soldSeries, cameraLine, gradedPopLabel } from "./market-depth.mjs";
 import { readSheet, patternSentence, priceBits, beatOddsText } from "./read-sheet.mjs";
 import { readShareUrl } from "./share-card.mjs";
@@ -3039,6 +3040,47 @@ function chartPath(card, opts = {}) {
   return "";
 }
 
+function factPath(card, opts) {
+  const pretty = chartPath(card, opts);
+  if (pretty) return pretty;
+  const id = String(card?.id || "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(id)) return "";
+  return (card?.kind === "sealed" ? "/p/" : "/c/") + id;
+}
+
+function productCopyFact({ card, opts, endDay, series, held, price, listings }) {
+  const href = factPath(card, opts);
+  const checking = held === true || !(Number(price) > 0);
+  const pct = checking ? null : exactWindowPct(series, 90, endDay);
+  const html = copyFactHtml({
+    name: card?.name,
+    href,
+    held: checking,
+    price,
+    source: checking ? "" : sourceLine(card),
+    date: endDay,
+    changePct: typeof pct === "number" ? pct : null,
+    days: typeof pct === "number" ? 90 : 0,
+    listings: !checking && listings && Number.isFinite(Number(listings.n)) ? Number(listings.n) : null,
+    listingsDate: listings && (listings.day || listings.date),
+  });
+  if (!html) return "";
+  return `<style>${COPY_FACT_CSS}</style>${html}<script>${COPY_FACT_JS}</script>`;
+}
+
+function feedFactPool(rows) {
+  const bits = [];
+  for (const row of rows || []) {
+    const html = copyFactHtml(readFactInput(row));
+    if (!html) continue;
+    const id = String(row?.id || "");
+    if (!id || /["'<>]/.test(id)) continue;
+    bits.push(html.replace('class="copy-fact"', `class="copy-fact" data-fact-for="${esc(id)}"`));
+  }
+  if (!bits.length) return "";
+  return `<style>${COPY_FACT_CSS}</style><div id="copy-fact-pool">${bits.join("")}</div><script>${COPY_FACT_JS}</script><script>(function(){var pool=document.getElementById("copy-fact-pool");var host=document.getElementById("feed-one");if(!pool||!host)return;function place(){var cards=host.querySelectorAll("article.feed-card");for(var c=0;c<cards.length;c++){var card=cards[c];if(card.querySelector(".copy-fact"))continue;var id=card.id&&card.id.indexOf("r-")===0?card.id.slice(2):"";if(!id)continue;var nodes=pool.querySelectorAll("[data-fact-for]");for(var i=0;i<nodes.length;i++){if(nodes[i].getAttribute("data-fact-for")===id){card.appendChild(nodes[i]);break;}}}}place();if(window.MutationObserver)new MutationObserver(place).observe(host,{childList:true,subtree:true});})();</script>`;
+}
+
 function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeRow, img, setBit, held = false }) {
   const view = conditionView(card, opts.conditionLadder, held);
   const showPrice = view.selected ? money(view.selected.amount) : price;
@@ -3098,7 +3140,9 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   void also;
   const math = [];
   const allReadsHtml = itemReadsHtml(opts.allReads, { feed: !!opts.feed, held, dropNm: held || !view.selected || view.selected.key !== "NM" });
-  
+  const factPrice = view.selected ? Number(view.selected.amount) : Number(card.price);
+  const factCopy = productCopyFact({ card, opts, endDay, series: priceSeries, held: held || !(factPrice > 0), price: factPrice, listings: listRow });
+
   return withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance card-page">
 <style>${SINGLE_CSS}</style>
 <header class="cp-head">
@@ -3115,6 +3159,7 @@ ${held || !showPrice ? `<p class="cp-price"><span class="cp-cond-label">${view.s
 ${view.html}
 ${held ? "" : chips}
 ${strip}
+${factCopy}
 ${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : (view.selected ? Number(view.selected.amount) : Number(card.price)), track: opts.trackLine || "" })}
 ${readLink(card)}
 ${tags.length ? `<div class="vchips" aria-label="Printing">${tags.map((tag) => `<a class="vchip" href="/search?tag=${encodeURIComponent(tag)}">${esc(tag)}</a>`).join("")}</div>` : ""}
@@ -3366,6 +3411,7 @@ export function renderCard(card, stamp, opts = {}) {
     : (askFallback
       ? `<p class="px"><span style="font:600 40px/1 var(--serif);color:var(--gold)">${askFallback}</span>${priceKnow(card, endDay, opts, "eBay asks")}</p>`
       : `<p class="px">Price being checked</p>`);
+  const factCopy = productCopyFact({ card, opts, endDay, series: held ? [] : priceSeries, held: held || !(Number(shown) > 0), price: shown, listings: sealedListings });
   const body = withItemSections(`<main id="main" tabindex="-1" class="wrap product-glance">
 <style>
 .glance{display:block;max-width:100%}
@@ -3407,6 +3453,7 @@ ${card.exclusive === "Costco" ? `<p class="muted">Costco exclusive${card.region 
 ${card.contents ? `<p>Inside: ${esc(card.contents)}</p>` : ""}
 ${opts.signalCard ? signalRowHtml(opts.signalCard, { href: "" }) : ""}
 ${priceHtml}
+${factCopy}
 ${sealedStrip}
 ${returnActions(card, { asOf: endDay, series: held ? [] : priceSeries, price: held ? 0 : Number(shown), track: opts.trackLine || "" })}
 ${readLink(card)}
@@ -5033,6 +5080,7 @@ export function renderFeed(bundle, startId, stamp, opts = {}) {
   const opened = page === "read" ? pool.find((row) => String(row.id) === String(startId)) : null;
   const sheet = opened ? readSheet(opened, { meta: opts.readYear?.meta, logo: opts.logo || "", rotation: opts.rotation || null, reads: pool, facts: opts.facts || null }) : "";
   const signalHead = opened ? signalRowHtml(opened, { href: "" }) : "";
+  const factPool = feedFactPool(page === "read" ? (opened ? [opened] : []).concat(first) : first);
   let body = `<style>${css}</style><main id="main" tabindex="-1" class="wrap feed-page">
 <link rel="preload" href="/data/feed/meta.json" as="fetch" crossorigin>
 <link rel="preload" href="/data/feed/browse.json" as="fetch" crossorigin>
@@ -5061,6 +5109,7 @@ ${focusTitle && page !== "read" ? `<form class="feed-filters" id="feed-filters">
   <select id="f-sort" aria-label="Sort"><option value="move">Biggest move</option><option value="price">Price</option><option value="name">Name</option></select>
 </form>` : ""}
 ${page !== "read" ? feedToolsHtml() : ""}
+${factPool}
 <div id="feed-one"><div class="skel-card" aria-hidden="true"></div></div>
 ${page === "read" ? "" : '<div id="feed-sections"></div>'}
 </main>
