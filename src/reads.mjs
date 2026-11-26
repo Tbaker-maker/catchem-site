@@ -583,7 +583,6 @@ export function renderReadsPage(state = {}) {
 })();
 </script>
 </section>
-<p class="rd-note">This read is free.</p>
 ${notes.map((note) => `<p class="rd-note">${esc(note)}</p>`).join("")}
 <form class="rd-card" id="rd-form" method="post" action="/api/reads" data-signed-in="${signedIn ? "1" : "0"}">
 <h2>Quick start</h2>
