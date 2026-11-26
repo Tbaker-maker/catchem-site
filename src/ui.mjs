@@ -2513,7 +2513,7 @@ export function changeTable(series, endDay) {
   return `<style>.chg{display:grid;grid-template-columns:repeat(${cells.length},minmax(0,1fr));gap:6px;margin:10px 0 14px;padding:6px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid #2f2b26;max-width:420px}.chg div{padding:8px 6px;border-radius:12px;text-align:center}.chg dt{font:500 12px/1.2 var(--sans);color:var(--dim)}.chg dd{margin:3px 0 0;font:650 15px/1.2 var(--sans)}.chg .up{color:#7fc79a}.chg .down{color:#e0877a}</style><dl class="chg" aria-label="Price change">${cells.map(([label, n]) => `<div><dt>${label}</dt><dd class="${n > 0 ? "up" : n < 0 ? "down" : ""}">${n > 0 ? "+" : ""}${n}%</dd></div>`).join("")}</dl><p class="chg-src muted" style="margin:-8px 0 12px;font-size:13px">Change in TCGplayer market price${priceDay(endDay) ? ` to ${esc(priceDay(endDay).replace(/, \d{4}$/, ""))}` : ""}${infoTap(`TCGplayer market price, our dated nightly files${priceDay(endDay) ? `, ${priceDay(endDay).replace(/, \d{4}$/, "")}` : ""}`)}</p>`;
 }
 
-function summaryStrip({ nm = false, prefix = "", price = "", year = null, listings = null, rotation = "" } = {}) {
+function summaryStrip({ nm = false, prefix = "", price = "", priceDate = "", year = null, listings = null, rotation = "" } = {}) {
   const bits = [];
   const tag = String(prefix || (nm ? "NM" : "")).trim();
   if (price) bits.push(`<span class="sum-chip">${tag ? `${esc(tag)} ` : ""}${esc(price)}</span>`);
@@ -2533,7 +2533,9 @@ function summaryStrip({ nm = false, prefix = "", price = "", year = null, listin
     const fromBit = Number.isFinite(Number(listings.from)) && Number(listings.from) >= 0 && fromShort ? `, from ${Number(listings.from).toLocaleString("en-US")} on ${esc(fromShort)}` : "";
     const win = Number.isFinite(pct) && days > 0 && listings.prevDay ? { tag: `${days}D`, said: `over ${days} days, since ${esc(fromWhen || priceDay(listings.prevDay))}` } : null;
     const arrow = !win ? "" : pct === 0 ? `<span class="sum-arrow" aria-label="Flat ${win.said}">\u2192 0% ${win.tag}</span>` : `<span class="sum-arrow ${pct > 0 ? "up" : "down"}" aria-label="${pct > 0 ? "Up" : "Down"} ${Math.abs(pct)}% ${win.said}">${pct > 0 ? "\u25B2" : "\u25BC"} ${Math.abs(pct)}% ${win.tag}</span>`;
-    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${short ? `, ${esc(short)}` : ""}${fromBit}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${short ? `, ${short}` : ""}`)}</span>`);
+    // An older count beside today's price says it is the last count, not today's.
+    const older = price && /^\d{4}-\d{2}-\d{2}$/.test(String(priceDate || "")) && String(listings.day).slice(0, 10) < String(priceDate);
+    bits.push(`<span class="sum-chip">${Number(listings.n).toLocaleString("en-US")} listings counted${short ? `, ${older ? "last count " : ""}${esc(short)}` : ""}${fromBit}${arrow ? ` ${arrow}` : ""}${infoTap(`eBay listings counted${short ? `, ${short}` : ""}`)}</span>`);
     listed = true;
   }
   if (rotation) bits.push(`<span class="sum-chip">${esc(rotation)}</span>`);
@@ -3046,6 +3048,7 @@ function renderSingleCard({ card, opts, price, endDay, hist, priceSeries, rangeR
   const strip = summaryStrip({
     prefix: view.selected ? view.selected.key : conditionPrefix(card, held),
     price: held ? "" : showPrice,
+    priceDate: endDay,
     listings: pageListings(opts.fact, opts.listingSeries, endDay, opts.itemListings, "single"),
     rotation: rotationChipLabel(opts.rotationFact),
   });
@@ -3328,6 +3331,7 @@ export function renderCard(card, stamp, opts = {}) {
   const sealedListings = pageListings(fact, opts.listingSeries, endDay, opts.itemListings, "sealed");
   const sealedStrip = sealed ? summaryStrip({
     price: price && priceDay(endDay) ? `${price} · ${priceDay(endDay).replace(/, \d{4}$/, "")}` : price,
+    priceDate: endDay,
     listings: sealedListings,
     rotation: rotationChipLabel(opts.rotationFact || opts.rotationHtml),
   }) : "";
