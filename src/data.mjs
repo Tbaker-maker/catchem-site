@@ -509,6 +509,26 @@ export async function bucketRows(ids, fetchImpl = fetch) {
   return out;
 }
 
+// Many rows, FEED_KV first: one small KV read per id, then one bucket text per
+// bucket for the misses (bucketRows). A Pokémon page never parses a bucket.
+export async function bucketRowsKvFirst(ids, fetchImpl = fetch) {
+  const out = new Map();
+  const miss = [];
+  const list = [...new Set(ids)];
+  for (let i = 0; i < list.length; i += 16) {
+    await Promise.all(list.slice(i, i + 16).map(async (id) => {
+      let row = null;
+      if (rawKv) {
+        try { const hit = await rawKv.get(prodrowKey(id)); if (hit) row = JSON.parse(hit); } catch { row = null; }
+      }
+      if (row) out.set(id, row);
+      else miss.push(id);
+    }));
+  }
+  if (miss.length) for (const [id, row] of await bucketRows(miss, fetchImpl)) out.set(id, row);
+  return out;
+}
+
 // Per-read facts file. Small and per id, so it skips the shared cache (keeps reads.json warm).
 export async function loadReadFacts(id, fetchImpl = fetch) {
   const name = String(id || "").replace(/[^A-Za-z0-9._-]/g, "_");
