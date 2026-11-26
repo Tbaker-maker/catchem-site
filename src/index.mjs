@@ -1845,7 +1845,8 @@ async function setFeatureHtml(slug, fetchImpl, valueDoc) {
   if (doc && Array.isArray(doc.top)) {
     const top = doc.top.filter((row) => row && !held[row.id]);
     const dropped = top.length !== doc.top.length;
-    doc = { ...doc, top };
+    const heldTop = (Array.isArray(doc.heldTop) ? doc.heldTop : []).concat(doc.top.filter((row) => row && held[row.id]).map((row) => ({ id: row.id, name: row.name, number: row.number })));
+    doc = { ...doc, top, heldTop };
     if (dropped && doc.master) doc = { ...doc, master: { ...doc.master, total: null } };
   }
   const images = doc ? await catalogueMap(fetchImpl) : {};

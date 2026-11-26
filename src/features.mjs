@@ -51,6 +51,18 @@ export const SET_PAIRS = {
   "base-set-shadowless": { slug: "base-set", label: "Base Set" },
 };
 
+// A held card is not in the Top 10 or the total. Say so, by name when it would rank.
+export function heldSetValueLine(doc) {
+  const named = (Array.isArray(doc?.heldTop) ? doc.heldTop : [])
+    .filter((r) => r && r.id && r.name)
+    .map((r) => String(r.name).replace(/ - (?=[0-9A-Za-z]+\/[0-9A-Za-z]+$)/, " "));
+  const count = Math.max(Number(doc?.master?.held) || 0, named.length);
+  if (!count) return "";
+  const noun = count === 1 ? "card" : "cards";
+  const list = named.length ? `: ${named.slice(0, 5).join(", ")}${named.length > 5 ? `, and ${named.length - 5} more` : ""}` : "";
+  return `Top 10 and total leave out ${count} ${noun} with price being checked${list}.`;
+}
+
 export function setValueBlock(doc, images = {}, slug = "") {
   const c = COPY.setValue;
   const pair = SET_PAIRS[slug || doc?.slug || ""];
@@ -71,10 +83,12 @@ export function setValueBlock(doc, images = {}, slug = "") {
   const counts = Number.isFinite(Number(m.priced))
     ? `${Number(m.priced)} priced, ${Number(m.unpriced) || 0} unpriced${Number(m.inSet) ? `, ${Number(m.inSet)} cards in the set` : ""}.`
     : "";
+  const heldLine = heldSetValueLine(doc);
   return `<section class="sv" aria-labelledby="sv-h"><h2 id="sv-h">${c.heading}</h2>
 <p class="muted">${c.explainer}</p>
 ${total ? `<p class="sv-total">Master-set total <b>${total}</b>${day ? `<span class="itap" tabindex="0" role="button" aria-label="Where this number comes from: ${esc(`TCGplayer market price, one of each card, ${day}`)}"><span class="itap-i" aria-hidden="true">i</span><span class="itap-pop" role="tooltip">${esc(`TCGplayer market price, one of each card, ${day}`)}</span></span>` : ""}</p>` : ""}
 ${counts ? `<p>${esc(counts)}</p>` : ""}
+${heldLine ? `<p class="muted sv-held">${esc(heldLine)}</p>` : ""}
 ${rows ? `<ol class="sv-list">${rows}</ol>` : ""}
 <p class="muted">Source: TCGplayer market, ${esc(day)}.</p>
 ${pairLine}</section>`;

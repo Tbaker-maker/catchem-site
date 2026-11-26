@@ -85,5 +85,23 @@ t("1st Edition and Unlimited stay separate when published", pair.includes("1st E
 const phrase = "Price being checked";
 t("the checking phrase passes the copy rules", phrase === "Price being checked" && !/[\u2014\u2013]/.test(phrase) && !ban.test(phrase) && !ban.test(espeon.replace(/<[^>]+>/g, " ")));
 
+// Live sweep Nov 25: Charizard ex 199/165 was held, and its Release cycle block still printed $279.99.
+const cycleArt = '<div class="rchips"><a class="rchip past" href="/rotation"><span>Rotated Apr 10, 2026</span></a></div><section class="ircy" aria-label="Release cycle"><h2>Release cycle</h2><dl><dt>Price</dt><dd>$279.99 on Nov 25, 2026, TCGplayer market</dd><dt>30 days</dt><dd>Down 5%: $294.42 (Oct 26, 2026) to $279.99 (Nov 25, 2026)</dd></dl></section>';
+const rotationChip = '<a class="rchip past" href="/rotation"><span>Rotated Apr 10, 2026</span></a>';
+const charizard = renderCard({
+  id: "tcgcsv-517045",
+  name: "Charizard ex - 199/165",
+  kind: "single",
+  set: "SV: Scarlet & Violet 151",
+  price: null,
+  priceStatus: "checking",
+  asOf: "2026-11-25",
+  source: "TCGplayer market",
+}, "stamp", { priceHeld: true, rotationHtml: cycleArt + rotationChip, rotationFact: rotationChip, cycleHtml: cycleArt });
+t("a held page prints no price in the release cycle block", charizard.includes("Price being checked") && !charizard.includes("$279.99") && !charizard.includes("$294.42"));
+t("a held page keeps its rotation chip", charizard.includes("Rotated Apr 10, 2026"));
+const unheld = renderCard({ id: "tcgcsv-517045", name: "Charizard ex - 199/165", kind: "single", set: "SV: Scarlet & Violet 151", price: 279.99, asOf: "2026-11-25", source: "TCGplayer market" }, "stamp", { rotationHtml: cycleArt + rotationChip, rotationFact: rotationChip, cycleHtml: cycleArt });
+t("a priced page keeps its release cycle block", unheld.includes("Release cycle") && unheld.includes("$294.42"));
+
 if (fail) process.exit(1);
 console.log("price hold ok");
