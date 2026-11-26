@@ -144,6 +144,31 @@ export function returnLines(products, lastVisit, asOf, limit = 5) {
   return ranked(rows, limit);
 }
 
+export function quietLine(products, fromDay, toDay) {
+  const from = isoDay(fromDay);
+  const to = isoDay(toDay);
+  if (!from || !to || from >= to) return "";
+  let floor = 0;
+  let measured = 0;
+  for (const product of products || []) {
+    if (!product) return "";
+    if (priceMove(product.hist, from, to)) return "";
+    const pts = pointsOf(product.hist);
+    const start = onOrBefore(pts, from);
+    const end = onOrBefore(pts, to);
+    if (!start || !end || !(start.price > 0)) return "";
+    if (gapDays(start.date, from) > 2 || gapDays(end.date, to) > 2) return "";
+    if (end.date < start.date) return "";
+    const pct = Math.abs((end.price - start.price) / start.price) * 100;
+    if (!Number.isFinite(pct)) return "";
+    measured += 1;
+    if (pct > floor) floor = pct;
+  }
+  if (!measured) return "";
+  const shown = Math.max(0.1, Math.ceil(floor * 10) / 10);
+  return `Nothing moved more than ${shown.toFixed(1)}% since ${monthDay(from)}.`;
+}
+
 export function weekLines(products, asOf, limit = 3) {
   const end = isoDay(asOf);
   const from = end ? shiftDay(end, -7) : "";
@@ -286,7 +311,10 @@ export function buildVisitPayload(model, opts = {}) {
       note = `Price history on file starts ${monthDay(start)}, after ${monthDay(visit)}.`;
     } else {
       rows = returnLines(pool, visit, asOf, cap || 5);
-      if (!rows.length) note = `No price change is on file since ${monthDay(visit)}.`;
+      if (!rows.length) {
+        const quiet = quietLine(pool, visit, asOf);
+        note = quiet || `No price change is on file since ${monthDay(visit)}.`;
+      }
     }
   }
   const suggestRows = weekLines(products.filter((row) => !wanted.has(row.id)), asOf);
@@ -353,8 +381,7 @@ export function feedShareButton(asOf) {
 export function watchDocument() {
   return `<main id="main" tabindex="-1" class="wrap watch-page" data-rv-page="watch">
 <h1>Watch</h1>
-<p class="rv-empty" id="rv-empty">Nothing saved on this device yet.</p>
-<p class="rv-invite" id="rv-invite">Tap Watch on a product, or start with one of these.</p>
+<p class="rv-empty" id="rv-empty">Nothing saved on this device yet. Tap Watch on a product page.</p>
 <div id="rv-suggest" class="rv-cards" aria-busy="true"></div>
 <h2 id="rv-changed-h" hidden>What changed</h2>
 <div id="rv-changed" class="rv-cards"></div>
@@ -593,10 +620,10 @@ export const RETURN_BOOT = `(function(){
         if(suggest) suggest.innerHTML="";
         if(head) head.hidden=!lines.length;
         root.innerHTML=lines.map(function(row){return cardHtml(row,true);}).join("");
-        var rest=rows.filter(function(row){return !have[row.id];});
-        if(quiet) quiet.innerHTML=rest.map(function(row){
-          return cardHtml({id:row.id,name:row.name,href:row.href,kind:row.kind,text:"No change on file for this window.",know:""}, true);
-        }).join("");
+        if(quiet){
+          var note=doc&&doc.note?String(doc.note):"";
+          quiet.innerHTML=!lines.length&&note?'<p class="rv-empty">'+escapeHtml(note)+'</p>':"";
+        }
       }
       paintButtons();
     });

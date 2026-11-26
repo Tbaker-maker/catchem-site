@@ -4048,7 +4048,7 @@ export function renderCompare(left, right, stamp, opts = {}) {
     const name = esc(row.name || "Not in the catalog");
     return `<th>${href ? `<a href="${href}">${name}</a>` : name}</th>`;
   }).join("");
-  const table = slots.length >= 2 ? `<div class="cmp-table-wrap"><table class="cmp-table"><thead><tr><th></th>${heads}</tr></thead><tbody>${bodyRows}</tbody></table></div>` : `<p class="muted">Add two product ids.</p>`;
+  const table = slots.length >= 2 ? `<div class="cmp-table-wrap"><table class="cmp-table"><thead><tr><th></th>${heads}</tr></thead><tbody>${bodyRows}</tbody></table></div>` : `<p class="muted">Type two product ids, then tap Show.</p>`;
   const chart = compareChart(opts.charts);
   const field = (name, label) => `<label>${label} <input name="${name}" value="${esc(opts[name] || "")}" aria-label="${label} product"></label>`;
   const body = `<main id="main" tabindex="-1" class="wrap">
