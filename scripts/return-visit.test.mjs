@@ -52,6 +52,7 @@ const unsourced = buildVisitPayload({ asOf: "2026-10-25", products: [{ ...quiet,
 t("unknown source never becomes a number", unsourced.lines.length === 0);
 const sameDay = buildVisitPayload(model, { since: "2026-10-25" });
 t("same day states that nothing new is on file", sameDay.mode === "today" && sameDay.lines.length === 0 && /No price change is on file/.test(sameDay.note));
+t("same day names the price day, never a morning", sameDay.note === "No price change is on file since Oct 25." && !/morning/i.test(sameDay.note));
 
 const know = howWeKnow({ source: "TCGplayer market via TCGCSV", date: "2026-10-25", listings: 18, track: "12 of 20 reads moved the way they said." });
 t("how we know names source, date, listings, and track record", know.includes("TCGplayer market") && know.includes("Oct 25") && know.includes("18 listings counted") && know.includes("Track record:"));

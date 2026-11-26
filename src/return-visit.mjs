@@ -271,7 +271,8 @@ export function buildVisitPayload(model, opts = {}) {
   } else if (visit >= asOf) {
     mode = "today";
     title = "Since your last visit";
-    note = "No price change is on file since this morning.";
+    // The run time is not promised, so the note names the price day, not a time of day.
+    note = `No price change is on file since ${monthDay(asOf)}.`;
   } else {
     mode = "return";
     title = "Since your last visit";

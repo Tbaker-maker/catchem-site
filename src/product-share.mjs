@@ -242,7 +242,9 @@ export function shareFieldsFromProduct(card, opts = {}) {
   const priceNum = Number(card.price);
   // No price on file, no date: a date alone reads as a current price day.
   const day = priceNum > 0 ? String(card.asOf || card.priceDate || "").slice(0, 10) : "";
-  const hist = Array.isArray(card.hist) ? card.hist : [];
+  // The page says "Price being checked" when there is no price on file, so the
+  // share image draws no price line either (Generations ETB, live sweep Nov 25).
+  const hist = Array.isArray(card.hist) && priceNum > 0 ? card.hist : [];
   const points = hist
     .filter((p) => Array.isArray(p) && Number(p[1]) > 0 && !p[3])
     .slice(-36)

@@ -1,7 +1,7 @@
 // Held prices, condition labels, and the price row must stay inside the page.
 import { readFileSync } from "node:fs";
 import { banGuard } from "../src/advice-rules.mjs";
-import { renderCard } from "../src/ui.mjs";
+import { renderCard, isVolumeRow } from "../src/ui.mjs";
 
 const PAGE = { skipKinds: ["house"] };
 const ban = banGuard("price hold", null, PAGE);
@@ -102,6 +102,11 @@ t("a held page prints no price in the release cycle block", charizard.includes("
 t("a held page keeps its rotation chip", charizard.includes("Rotated Apr 10, 2026"));
 const unheld = renderCard({ id: "tcgcsv-517045", name: "Charizard ex - 199/165", kind: "single", set: "SV: Scarlet & Violet 151", price: 279.99, asOf: "2026-11-25", source: "TCGplayer market" }, "stamp", { rotationHtml: cycleArt + rotationChip, rotationFact: rotationChip, cycleHtml: cycleArt });
 t("a priced page keeps its release cycle block", unheld.includes("Release cycle") && unheld.includes("$294.42"));
+
+// Live sweep Nov 25 (latent): feed volume rows print "Near Mint" with no sealed guard.
+const volumeRow = { readKind: "volume", href: "/c/tcgcsv-1", headline: "5 Near Mint copies on TCGplayer in 30 days.", sold: { source: "TCGplayer sales via PokemonPriceTracker", condition: "Near Mint", count30d: 5, window30d: { from: "2026-10-26", to: "2026-11-25" } } };
+t("a card volume row is a volume row (fixture sanity)", isVolumeRow(volumeRow));
+t("a sealed product never gets a Near Mint volume row", !isVolumeRow({ ...volumeRow, href: "/p/tcgcsv-2" }) && !isVolumeRow({ ...volumeRow, itemKind: "sealed" }) && !isVolumeRow({ ...volumeRow, sealed: true }));
 
 if (fail) process.exit(1);
 console.log("price hold ok");

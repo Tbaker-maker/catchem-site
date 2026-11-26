@@ -181,6 +181,7 @@ const heldFields = shareFieldsFromProduct({ ...card, priceStatus: "checking" });
 const noPriceFields = shareFieldsFromProduct({ ...card, price: null, asOf: "2026-11-25", hist: [["2026-10-16", 30], ["2026-11-15", 40]] });
 assert.equal(noPriceFields.price, "");
 assert.equal(noPriceFields.date, ""); // no price on file means no date on the share image
+assert.deepEqual(noPriceFields.points, []); // and no price line: the page says Price being checked
 assert.equal(heldFields.price, "");
 assert.deepEqual(heldFields.points, []);
 const heldPng = await renderProductSharePng({ ...heldFields, facts: [] });
