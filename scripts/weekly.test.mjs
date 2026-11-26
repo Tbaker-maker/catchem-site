@@ -94,5 +94,17 @@ t("route renders", res.status === 200 && html.includes("<h1>Weekly</h1>") && htm
 const scan = await (await renderPath("/scanner", fetchImpl, { window: "7d" })).text();
 t("scanner route renders", scan.includes("<h1>Scanner</h1>") && scan.includes("38.5%") && !scan.includes("train="));
 
+// Live sweep 2, Nov 25: "TCGplayer-100492: 2 listings counted" and "1 listings counted".
+{
+  const { renderWeekly } = await import("../src/weekly.mjs");
+  const wk = renderWeekly({ asOf: "2026-11-25", movers: [], patterns: [], listingsCounted: { daysOnFile: 2, changes: [
+    { id: "tcgcsv-100492", name: "", kind: "sealed", prev: 1, n: 2, prevDate: "2026-11-24", date: "2026-11-25" },
+    { id: "tcgcsv-136599", name: "Example Tin", kind: "sealed", prev: 3, n: 1, prevDate: "2026-11-24", date: "2026-11-25" },
+  ] } }, "", {}, {});
+  const text = wk.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+  t("a weekly listings row with no name is left out, never shown as an id", !/tcgplayer-100492|tcgcsv-100492:/i.test(text));
+  t("one listing counted is singular", text.includes("Example Tin: 1 listing counted on") && !text.includes("1 listings counted"));
+}
+
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("weekly ok");
