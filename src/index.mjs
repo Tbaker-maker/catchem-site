@@ -569,10 +569,11 @@ export async function quickFor(cardId, fetchImpl, opts = {}) {
           set: hit.set,
           num: hit.number,
           artist: hit.artist,
-          price: hit.price,
-          asOf: hit.priceDate,
-          source: hit.source,
-          printing: hit.finish || "",
+          // The catalogue price is an old import snapshot (Aug 22), never shown.
+          price: null,
+          asOf: "",
+          source: "",
+          printing: "",
           kind: "single",
           hist: [],
         };
@@ -840,7 +841,8 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
         return html(renderNotFound(stamp, pageOpts), 404);
       }
       const images = await catalogueMap(fetchImpl);
-      const idsByCard = nightlyIdsByCard(page.cards, images);
+      const moved = await loadJson("redirects.json", fetchImpl).catch(() => null);
+      const idsByCard = nightlyIdsByCard(page.cards, images, moved?.products);
       const ids = [...new Set(idsByCard.values())];
       // Tonight's row per card: FEED_KV first, then one bucket text per bucket.
       const rows = await bucketRowsKvFirst(ids, fetchImpl).catch(() => new Map());
@@ -870,11 +872,14 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
             set: hit.set,
             num: hit.number,
             artist: hit.artist,
-            price: hit.price,
-            asOf: hit.priceDate,
-            source: hit.source,
+            // No nightly product for this catalogue card (redirects.json above
+            // sends every joined one to /c/tcgcsv-N). The catalogue price is an
+            // old import snapshot, so the page shows no price.
+            price: null,
+            asOf: "",
+            source: "",
             release: hit.release || "",
-            printing: hit.finish || "",
+            printing: "",
             kind: "single",
             tcgPlayerId: hit.tcgPlayerId || hit.pid || "",
             sku: hit.sku || "",
