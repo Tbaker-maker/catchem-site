@@ -3274,10 +3274,21 @@ function premiumFlagLine(card) {
   return `<p class="prem-flag" style="display:inline-block;margin:8px 0;border-radius:999px;padding:3px 10px;background:${bg};color:${fg};font:600 13px/1.4 var(--sans)">${esc(word)}</p>`;
 }
 
+export function heldPanels(opts = {}) {
+  const priced = (html) => /\$\s?\d/.test(String(html || ""));
+  const out = { ...opts };
+  for (const key of ["cycleHtml", "ratingHtml"]) if (priced(out[key])) out[key] = "";
+  if (priced(out.rotationHtml)) out.rotationHtml = priced(out.rotationFact) ? "" : String(out.rotationFact || "");
+  return out;
+}
+
 export function renderCard(card, stamp, opts = {}) {
   if (!card) return chrome("", `<main id="main" tabindex="-1" class="wrap"><h1>Not in the catalog</h1><p class="muted">That id is not in the TCGplayer catalog we publish.</p></main>`, "Not found", stamp, "", feedNav(opts));
   const fact = opts.fact || null;
   const held = opts.priceHeld === true || card.priceStatus === "checking";
+  // A held page prints no price anywhere. The release cycle art carries the
+  // last price and a 30 day move, so it goes; the rotation chip alone stays.
+  if (held) opts = heldPanels(opts);
   const shown = held ? null : (fact?.price > 0 ? fact.price : card.price);
   const price = money(shown);
   const asOf = fact?.asOf || card.asOf;

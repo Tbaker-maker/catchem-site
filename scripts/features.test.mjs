@@ -6,6 +6,7 @@ const PAGE = { skipKinds: ["house"] };
 import { renderPath, pageKind } from "../src/index.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { PRINT_RUN_LINE } from "../src/rotation.mjs";
+import * as featuresMod from "../src/features.mjs";
 import { listingsCountedLine, rotationBadge, setValueBlock, upcomingReleases, noDash, COPY } from "../src/features.mjs";
 
 let fail = 0;
@@ -85,6 +86,17 @@ t("set value hides when no doc", setValueBlock(null) === "");
 t("set value strips number from name", setValueBlock({ asOf: "2026-10-12", top: [{ id: "tcgcsv-1", name: "Magikarp - 203/193", number: "203/193", price: 5 }], master: { total: 5, priced: 1, unpriced: 0 } }).includes("1. Magikarp</b>"));
 t("print-run line is the approved text", PRINT_RUN_LINE === "Rotated sets historically stop getting new print runs. Older packs can still turn up in tins and collections.");
 t("print-run line never says supply", !/supply/i.test(PRINT_RUN_LINE));
+{
+  // Live sweep Nov 25: Charizard ex 199/165 was held and silently missing from the 151 Top 10 and total.
+  const heldDoc = { slug: "sv-scarlet-and-violet-151", asOf: "2026-11-25", top: [{ id: "tcgcsv-517046", name: "Blastoise ex - 200/165", number: "200/165", price: 106.41, date: "2026-11-25" }], master: { total: 1188.07, priced: 207, unpriced: 1, inSet: 208, held: 1 }, heldTop: [{ id: "tcgcsv-517045", name: "Charizard ex - 199/165", number: "199/165" }] };
+  const block = setValueBlock(heldDoc, {}, "sv-scarlet-and-violet-151");
+  t("a set value with a held card names it", block.includes("Top 10 and total leave out 1 card with price being checked: Charizard ex 199/165."));
+  const line = typeof featuresMod.heldSetValueLine === "function" ? featuresMod.heldSetValueLine({ master: { held: 3 }, heldTop: [] }) : "";
+  t("held cards that would not rank are still counted", line === "Top 10 and total leave out 3 cards with price being checked.");
+  t("the held line passes the copy rules", !/[\u2014\u2013]/.test(line) && !banGuard("held line", null, PAGE).test(line));
+  const plain = setValueBlock({ ...heldDoc, master: { ...heldDoc.master, held: 0 }, heldTop: [] }, {}, "sv-scarlet-and-violet-151");
+  t("a set value with nothing held says nothing about holds", !plain.includes("leave out"));
+}
 resetJsonCache();
 if (fail) { console.log(`features: ${fail} failed`); process.exitCode = 1; throw new Error(`features: ${fail} failed`); }
 console.log("features ok");
