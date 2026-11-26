@@ -16,6 +16,24 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const longDay = (d) => { const p = String(d).split("-"); return `${MONTHS[+p[1] - 1]} ${+p[2]}, ${p[0]}`; };
 
+// Video frame: ?camera=1&size=16x9|9x16|1x1. Size is ignored unless camera is on.
+export function cameraQuery(search) {
+  const q = String(search || "");
+  const on = /(?:^|[?&])camera=1(?:&|$)/.test(q);
+  const m = /(?:^|[?&])size=(16x9|9x16|1x1)(?:&|$)/.exec(q);
+  return { on, size: on && m ? m[1] : "" };
+}
+
+// Date and source together, or nothing. A missing half is not a blank stat.
+export function cameraMetaHtml(date, source) {
+  const s = String(source || "").replace(/[\u2014\u2013]/g, "").trim();
+  let d = String(date || "").replace(/[\u2014\u2013]/g, "").trim();
+  const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) d = `${MONTHS[+iso[2] - 1]} ${+iso[3]}, ${iso[1]}`;
+  if (!d || !s) return "";
+  return `<p class="pc-cam-meta">${esc(s)}, ${esc(d)}</p>`;
+}
+
 // Real listings nights: [[date, count]], counts may be 0, sorted, one per date.
 export function listingPoints(rows) {
   const map = new Map();
@@ -93,7 +111,7 @@ export function chartWindow(view, days, P, L) {
   return { from: from, t0: t0, t1: t1, p: p, l: l, useP: useP, useL: useL };
 }
 
-export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "", cameraLine = "" } = {}) {
+export function productChart({ price = [], listings = [], sold = [], soldSource = "", asOf = "", ownLabel, path = "", cameraLine = "", cameraDate = "", cameraSource = "" } = {}) {
   const priceReal = (price || []).filter((p) => Array.isArray(p) && ISO.test(String(p[0])) && Number(p[1]) > 0 && !p[3]);
   const list = listingPoints(listings);
   const soldPts = soldPoints(sold);
@@ -121,6 +139,7 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
   const markSrc = priceReal.length >= 2 ? "TCGplayer market" : "eBay listings counted";
   const camLine = String(cameraLine || "").replace(/[\u2014\u2013]/g, "").trim();
   const camHtml = camLine ? `<p class="md-cam">${esc(camLine)}</p>` : "";
+  const camMeta = cameraMetaHtml(cameraDate || asOf, cameraSource);
   const sum = priceReal.length >= 2
     ? `Price from ${esc(priceReal[0][0])} to ${esc(priceReal.at(-1)[0])}.${list.length >= 2 ? ` eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).` : ""}`
     : `eBay listings counted from ${esc(list[0][0])} (${list[0][1]}) to ${esc(list.at(-1)[0])} (${list.at(-1)[1]}).`;
@@ -129,6 +148,7 @@ export function productChart({ price = [], listings = [], sold = [], soldSource 
 ${tabs}
 <div class="hc-top"><div class="hc-read"><span class="hc-price"></span><span class="hc-date muted"></span></div><div class="hc-pills" role="group" aria-label="Chart range">${pills}</div></div>
 ${camHtml}
+${camMeta}
 <div class="pc-units muted" aria-hidden="true"><span class="pc-ul"></span><span class="pc-ur"></span></div>
 <div class="hc-plot"><svg class="hc-svg" viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="${views.map((v) => esc(v[1])).join(", ")} chart"></svg><div class="hc-gls" aria-hidden="true"></div><div class="pc-tags" aria-hidden="true"></div><div class="hc-tip" hidden></div></div>
 <div class="hc-axis muted"></div>
@@ -258,7 +278,16 @@ html.pc-cam #stats .kv dd{min-width:0}
 html.pc-cam #stats .cp-facts{margin:4px 0 0}
 html.pc-cam #stats .cp-facts li{padding:2px 0}
 }
-@media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}`;
+@media(max-width:420px){.pc .pc-tabs{display:grid;grid-template-columns:1fr 1fr}.pc-tab{padding:6px 4px}}
+html.pc-cam.pc-size-16x9 .pc-tabs,html.pc-cam.pc-size-9x16 .pc-tabs,html.pc-cam.pc-size-1x1 .pc-tabs,html.pc-cam.pc-size-16x9 .hc-pills,html.pc-cam.pc-size-9x16 .hc-pills,html.pc-cam.pc-size-1x1 .hc-pills,html.pc-cam.pc-size-16x9 .pc-cam-btn,html.pc-cam.pc-size-9x16 .pc-cam-btn,html.pc-cam.pc-size-1x1 .pc-cam-btn,html.pc-cam.pc-size-16x9 .pc-cam-x,html.pc-cam.pc-size-9x16 .pc-cam-x,html.pc-cam.pc-size-1x1 .pc-cam-x,html.pc-cam.pc-size-16x9 button,html.pc-cam.pc-size-9x16 button,html.pc-cam.pc-size-1x1 button{display:none!important}
+html.pc-cam.pc-size-16x9 .wrap{padding:5%!important;box-sizing:border-box}
+html.pc-cam.pc-size-16x9 .sum-chip:nth-child(n+4){display:none!important}
+html.pc-cam.pc-size-16x9 .pc-cam-meta{display:block!important;margin:8px 0 0;font:500 28px/1.3 var(--sans)}
+html.pc-cam.pc-size-9x16 .wrap{padding:15% 6% 15%!important;box-sizing:border-box}
+html.pc-cam.pc-size-9x16 .sum-strip,html.pc-cam.pc-size-9x16 #stats,html.pc-cam.pc-size-9x16 .chg,html.pc-cam.pc-size-9x16 .yr,html.pc-cam.pc-size-9x16 .glance-photo,html.pc-cam.pc-size-9x16 .cp-photo{display:none!important}
+html.pc-cam.pc-size-9x16 .md-cam{display:block!important}
+html.pc-cam.pc-size-1x1 .wrap{padding:5%!important;box-sizing:border-box}
+.pc-cam-meta{display:none}`;
 
 // Client script. Kept free of dashed strokes: the price line stays solid.
 export const PRODUCT_CHART_JS = `(function(){
@@ -351,7 +380,7 @@ fig.querySelectorAll(".pc-tab").forEach(function(b){b.addEventListener("click",f
 fig.querySelectorAll(".pc-cam-x").forEach(function(b){b.addEventListener("click",function(){cam(false);});});
 fig.querySelectorAll(".pc-cam-btn").forEach(function(b){b.addEventListener("click",function(){cam(!document.documentElement.classList.contains("pc-cam"));});});
 var q=typeof location!=="undefined"?location.search:"";var vm=/[?&]view=(price|listings|both|sold|change)\\b/.exec(q);if(vm){var t=fig.querySelector('.pc-tab[data-view="'+vm[1]+'"]');if(t)t.click();}
-draw();if(/[?&]camera=1\\b/.test(q))cam(true);}
+draw();if(/[?&]camera=1\\b/.test(q)){cam(true);var sm=/[?&]size=(16x9|9x16|1x1)\\b/.exec(q);if(sm)document.documentElement.classList.add("pc-size-"+sm[1]);}}
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&document.documentElement.classList.contains("pc-cam"))cam(false);});
 function all(){document.querySelectorAll("figure.pc[data-p]").forEach(mount);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",all);else all();})();`;

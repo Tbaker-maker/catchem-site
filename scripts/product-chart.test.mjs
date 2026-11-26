@@ -1,7 +1,7 @@
 // Product page chart: switchable views from published series only. These checks run
 // without sold data: the Sold view (eBay sold comps) is covered in market-depth.test.mjs.
 import vm from "node:vm";
-import { productChart, chartViews, defaultView, listingPoints, chartWindow, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS } from "../src/product-chart.mjs";
+import { productChart, chartViews, defaultView, listingPoints, chartWindow, yDomain, MIN_SPAN, PRODUCT_CHART_CSS, PRODUCT_CHART_JS, cameraQuery, cameraMetaHtml } from "../src/product-chart.mjs";
 import { renderCard } from "../src/ui.mjs";
 import { hasAdvice } from "../src/advice-rules.mjs";
 let fail = 0;
@@ -123,5 +123,13 @@ const allList = chartWindow("listings", 0, longPrice, lateList);
 t("All on Listings stays on the listings series", iso(allList.t0) === "2026-10-10" && iso(allList.t1) === "2026-10-30" && allList.p.length === 0);
 
 t("client chart uses the shared window function and does not clamp All to listings", PRODUCT_CHART_JS.includes("var chartWindow=function chartWindow(") && PRODUCT_CHART_JS.includes("chartWindow(view,days,P,L)") && !/from=Math\.max\(from,ms\(L\[0\]\[0\]\)\)/.test(PRODUCT_CHART_JS));
+
+t("video size is read only with camera on", cameraQuery("?camera=1&size=16x9").size === "16x9" && cameraQuery("?camera=1&size=9x16").size === "9x16" && cameraQuery("?camera=1&size=1x1").size === "1x1" && cameraQuery("?size=16x9").size === "" && cameraQuery("?camera=1&size=4x3").size === "");
+t("a missing date or source fails closed", cameraMetaHtml("", "TCGplayer market") === "" && cameraMetaHtml("2026-11-25", "") === "" && cameraMetaHtml("2026-11-25", "TCGplayer market") === '<p class="pc-cam-meta">TCGplayer market, Nov 25, 2026</p>');
+const noDate = productChart({ price, listings: [{ date: day(390), listingCount: 40 }, { date: day(395), listingCount: 31 }], cameraSource: "TCGplayer market" });
+t("chart with no date does not print an empty stat", !noDate.includes('class="pc-cam-meta"'));
+t("video frames hide tabs, range pills, and every control", ["16x9", "9x16", "1x1"].every((s) => PRODUCT_CHART_CSS.includes(`html.pc-cam.pc-size-${s} .pc-tabs`) && PRODUCT_CHART_CSS.includes(`html.pc-cam.pc-size-${s} .hc-pills`) && PRODUCT_CHART_CSS.includes(`html.pc-cam.pc-size-${s} button`)));
+t("16:9 keeps a 5 percent margin and 9:16 keeps the top and bottom 15 percent clear", PRODUCT_CHART_CSS.includes("html.pc-cam.pc-size-16x9 .wrap{padding:5%") && PRODUCT_CHART_CSS.includes("html.pc-cam.pc-size-9x16 .wrap{padding:15% 6% 15%"));
+t("the client applies the size class from the query", PRODUCT_CHART_JS.includes('classList.add("pc-size-"+sm[1])') && PRODUCT_CHART_JS.includes("size=(16x9|9x16|1x1)"));
 
 if (fail) process.exit(1); else console.log("product chart ok");
