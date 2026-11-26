@@ -3638,19 +3638,19 @@ export function heroToday(doc) {
 
 export function renderToday(doc, stamp, opts = {}) {
   const labels = { mover: "Biggest move", high: "6-month high", fact: "Fact", news: "News", supply: "Listings" };
-  const lines = (doc?.lines || []).map((line) => {
+  // A flag that is off leaves its line out. The page never prints the flag.
+  const shown = (doc?.lines || []).filter((line) => line && (line.slot !== "supply" || doc?.supply === "on"));
+  const lines = shown.map((line) => {
     const label = labels[line.slot] || line.slot;
     const text = dropInventedNm(line.text, line);
     const body = line.href ? `<a href="${esc(line.href)}">${esc(text)}</a>` : esc(text);
     const note = line.note ? `<p class="muted">${esc(line.note)}</p>` : "";
     return `<li><b>${esc(label)}</b><p>${body}</p>${note}</li>`;
   }).join("");
-  const supply = doc?.supply === "on" ? "" : `<p>The listings line is off.</p>`;
-  const payload = JSON.stringify((doc?.lines || []).map((line) => ({ text: dropInventedNm(line.text, line) }))).replace(/</g, "\\u003c");
+  const payload = JSON.stringify(shown.map((line) => ({ text: dropInventedNm(line.text, line) }))).replace(/</g, "\\u003c");
   const body = `<main id="main" tabindex="-1" class="wrap">
 <h1>Today</h1>
 <p class="muted">${esc(doc?.asOf || "")}</p>
-${supply}
 <ol class="today-lines">${lines}</ol>
 <p><button type="button" id="share-card">Share card</button></p>
 <p class="muted" id="share-note"></p>
