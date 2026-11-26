@@ -9,6 +9,7 @@ import {
   formatLine,
   howWeKnow,
   priceMove,
+  quietLine,
   returnLines,
   typicalSwing,
   weekLines,
@@ -50,7 +51,11 @@ const weekAgo = buildVisitPayload(model, { since: "2026-10-18", ids: ["tcgcsv-1"
 t("seven days ago stays on the watched item", weekAgo.mode === "return" && weekAgo.lines.length === 1 && weekAgo.lines[0].id === "tcgcsv-1");
 const still = { ...quiet, id: "tcgcsv-9", name: "Still Box", href: "/p/tcgcsv-9", hist: flat(100) };
 const quietDay = buildVisitPayload({ asOf: "2026-10-25", products: [still] }, { since: "2026-10-18", ids: ["tcgcsv-9"], watchedOnly: true });
-t("a quiet day names the visit day and adds no move", quietDay.lines.length === 0 && quietDay.note === "No price change is on file since Oct 18.");
+t("a quiet day names the visit day and adds no move", quietDay.lines.length === 0 && quietDay.note === "Nothing moved more than 0.1% since Oct 18." && quietLine([still], "2026-10-18", "2026-10-25") === quietDay.note);
+const yesterdayQuiet = buildVisitPayload({ asOf: "2026-10-25", products: [still] }, { since: "2026-10-24", ids: ["tcgcsv-9"], watchedOnly: true });
+t("yesterday quiet uses the same floor", yesterdayQuiet.lines.length === 0 && yesterdayQuiet.note === "Nothing moved more than 0.1% since Oct 24.");
+t("a real move is not called quiet", buildVisitPayload(model, { since: "2026-10-18", ids: ["tcgcsv-2"] }).note === "" && quietLine([jumpy], "2026-10-18", "2026-10-25") === "");
+t("no stored visit does not invent a since line", first.note === "" && first.lines.length === 0);
 const again = buildVisitPayload(model, { since: "2026-10-18" });
 t("return title and cap", again.mode === "return" && again.title === "Since your last visit" && again.lines.length <= 5);
 const watched = buildVisitPayload(model, { since: "2026-10-18", ids: ["tcgcsv-3"] });
@@ -83,12 +88,12 @@ const cardUrl = frameUrl({
 const svg = frameSvg(new URL(cardUrl).searchParams);
 t("share card is 1200 by 675 with a chart and no condition", svg.includes('width="1200"') && svg.includes('height="675"') && svg.includes('rx="32"') && svg.includes("Catch'em") && svg.includes("$2,214.94") && svg.includes("down 0.7% since Oct 18") && svg.includes("<path ") && !/\bNM\b|Near Mint/.test(svg));
 t("a price without a date is left off the card", !frameSvg(new URLSearchParams("n=Box&p=10&src=tcg&s=1")).includes("$10"));
-t("copy has no dash, sold, or advice", [formatLine({ name: "Evolving Skies Booster Box", pct: -4.2, since: "2026-10-18", listings: 12 }), know, first.title, again.title, sameDay.note, "Nothing saved on this device yet.", "Tap Watch on a product, or start with one of these."].every((line) => !/[\u2014\u2013]/.test(line) && !BANNED.test(line)));
+t("copy has no dash, sold, or advice", [formatLine({ name: "Evolving Skies Booster Box", pct: -4.2, since: "2026-10-18", listings: 12 }), know, first.title, again.title, sameDay.note, quietDay.note, "Nothing saved on this device yet. Tap Watch on a product page.", "Type two product ids, then tap Show."].every((line) => !/[\u2014\u2013]/.test(line) && !BANNED.test(line)));
 
 const home = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 t("home hides a first visit and asks only for watched ids", home.includes('if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(since)){ box.hidden=true; since=""; }') && home.includes('localStorage.getItem("catchem-product-watch"') && home.includes('+"ids="+encodeURIComponent(ids.join(","))') && !home.includes("this morning") && !home.includes("Biggest moves this week"));
 const page = renderWatch("Updated Oct 25");
-t("watch page has an empty state and no account", page.includes("Nothing saved on this device yet.") && page.includes('data-rv-page="watch"') && !/sign in to watch/i.test(page));
+t("watch page has an empty state and no account", page.includes("Nothing saved on this device yet. Tap Watch on a product page.") && page.includes('data-rv-page="watch"') && page.includes('id="rv-changed"') && !/sign in to watch/i.test(page) && !page.includes("you missed"));
 
 const env = { ASSETS: { fetch: async () => new Response("", { status: 404 }) }, PUBLIC_FETCH: async () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } }) };
 const res = await worker.fetch(new Request("https://catchemtcg.com/api/return-visit"), env);

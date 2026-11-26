@@ -16,7 +16,7 @@ const day = (n) => new Date(Date.parse("2025-09-01T00:00:00Z") + n * 86400000).t
 const line = (price) => Array.from({ length: 400 }, (_, i) => [day(i), price + i * 0.01]);
 
 const empty = renderCompare(null, null, "stamp");
-t("empty compare keeps the heading and hides the chart", empty.includes("<h1>Compare two products</h1>") && empty.includes("A missing number is left off.") && empty.includes("Add two product ids.") && empty.includes('name="c"') && empty.includes('name="d"') && !empty.includes('id="cmp-plot"'));
+t("empty compare keeps the heading and hides the chart", empty.includes("<h1>Compare two products</h1>") && empty.includes("A missing number is left off.") && empty.includes("Type two product ids, then tap Show.") && empty.includes('name="c"') && empty.includes('name="d"') && !empty.includes('id="cmp-plot"'));
 
 const compared = compareRows({ market: 10, date: "2026-10-09", source: "TCGplayer market" }, { market: 12, low: 8, source: "TCGplayer market" });
 t("compare leaves a missing row off", compared.map((row) => row.label).join() === "Market,Source" && !/winner|score|better|higher|lower/i.test(JSON.stringify(compared)));
