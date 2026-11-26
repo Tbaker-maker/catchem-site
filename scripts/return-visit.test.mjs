@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { banGuard } from "../src/advice-rules.mjs";
 import worker from "../src/index.mjs";
 import { renderWatch } from "../src/ui.mjs";
@@ -42,7 +43,14 @@ t("a first visit keeps the three biggest week moves", week.length <= 3 && week[0
 
 const model = { asOf: "2026-10-25", products: [quiet, jumpy, listed] };
 const first = buildVisitPayload(model, {});
-t("first visit title", first.mode === "week" && first.title === "Biggest moves this week" && first.lines.length >= 1 && first.lines.length <= 3);
+t("first visit shows nothing new", first.mode === "first" && first.title === "" && first.lines.length === 0 && first.note === "" && first.suggestions.length >= 1 && first.suggestions.length <= 3);
+const yesterday = buildVisitPayload(model, { since: "2026-10-24", ids: ["tcgcsv-3"], watchedOnly: true });
+t("yesterday keeps that watched move and its dates", yesterday.mode === "return" && yesterday.lines.length === 1 && yesterday.lines[0].text.includes("since Oct 24") && yesterday.lines[0].text.includes("as of Oct 25"));
+const weekAgo = buildVisitPayload(model, { since: "2026-10-18", ids: ["tcgcsv-1"], watchedOnly: true });
+t("seven days ago stays on the watched item", weekAgo.mode === "return" && weekAgo.lines.length === 1 && weekAgo.lines[0].id === "tcgcsv-1");
+const still = { ...quiet, id: "tcgcsv-9", name: "Still Box", href: "/p/tcgcsv-9", hist: flat(100) };
+const quietDay = buildVisitPayload({ asOf: "2026-10-25", products: [still] }, { since: "2026-10-18", ids: ["tcgcsv-9"], watchedOnly: true });
+t("a quiet day names the visit day and adds no move", quietDay.lines.length === 0 && quietDay.note === "No price change is on file since Oct 18.");
 const again = buildVisitPayload(model, { since: "2026-10-18" });
 t("return title and cap", again.mode === "return" && again.title === "Since your last visit" && again.lines.length <= 5);
 const watched = buildVisitPayload(model, { since: "2026-10-18", ids: ["tcgcsv-3"] });
@@ -77,6 +85,8 @@ t("share card is 1200 by 675 with a chart and no condition", svg.includes('width
 t("a price without a date is left off the card", !frameSvg(new URLSearchParams("n=Box&p=10&src=tcg&s=1")).includes("$10"));
 t("copy has no dash, sold, or advice", [formatLine({ name: "Evolving Skies Booster Box", pct: -4.2, since: "2026-10-18", listings: 12 }), know, first.title, again.title, sameDay.note, "Nothing saved on this device yet.", "Tap Watch on a product, or start with one of these."].every((line) => !/[\u2014\u2013]/.test(line) && !BANNED.test(line)));
 
+const home = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+t("home hides a first visit and asks only for watched ids", home.includes('if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(since)){ box.hidden=true; since=""; }') && home.includes('localStorage.getItem("catchem-product-watch"') && home.includes('+"ids="+encodeURIComponent(ids.join(","))') && !home.includes("this morning") && !home.includes("Biggest moves this week"));
 const page = renderWatch("Updated Oct 25");
 t("watch page has an empty state and no account", page.includes("Nothing saved on this device yet.") && page.includes('data-rv-page="watch"') && !/sign in to watch/i.test(page));
 

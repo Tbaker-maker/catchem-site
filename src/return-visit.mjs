@@ -164,6 +164,8 @@ export function formatLine(row) {
   if (!since) return "";
   const dir = row.pct > 0 ? "up" : "down";
   let line = `${row.name}: ${dir} ${Math.abs(row.pct).toFixed(1)}% since ${since}`;
+  const asOf = monthDay(row.to);
+  if (asOf && asOf !== since) line += `, as of ${asOf}`;
   if (Number.isInteger(row.listings) && row.listings !== 0) {
     const way = row.listings > 0 ? "up" : "down";
     line += `, listings counted ${way} ${Math.abs(row.listings)}`;
@@ -259,15 +261,18 @@ export function buildVisitPayload(model, opts = {}) {
   if (!asOf || !products.length) return empty;
   const ids = (opts.ids || []).filter((id) => /^tcgcsv-\d+$/.test(id)).slice(0, 25);
   const wanted = new Set(ids);
-  const pool = wanted.size ? products.filter((row) => wanted.has(row.id)) : products;
+  const watchedOnly = opts.watchedOnly === true;
+  const pool = (watchedOnly || wanted.size) ? products.filter((row) => wanted.has(row.id)) : products;
   const visit = isoDay(opts.since);
   let mode = "week";
-  let title = "Biggest moves this week";
+  let title = "";
   let note = "";
   let rows = [];
   const cap = wanted.size || 0;
-  if (!visit) {
-    rows = weekLines(pool, asOf, cap || 3);
+  if (watchedOnly && !wanted.size) {
+    mode = visit ? "return" : "first";
+  } else if (!visit) {
+    mode = "first";
   } else if (visit >= asOf) {
     mode = "today";
     title = "Since your last visit";
@@ -575,6 +580,13 @@ export const RETURN_BOOT = `(function(){
         root.innerHTML="";
         if(quiet) quiet.innerHTML="";
         if(suggest) suggest.innerHTML=ideas.map(function(row){return cardHtml(row,false);}).join("");
+      }else if(!since || (doc && doc.mode==="first")){
+        if(empty) empty.hidden=true;
+        if(invite) invite.hidden=true;
+        if(suggest) suggest.innerHTML="";
+        if(head) head.hidden=true;
+        root.innerHTML="";
+        if(quiet) quiet.innerHTML="";
       }else{
         if(empty) empty.hidden=true;
         if(invite) invite.hidden=true;
@@ -610,8 +622,9 @@ export async function handleReturnVisit(url, fetchImpl) {
     doc = null;
   }
   const since = isoDay(url.searchParams.get("since"));
+  const asked = url.searchParams.has("ids");
   const ids = String(url.searchParams.get("ids") || "").split(",").map((id) => id.trim()).filter((id) => /^tcgcsv-\d+$/.test(id)).slice(0, 25);
-  const body = buildVisitPayload(productsFromMovers(doc), { since, ids });
+  const body = buildVisitPayload(productsFromMovers(doc), { since, ids, watchedOnly: asked });
   return new Response(JSON.stringify(body), {
     headers: {
       "content-type": "application/json; charset=utf-8",

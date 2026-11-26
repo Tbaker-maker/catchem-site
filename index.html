@@ -502,14 +502,28 @@ footer a{color:var(--gold)}
   var KEY="catchem-visit-day";
   var since="";
   try{ since=localStorage.getItem(KEY)||""; }catch(e){}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(since)){ box.hidden=true; since=""; }
+  var watch=[];
+  try{ watch=JSON.parse(localStorage.getItem("catchem-product-watch")||"[]"); }catch(e){}
+  var ids=[];
+  if(Array.isArray(watch)){
+    for(var i=0;i<watch.length && ids.length<25;i++){
+      var id=watch[i]&&watch[i].id?String(watch[i].id):"";
+      if(/^tcgcsv-\d+$/.test(id)) ids.push(id);
+    }
+  }
   var url="/api/return-visit"+(since?"?since="+encodeURIComponent(since):"");
+  if(since) url+=(url.indexOf("?")>=0?"&":"?")+"ids="+encodeURIComponent(ids.join(","));
   function hide(){ box.hidden=true; box.removeAttribute("aria-busy"); }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ if(c==="&")return "&"+"amp;"; if(c==="<")return "&"+"lt;"; if(c===">")return "&"+"gt;"; if(c==='"')return "&"+"quot;"; return "&"+"#39;"; }); }
   fetch(url).then(function(res){ return res.ok?res.json():null; }).catch(function(){ return null; }).then(function(doc){
     box.removeAttribute("aria-busy");
     var skel=box.querySelector(".since-skel");
     if(skel) skel.remove();
-    if(!doc || (!doc.lines || !doc.lines.length) && !doc.note){ hide(); return; }
+    if(doc && doc.asOf && /^\d{4}-\d{2}-\d{2}$/.test(doc.asOf)){
+      try{ localStorage.setItem(KEY, doc.asOf); }catch(e){}
+    }
+    if(!since || !doc || doc.mode==="first" || ((!doc.lines || !doc.lines.length) && !doc.note)){ hide(); return; }
     var kicker=document.getElementById("since-kicker");
     if(kicker) kicker.textContent=doc.title || "Since your last visit";
     var list=document.getElementById("since-list");
@@ -520,9 +534,6 @@ footer a{color:var(--gold)}
       return '<div class="since-row"><a href="'+esc(row.href||"/")+'">'+esc(row.text||"")+'</a>'+know+'</div>';
     }).join("");
     if(list) list.innerHTML=html;
-    if(doc.asOf && /^\d{4}-\d{2}-\d{2}$/.test(doc.asOf)){
-      try{ localStorage.setItem(KEY, doc.asOf); }catch(e){}
-    }
   });
 })();
 </script>
