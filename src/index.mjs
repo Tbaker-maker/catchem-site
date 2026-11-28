@@ -66,6 +66,7 @@ import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
 import { openAccess } from "./open-access.mjs";
 import { exploreOn, exploreResponse, paintExplore } from "./explore-page.mjs";
+import { loadExploreRows, renderExplore } from "./explorer.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
 async function withPremium(card, fetchImpl) {
@@ -166,6 +167,7 @@ export function pageKind(pathname) {
   if (path.startsWith("/dive/")) return "dive";
   if (path === "/board" || path === "/movers") return "movers";
   if (path === "/search") return "search";
+  if (path === "/explore") return "explore";
   if (path === "/receipts") return "receipts";
   if (path === "/methodology") return "method";
   if (path === "/rotation") return "rotation";
@@ -1201,6 +1203,10 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     return html(renderMovers(painted, stamp, pageOpts));
   }
   if (kind === "search") return html(renderSearch(pageOpts));
+  if (kind === "explore") {
+    const rows = await loadExploreRows(fetchImpl, { q: opts.q || "", kind: opts.kind || "" });
+    return html(pageChrome("Explore", renderExplore(rows, { q: opts.q || "", kind: opts.kind || "", sort: opts.sort || "", page: opts.page || "" }), "Explore", stamp, "", pageOpts.feed === true));
+  }
   if (kind === "watch") return html(renderWatch(stamp, pageOpts));
   if (kind === "receipts") return home302();
   if (kind === "method") return html(renderMethod(await loadJson("counts.json", fetchImpl).catch(() => null), stamp, pageOpts));
@@ -1688,7 +1694,7 @@ const worker = {
           const prewarmParam = url.searchParams.get("prewarm") || "";
           const prewarm = prewarmParam === "1" || prewarmParam === "html";
           const prewarmHtml = prewarmParam === "html";
-          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, prewarmHtml, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env), officeSearch: url.search || "", openAccess: openAccess(env) });
+          const page = await renderPath(url.pathname, fetchImpl, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined, kv: env?.FEED_KV, anon, prewarm, prewarmHtml, video, feed, premium, reads, collectionCheck: env?.COLLECTION_CHECK === "on", sort: url.searchParams.get("sort") || "", range: url.searchParams.get("range") || "", a: url.searchParams.get("a") || "", b: url.searchParams.get("b") || "", c: url.searchParams.get("c") || "", d: url.searchParams.get("d") || "", set: url.searchParams.get("set") || "", page: url.searchParams.get("page") || "", q: url.searchParams.get("q") || "", kind: url.searchParams.get("kind") || "", premiumMode: premiumMode(env), postOffice: postOfficeOn(env), officeSearch: url.search || "", openAccess: openAccess(env) });
           if (page) return await withShareMeta(page, url.pathname, kind);
         } catch {
           // Fall through to the baked asset if the catalog did not load.
