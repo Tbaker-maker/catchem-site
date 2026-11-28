@@ -109,3 +109,4 @@ jobs:
       - run: node scripts/lock-regression.test.mjs
       - run: node scripts/product-cold.test.mjs
       - run: node scripts/explore-page.test.mjs
+      - run: node scripts/explorer.test.mjs
