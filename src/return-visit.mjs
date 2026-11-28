@@ -329,6 +329,136 @@ export function buildVisitPayload(model, opts = {}) {
   };
 }
 
+const SINCE_HERE_FALLBACK = "Today's changes load from the published files.";
+
+function plainSource(source) {
+  const raw = String(source || "").replace(/\s*[\u2014\u2013]\s*/g, ", ").replace(/\s+/g, " ").trim();
+  return raw && !/[\u2014\u2013]/.test(raw) ? raw : "";
+}
+
+function badCopy(text) {
+  return !text || /you missed|\bstreak\b|this morning|[\u2014\u2013]|\bsold\b/i.test(text);
+}
+
+function scrubSealedName(name) {
+  return String(name || "").replace(/\bNM\b/g, "").replace(/Near Mint/gi, "").replace(/\s+/g, " ").trim();
+}
+
+function moveLine(row) {
+  const sealed = row && row.kind === "sealed";
+  const named = sealed ? { ...row, name: scrubSealedName(row.name) } : row;
+  let text = formatLine(named);
+  if (sealed && text) {
+    text = text.replace(/\bNM\b/g, "").replace(/Near Mint/gi, "").replace(/\s{2,}/g, " ").replace(/\s+([,.:])/g, "$1").trim();
+  }
+  const date = isoDay(row && row.to);
+  const source = knownSource(row && row.source) ? (/eBay asks/i.test(String(row.source)) ? "eBay asks" : "TCGplayer market") : "";
+  if (!text || !date || !source || badCopy(text) || (sealed && /\bNM\b|Near Mint/i.test(text))) return null;
+  return { kind: "move", text, source, date, href: String(row.href || "") };
+}
+
+function datedFact(row, kind) {
+  if (!row || typeof row !== "object") return null;
+  const date = isoDay(row.date || row.asOf);
+  const source = plainSource(row.source);
+  const title = String(row.title || row.headline || row.name || "").replace(/[\u2014\u2013]/g, ",").replace(/\s+/g, " ").trim();
+  if (!date || !source || !title || badCopy(title)) return null;
+  const text = kind === "release" ? `${title}, ${monthDay(date)}` : title;
+  if (badCopy(text)) return null;
+  const href = String(row.href || "");
+  return { kind, text, source, date, href: href.startsWith("/") ? href : "" };
+}
+
+// Home digest. Moves reuse returnLines and, for a week-long gap, weekLines.
+// Reads and releases are included only when the caller already has those
+// published lists. An omitted list is not invented.
+export function sinceHere({ reads, moves, releases, lastVisit, asOf } = {}) {
+  const end = isoDay(asOf);
+  if (!end) return [];
+  const visit = isoDay(lastVisit);
+  if (visit && visit >= end) {
+    const text = `No price change is on file since ${monthDay(end)}.`;
+    return [{ kind: "note", text, source: "TCGplayer market", date: end, href: "" }];
+  }
+  const from = visit || shiftDay(end, -1);
+  if (!from || from >= end) return [];
+  const lines = [];
+  const open = (date) => date > from && date <= end;
+
+  if (Array.isArray(reads)) {
+    for (const row of reads) {
+      const bit = datedFact(row, "read");
+      if (bit && open(bit.date)) lines.push(bit);
+    }
+  }
+
+  const products = Array.isArray(moves) ? moves.filter((row) => row && Array.isArray(row.hist) && row.name && row.href) : [];
+  if (products.length) {
+    const ranked = returnLines(products, from, end, 5);
+    if (visit && gapDays(visit, end) >= 7) {
+      const seen = new Set(ranked.map((row) => row.id));
+      for (const row of weekLines(products, end, 5)) {
+        if (!row || seen.has(row.id) || ranked.length >= 5) continue;
+        const stamp = isoDay(row.to);
+        if (!stamp || stamp <= visit) continue;
+        ranked.push(row);
+        seen.add(row.id);
+      }
+    }
+    let movesOut = 0;
+    for (const row of ranked) {
+      const line = moveLine(row);
+      if (!line || !open(line.date)) continue;
+      lines.push(line);
+      movesOut += 1;
+    }
+    if (!movesOut) {
+      const quiet = quietLine(products, from, end);
+      if (quiet && !badCopy(quiet)) lines.push({ kind: "note", text: quiet, source: "TCGplayer market", date: end, href: "" });
+    }
+  }
+
+  if (Array.isArray(releases)) {
+    for (const row of releases) {
+      const bit = datedFact(row, "release");
+      if (bit && open(bit.date)) lines.push(bit);
+    }
+  }
+  return lines;
+}
+
+export function sinceHereListHtml(lines) {
+  const rows = (lines || []).map((row) => {
+    const text = esc(row.text || "");
+    const meta = esc([row.source, monthDay(row.date)].filter(Boolean).join(", "));
+    const href = String(row.href || "");
+    const body = href.startsWith("/") ? `<a href="${esc(href)}">${text}</a>` : `<p class="since-here-text">${text}</p>`;
+    const know = meta ? `<p class="since-here-meta">${meta}</p>` : "";
+    return `<article class="since-here-row">${body}${know}</article>`;
+  }).join("");
+  return rows ? `<div class="since-here-list">${rows}</div>` : "";
+}
+
+// Server shell. Without a stored visit the page still has the heading and one
+// honest line. The client replaces the body from /api/return-visit.
+export function sinceHereHomeHtml(input) {
+  const lines = input && isoDay(input.asOf) ? sinceHere(input) : [];
+  const inner = lines.length
+    ? sinceHereListHtml(lines)
+    : `<p class="since-here-note" id="since-here-note">${SINCE_HERE_FALLBACK}</p>`;
+  return `<section id="since-here" class="since-here" aria-labelledby="since-here-h" aria-live="polite"><h2 id="since-here-h">Since you were last here</h2><div id="since-here-body">${inner}</div></section>`;
+}
+
+export function returnVisitBody(model, opts = {}) {
+  const body = buildVisitPayload(model, opts);
+  body.here = sinceHere({
+    moves: (model && model.products) || [],
+    lastVisit: opts.since,
+    asOf: (model && model.asOf) || body.asOf,
+  });
+  return body;
+}
+
 export function alertHookDoc(items) {
   return {
     version: 1,
@@ -651,7 +781,8 @@ export async function handleReturnVisit(url, fetchImpl) {
   const since = isoDay(url.searchParams.get("since"));
   const asked = url.searchParams.has("ids");
   const ids = String(url.searchParams.get("ids") || "").split(",").map((id) => id.trim()).filter((id) => /^tcgcsv-\d+$/.test(id)).slice(0, 25);
-  const body = buildVisitPayload(productsFromMovers(doc), { since, ids, watchedOnly: asked });
+  const model = productsFromMovers(doc);
+  const body = returnVisitBody(model, { since, ids, watchedOnly: asked });
   return new Response(JSON.stringify(body), {
     headers: {
       "content-type": "application/json; charset=utf-8",
