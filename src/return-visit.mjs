@@ -341,19 +341,28 @@ function badCopy(text) {
 }
 
 function scrubSealedName(name) {
-  return String(name || "").replace(/\bNM\b/g, "").replace(/Near Mint/gi, "").replace(/\s+/g, " ").trim();
+  return String(name || "")
+    .replace(/\bnear mint\b/gi, " ")
+    .replace(/\blightly played\b/gi, " ")
+    .replace(/\bmoderately played\b/gi, " ")
+    .replace(/\bheavily played\b/gi, " ")
+    .replace(/\bmint condition\b/gi, " ")
+    .replace(/\bdamaged\b/gi, " ")
+    .replace(/\b(NM|LP|MP|HP|DMG)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.:])/g, "$1")
+    .trim();
 }
 
 function moveLine(row) {
   const sealed = row && row.kind === "sealed";
   const named = sealed ? { ...row, name: scrubSealedName(row.name) } : row;
   let text = formatLine(named);
-  if (sealed && text) {
-    text = text.replace(/\bNM\b/g, "").replace(/Near Mint/gi, "").replace(/\s{2,}/g, " ").replace(/\s+([,.:])/g, "$1").trim();
-  }
+  if (sealed && text) text = scrubSealedName(text);
   const date = isoDay(row && row.to);
   const source = knownSource(row && row.source) ? (/eBay asks/i.test(String(row.source)) ? "eBay asks" : "TCGplayer market") : "";
-  if (!text || !date || !source || badCopy(text) || (sealed && /\bNM\b|Near Mint/i.test(text))) return null;
+  const conditionLeft = /\b(NM|LP|MP|HP|DMG)\b|Near Mint|Lightly Played|Moderately Played|Heavily Played|Mint Condition/i;
+  if (!text || !date || !source || badCopy(text) || (sealed && conditionLeft.test(text))) return null;
   return { kind: "move", text, source, date, href: String(row.href || "") };
 }
 

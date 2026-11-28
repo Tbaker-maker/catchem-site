@@ -81,6 +81,14 @@ t("sealed line has no NM",
   && /listings counted/.test(sealedText)
   && !/\bsold\b/i.test(sealedText + sealedHtml));
 
+const lpSealed = { ...sealed, id: "tcgcsv-6", name: "LP Hidden Fates Tin Lightly Played", href: "/p/tcgcsv-6" };
+const lpLines = sinceHere({ moves: [lpSealed], lastVisit: yesterday, asOf });
+const lpText = lpLines.map((line) => line.text).join(" ");
+t("sealed line drops LP and Lightly Played",
+  lpLines.length === 1
+  && /Hidden Fates Tin/.test(lpText)
+  && !/\b(NM|LP|MP|HP|DMG)\b|Near Mint|Lightly Played/.test(lpText));
+
 const bare = sinceHere({ asOf });
 t("missing lists are omitted", bare.length === 0);
 
@@ -95,6 +103,8 @@ const home = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 t("home renders the shell", home.includes('id="since-here"') && home.includes("Since you were last here") && home.includes("Today's changes load from the published files.") && !home.includes('id="since-here-body"></div>'));
 t("home reuses the visit key and the return-visit payload", home.includes('var KEY="catchem-visit-day"') && home.includes('"/api/return-visit"') && home.includes("doc.here"));
 t("home does not load reads or releases for this module", !home.includes("/data/reads.json") && !home.includes("releases.json"));
+const staticSince = (home.split('id="since-here-body"')[1] || "").split("</div>")[0];
+t("home HTML does not invent read or release rows", !/read|release/i.test(staticSince) && !staticSince.includes("since-here-row"));
 
 const watched = returnVisitBody({ asOf, products: moves }, { since: weekAgo, ids: ["tcgcsv-1"], watchedOnly: true });
 t("watched lines stay on that product while here keeps the week window",
@@ -104,6 +114,8 @@ t("watched lines stay on that product while here keeps the week window",
 const firstBody = returnVisitBody({ asOf, products: moves }, {});
 t("first visit payload still has empty lines and fills today's here rows",
   firstBody.mode === "first" && firstBody.lines.length === 0 && firstBody.here.some((line) => line.href === "/c/tcgcsv-1") && !firstBody.here.some((line) => line.href === "/c/tcgcsv-2"));
+t("live here payload does not invent read or release rows",
+  [firstBody, watched].every((body) => Array.isArray(body.here) && body.here.every((line) => line.kind !== "read" && line.kind !== "release")));
 
 const copy = [
   "Since you were last here",
@@ -113,6 +125,7 @@ const copy = [
   ...week.map((line) => line.text),
   ...quietDay.map((line) => line.text),
   ...sealedLines.map((line) => line.text),
+  ...lpLines.map((line) => line.text),
 ];
 for (const line of copy) {
   t("copy clean: " + line.slice(0, 60), flagLine(line).length === 0 && !/[\u2014\u2013]/.test(line) && !/\bsold\b/i.test(line));
