@@ -106,6 +106,7 @@ jobs:
       - run: node scripts/pattern-track.test.mjs
       - run: node scripts/market-meter.test.mjs
       - run: node scripts/heatmap-mount.test.mjs
+      - run: node scripts/pulse-brand.test.mjs
       - run: node scripts/lock-regression.test.mjs
       - run: node scripts/product-cold.test.mjs
       - run: node scripts/explore-page.test.mjs

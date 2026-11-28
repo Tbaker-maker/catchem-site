@@ -125,6 +125,22 @@ export function prettyDay(iso) {
   return MONTHS[Number(d.slice(5, 7)) - 1] + " " + Number(d.slice(8, 10)) + ", " + d.slice(0, 4);
 }
 
+// A real YYYY-MM-DD only. Empty stays empty. Never the clock.
+function isoAsOf(value) {
+  const d = String(value ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+}
+
+function dataDateLine(asOf) {
+  const iso = isoAsOf(asOf);
+  if (!iso) return "";
+  return `<p class="bv-asof" data-as-of="${esc(iso)}"><span>Data date</span> ${esc(iso)}.</p>`;
+}
+
+function brandBand(asOf) {
+  return `<header class="bv-band" data-first-screen="390 1280"><a class="bv-mark" href="https://catchemtcg.com/">${esc(BRAND.wordmark)}</a>${dataDateLine(asOf)}</header>`;
+}
+
 export function foldSetName(s) {
   return String(s || "")
     .normalize("NFD")
@@ -290,7 +306,9 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
   }).join("");
   const last = opts.median || MARKET_MEDIAN[MARKET_MEDIAN.length - 1];
   const source = opts.source || SOURCE;
-  const asOf = opts.asOf || AS_OF;
+  const asOf = Object.prototype.hasOwnProperty.call(opts, "asOf") ? isoAsOf(opts.asOf) : AS_OF;
+  const day = prettyDay(asOf);
+  const sourceBit = day ? `${esc(source)}, ${esc(day)}` : esc(source);
   const legend = `<div class="bv-legend" role="group" aria-label="Color scale for month change">
       <span class="bv-legend-k">Month change</span>
       <span class="bv-swatch bv-swatch-down" aria-hidden="true"></span>
@@ -303,17 +321,23 @@ export function heatmapHtml(rows = PULSE_SAMPLE, opts = {}) {
       <span class="bv-legend-lab">No reading</span>
     </div>`;
   return `<section class="bv-card" id="heat">
+    ${brandBand(asOf)}
     <div class="bv-scroll">
       <div class="bv-heat" style="--m:${months.length}">${head}${body}</div>
     </div>
     ${legend}
-    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${esc(source)}, ${esc(prettyDay(asOf))}. A month with no price says No reading. A month before release is blank. These rows are on file.</p>
+    <p class="bv-note">${esc(monthLabel(last.ym))} sealed market median ${esc(pctLabel(last.pct))}. ${sourceBit}. A month with no price says No reading. A month before release is blank. These rows are on file.</p>
   </section>`;
 }
 
 export const BRAND_CSS = `
 .bv-page{margin:0;background:${BRAND.paper};color:${BRAND.ink};font:16px/1.4 ${BRAND.font};padding:20px 16px 48px}
 .bv-mark{color:${BRAND.gold};font:600 28px/1 ${BRAND.font};letter-spacing:-0.03em;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+.bv-band{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;position:sticky;top:0;z-index:30;background:${BRAND.paper};padding:0 0 8px}
+.bv-band .bv-asof{margin:0}
+.bv-card .bv-band{position:static;background:transparent;padding:0 0 10px;z-index:1}
+@media (max-width:390px){.bv-band{display:flex;position:sticky;top:0;background:${BRAND.paper}}.bv-card .bv-band{position:static;background:transparent}}
+@media (min-width:1280px){.bv-band{display:flex;position:sticky;top:0;background:${BRAND.paper}}.bv-card .bv-band{position:static;background:transparent}}
 .bv-nav{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .bv-nav a{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;border:1px solid ${BRAND.line};color:${BRAND.ink};text-decoration:none;font:600 15px/1 ${BRAND.font}}
 .bv-nav a[aria-current="page"]{background:${BRAND.gold};color:#1a1407;border-color:${BRAND.gold}}
@@ -415,7 +439,7 @@ export function brandPageFromDoc(doc, opts = {}) {
   const rows = rowsFromPulseDoc(doc);
   const use = rows.length ? rows : PULSE_SAMPLE;
   const cutouts = opts.cutouts || null;
-  const asOf = (doc && doc.asOf) || AS_OF;
+  const asOf = isoAsOf(doc && doc.asOf);
   const source = (doc && doc.source) || SOURCE;
   const about = (doc && doc.about) || "";
   const medians = medianFromDoc(doc);
@@ -444,13 +468,12 @@ export function brandPageFromDoc(doc, opts = {}) {
     date: prettyDay(asOf),
     href: "https://catchemtcg.com/sealed-pulse",
   };
-  const day = prettyDay(asOf);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sealed Market Pulse</title><style>${BRAND_CSS}
 .bv-skip{position:absolute;left:8px;top:-60px;z-index:1000;background:#111;color:#fff;padding:8px 12px;border-radius:6px}
 .bv-skip:focus{top:8px}
 </style></head><body class="bv-page">
 <a class="bv-skip" href="#main">Skip to content</a>
-<a class="bv-mark" href="https://catchemtcg.com/">${esc(BRAND.wordmark)}</a>
+${brandBand(asOf)}
 <nav class="bv-nav" aria-label="Site">
   <a href="/">Back</a>
   <a href="/collection">Collection</a>
@@ -462,7 +485,6 @@ export function brandPageFromDoc(doc, opts = {}) {
 <p class="bv-kicker">Sealed Market Pulse</p>
 <h1>Month end market.</h1>
 <p class="bv-src">${esc(source)}.</p>
-<p class="bv-asof" data-as-of="${esc(String(asOf).slice(0, 10))}"><span>Data date</span> ${esc(day)}.</p>
 ${heat}
 <p class="bv-note">${esc(MIRROR_NOTE)}</p>
 <section class="bv-shares" id="shares" aria-labelledby="shares-h">
