@@ -1,4 +1,5 @@
 import { pageKind, renderPath } from "../src/index.mjs";
+import entry from "../src/site-entry.mjs";
 import { resetJsonCache } from "../src/data.mjs";
 import { catalogRows, renderExplore, PAGE_SIZE } from "../src/explorer.mjs";
 
@@ -91,6 +92,19 @@ const fetchImpl = async (url) => {
 };
 const live = await (await renderPath("/explore", fetchImpl, {})).text();
 t("the route draws the set with its source and date", live.includes("Base Set") && live.includes("TCGplayer market") && live.includes('data-date="1999-01-09"') && live.includes('action="/explore"') && !live.includes("No Release"));
+resetJsonCache();
+
+const env = {
+  PUBLIC_FETCH: fetchImpl,
+  ASSETS: { fetch: async () => new Response("no", { status: 404, headers: { "content-type": "text/plain" } }) },
+};
+const ctx = { waitUntil() {} };
+const workerRes = await entry.fetch(new Request("https://catchemtcg.com/explore"), env, ctx);
+const workerHtml = await workerRes.text();
+t("default worker HTML for /explore contains the explorer heading", workerRes.status === 200 && workerHtml.includes("<h1>Explore</h1>") && !workerHtml.includes("<h1>Wander"));
+const flagged = await entry.fetch(new Request("https://catchemtcg.com/explore"), { ...env, TF_EXPLORE: "on" }, ctx);
+const flaggedHtml = await flagged.text();
+t("TF_EXPLORE on still serves the wander page", flagged.status === 200 && flaggedHtml.includes("<h1>Wander.</h1>") && !flaggedHtml.includes("<h1>Explore</h1>"));
 resetJsonCache();
 
 if (fail) {
