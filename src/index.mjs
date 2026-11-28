@@ -66,6 +66,7 @@ import { gaugeHtml, renderMeterPage } from "./market-meter.mjs";
 import { paintPublicHtml, premiumMode } from "./premium-mode.mjs";
 import { openAccess } from "./open-access.mjs";
 import { exploreOn, exploreResponse, paintExplore } from "./explore-page.mjs";
+import { renderToolsPage } from "./tools.mjs";
 import { handlePremiumRequest, noteConverted, renderWaitlistPage } from "./premium-waitlist.mjs";
 
 async function withPremium(card, fetchImpl) {
@@ -177,6 +178,7 @@ export function pageKind(pathname) {
   if (path === "/reads") return "reads";
   if (path === "/scanner") return "scanner";
   if (path === "/releases") return "releases";
+  if (path === "/tools") return "tools";
   if (path === "/practice") return "practice";
   if (path === "/accuracy") return "accuracy";
   if (path === "/faq") return "faq";
@@ -1221,6 +1223,7 @@ export async function renderPath(pathname, fetchImpl = fetch, opts = {}) {
     const setsDoc = await loadJson("sets.json", fetchImpl).catch(() => null);
     return html(renderReleases(doc, stamp, { ...pageOpts, today: opts.today || vancouverDay(), sets: setsDoc?.sets || [] }));
   }
+  if (kind === "tools") return html(renderToolsPage());
   if (kind === "accuracy") return home302();
   if (kind === "faq" || kind === "creators") return html(renderRetired(kind, pageOpts));
   if (kind === "post" || kind === "build") {
